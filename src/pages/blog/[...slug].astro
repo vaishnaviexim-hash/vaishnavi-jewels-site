@@ -1,0 +1,89 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+
+// getStaticPaths tells Astro to generate one page per blog post file at
+// build time. This is what an automation is really "publishing" into —
+// dropping a new .md file into src/content/blog/ and pushing to GitHub is
+// the entire act of adding a new live page.
+export async function getStaticPaths() {
+  const posts = await getCollection('blog', ({ data }) => !data.draft);
+  return posts.map((post) => ({
+    params: { slug: post.slug },
+    props: { post },
+  }));
+}
+
+const { post } = Astro.props;
+const { Content } = await post.render();
+---
+<BaseLayout
+  title={`${post.data.title} | Vaishnavi Jewels Journal`}
+  description={post.data.description}
+  canonicalPath={`/blog/${post.slug}`}
+  ogImage={post.data.heroImage}
+  isArticle={true}
+  pubDate={post.data.pubDate}
+>
+  <SiteHeader />
+  <main>
+    <article class="post">
+      <div class="container post-header">
+        {post.data.tags.length > 0 && (
+          <p class="eyebrow">{post.data.tags.join(' · ')}</p>
+        )}
+        <h1>{post.data.title}</h1>
+        <p class="post-date">
+          {post.data.pubDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+        </p>
+      </div>
+
+      {post.data.heroImage && (
+        <div class="post-hero-img">
+          <img src={post.data.heroImage} alt={post.data.title} />
+        </div>
+      )}
+
+      <div class="container">
+        <div class="prose">
+          <Content />
+        </div>
+        <a href="/blog" class="btn btn-outline back-link">&larr; Back to Journal</a>
+      </div>
+    </article>
+  </main>
+  <SiteFooter />
+</BaseLayout>
+
+<style>
+  .post-header {
+    padding: 56px 0 32px;
+    max-width: 760px;
+  }
+  .post-header h1 { font-size: clamp(30px, 5vw, 46px); margin: 12px 0 14px; }
+  .post-date { font-size: 13px; color: var(--color-ink-soft); }
+  .post-hero-img { margin-bottom: 40px; }
+  .post-hero-img img { width: 100%; max-height: 480px; object-fit: cover; }
+
+  .prose {
+    max-width: 720px;
+    font-size: 17px;
+    line-height: 1.75;
+    color: var(--color-ink);
+  }
+  .prose :global(h2) {
+    font-size: 28px;
+    margin: 40px 0 16px;
+  }
+  .prose :global(h3) {
+    font-size: 22px;
+    margin: 32px 0 12px;
+  }
+  .prose :global(p) { margin-bottom: 20px; color: var(--color-ink-soft); }
+  .prose :global(a) { color: var(--color-gold-deep); text-decoration: underline; }
+  .prose :global(ul), .prose :global(ol) { margin-bottom: 20px; padding-left: 22px; color: var(--color-ink-soft); }
+
+  .back-link { margin: 48px 0 72px; }
+</style>

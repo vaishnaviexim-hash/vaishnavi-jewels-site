@@ -1,0 +1,104 @@
+/*
+  Design tokens carried over from the existing vaishnavijewels.com site:
+  warm ivory background, a muted antique-gold accent, a serif display face
+  for headlines (echoing the italic "Your Vision. Our Craft." treatment),
+  and a quiet sans-serif for navigation and body copy.
+*/
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Jost:wght@400;500;600&display=swap');
+
+:root {
+  /* Color */
+  --color-ivory: #FBF6EC;
+  --color-ivory-deep: #F3EAD6;
+  --color-ink: #2A2620;
+  --color-ink-soft: #5B5648;
+  --color-gold: #A9852E;
+  --color-gold-deep: #8C6E24;
+  --color-line: #DCD1B4;
+  --color-white: #FFFFFF;
+
+  /* Type */
+  --font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --font-body: 'Jost', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Layout */
+  --content-max: 1120px;
+  --radius: 2px; /* jewellery brand: sharp, not soft/app-like */
+}
+
+* { box-sizing: border-box; }
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--color-ivory);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+img { max-width: 100%; display: block; }
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  line-height: 1.15;
+  margin: 0;
+  color: var(--color-ink);
+}
+
+p { margin: 0 0 1em; }
+
+.container {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.eyebrow {
+  font-family: var(--font-body);
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  color: var(--color-gold-deep);
+  font-weight: 500;
+}
+
+.btn {
+  display: inline-block;
+  padding: 14px 28px;
+  border: 1px solid var(--color-gold);
+  font-family: var(--font-body);
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+  border-radius: var(--radius);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.btn-solid {
+  background: var(--color-gold);
+  color: var(--color-white);
+}
+.btn-solid:hover { background: var(--color-gold-deep); }
+
+.btn-outline {
+  background: transparent;
+  color: var(--color-ink);
+  border-color: var(--color-ink);
+}
+.btn-outline:hover { background: var(--color-ink); color: var(--color-white); }
+
+@media (max-width: 640px) {
+  .container { padding: 0 18px; }
+}

@@ -1,0 +1,193 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import SiteFooter from '../components/SiteFooter.astro';
+import InstagramFeed from '../components/InstagramFeed.astro';
+
+const title = "Vaishnavi Jewels | Diamond, Polki & Jadau Jewellery in Surat | Since 2005";
+const description = "Vaishnavi Jewels — Surat's premier jewellery showroom since 2005. Natural & lab-grown diamond jewellery, Polki, Jadau. Over 3000 designs at Rajhans Ornate Mall, Parle Point.";
+---
+<BaseLayout title={title} description={description} canonicalPath="/">
+  <SiteHeader />
+
+  <main>
+    <section class="hero">
+      <div class="container hero-inner">
+        <p class="eyebrow">SURAT'S PREMIER JEWELLERY HOUSE &middot; EST. 2005</p>
+        <h1 class="hero-headline">
+          <em>Your Vision.</em><br/>
+          Our Craft.
+        </h1>
+        <div class="hero-rule"></div>
+        <p class="hero-sub">Certified Natural &amp; Lab-Grown Diamonds</p>
+        <p class="hero-tag">Polki &middot; Jadau &ndash; Diamond Jewellery</p>
+        <p class="hero-detail">Over 3,000 Designs<br/>Crafted with Love in Surat</p>
+
+        <div class="hero-actions">
+          <a href="#collections" class="btn btn-solid">Explore Collections</a>
+          <a href="https://wa.me/917567400099" target="_blank" rel="noopener" class="btn btn-outline">WhatsApp Us</a>
+          <a href="https://instagram.com/vaishnavijewels.surat" target="_blank" rel="noopener" class="btn btn-outline">Follow Us on Instagram</a>
+          <a href="https://g.page/r/Ce9kbGlQK0O8EBM/review" target="_blank" rel="noopener" class="btn btn-outline">Rate Us on Google</a>
+        </div>
+      </div>
+    </section>
+
+    <InstagramFeed
+      sectionId="collections"
+      eyebrow="OUR DESIGNS"
+      heading="Recent Collections"
+      limit={6}
+    />
+
+    <section id="about" class="about">
+      <div class="container about-inner">
+        <p class="eyebrow">ABOUT US</p>
+        <h2>Two decades of honest hands, flawless jewels.</h2>
+        <p class="about-body">
+          Founded in 2005 by Shilpi Agarwal, Vaishnavi Jewels is a self-owned
+          2,500 sq ft showroom at Rajhans Ornate Mall, Parle Point, Surat. We
+          hold over 3,000 designs across natural diamond jewellery, lab-grown
+          diamond jewellery, Polki and Jadau &mdash; from bridal necklace sets
+          and mangalsutras to solitaire rings, earrings and daily wear.
+        </p>
+        <p class="about-body">
+          What sets us apart is choice: take any design and change the gold
+          karat, the diamond quality, the diamond origin, and the design
+          itself. Every piece is certified and crafted by karigars we have
+          worked with for two decades.
+        </p>
+      </div>
+    </section>
+
+    <section id="contact" class="contact">
+      <div class="container contact-inner">
+        <p class="eyebrow">VISIT US</p>
+        <h2>120, Rajhans Ornate Mall, Parle Point Circle, Surat</h2>
+        <div class="contact-grid">
+          <div class="contact-block">
+            <p class="contact-label">Address</p>
+            <p class="contact-value">Rajhans Ornate Mall, Parle Point, Surat, Gujarat</p>
+          </div>
+          <div class="contact-block">
+            <p class="contact-label">Phone / WhatsApp</p>
+            <p class="contact-value">
+              <a href="tel:+917567400099">+91 75674 00099</a>
+            </p>
+          </div>
+          <div class="contact-block">
+            <p class="contact-label">Email</p>
+            <p class="contact-value">
+              <a href="mailto:vaishnaviexim@gmail.com">vaishnaviexim@gmail.com</a>
+            </p>
+          </div>
+        </div>
+        <div class="contact-cta-row">
+          <a href="https://wa.me/917567400099" target="_blank" rel="noopener" class="btn btn-solid whatsapp-btn">
+            Chat on WhatsApp
+          </a>
+          <!-- Uses a text-address search, which is reliable and needs no
+          extra setup. If you ever want to point at the exact pin instead of
+          an address match, swap the destination param for your Google Maps
+          Place ID (found via Google's Place ID Finder tool). -->
+          <a
+            href="https://www.google.com/maps/dir/?api=1&destination=Rajhans+Ornate+Mall%2C+Parle+Point%2C+Surat%2C+Gujarat"
+            target="_blank"
+            rel="noopener"
+            class="btn btn-outline directions-btn"
+          >
+            Get Directions
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <SiteFooter />
+</BaseLayout>
+
+<style>
+  .hero {
+    background: linear-gradient(180deg, var(--color-ivory) 0%, var(--color-ivory-deep) 100%);
+    padding: 88px 0 72px;
+    text-align: center;
+  }
+  .hero-inner { max-width: 760px; }
+  .hero-headline {
+    font-size: clamp(48px, 8vw, 88px);
+    margin: 18px 0;
+  }
+  .hero-headline em { font-style: italic; font-weight: 400; }
+  .hero-rule {
+    width: 64px;
+    height: 1px;
+    background: var(--color-gold);
+    margin: 28px auto;
+  }
+  .hero-sub {
+    font-size: 18px;
+    color: var(--color-ink-soft);
+    margin-bottom: 4px;
+  }
+  .hero-tag {
+    font-family: var(--font-display);
+    font-size: 22px;
+    color: var(--color-gold-deep);
+    margin-bottom: 12px;
+  }
+  .hero-detail {
+    font-size: 15px;
+    color: var(--color-ink-soft);
+    margin-bottom: 36px;
+  }
+  .hero-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    max-width: 620px;
+    margin: 0 auto;
+  }
+  .hero-actions .btn { text-align: center; }
+
+  .about, .contact {
+    padding: 72px 0;
+    border-top: 1px solid var(--color-line);
+  }
+  .about-inner, .contact-inner {
+    max-width: 720px;
+  }
+  .about h2, .contact h2 {
+    font-size: clamp(28px, 4vw, 38px);
+    margin: 10px 0 24px;
+  }
+  .about-body { color: var(--color-ink-soft); font-size: 17px; }
+
+  .contact-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin: 32px 0;
+  }
+  .contact-label {
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: var(--color-gold-deep);
+    margin-bottom: 6px;
+  }
+  .contact-value {
+    font-size: 16px;
+    color: var(--color-ink-soft);
+  }
+  .contact-value a { color: var(--color-ink); text-decoration: underline; }
+  .contact-cta-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 640px) {
+    .hero-actions { grid-template-columns: 1fr; }
+    .contact-grid { grid-template-columns: 1fr; }
+    .contact-cta-row { flex-direction: column; }
+    .contact-cta-row .btn { text-align: center; }
+  }
+</style>

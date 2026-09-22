@@ -1,0 +1,90 @@
+---
+import { getCollection } from 'astro:content';
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import SiteFooter from '../../components/SiteFooter.astro';
+
+// Pulls every .md file in src/content/blog/, drops drafts, sorts newest first.
+// This list updates automatically — nothing to maintain by hand when a new
+// post file is added by the automation.
+const allPosts = await getCollection('blog', ({ data }) => !data.draft);
+const posts = allPosts.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
+
+const title = "Journal | Vaishnavi Jewels";
+const description = "Guides and stories on diamond, Polki and Jadau jewellery from Vaishnavi Jewels, Surat.";
+---
+<BaseLayout title={title} description={description} canonicalPath="/blog">
+  <SiteHeader />
+  <main>
+    <section class="blog-hero">
+      <div class="container">
+        <p class="eyebrow">THE JOURNAL</p>
+        <h1>Notes on craft, stone and style</h1>
+      </div>
+    </section>
+
+    <section class="blog-list">
+      <div class="container">
+        {posts.length === 0 && <p class="empty">New posts are on the way.</p>}
+        <div class="grid">
+          {posts.map((post) => (
+            <a href={`/blog/${post.slug}`} class="card">
+              {post.data.heroImage && (
+                <img src={post.data.heroImage} alt={post.data.title} class="card-img" />
+              )}
+              <p class="card-date">
+                {post.data.pubDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+              </p>
+              <h2 class="card-title">{post.data.title}</h2>
+              <p class="card-desc">{post.data.description}</p>
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  </main>
+  <SiteFooter />
+</BaseLayout>
+
+<style>
+  .blog-hero {
+    padding: 64px 0 40px;
+    border-bottom: 1px solid var(--color-line);
+  }
+  .blog-hero h1 { font-size: clamp(32px, 5vw, 48px); margin-top: 10px; }
+  .blog-list { padding: 56px 0 88px; }
+  .empty { color: var(--color-ink-soft); }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 40px;
+  }
+  .card { display: block; }
+  .card-img {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    margin-bottom: 16px;
+  }
+  .card-date {
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: var(--color-ink-soft);
+    margin-bottom: 6px;
+  }
+  .card-title {
+    font-size: 22px;
+    margin-bottom: 8px;
+  }
+  .card-desc {
+    font-size: 14px;
+    color: var(--color-ink-soft);
+    margin: 0;
+  }
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media (max-width: 600px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>

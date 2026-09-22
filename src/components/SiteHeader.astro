@@ -1,0 +1,66 @@
+---
+---
+<header class="site-header">
+  <div class="container header-inner">
+    <a href="/" class="logo">
+      <img src="/logo_vaishnavi_jewels.png" alt="Vaishnavi Jewels" />
+      <span class="logo-text">vaishnavi<br/><em>JEWELS</em></span>
+    </a>
+    <nav class="nav">
+      <a href="/">Home</a>
+      <a href="/#collections">Collections</a>
+      <a href="/#about">About</a>
+      <a href="/blog">Journal</a>
+      <a href="/#contact">Contact</a>
+    </nav>
+    <a href="/#contact" class="btn btn-solid enquire-btn">Enquire Now</a>
+  </div>
+</header>
+
+<style>
+  .site-header {
+    border-bottom: 1px solid var(--color-line);
+    background: var(--color-ivory);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 16px;
+    padding-bottom: 16px;
+    gap: 24px;
+  }
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo img { width: 34px; height: 34px; object-fit: contain; }
+  .logo-text {
+    font-family: var(--font-body);
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    line-height: 1.3;
+    color: var(--color-ink);
+  }
+  .logo-text em {
+    font-style: normal;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+  }
+  .nav {
+    display: flex;
+    gap: 32px;
+    font-size: 14px;
+  }
+  .nav a { color: var(--color-ink-soft); }
+  .nav a:hover { color: var(--color-gold-deep); }
+  .enquire-btn { font-size: 13px; padding: 11px 22px; }
+
+  @media (max-width: 860px) {
+    .nav { display: none; }
+  }
+</style>

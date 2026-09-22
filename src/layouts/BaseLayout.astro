@@ -1,0 +1,87 @@
+---
+// BaseLayout.astro
+// Every page (homepage, blog index, individual posts) renders through this.
+// The meta/SEO block below is carried over from the existing live site's
+// <head> — same tags, same structured data pattern — just made dynamic
+// per-page instead of hardcoded once.
+
+interface Props {
+  title: string;
+  description: string;
+  canonicalPath?: string; // e.g. "/blog/my-post" — defaults to "/"
+  ogImage?: string; // absolute or root-relative path
+  isArticle?: boolean;
+  pubDate?: Date;
+}
+
+const {
+  title,
+  description,
+  canonicalPath = '/',
+  ogImage = '/logo_vaishnavi_jewels.png',
+  isArticle = false,
+  pubDate,
+} = Astro.props;
+
+const siteUrl = 'https://vaishnavijewels.com';
+const canonicalUrl = new URL(canonicalPath, siteUrl).toString();
+const absoluteOgImage = ogImage.startsWith('http') ? ogImage : new URL(ogImage, siteUrl).toString();
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title}</title>
+
+  <!-- SEO Meta Tags -->
+  <meta name="description" content={description} />
+  <meta name="author" content="Vaishnavi Gem & Jewel Pvt Ltd" />
+  <meta name="robots" content="index, follow" />
+  <meta name="geo.region" content="IN-GJ" />
+  <meta name="geo.placename" content="Surat, Gujarat, India" />
+
+  <!-- Open Graph (WhatsApp / Facebook preview) -->
+  <meta property="og:title" content={title} />
+  <meta property="og:description" content={description} />
+  <meta property="og:type" content={isArticle ? 'article' : 'website'} />
+  <meta property="og:url" content={canonicalUrl} />
+  <meta property="og:image" content={absoluteOgImage} />
+  <meta property="og:site_name" content="Vaishnavi Jewels" />
+  <meta property="og:locale" content="en_IN" />
+  {isArticle && pubDate && (
+    <meta property="article:published_time" content={pubDate.toISOString()} />
+  )}
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content={title} />
+  <meta name="twitter:description" content={description} />
+
+  <!-- Canonical URL -->
+  <link rel="canonical" href={canonicalUrl} />
+
+  <!-- Schema.org Structured Data -->
+  <script type="application/ld+json" set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "JewelryStore",
+    "name": "Vaishnavi Gem & Jewel Pvt Ltd",
+    "alternateName": "Vaishnavi Jewels",
+    "url": siteUrl,
+    "image": absoluteOgImage,
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "Rajhans Ornate Mall, Parle Point",
+      "addressLocality": "Surat",
+      "addressRegion": "Gujarat",
+      "addressCountry": "IN"
+    }
+  })} />
+
+  <link rel="stylesheet" href="/src/styles/global.css" />
+</head>
+<body>
+  <slot />
+</body>
+</html>

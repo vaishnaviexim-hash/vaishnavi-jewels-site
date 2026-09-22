@@ -1,0 +1,8 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+# Basic rate limiting isn't set here (Netlify's free tier doesn't expose
+# this in config) — see README "Protecting the review-draft function from
+# abuse" for how to add a lightweight guard if this gets misused.

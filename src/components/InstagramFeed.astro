@@ -1,0 +1,82 @@
+---
+import posts from '../data/instagram-posts.json';
+
+// Shows the most recent posts from src/data/instagram-posts.json.
+// That file is the "contract": an automation (or a manual edit) updates
+// it, and this section reflects whatever's in it at build time. No
+// runtime API calls — the site stays fast and doesn't depend on
+// Instagram being reachable when a visitor loads the page.
+//
+// "limit" controls how many show — this component is reused for both
+// the homepage's curated Collections gallery (a small number) and could
+// be reused elsewhere with a higher limit for a fuller feed.
+interface Props {
+  limit?: number;
+  showFollowCta?: boolean;
+  sectionId?: string;
+  eyebrow?: string;
+  heading?: string;
+}
+const {
+  limit = 6,
+  showFollowCta = true,
+  sectionId = 'instagram',
+  eyebrow = '@vaishnavijewels.surat',
+  heading = 'From Instagram',
+} = Astro.props;
+const recentPosts = posts.slice(0, limit);
+---
+{recentPosts.length > 0 && (
+  <section id={sectionId} class="ig-section">
+    <div class="container">
+      <p class="eyebrow">{eyebrow}</p>
+      <h2>{heading}</h2>
+      <div class="ig-grid">
+        {recentPosts.map((post) => (
+          <a href={post.permalink} target="_blank" rel="noopener" class="ig-item">
+            <img src={post.mediaUrl} alt={post.caption?.slice(0, 80) || 'Instagram post'} />
+          </a>
+        ))}
+      </div>
+      {showFollowCta && (
+        <a href="https://instagram.com/vaishnavijewels.surat" target="_blank" rel="noopener" class="btn btn-outline ig-cta">
+          Follow on Instagram
+        </a>
+      )}
+    </div>
+  </section>
+)}
+
+<style>
+  .ig-section {
+    padding: 72px 0;
+    border-top: 1px solid var(--color-line);
+    text-align: center;
+  }
+  .ig-section h2 {
+    font-size: clamp(28px, 4vw, 38px);
+    margin: 10px 0 32px;
+  }
+  .ig-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    margin-bottom: 32px;
+  }
+  .ig-item {
+    display: block;
+    aspect-ratio: 1;
+    overflow: hidden;
+  }
+  .ig-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+  }
+  .ig-item:hover img { transform: scale(1.05); }
+
+  @media (max-width: 720px) {
+    .ig-grid { grid-template-columns: repeat(3, 1fr); }
+  }
+</style>
