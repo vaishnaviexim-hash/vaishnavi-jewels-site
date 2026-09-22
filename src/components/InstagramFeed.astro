@@ -26,18 +26,22 @@ const {
 } = Astro.props;
 const recentPosts = posts.slice(0, limit);
 ---
-{recentPosts.length > 0 && (
+{(
   <section id={sectionId} class="ig-section">
     <div class="container">
       <p class="eyebrow">{eyebrow}</p>
       <h2>{heading}</h2>
-      <div class="ig-grid">
-        {recentPosts.map((post) => (
-          <a href={post.permalink} target="_blank" rel="noopener" class="ig-item">
-            <img src={post.mediaUrl} alt={post.caption?.slice(0, 80) || 'Instagram post'} />
-          </a>
-        ))}
-      </div>
+      {recentPosts.length > 0 ? (
+        <div class="ig-grid">
+          {recentPosts.map((post) => (
+            <a href={post.permalink} target="_blank" rel="noopener" class="ig-item">
+              <img src={post.mediaUrl} alt={post.caption?.slice(0, 80) || 'Instagram post'} />
+            </a>
+          ))}
+        </div>
+      ) : (
+        <p class="ig-empty">New pieces are on their way — follow along on Instagram in the meantime.</p>
+      )}
       {showFollowCta && (
         <a href="https://instagram.com/vaishnavijewels.surat" target="_blank" rel="noopener" class="btn btn-outline ig-cta">
           Follow on Instagram
@@ -75,6 +79,11 @@ const recentPosts = posts.slice(0, limit);
     transition: transform 0.3s ease;
   }
   .ig-item:hover img { transform: scale(1.05); }
+  .ig-empty {
+    color: var(--color-ink-soft);
+    font-size: 16px;
+    margin-bottom: 32px;
+  }
 
   @media (max-width: 720px) {
     .ig-grid { grid-template-columns: repeat(3, 1fr); }

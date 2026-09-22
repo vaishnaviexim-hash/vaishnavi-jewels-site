@@ -2,7 +2,6 @@
 title: "Polki vs Jadau: What's the Difference?"
 description: "A simple guide to two of India's most celebrated bridal jewellery styles, and how to choose between them."
 pubDate: 2026-09-20
-heroImage: "/blog-images/polki-vs-jadau.jpg"
 tags: ["bridal", "polki", "jadau", "guide"]
 draft: false
 ---

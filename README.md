@@ -65,58 +65,14 @@ Builds the static site into `dist/` — this is what actually gets deployed.
    `dist`.
 5. Trigger a deploy. Netlify will now auto-deploy on every push to `main`.
 
-## Leave a Review page (GPT-assisted review drafting)
+## Instagram feed on the homepage ("Recent Collections")
 
-`src/pages/leave-a-review.astro` + `netlify/functions/draft-review.js`
+The homepage has a gallery section fed by `src/data/instagram-posts.json`.
+It's currently an **empty array** — the section shows a friendly
+placeholder message instead of images until real data is added, so
+nothing links to an image that doesn't exist.
 
-A customer fills in a short form (what they bought, what stood out), GPT
-drafts a starting point in their voice, they read and edit it, then click
-through to your **real Google review link** to post it themselves, on
-their own Google account. Nothing gets posted automatically or on your
-behalf — that would violate Google's review policies and risk the whole
-Business Profile getting suspended. This tool only removes the
-"blank page" friction of writing a review from scratch.
-
-### Setup required before this works
-
-1. **Get an OpenAI API key** from platform.openai.com (if you don't
-   already have one from other work).
-2. In Netlify: **Project configuration → Environment variables** → add
-   `OPENAI_API_KEY` with that key as the value. Never commit the key to
-   this repo.
-3. Netlify Functions need the site's Netlify plan to support serverless
-   functions — this is included on Netlify's free tier, so no upgrade
-   should be needed.
-
-### Sharing this page with customers
-
-Since it's meant to be sent directly rather than browsed to, some ways to
-share `vaishnavijewels.com/leave-a-review`:
-- A WhatsApp message after a purchase (could be added to the existing
-  Interakt/WhatsApp CRM automation as a follow-up message template)
-- A QR code at the counter or on the receipt, alongside/replacing the
-  existing review QR cards
-- A short follow-up email
-
-### Protecting the review-draft function from abuse
-
-Because this calls a paid API and the page is public, it's worth adding
-basic abuse protection before high-traffic sharing (e.g. a QR code
-displayed publicly in-store). Two low-effort options:
-- **Netlify Rate Limiting** (available on paid plans) can cap requests
-  per IP to this function.
-- A simple honeypot field or a delay-based check in the form can filter
-  out basic bots, though this form is low-risk anyway since it needs a
-  real answer typed into the "what stood out" field to produce output.
-
-
-
-The homepage has an "From Instagram" section that reads from
-`src/data/instagram-posts.json`. It's a static file, read at build time —
-the site never calls Instagram directly when someone visits, which keeps
-it fast and keeps it working even if Instagram's API has issues.
-
-Format:
+Format, once ready to populate it:
 ```json
 [
   {
@@ -130,25 +86,12 @@ Format:
 ]
 ```
 
-Images referenced by `mediaUrl` need to actually exist in
+Any image referenced by `mediaUrl` must actually exist in
 `public/instagram-cache/` — Instagram's own image URLs expire, so images
-must be downloaded and stored in this repo, not linked directly.
-
-**This isn't automated yet.** To make it update automatically, a Make.com
-scenario needs to:
-1. Poll the Instagram Graph API for new posts (this requires a Meta
-   Business/Developer app with Instagram Graph API access tied to your
-   Instagram professional account — likely already set up if
-   `instagramfeed.gs` was doing something similar before).
-2. Download each new post's image and commit it to
-   `public/instagram-cache/`.
-3. Update `src/data/instagram-posts.json` with the new post's data.
-4. Commit both to GitHub — Netlify auto-deploys, and the homepage feed
-   updates.
-
-This can run on the same schedule as the existing Instagram cross-posting
-scenario, or as a new branch off it, since it needs the same source data
-(new Instagram posts) that scenario already detects.
+need to be downloaded and stored in this repo, not linked directly. This
+is the eventual target for the Instagram-sync Make.com automation
+discussed separately — polling for new posts, downloading each image into
+this folder, and updating this JSON file, then committing both to GitHub.
 
 ## Adding a blog post — the format an automation must follow
 
