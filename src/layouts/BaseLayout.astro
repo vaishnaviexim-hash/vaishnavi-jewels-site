@@ -4,6 +4,7 @@
 // The meta/SEO block below is carried over from the existing live site's
 // <head> — same tags, same structured data pattern — just made dynamic
 // per-page instead of hardcoded once.
+import '../styles/global.css';
 
 interface Props {
   title: string;
@@ -78,8 +79,6 @@ const absoluteOgImage = ogImage.startsWith('http') ? ogImage : new URL(ogImage, 
       "addressCountry": "IN"
     }
   })} />
-
-  <link rel="stylesheet" href="/src/styles/global.css" />
 </head>
 <body>
   <slot />
