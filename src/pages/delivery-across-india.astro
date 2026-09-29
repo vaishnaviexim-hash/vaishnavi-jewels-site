@@ -1,0 +1,40 @@
+---
+import InfoPage from '../layouts/InfoPage.astro';
+const howTo = {
+  '@context': 'https://schema.org',
+  '@type': 'HowTo',
+  name: 'How to buy jewellery from Vaishnavi Jewels from anywhere in India',
+  step: [
+    { '@type': 'HowToStep', name: 'Tell us what you are looking for', text: 'Message us on WhatsApp at +91 75674 00099 with the piece, occasion or a reference photo.' },
+    { '@type': 'HowToStep', name: 'See the pieces on a video call', text: 'We show shortlisted designs live on a video call and share photos, videos and certificate details.' },
+    { '@type': 'HowToStep', name: 'Confirm and pay', text: 'Confirm the final piece and pay by NEFT or UPI.' },
+    { '@type': 'HowToStep', name: 'Receive insured delivery', text: 'We ship with free insured delivery to major Indian cities, along with the certificate and invoice.' },
+  ],
+};
+---
+<InfoPage
+  title="Jewellery Delivery Across India | Vaishnavi Jewels, Surat"
+  description="Buy diamond, Polki and Jadau jewellery from Vaishnavi Jewels, Surat from anywhere in India: video calls, NEFT/UPI payment and free insured delivery."
+  path="/delivery-across-india"
+  eyebrow="SHOP FROM ANYWHERE IN INDIA"
+  heading="Delivery Across India"
+  intro="You do not need to be in Surat to buy from us. Here is how it works."
+  extraSchema={[howTo]}
+>
+  <h2>How it works</h2>
+  <ul>
+    <li><strong>Tell us what you want.</strong> WhatsApp us at <a href="https://wa.me/917567400099">+91 75674 00099</a> with the piece, occasion or a reference photo.</li>
+    <li><strong>See it live.</strong> We show pieces on a video call and share photos, videos and certificate details.</li>
+    <li><strong>Pay securely.</strong> Payment by NEFT or UPI.</li>
+    <li><strong>Insured delivery.</strong> Free insured shipping to major Indian cities, with the certificate and invoice.</li>
+  </ul>
+
+  <h2>Certificates</h2>
+  <p>Diamond jewellery comes with certificates from recognised laboratories such as IGI, TGL and EGL where applicable, and gold jewellery is BIS HUID hallmarked.</p>
+
+  <h2>Custom orders</h2>
+  <p>Because we manufacture in-house, custom and made-to-order pieces can also be delivered. We share progress on WhatsApp before dispatch.</p>
+
+  <h2>Other locations</h2>
+  <p>For towns outside the major cities, or for delivery outside India, message us and we will confirm the options for your location.</p>
+</InfoPage>

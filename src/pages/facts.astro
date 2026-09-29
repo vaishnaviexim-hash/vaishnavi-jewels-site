@@ -1,0 +1,33 @@
+---
+import InfoPage from '../layouts/InfoPage.astro';
+import { business as b } from '../data/business.js';
+const facts = [
+  ['Business name', `${b.name} (${b.legalName})`],
+  ['Type', 'Fine jewellery showroom and manufacturer'],
+  ['Founded', `${b.foundedText}, by ${b.founder}`],
+  ['Address', b.addressText],
+  ['Opening hours', b.hoursText],
+  ['Phone / WhatsApp', b.phone],
+  ['Email', b.email],
+  ['Showroom', `${b.showroomSize}, self-owned, at Rajhans Ornate Mall, Parle Point, Surat`],
+  ['Designs', `${b.designs} designs`],
+  ['Specialities', 'Natural diamond jewellery, lab-grown diamond jewellery, Polki, Jadau, bridal jewellery'],
+  ['Manufacturing', 'In-house; any design can be customised in gold karat, diamond quality and design'],
+  ['Certification', 'Diamond certificates from recognised laboratories such as IGI, TGL and EGL where applicable; BIS HUID hallmarked gold'],
+  ['Delivery', 'Free insured delivery to major Indian cities'],
+  ['Remote buying', 'Video calls, with payment by NEFT or UPI'],
+  ['Exchange and buyback', 'Available; value after deducting labour, certification and other applicable charges'],
+];
+---
+<InfoPage
+  title="Vaishnavi Jewels Facts | Jewellery Showroom in Surat since 2005"
+  description="Key facts about Vaishnavi Jewels, Surat: founded 2005, address, hours, contact, certification, manufacturing and delivery across India."
+  path="/facts"
+  eyebrow="AT A GLANCE"
+  heading="Vaishnavi Jewels: Key Facts"
+  intro="Verified facts about our business, kept up to date by us."
+>
+  <dl>
+    {facts.map(([k, v]) => (<><dt>{k}</dt><dd>{v}</dd></>))}
+  </dl>
+</InfoPage>

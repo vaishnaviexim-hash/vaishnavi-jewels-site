@@ -1,0 +1,34 @@
+---
+import InfoPage from '../layouts/InfoPage.astro';
+const faqs = [
+  ['Where is Vaishnavi Jewels located?', 'Our showroom is at 120, Rajhans Ornate - High Street Retail Mall, Parle Point, Surat, Gujarat 395007.'],
+  ['What are your opening hours?', 'Monday to Saturday, 11 AM to 8 PM. We are closed on Sunday.'],
+  ['What kind of jewellery do you sell?', 'Natural diamond jewellery, lab-grown diamond jewellery, Polki and Jadau, including bridal sets, necklaces, rings, earrings, bangles, bracelets, pendants and mangalsutras. We have over 3,000 designs.'],
+  ['Do you make the jewellery yourselves?', 'Yes. We manufacture in-house, so any design can be customised in gold karat, diamond quality and design.'],
+  ['Is your jewellery certified?', 'Diamonds come with certificates from recognised laboratories such as IGI, TGL and EGL where applicable, and our gold jewellery is BIS HUID hallmarked.'],
+  ['Do you deliver outside Surat?', 'Yes. We offer free insured delivery to major Indian cities. For other locations, message us and we will confirm the options.'],
+  ['Can I see the jewellery before buying if I am not in Surat?', 'Yes. We show pieces on video calls and share photos, videos and certificate details on WhatsApp.'],
+  ['How can I pay?', 'We accept payment by NEFT and UPI.'],
+  ['Do you offer exchange and buyback?', 'Yes. Exchange and buyback are available on jewellery bought from us. The value is calculated after deducting labour, certification and other applicable charges. Please ask us for the current terms for your piece.'],
+  ['Do you sell both natural and lab-grown diamonds?', 'Yes. We offer both, and every certificate clearly states the type of diamond.'],
+  ['How do I contact you?', 'Call or WhatsApp +91 75674 00099, or email vaishnaviexim@gmail.com.'],
+];
+const faqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: faqs.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })),
+};
+---
+<InfoPage
+  title="FAQ | Vaishnavi Jewels, Surat"
+  description="Answers about Vaishnavi Jewels, Surat: location, hours, certification, delivery across India, payment, exchange and custom jewellery."
+  path="/faq"
+  eyebrow="QUESTIONS"
+  heading="Frequently Asked Questions"
+  intro="Quick answers about visiting, buying and delivery."
+  extraSchema={[faqSchema]}
+>
+  <dl>
+    {faqs.map(([q, a]) => (<><dt>{q}</dt><dd>{a}</dd></>))}
+  </dl>
+</InfoPage>
