@@ -5,6 +5,7 @@
 // <head> — same tags, same structured data pattern — just made dynamic
 // per-page instead of hardcoded once.
 import '../styles/global.css';
+import { storeSchema } from '../data/business.js';
 
 interface Props {
   title: string;
@@ -13,6 +14,7 @@ interface Props {
   ogImage?: string; // absolute or root-relative path
   isArticle?: boolean;
   pubDate?: Date;
+  extraSchema?: object[];
 }
 
 const {
@@ -22,6 +24,7 @@ const {
   ogImage = '/logo_vaishnavi_jewels.png',
   isArticle = false,
   pubDate,
+  extraSchema = [],
 } = Astro.props;
 
 const siteUrl = 'https://vaishnavijewels.com';
@@ -64,21 +67,8 @@ const absoluteOgImage = ogImage.startsWith('http') ? ogImage : new URL(ogImage, 
   <link rel="canonical" href={canonicalUrl} />
 
   <!-- Schema.org Structured Data -->
-  <script type="application/ld+json" set:html={JSON.stringify({
-    "@context": "https://schema.org",
-    "@type": "JewelryStore",
-    "name": "Vaishnavi Gem & Jewel Pvt Ltd",
-    "alternateName": "Vaishnavi Jewels",
-    "url": siteUrl,
-    "image": absoluteOgImage,
-    "address": {
-      "@type": "PostalAddress",
-      "streetAddress": "Rajhans Ornate Mall, Parle Point",
-      "addressLocality": "Surat",
-      "addressRegion": "Gujarat",
-      "addressCountry": "IN"
-    }
-  })} />
+  <script type="application/ld+json" set:html={JSON.stringify(storeSchema())} />
+  {extraSchema.map((sch) => <script type="application/ld+json" set:html={JSON.stringify(sch)} />)}
 </head>
 <body>
   <slot />
