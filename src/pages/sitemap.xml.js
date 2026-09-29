@@ -1,4 +1,5 @@
 import { getCollection } from 'astro:content';
+import { infoPages } from '../data/business.js';
 
 // Self-built sitemap (avoids @astrojs/sitemap, which has a known version
 // compatibility bug against recent Astro releases). This runs at build
@@ -13,6 +14,7 @@ export async function GET() {
   const staticUrls = [
     { loc: '/', changefreq: 'weekly', priority: '1.0' },
     { loc: '/blog', changefreq: 'weekly', priority: '0.8' },
+    ...infoPages.map((p) => ({ loc: p.path, changefreq: 'monthly', priority: '0.7' })),
   ];
 
   const postUrls = posts.map((post) => ({
