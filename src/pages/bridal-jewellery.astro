@@ -1,28 +1,42 @@
 ---
 import InfoPage from '../layouts/InfoPage.astro';
+const faqs: [string, string][] = [
+  ['Can a bridal set be customised?', 'Yes. We manufacture in-house, so any design can be changed in gold karat, diamond quality, stone colours, size and layout to suit your outfits.'],
+  ['Do you offer bridal jewellery in both natural and lab-grown diamonds?', 'Yes. We make bridal sets in both, and the certificate for every diamond piece clearly states the type of diamond.'],
+  ['Can we plan jewellery for the whole family, not only the bride?', 'Yes. We can plan jewellery for the bride, mothers, sisters and the groom together, so the looks work well across the wedding functions.'],
+  ['How early should we start planning?', 'As early as you can. Custom pieces are made in our workshop, so message us with your wedding dates and we will tell you the timeline for the designs you choose.'],
+  ['We are not in Surat. Can we still plan bridal jewellery with you?', 'Yes. We plan bridal jewellery on video calls with families across India, take payment by NEFT or UPI and deliver with free insured shipping to major Indian cities.'],
+];
 ---
 <InfoPage
-  title="Bridal Jewellery in Surat | Diamond, Polki & Jadau | Vaishnavi Jewels"
-  description="Bridal jewellery in Surat since 2005: diamond, Polki and Jadau necklace sets, mangalsutras and rings, customised and delivered across India."
+  title="Bridal Jewellery in Surat | Diamond, Polki & Jadau Sets | Vaishnavi Jewels"
+  description="Bridal jewellery in Surat since 2005: diamond, Polki and Jadau necklace sets, mangalsutras, rings and maang tikkas, made in-house and delivered across India."
   path="/bridal-jewellery"
   eyebrow="BRIDAL"
   heading="Bridal Jewellery"
   intro="Complete bridal looks in diamonds, Polki and Jadau &ndash; planned with you, made in our own workshop."
+  faqs={faqs}
 >
   <h2>What brides choose from</h2>
   <ul>
     <li>Diamond necklace sets, in natural or lab-grown diamonds</li>
-    <li>Polki and Jadau chokers, long necklaces and full sets</li>
+    <li><a href="/polki-jewellery">Polki</a> and <a href="/jadau-jewellery">Jadau</a> chokers, long necklaces (raani haar) and full sets</li>
     <li>Mangalsutras, engagement and wedding rings</li>
-    <li>Earrings, maang tikkas, bangles and bracelets</li>
+    <li>Earrings, jhumkas, maang tikkas, bangles, kadas and bracelets</li>
   </ul>
 
+  <h2>Jewellery for every function</h2>
+  <p>Most weddings have several functions, and each one suits a different kind of jewellery. For the engagement or roka, brides often choose a ring with a light diamond necklace or earrings. For mehendi and haldi, lighter Polki or floral pieces work well. The wedding day usually calls for a full Polki or Jadau set with a maang tikka and bangles, and for the reception many brides move to a statement diamond necklace set. We help you plan the whole wardrobe so pieces can be re-worn and nothing is repeated in the photographs.</p>
+
+  <h2>Matching jewellery to your outfit</h2>
+  <p>Bring photos or swatches of your lehengas and sarees. Emeralds and rubies set in Polki complement red, maroon and green outfits; diamond sets suit pastels, ivory and gowns; and Jadau with pearls brings warmth to gold and beige tones. Because we make everything ourselves, stone colours can be chosen to match your outfit.</p>
+
   <h2>How we plan a bridal set</h2>
-  <p>Share your outfits, colours and budget with us. We shortlist designs from over 3,000 pieces, adjust the gold karat, diamond quality and design where needed, and make the final pieces in-house.</p>
+  <p>Share your outfits, colours and budget with us. We shortlist designs from over 3,000 pieces, adjust the gold karat, diamond quality and design where needed, and make the final pieces in-house. You see progress on WhatsApp before the pieces are finished.</p>
 
   <h2>Certified and hallmarked</h2>
   <p>Diamonds come with certificates from recognised laboratories such as IGI, TGL and EGL where applicable; gold jewellery is BIS HUID hallmarked.</p>
 
   <h2>Families outside Surat</h2>
-  <p>We regularly help families shopping from other cities through video calls, with NEFT or UPI payment and free insured delivery to major Indian cities. See <a href="/delivery-across-india">Delivery across India</a>.</p>
+  <p>We regularly help families from Ahmedabad, Vadodara, Mathura and other cities through video calls, with NEFT or UPI payment and free insured delivery to major Indian cities. See <a href="/visit-us">Visit our showroom</a> and <a href="/delivery-across-india">Delivery across India</a>.</p>
 </InfoPage>

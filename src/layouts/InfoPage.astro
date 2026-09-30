@@ -13,8 +13,14 @@ interface Props {
   heading: string;
   intro: string;
   extraSchema?: object[];
+  faqs?: [string, string][]; // page-specific questions: shown on the page and sent as FAQPage schema
 }
-const { title, description, path, eyebrow, heading, intro, extraSchema = [] } = Astro.props;
+const { title, description, path, eyebrow, heading, intro, extraSchema = [], faqs = [] } = Astro.props;
+const faqSchema = faqs.length ? [{
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: faqs.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })),
+}] : [];
 const crumbs = {
   '@context': 'https://schema.org',
   '@type': 'BreadcrumbList',
@@ -24,7 +30,7 @@ const crumbs = {
   ],
 };
 ---
-<BaseLayout title={title} description={description} canonicalPath={path} extraSchema={[crumbs, ...extraSchema]}>
+<BaseLayout title={title} description={description} canonicalPath={path} extraSchema={[crumbs, ...extraSchema, ...faqSchema]}>
   <SiteHeader />
   <main>
     <article class="info">
@@ -34,7 +40,15 @@ const crumbs = {
         <p class="lead">{intro}</p>
       </div>
       <div class="container">
-        <div class="prose"><slot /></div>
+        <div class="prose">
+          <slot />
+          {faqs.length > 0 && (
+            <section class="page-faq">
+              <h2>Questions we are often asked</h2>
+              <dl>{faqs.map(([q, a]) => (<><dt>{q}</dt><dd>{a}</dd></>))}</dl>
+            </section>
+          )}
+        </div>
         <aside class="cta">
           <p class="cta-title">See it in person or on a video call</p>
           <p class="cta-text">{business.addressText} &middot; {business.hoursText}</p>

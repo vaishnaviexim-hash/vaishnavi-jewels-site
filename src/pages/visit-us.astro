@@ -1,0 +1,54 @@
+---
+import InfoPage from '../layouts/InfoPage.astro';
+import { business as b } from '../data/business.js';
+const faqs: [string, string][] = [
+  ['Where exactly is the Vaishnavi Jewels showroom?', `Shop 120, Rajhans Ornate - High Street Retail Mall, Parle Point, Surat, Gujarat 395007. Tap "Get Directions" on this page to open it in Google Maps.`],
+  ['What are your opening hours?', 'Monday to Saturday, 11 AM to 8 PM. The showroom is closed on Sunday.'],
+  ['Do I need an appointment?', 'Walk-ins are welcome during opening hours. For bridal shopping or a larger family visit, a WhatsApp message a day or two ahead helps us keep a shortlist ready for you.'],
+  ['We live in Ahmedabad, Vadodara or Mathura. Can we shop without travelling?', 'Yes. We show pieces live on video calls, share photos, videos and certificate details on WhatsApp, take payment by NEFT or UPI and send free insured delivery to major Indian cities.'],
+  ['Can we see a piece on a video call first and then visit to finalise?', 'Yes. You can shortlist on a video call and then visit once to see the final pieces in person. Tell us your visit date and we will keep your shortlist ready.'],
+];
+const pageSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: 'Visit Vaishnavi Jewels at Parle Point, Surat',
+  url: 'https://vaishnavijewels.com/visit-us',
+  about: { '@id': 'https://vaishnavijewels.com/#store' },
+  mentions: ['Ahmedabad', 'Vadodara', 'Mathura'].map((c) => ({ '@type': 'City', name: c })),
+};
+---
+<InfoPage
+  title="Jewellery Showroom at Parle Point, Surat | Visit Vaishnavi Jewels"
+  description="Visit Vaishnavi Jewels at Rajhans Ornate Mall, Parle Point, Surat: hours, directions and how families from Ahmedabad, Vadodara and Mathura shop with us."
+  path="/visit-us"
+  eyebrow="VISIT US"
+  heading="Our Showroom at Parle Point, Surat"
+  intro="A 2,500 sq ft showroom of our own, with over 3,000 designs in natural diamonds, lab-grown diamonds, Polki and Jadau."
+  extraSchema={[pageSchema]}
+  faqs={faqs}
+>
+  <h2>Where to find us</h2>
+  <p><strong>{b.addressText}</strong><br />{b.hoursText}</p>
+  <p>We are inside Rajhans Ornate &ndash; High Street Retail Mall at Parle Point, one of the best-known landmarks in Surat. Use the <a href={b.mapsUrl} target="_blank" rel="noopener">Get Directions</a> link to open the route in Google Maps from wherever you are.</p>
+
+  <h2>What you will see</h2>
+  <p>Our showroom is self-owned and has been serving families since {b.foundedText}. Everything is made in our own workshop, so you can see a design, then ask us to change the gold karat, diamond quality or the design itself. We show natural diamond jewellery, lab-grown diamond jewellery, Polki and Jadau, from daily-wear pieces to complete bridal sets.</p>
+
+  <h2>Planning your visit</h2>
+  <ul>
+    <li><strong>Message us first for bridal.</strong> WhatsApp <a href={b.whatsapp}>{b.phone}</a> with your dates and outfits so we can shortlist before you arrive.</li>
+    <li><strong>Bring references.</strong> Photos of your outfits and designs you like help us show the right pieces quickly.</li>
+    <li><strong>Allow time.</strong> A relaxed bridal visit, trying sets for different functions, can take a couple of hours.</li>
+  </ul>
+
+  <h2>Families from Ahmedabad</h2>
+  <p>We have a strong base of customers in Ahmedabad. Surat is well connected to Ahmedabad by road and rail, so you can plan a single visit to finalise bridal and festive jewellery. If you would rather not travel, we can do the whole selection on video calls and deliver to your home in Ahmedabad with free insured shipping.</p>
+
+  <h2>Families from Vadodara</h2>
+  <p>We have a strong base of customers in Vadodara. It is close enough for an easy day visit to Surat, so you can see your shortlisted pieces in person. Custom orders made in our workshop can then be delivered to Vadodara, fully insured, when they are ready.</p>
+
+  <h2>Families from Mathura</h2>
+  <p>We have a strong base of customers in Mathura, and you can shop with us fully from home: we show pieces live on video calls, share certificate details on WhatsApp, take payment by NEFT or UPI and send the jewellery with free insured delivery. If you are visiting Gujarat, tell us your dates and we will keep your shortlist ready at the showroom.</p>
+
+  <p>Shopping from somewhere else in India? See <a href="/delivery-across-india">Delivery across India</a>.</p>
+</InfoPage>

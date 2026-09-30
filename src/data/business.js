@@ -39,6 +39,7 @@ export const infoPages = [
   { path: '/polki-jewellery', label: 'Polki Jewellery' },
   { path: '/jadau-jewellery', label: 'Jadau Jewellery' },
   { path: '/bridal-jewellery', label: 'Bridal Jewellery' },
+  { path: '/visit-us', label: 'Visit Our Showroom' },
   { path: '/delivery-across-india', label: 'Delivery Across India' },
   { path: '/faq', label: 'FAQ' },
   { path: '/facts', label: 'Facts' },

@@ -1,23 +1,34 @@
 ---
 import InfoPage from '../layouts/InfoPage.astro';
+const faqs: [string, string][] = [
+  ['Is a lab-grown diamond a real diamond?', 'Yes. A lab-grown diamond is made of the same carbon crystal structure as any diamond and has the same hardness and brilliance. It is graded on the same 4Cs: cut, colour, clarity and carat.'],
+  ['Does lab-grown diamond jewellery come with a certificate?', 'Yes. Our lab-grown diamonds come with certificates from recognised laboratories such as IGI, TGL and EGL where applicable, and each certificate clearly states that the stone is laboratory-grown.'],
+  ['Can I customise a lab-grown diamond piece?', 'Yes. We manufacture in-house, so you can choose the gold karat, diamond quality, shape and design.'],
+  ['Can lab-grown diamonds be used for bridal jewellery?', 'Yes. We make lab-grown diamond engagement rings, necklace sets and complete bridal sets.'],
+  ['How do I care for lab-grown diamond jewellery?', 'Clean it gently with warm water, mild soap and a soft brush, dry it with a soft cloth, and store pieces separately so they do not scratch each other.'],
+];
 ---
 <InfoPage
-  title="Lab-Grown Diamond Jewellery in Surat | Vaishnavi Jewels"
-  description="Certified lab-grown diamond jewellery made in-house in Surat: rings, earrings, necklaces and bridal sets, with insured delivery across India."
+  title="Lab-Grown Diamond Jewellery in Surat | Certified | Vaishnavi Jewels"
+  description="Certified lab-grown diamond jewellery made in-house in Surat: solitaire rings, earrings, necklaces and bridal sets, with insured delivery across India."
   path="/lab-grown-diamond-jewellery"
   eyebrow="LAB-GROWN DIAMONDS"
   heading="Lab-Grown Diamond Jewellery"
   intro="Diamonds grown in a controlled environment, cut and polished like any diamond, and set in gold by our own craftsmen."
+  faqs={faqs}
 >
   <h2>What a lab-grown diamond is</h2>
-  <p>A lab-grown diamond is a diamond: a crystal of carbon, grown under carefully controlled conditions instead of deep in the earth. It is cut, polished and graded on the same 4Cs &ndash; cut, colour, clarity and carat.</p>
+  <p>A lab-grown diamond is a diamond: a crystal of carbon, grown under carefully controlled conditions instead of deep in the earth. It is cut, polished and graded on the same 4Cs &ndash; cut, colour, clarity and carat. Surat, where we are based, is one of the world's leading centres for diamond cutting and polishing.</p>
 
   <h2>What we make</h2>
-  <p>Solitaire and cluster rings, earrings, pendants, bracelets, necklaces and bridal sets. Lab-grown diamonds make larger and bolder designs easier to plan, and every piece can be customised in gold karat, diamond quality and design.</p>
+  <p>Solitaire and cluster rings, eternity bands, stud and drop earrings, pendants, tennis bracelets, necklaces and complete bridal sets. Every piece can be customised in gold karat, diamond quality, shape and design.</p>
+
+  <h2>Reading your certificate</h2>
+  <p>Each certificate has a unique report number and lists the diamond's shape, carat weight, colour, clarity and cut, and states that the diamond is laboratory-grown. Some reports also mention the growth method. We walk you through your certificate in simple terms before you buy.</p>
 
   <h2>Certified and hallmarked</h2>
-  <p>Our lab-grown diamonds come with certificates from recognised laboratories such as IGI, TGL and EGL where applicable, clearly stating that the stone is laboratory-grown. Gold jewellery is BIS HUID hallmarked.</p>
+  <p>Our lab-grown diamonds come with certificates from recognised laboratories such as IGI, TGL and EGL where applicable. Gold jewellery is BIS HUID hallmarked.</p>
 
   <h2>Buying from outside Surat</h2>
-  <p>Video calls, NEFT or UPI payment and free insured delivery to major Indian cities. See <a href="/delivery-across-india">Delivery across India</a>.</p>
+  <p>Video calls, NEFT or UPI payment and free insured delivery to major Indian cities. See <a href="/delivery-across-india">Delivery across India</a> or <a href="/visit-us">visit our showroom</a>.</p>
 </InfoPage>
