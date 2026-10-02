@@ -1,0 +1,24 @@
+---
+// Shown for any address that does not exist. Astro builds this as 404.html,
+// which Cloudflare Pages serves with a real 404 status (not the home page).
+import InfoPage from '../layouts/InfoPage.astro';
+---
+<InfoPage
+  title="Page not found | Vaishnavi Jewels, Surat"
+  description="This page could not be found. Explore natural and lab-grown diamond, Polki and Jadau jewellery from Vaishnavi Jewels, Surat."
+  path="/404"
+  eyebrow="PAGE NOT FOUND"
+  heading="This page has moved or no longer exists"
+  intro="The link you followed may be from our old website. Here is where to find what you are looking for."
+>
+  <ul>
+    <li><a href="/">Home</a></li>
+    <li><a href="/natural-diamond-jewellery">Natural diamond jewellery</a></li>
+    <li><a href="/lab-grown-diamond-jewellery">Lab-grown diamond jewellery</a></li>
+    <li><a href="/polki-jewellery">Polki jewellery</a></li>
+    <li><a href="/jadau-jewellery">Jadau jewellery</a></li>
+    <li><a href="/bridal-jewellery">Bridal jewellery</a></li>
+    <li><a href="/blog">Journal</a></li>
+    <li><a href="/visit-us">Visit our showroom</a></li>
+  </ul>
+</InfoPage>
