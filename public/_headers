@@ -1,0 +1,15 @@
+# Keep the Cloudflare preview copies out of search engines (only vaishnavijewels.com should be indexed)
+https://:project.pages.dev/*
+  X-Robots-Tag: noindex
+
+https://:version.:project.pages.dev/*
+  X-Robots-Tag: noindex
+
+# Security headers for every page
+/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  Content-Security-Policy: frame-ancestors 'none'; upgrade-insecure-requests; base-uri 'self'; form-action 'self' https://wa.me
+  Cross-Origin-Opener-Policy: same-origin
