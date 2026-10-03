@@ -1,29 +1,45 @@
 ---
 import InfoPage from '../layouts/InfoPage.astro';
+import { business as b } from '../data/business.js';
 const faqs: [string, string][] = [
-  ['Can a bridal set be customised?', 'Yes. We manufacture in-house, so any design can be changed in gold karat, diamond quality, stone colours, size and layout to suit your outfits.'],
+  ['Which is the best bridal jewellery shop in Surat?', 'Surat has many fine jewellers, so choose one that makes its own jewellery, certifies its diamonds and can customise designs. Vaishnavi Jewels at Rajhans Ornate, Parle Point, has made bridal jewellery in-house since 2005, in natural diamonds, lab-grown diamonds, Polki and Jadau, with BIS HUID hallmarked gold and certified diamonds.'],
+  ['Why do families come to Surat for bridal jewellery?', 'Surat is the world\'s diamond-cutting centre, so families find a wide choice of diamond, Polki and Jadau designs, makers who can customise any piece, and pricing direct from the workshop.'],
+  ['Can I get a custom bridal set made in Surat?', 'Yes. We manufacture in-house, so we can create your design from a photo or sketch, or change gold karat, diamond quality, stone colours, size and layout to suit your outfits. Most custom bridal pieces take 2 to 4 weeks depending on the design, and we have delivered some in as little as 8 days.'],
   ['Do you offer bridal jewellery in both natural and lab-grown diamonds?', 'Yes. We make bridal sets in both, and the certificate for every diamond piece clearly states the type of diamond.'],
   ['Can we plan jewellery for the whole family, not only the bride?', 'Yes. We can plan jewellery for the bride, mothers, sisters and the groom together, so the looks work well across the wedding functions.'],
-  ['How early should we start planning?', 'As early as you can. Custom pieces are made in our workshop, so message us with your wedding dates and we will tell you the timeline for the designs you choose.'],
-  ['We are not in Surat. Can we still plan bridal jewellery with you?', 'Yes. We plan bridal jewellery on video calls with families across India, take payment by NEFT or UPI and deliver with free insured shipping to major Indian cities.'],
+  ['Do we need an appointment for bridal shopping?', 'Walk-ins are welcome Monday to Saturday, 11 AM to 8 PM. For bridal shopping, especially if you are travelling to Surat, a WhatsApp message a day or two ahead lets us keep a shortlist ready and give your family a private consultation.'],
+  ['How early should we start planning?', 'As early as you can. Most custom pieces take 2 to 4 weeks, so message us with your wedding dates and we will confirm the timeline for the designs you choose.'],
+  ['We are not in Surat. Can we still plan bridal jewellery with you?', 'Yes. We plan bridal jewellery on video calls with families across India, take payment by NEFT or UPI and deliver with free insured shipping to major Indian cities. Many families shortlist on a video call and then visit once to finalise.'],
 ];
 ---
 <InfoPage
-  title="Bridal Jewellery in Surat | Diamond, Polki & Jadau Sets | Vaishnavi Jewels"
-  description="Bridal jewellery in Surat since 2005: diamond, Polki and Jadau necklace sets, mangalsutras, rings and maang tikkas, made in-house and delivered across India."
+  title="Bridal Jewellery Shop in Surat Since 2005 | Diamond, Polki & Jadau | Vaishnavi Jewels"
+  description="Planning bridal jewellery shopping in Surat? Vaishnavi Jewels, Parle Point: certified diamond, Polki and Jadau bridal sets made in-house since 2005, custom designs in 2 to 4 weeks, private appointments."
   path="/bridal-jewellery"
   eyebrow="BRIDAL"
-  heading="Bridal Jewellery"
-  intro="Complete bridal looks in diamonds, Polki and Jadau &ndash; planned with you, made in our own workshop."
+  heading="Bridal Jewellery in Surat"
+  intro="Complete bridal looks in diamonds, Polki and Jadau &ndash; planned with you, made in our own workshop at Parle Point, Surat, since 2005."
   faqs={faqs}
 >
+  <h2>Choosing a bridal jewellery shop in Surat</h2>
+  <p>If you are looking for the best bridal jewellery shop in Surat, look for three things: a jeweller who makes the jewellery in-house, certified diamonds and hallmarked gold, and the freedom to customise. Vaishnavi Jewels has offered all three since 2005, from our 2,500 sq ft showroom at Rajhans Ornate, Parle Point, with over 3,000 designs in natural diamonds, lab-grown diamonds, Polki and Jadau.</p>
+
   <h2>What brides choose from</h2>
   <ul>
     <li>Diamond necklace sets, in natural or lab-grown diamonds</li>
     <li><a href="/polki-jewellery">Polki</a> and <a href="/jadau-jewellery">Jadau</a> chokers, long necklaces (raani haar) and full sets</li>
-    <li>Mangalsutras, engagement and wedding rings</li>
+    <li>Mangalsutras, engagement and wedding rings, and solitaires</li>
     <li>Earrings, jhumkas, maang tikkas, bangles, kadas and bracelets</li>
   </ul>
+
+  <h2>Planning a bridal shopping trip to Surat</h2>
+  <ol>
+    <li><strong>Message us before you travel.</strong> WhatsApp <a href={b.whatsapp} target="_blank" rel="noopener">{b.phone}</a> with your wedding dates, outfits and budget.</li>
+    <li><strong>Shortlist on a video call.</strong> We show pieces live, so you arrive knowing what you want to see.</li>
+    <li><strong>Book a private appointment.</strong> We keep your shortlist ready and a dedicated consultant for your family. A relaxed bridal visit can take a couple of hours.</li>
+    <li><strong>Customise and collect.</strong> Most custom pieces are ready in 2 to 4 weeks depending on the design, and some have been delivered in 8 days. We can also send them to you with free insured delivery to major Indian cities.</li>
+  </ol>
+  <p>Showroom hours: {b.hoursText} See <a href="/visit-us">Visit our showroom</a> for directions.</p>
 
   <h2>Jewellery for every function</h2>
   <p>Most weddings have several functions, and each one suits a different kind of jewellery. For the engagement or roka, brides often choose a ring with a light diamond necklace or earrings. For mehendi and haldi, lighter Polki or floral pieces work well. The wedding day usually calls for a full Polki or Jadau set with a maang tikka and bangles, and for the reception many brides move to a statement diamond necklace set. We help you plan the whole wardrobe so pieces can be re-worn and nothing is repeated in the photographs.</p>
@@ -35,7 +51,7 @@ const faqs: [string, string][] = [
   <p>Share your outfits, colours and budget with us. We shortlist designs from over 3,000 pieces, adjust the gold karat, diamond quality and design where needed, and make the final pieces in-house. You see progress on WhatsApp before the pieces are finished.</p>
 
   <h2>Certified and hallmarked</h2>
-  <p>Diamonds come with certificates from recognised laboratories such as IGI, TGL and EGL where applicable; gold jewellery is BIS HUID hallmarked.</p>
+  <p>Diamonds come with certificates from recognised laboratories such as IGI, TGL and EGL where applicable; gold jewellery is BIS HUID hallmarked. Every Vaishnavi solitaire is laser-inscribed with its report number, which you can verify online.</p>
 
   <h2>Families outside Surat</h2>
   <p>We regularly help families from Ahmedabad, Vadodara, Mathura and other cities through video calls, with NEFT or UPI payment and free insured delivery to major Indian cities. See <a href="/visit-us">Visit our showroom</a> and <a href="/delivery-across-india">Delivery across India</a>.</p>
