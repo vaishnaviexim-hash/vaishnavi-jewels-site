@@ -1,34 +1,69 @@
 ---
 import InfoPage from '../layouts/InfoPage.astro';
-const faqs = [
-  ['Where is Vaishnavi Jewels located?', 'Our showroom is at 120, Rajhans Ornate - High Street Retail Mall, Parle Point, Surat, Gujarat 395007.'],
-  ['What are your opening hours?', 'Monday to Saturday, 11 AM to 8 PM. We are closed on Sunday.'],
-  ['What kind of jewellery do you sell?', 'Natural diamond jewellery, lab-grown diamond jewellery, Polki and Jadau, including bridal sets, necklaces, rings, earrings, bangles, bracelets, pendants and mangalsutras. We have over 3,000 designs.'],
-  ['Do you make the jewellery yourselves?', 'Yes. We manufacture in-house, so any design can be customised in gold karat, diamond quality and design.'],
-  ['Is your jewellery certified?', 'Diamonds come with certificates from recognised laboratories such as IGI, TGL and EGL where applicable, and our gold jewellery is BIS HUID hallmarked.'],
-  ['Do you deliver outside Surat?', 'Yes. We offer free insured delivery to major Indian cities. For other locations, message us and we will confirm the options.'],
-  ['Can I see the jewellery before buying if I am not in Surat?', 'Yes. We show pieces on video calls and share photos, videos and certificate details on WhatsApp.'],
-  ['How can I pay?', 'We accept payment by NEFT and UPI.'],
-  ['Do you offer exchange and buyback?', 'Yes. Exchange and buyback are available on jewellery bought from us. The value is calculated after deducting labour, certification and other applicable charges. Please ask us for the current terms for your piece.'],
-  ['Do you sell both natural and lab-grown diamonds?', 'Yes. We offer both, and every certificate clearly states the type of diamond.'],
-  ['How do I contact you?', 'Call or WhatsApp +91 75674 00099, or email vaishnaviexim@gmail.com.'],
+
+// Answer-first FAQ: the first sentence of every answer is the direct answer,
+// so search engines and AI assistants can quote it as-is.
+// Questions come from real customer searches (Questions tab, VJ_Marketing_Engine).
+const groups = [
+  {
+    title: 'Certificates, hallmark and checking what you buy',
+    faqs: [
+      ['What documents do I get when I buy diamond jewellery from Vaishnavi Jewels?', 'You get a grading report, a BIS HUID hallmark on the gold and an itemised invoice. Every solitaire has its own grading report, and every jewellery piece has a jewellery grading report; both clearly state the quality and whether the diamonds are natural or lab-grown. Small diamonds are listed with their total weight, number of pieces and quality.'],
+      ['Is your jewellery certified?', 'Yes. Our solitaires and jewellery come with grading reports from IGI, EGL or TGL that state the quality and the origin (natural or lab-grown), and all our gold jewellery is BIS HUID hallmarked.'],
+      ['Do earrings, pendants and rings with small diamonds come with a certificate?', 'Yes. The jewellery grading report covers the whole piece, and it states the total diamond weight, the number of diamonds and their quality, along with whether they are natural or lab-grown.'],
+      ['How can I check if a diamond is real?', 'The reliable way is the grading report and the laser inscription. Every Vaishnavi solitaire has its report number laser-inscribed on the diamond, which you can see under magnification and match to the report, then verify on the laboratory\'s website. Home tricks like the fog or water test are not conclusive. We are happy to show you the inscription in our showroom.'],
+      ['How do I verify the HUID on my gold jewellery?', 'Open the BIS Care app, choose "Verify HUID" and enter the 6-character HUID code stamped on the piece. The app shows the purity, the type of article and the jeweller\'s registration, which should match your invoice. We can do this check with you at the counter.'],
+      ['Which diamond certificates do you provide?', 'We provide grading reports from IGI, EGL or TGL. The laboratory name is printed on every report, so you can verify the report yourself on that laboratory\'s website using the report number.'],
+      ['Do lab-grown diamonds pass a diamond tester?', 'Yes. A lab-grown diamond is a real diamond, so a standard diamond tester reads it as diamond. A tester cannot tell where a diamond was grown; the grading report and the matching laser inscription are what confirm whether it is natural or lab-grown.'],
+      ['Are lab-grown diamonds real diamonds?', 'Yes. A lab-grown diamond is real diamond, made of the same carbon crystal, and is grown in a laboratory. Ours come with a grading report and a laser inscription so you can verify exactly what you are buying.'],
+      ['Do you sell both natural and lab-grown diamonds?', 'Yes. We offer both, and every grading report clearly states the type of diamond.'],
+    ],
+  },
+  {
+    title: 'Custom and bridal jewellery',
+    faqs: [
+      ['Do you make the jewellery yourselves?', 'Yes. We make jewellery in our own manufacturing unit, so any design can be customised in gold karat, diamond quality and design.'],
+      ['How long does custom bridal jewellery take?', 'Usually 2 to 4 weeks, depending on the design. Share your wedding date at your first visit and we will confirm the timeline once the design is final.'],
+      ['Can a ring be resized after I buy it?', 'Yes. Resizing is charged on actuals, based on the work and any gold needed. Some designs, such as rings set with diamonds all the way around, may be limited in how much they can be resized, so we will check your piece first.'],
+      ['How is the gold weight shown on the bill for Polki or Jadau jewellery?', 'Our invoice itemises the piece, showing the gold weight and the stones separately, so you can see what you are paying for. Ask us to walk you through the bill before you buy.'],
+    ],
+  },
+  {
+    title: 'Visiting, delivery and payment',
+    faqs: [
+      ['Where is Vaishnavi Jewels located?', 'Our showroom is at 120 & 220, Rajhans Ornate - High Street Retail Mall, Parle Point, Surat, Gujarat 395007.'],
+      ['Where can I buy certified diamond jewellery in Surat?', 'At Vaishnavi Jewels, Rajhans Ornate Mall, Parle Point, Surat. We have sold certified natural and lab-grown diamond jewellery since 2005, and we show you the grading report and the inscription before you buy.'],
+      ['What are your opening hours?', 'Monday to Saturday, 11 AM to 8 PM. We are closed on Sunday.'],
+      ['What kind of jewellery do you sell?', 'Natural diamond jewellery, lab-grown diamond jewellery, Polki and Jadau, including bridal sets, necklaces, rings, earrings, bangles, bracelets, pendants and mangalsutras. We have over 3,000 designs.'],
+      ['Do you deliver outside Surat?', 'Yes. We offer free insured delivery to major Indian cities. For other locations, message us and we will confirm the options.'],
+      ['Can I see the jewellery before buying if I am not in Surat?', 'Yes. We show pieces on video calls and share photos, videos and grading report details on WhatsApp.'],
+      ['How can I pay?', 'We accept payment by NEFT and UPI.'],
+      ['Do you offer exchange and buyback?', 'Yes. Exchange and buyback are available on jewellery bought from us. The value is calculated after deducting labour, certification and other applicable charges. Please ask us for the current terms for your piece.'],
+      ['How do I contact you?', 'Call or WhatsApp +91 75674 00099, or email vaishnaviexim@gmail.com.'],
+    ],
+  },
 ];
+
+const all = groups.flatMap((g) => g.faqs);
 const faqSchema = {
   '@context': 'https://schema.org',
   '@type': 'FAQPage',
-  mainEntity: faqs.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })),
+  mainEntity: all.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } })),
 };
 ---
 <InfoPage
-  title="FAQ | Vaishnavi Jewels, Surat"
-  description="Answers about Vaishnavi Jewels, Surat: location, hours, certification, delivery across India, payment, exchange and custom jewellery."
+  title="FAQ: Certificates, HUID, Custom Jewellery | Vaishnavi Jewels, Surat"
+  description="Straight answers on grading reports, HUID checks, natural and lab-grown diamonds, custom bridal timelines, resizing, delivery and payment at Vaishnavi Jewels, Surat."
   path="/faq"
   eyebrow="QUESTIONS"
   heading="Frequently Asked Questions"
-  intro="Quick answers about visiting, buying and delivery."
+  intro="Straight answers to what customers ask us most: certificates, checking your diamond, custom work, visiting and delivery."
   extraSchema={[faqSchema]}
 >
-  <dl>
-    {faqs.map(([q, a]) => (<><dt>{q}</dt><dd>{a}</dd></>))}
-  </dl>
+  {groups.map((g) => (
+    <section>
+      <h2>{g.title}</h2>
+      <dl>{g.faqs.map(([q, a]) => (<><dt>{q}</dt><dd>{a}</dd></>))}</dl>
+    </section>
+  ))}
 </InfoPage>
