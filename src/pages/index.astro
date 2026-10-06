@@ -3,9 +3,10 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import InstagramFeed from '../components/InstagramFeed.astro';
+import { business as b } from '../data/business.js';
 
-const title = "Vaishnavi Jewels | Diamond, Polki & Jadau Jewellery in Surat | Since 2005";
-const description = "Vaishnavi Jewels — Surat's premier jewellery showroom since 2005. Natural & lab-grown diamond jewellery, Polki, Jadau. Over 3000 designs at Rajhans Ornate Mall, Parle Point.";
+const title = "Certified Diamond Jewellery in Surat | Solitaire Rings & Bridal | Vaishnavi Jewels";
+const description = "Certified diamond jewellery made in Surat since 2005: natural and lab-grown diamonds, laser-inscribed solitaire rings you can verify online, Polki and bridal sets, BIS HUID hallmarked. Rajhans Ornate Mall, Parle Point.";
 ---
 <BaseLayout title={title} description={description} canonicalPath="/">
   <SiteHeader />
@@ -13,15 +14,15 @@ const description = "Vaishnavi Jewels — Surat's premier jewellery showroom sin
   <main>
     <section class="hero">
       <div class="container hero-inner">
-        <p class="eyebrow">SURAT'S PREMIER JEWELLERY HOUSE &middot; EST. 2005</p>
+        <p class="eyebrow">CERTIFIED DIAMOND JEWELLERY &middot; MADE IN SURAT &middot; EST. 2005</p>
         <h1 class="hero-headline">
           <em>Your Vision.</em><br/>
           Our Craft.
         </h1>
         <div class="hero-rule"></div>
         <p class="hero-sub">Certified Natural &amp; Lab-Grown Diamonds</p>
-        <p class="hero-tag">Polki &middot; Jadau &ndash; Diamond Jewellery</p>
-        <p class="hero-detail">Over 3,000 Designs<br/>Crafted with Love in Surat</p>
+        <p class="hero-tag">Solitaire Rings &middot; Bridal &middot; Polki</p>
+        <p class="hero-detail">Over 3,000 Designs<br/>Made in Surat, the Diamond City</p>
 
         <div class="hero-actions">
           <a href="#collections" class="btn btn-solid">Explore Collections</a>
@@ -29,6 +30,19 @@ const description = "Vaishnavi Jewels — Surat's premier jewellery showroom sin
           <a href="https://instagram.com/vaishnavijewels.surat" target="_blank" rel="noopener" class="btn btn-outline">Follow Us on Instagram</a>
           <a href="https://g.page/r/Ce9kbGlQK0O8EBM/review" target="_blank" rel="noopener" class="btn btn-outline">Rate Us on Google</a>
         </div>
+      </div>
+    </section>
+
+    <section class="trust" aria-label="Why buyers trust us">
+      <div class="container">
+        <ul class="trust-list">
+          <li><strong>Laser-inscribed solitaires</strong><span>Every solitaire carries its report number, verifiable online</span></li>
+          <li><strong>Certified diamonds</strong><span>IGI, EGL and TGL reports</span></li>
+          <li><strong>BIS HUID hallmarked</strong><span>Check any piece in the BIS Care app</span></li>
+          <li><strong>Our own manufacturing unit</strong><span>Any design made to your choice</span></li>
+          <li><strong>Since 2005</strong><span>Rajhans Ornate Mall, Parle Point, Surat</span></li>
+        </ul>
+        <p class="trust-link"><a href="/solitaire-rings">How to verify a solitaire</a> &middot; <a href="/faq">Certificates and HUID questions</a></p>
       </div>
     </section>
 
@@ -46,15 +60,17 @@ const description = "Vaishnavi Jewels — Surat's premier jewellery showroom sin
         <p class="about-body">
           Founded in 2005 by Shilpi Agarwal, Vaishnavi Jewels is a self-owned
           2,500 sq ft showroom at Rajhans Ornate Mall, Parle Point, Surat. We
-          hold over 3,000 designs across natural diamond jewellery, lab-grown
-          diamond jewellery, Polki and Jadau &mdash; from bridal necklace sets
-          and mangalsutras to solitaire rings, earrings and daily wear.
+          hold over 3,000 designs in certified natural and lab-grown diamond
+          jewellery and Polki &mdash; from <a href="/solitaire-rings">solitaire rings</a>
+          and mangalsutras to <a href="/bridal-jewellery">bridal necklace sets</a>,
+          earrings and daily wear.
         </p>
         <p class="about-body">
           What sets us apart is choice: take any design and change the gold
           karat, the diamond quality, the diamond origin, and the design
-          itself. Every piece is certified and crafted by karigars we have
-          worked with for two decades.
+          itself. Every piece is certified, BIS HUID hallmarked and made in
+          our own manufacturing unit, by a team that has worked with us for
+          two decades.
         </p>
       </div>
     </section>
@@ -62,11 +78,11 @@ const description = "Vaishnavi Jewels — Surat's premier jewellery showroom sin
     <section id="contact" class="contact">
       <div class="container contact-inner">
         <p class="eyebrow">VISIT US</p>
-        <h2>120, Rajhans Ornate Mall, Parle Point Circle, Surat</h2>
+        <h2>Rajhans Ornate Mall, Parle Point, Surat</h2>
         <div class="contact-grid">
           <div class="contact-block">
             <p class="contact-label">Address</p>
-            <p class="contact-value">120, Rajhans Ornate - High Street Retail Mall, Parle Point, Surat, Gujarat 395007<br/>Mon&ndash;Sat 11 AM&ndash;8 PM &middot; Sunday closed</p>
+            <p class="contact-value">{b.addressText}<br/>{b.hoursText}</p>
           </div>
           <div class="contact-block">
             <p class="contact-label">Phone / WhatsApp</p>
@@ -147,6 +163,20 @@ const description = "Vaishnavi Jewels — Surat's premier jewellery showroom sin
     margin: 0 auto;
   }
   .hero-actions .btn { text-align: center; }
+
+  .trust { padding: 36px 0 8px; }
+  .trust-list {
+    list-style: none; padding: 0; margin: 0 auto; max-width: 1040px;
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px;
+  }
+  .trust-list li { text-align: center; padding: 16px 10px; border: 1px solid var(--color-line); background: var(--color-ivory); }
+  .trust-list strong { display: block; font-family: var(--font-display); font-size: 17px; color: var(--color-ink); margin-bottom: 4px; }
+  .trust-list span { font-size: 13px; color: var(--color-ink-soft); }
+  .trust-link { text-align: center; font-size: 14px; margin-top: 14px; }
+  .trust-link a { color: var(--color-gold-deep); text-decoration: underline; }
+  .about-body a { color: var(--color-gold-deep); text-decoration: underline; }
+  @media (max-width: 900px) { .trust-list { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 520px) { .trust-list { grid-template-columns: 1fr; } }
 
   .about, .contact {
     padding: 72px 0;

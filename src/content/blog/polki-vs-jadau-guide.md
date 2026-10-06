@@ -30,7 +30,8 @@ adhesive or claws.
   multiple stone colours in one setting.
 
 Many bridal pieces, in fact, combine both — Jadau-set Polki diamonds — which
-is exactly the kind of work our karigars have specialised in for two
+is exactly the kind of work our own manufacturing unit has
+specialised in for two
 decades.
 
 *Visit us at Rajhans Ornate Mall, Parle Point, Surat to see both styles in

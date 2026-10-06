@@ -11,7 +11,7 @@ const allPosts = await getCollection('blog', ({ data }) => !data.draft);
 const posts = allPosts.sort((a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf());
 
 const title = "Journal | Vaishnavi Jewels";
-const description = "Guides and stories on diamond, Polki and Jadau jewellery from Vaishnavi Jewels, Surat.";
+const description = "Guides on certified diamonds, solitaires, HUID and Polki jewellery from Vaishnavi Jewels, Surat.";
 ---
 <BaseLayout title={title} description={description} canonicalPath="/blog">
   <SiteHeader />

@@ -34,15 +34,16 @@ export const business = {
 
 // Pages listed in the footer, sitemap and IndexNow.
 export const infoPages = [
+  { path: '/solitaire-rings', label: 'Certified Solitaire Rings' },
   { path: '/natural-diamond-jewellery', label: 'Natural Diamond Jewellery' },
   { path: '/lab-grown-diamond-jewellery', label: 'Lab-Grown Diamond Jewellery' },
   { path: '/polki-jewellery', label: 'Polki Jewellery' },
-  { path: '/jadau-jewellery', label: 'Jadau Jewellery' },
   { path: '/bridal-jewellery', label: 'Bridal Jewellery' },
   { path: '/visit-us', label: 'Visit Our Showroom' },
   { path: '/delivery-across-india', label: 'Delivery Across India' },
   { path: '/faq', label: 'FAQ' },
   { path: '/facts', label: 'Facts' },
+  { path: '/jadau-jewellery', label: 'Jadau Jewellery' },
 ];
 
 export function storeSchema(imageUrl) {
@@ -57,7 +58,7 @@ export function storeSchema(imageUrl) {
     url: SITE_URL,
     logo: SITE_URL + '/logo_vaishnavi_jewels.png',
     image: imageUrl || SITE_URL + '/logo_vaishnavi_jewels.png',
-    description: 'Fine jewellery showroom in Surat since 2005 offering certified natural diamond jewellery, lab-grown diamond jewellery, Polki and Jadau, made in-house, with insured delivery across India.',
+    description: 'Certified diamond jewellery made in Surat, the diamond city, since 2005: natural and lab-grown diamond jewellery, certified solitaire rings laser-inscribed with a report number you can verify online, Polki and bridal jewellery, BIS HUID hallmarked and made in our own manufacturing unit, with insured delivery across India.',
     telephone: b.phoneE164,
     email: b.email,
     foundingDate: b.foundingDate,
@@ -79,7 +80,7 @@ export function storeSchema(imageUrl) {
     areaServed: { '@type': 'Country', name: 'India' },
     paymentAccepted: 'NEFT, UPI',
     currenciesAccepted: 'INR',
-    knowsAbout: ['Natural diamond jewellery', 'Lab-grown diamond jewellery', 'Polki jewellery', 'Jadau jewellery', 'Bridal jewellery', 'Custom jewellery design'],
+    knowsAbout: ['Certified diamond jewellery', 'Certified solitaire rings', 'Natural diamond jewellery', 'Lab-grown diamond jewellery', 'Polki jewellery', 'Bridal jewellery', 'Mangalsutra', 'Custom jewellery design', 'BIS HUID hallmarking'],
     hasMap: b.mapsUrl,
     sameAs: b.sameAs,
   };

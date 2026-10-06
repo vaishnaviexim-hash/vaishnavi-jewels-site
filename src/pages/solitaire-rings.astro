@@ -1,0 +1,49 @@
+---
+import InfoPage from '../layouts/InfoPage.astro';
+import { business as b } from '../data/business.js';
+const faqs: [string, string][] = [
+  ['How do I verify a solitaire from Vaishnavi Jewels?', 'Every solitaire we sell is laser-inscribed on its girdle with the number of its grading report. Enter that number on the website of the laboratory that issued the report (IGI, EGL or TGL) and check that the shape, carat, colour and clarity match your report. In the showroom we show you the inscription under magnification before you buy.'],
+  ['Which certificates do your solitaires come with?', 'Each solitaire comes with an individual grading report from a recognised laboratory such as IGI, EGL or TGL. The report states the shape, carat weight, colour, clarity and cut, and whether the diamond is natural or laboratory-grown.'],
+  ['Do you have solitaire rings in both natural and lab-grown diamonds?', 'Yes. We make solitaire rings in natural diamonds and in lab-grown diamonds. The report for each stone states clearly which it is.'],
+  ['Is the gold in the ring hallmarked?', 'Yes. Our gold jewellery carries a BIS HUID hallmark, a 6-character code you can check yourself in the BIS Care app.'],
+  ['Can I choose my own diamond and ring design?', 'Yes. We manufacture in our own unit in Surat, so you can choose the diamond, the gold karat and colour, and the setting, or bring a photo of a design you like. Most custom pieces take 2 to 4 weeks depending on the design.'],
+  ['Can I buy a solitaire from outside Surat?', 'Yes. We show the stone and the ring live on a video call, share the report number so you can check it online before paying, accept NEFT or UPI and send the ring with free insured delivery to major Indian cities.'],
+];
+const pageSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: 'Certified Solitaire Rings in Surat',
+  url: 'https://vaishnavijewels.com/solitaire-rings',
+  about: { '@id': 'https://vaishnavijewels.com/#store' },
+};
+---
+<InfoPage
+  title="Certified Solitaire Rings in Surat | Laser-Inscribed, Verify Online | Vaishnavi Jewels"
+  description="Certified solitaire rings made in Surat, the diamond city: every solitaire laser-inscribed with its IGI, EGL or TGL report number so you can verify it online. Natural and lab-grown, BIS HUID hallmarked gold, delivery across India."
+  path="/solitaire-rings"
+  eyebrow="CERTIFIED SOLITAIRES"
+  heading="Certified Solitaire Rings in Surat"
+  intro="Every solitaire we sell is laser-inscribed with its report number, so you can check it yourself before you buy."
+  extraSchema={[pageSchema]}
+  faqs={faqs}
+>
+  <h2>A solitaire you can verify yourself</h2>
+  <p>A solitaire is usually the most valuable diamond a family buys, so you should not have to take anyone's word for it. Each solitaire at Vaishnavi Jewels comes with an individual grading report from a recognised laboratory such as IGI, EGL or TGL, and the report number is laser-inscribed on the diamond itself.</p>
+
+  <h2>How to check your solitaire in three steps</h2>
+  <ol>
+    <li><strong>Read the report.</strong> Note the report number, shape, carat weight, colour and clarity, and whether the diamond is natural or laboratory-grown.</li>
+    <li><strong>Check it online.</strong> Enter the report number on the issuing laboratory's website and confirm the details match.</li>
+    <li><strong>Match the inscription.</strong> Under magnification, the number inscribed on the diamond's girdle should be the same as the report number. We show you this at the counter.</li>
+  </ol>
+  <p>The gold is checked separately: every piece carries a BIS HUID hallmark that you can verify in the BIS Care app. Read more in our <a href="/faq">FAQ on certificates and HUID</a>.</p>
+
+  <h2>Natural or lab-grown</h2>
+  <p>We make solitaire rings in both <a href="/natural-diamond-jewellery">natural diamonds</a> and <a href="/lab-grown-diamond-jewellery">lab-grown diamonds</a>. Whichever you choose, the report states clearly what the diamond is, and the inscription ties that report to your stone.</p>
+
+  <h2>Made in our own manufacturing unit</h2>
+  <p>Surat is the world's diamond city, and we have made jewellery here since 2005. Because rings are made in our own unit, you can pick the diamond, the gold karat and colour, and the setting, or bring a photo of a design you like. Engagement rings, anniversary rings and solitaire pendants and earrings can all be made to your choice.</p>
+
+  <h2>See it before you decide</h2>
+  <p>Visit us at {b.addressText} ({b.hoursText}) or ask for a video call on WhatsApp at <a href={b.whatsapp} target="_blank" rel="noopener">{b.phone}</a>. Shopping from another city? See <a href="/delivery-across-india">Delivery across India</a>.</p>
+</InfoPage>
