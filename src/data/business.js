@@ -18,7 +18,7 @@ export const business = {
   phoneE164: '+917567400099',
   whatsapp: 'https://wa.me/917567400099?text=Hi%20Vaishnavi%20Jewels%2C%20I%20found%20you%20on%20your%20website.',
   email: 'vaishnaviexim@gmail.com',
-  hoursText: 'Monday to Saturday, 11 AM to 8 PM. Closed on Sunday.',
+  hoursText: 'Open every day, Sundays included, 11 AM to 8 PM until 7 November 2026; after that Monday to Saturday, 11 AM to 8 PM. Festival closures are shown on our Google profile.',
   showroomSize: '2,500 sq ft',
   designs: '3,000+',
   sameAs: [
@@ -78,6 +78,13 @@ export function storeSchema(imageUrl) {
       dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
       opens: '11:00',
       closes: '20:00',
+    }, {
+      '@type': 'OpeningHoursSpecification',
+      dayOfWeek: ['Sunday'],
+      opens: '11:00',
+      closes: '20:00',
+      validFrom: '2026-10-01',
+      validThrough: '2026-11-07',
     }],
     areaServed: { '@type': 'Country', name: 'India' },
     paymentAccepted: 'NEFT, UPI',
