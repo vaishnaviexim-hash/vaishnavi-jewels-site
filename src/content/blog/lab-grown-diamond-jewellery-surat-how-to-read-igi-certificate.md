@@ -50,7 +50,7 @@ Because we make our jewellery in-house, the gold karat, diamond quality and desi
 
 Many of our customers are not in Surat. If you are in Ahmedabad, Vadodara, Mathura or any other city, we can show you pieces and their reports over a video call, hold the report up to the camera, and walk you through each line together. Once you have chosen, payment is by NEFT or UPI, and we offer free insured [delivery across India](/delivery-across-india) to major cities. The laboratory report and hallmarked piece travel together.
 
-If you are in or near Surat, the simplest approach is to [visit our showroom](/visit-us) at 120, Rajhans Ornate, Parle Point, where you can look at the stone under a loupe, read the report alongside it and see the girdle inscription for yourself. We are open Monday to Saturday, 11 AM to 8 PM, and closed on Sunday.
+If you are in or near Surat, the simplest approach is to [visit our showroom](/visit-us) at UG120, Rajhans Ornate, Parle Point, where you can look at the stone under a loupe, read the report alongside it and see the girdle inscription for yourself. We are open Monday to Saturday, 11 AM to 8 PM, and closed on Sunday.
 
 ## Frequently asked questions
 
