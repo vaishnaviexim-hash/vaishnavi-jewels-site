@@ -1,4 +1,5 @@
 // Pages advanced-mode worker. Only /hooks/* reaches it (see _routes.json); everything else is served as static files.
+// Secrets added in Cloudflare 09/10/2026 18:07 IST.
 // WhatsApp webhook filter (Brain C-20261009-WAFILTER).
 // Checks Meta's signature, drops sent/delivered/read receipts (no Make credits),
 // forwards real messages and failed-delivery receipts to the Make A1 webhook unchanged.
