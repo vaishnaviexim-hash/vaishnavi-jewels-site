@@ -1,5 +1,5 @@
 ---
-import { infoPages } from '../data/business.js';
+import { infoPages, business } from '../data/business.js';
 ---
 <footer class="site-footer">
   <div class="container footer-inner">
@@ -7,6 +7,7 @@ import { infoPages } from '../data/business.js';
       <p class="footer-brand">Vaishnavi Jewels</p>
       <p class="footer-line">Rajhans Ornate Mall, Parle Point, Surat, Gujarat</p>
       <p class="footer-line">Since 2005</p>
+      <p class="footer-line">{business.name} is a brand of {business.legalName}.</p>
     </div>
     <div class="footer-links">
       {infoPages.map((p) => <a href={p.path}>{p.label}</a>)}
