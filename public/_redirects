@@ -6,6 +6,7 @@
 /lander       /           301
 /services-1   /           301
 /showroom     /visit-us   301
+/contact-us   /visit-us   301
 # Any other old blog address -> new blog
 /blog/f     /blog  301
 /blog/f/*   /blog  301
