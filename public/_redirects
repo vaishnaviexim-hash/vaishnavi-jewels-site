@@ -1,3 +1,11 @@
-# Old blog addresses from the previous website -> new blog (permanent)
+# Old addresses from the previous website -> matching new pages (permanent). Specific rules first.
+/blog/f/benefits-of-wearing-diamond                 /natural-diamond-jewellery  301
+/blog/f/why-you-should-buy-a-diamond-locket-pendant /natural-diamond-jewellery  301
+/blog/f/why-should-you-wear-our-diamond-locket-pendant /natural-diamond-jewellery  301
+/blog/f/what-makes-diamond-rings-special            /solitaire-rings  301
+/lander       /           301
+/services-1   /           301
+/showroom     /visit-us   301
+# Any other old blog address -> new blog
 /blog/f     /blog  301
 /blog/f/*   /blog  301
