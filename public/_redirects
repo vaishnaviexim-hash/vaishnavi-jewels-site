@@ -7,6 +7,8 @@
 /services-1   /           301
 /showroom     /visit-us   301
 /contact-us   /visit-us   301
+/privacy-policy  /privacy  301
+/blog/f/lab-grown-vs-natural-diamonds-which-one-is-right-for-you /lab-grown-diamond-jewellery  301
 # Any other old blog address -> new blog
 /blog/f     /blog  301
 /blog/f/*   /blog  301
