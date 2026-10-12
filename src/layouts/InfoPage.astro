@@ -1,10 +1,14 @@
 ---
 // Layout for the evergreen information pages (collections, delivery, FAQ, facts).
+// v2 (C-20261012-WEBBEAUTY): optional image hero, trust strip, gallery of our pieces,
+// FAQ accordion and an image call-to-action band. Text, schema and URLs are unchanged.
 import BaseLayout from './BaseLayout.astro';
 import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import { business } from '../data/business.js';
+import { img, srcset } from '../data/images.js';
 
+type Pic = { id: string; alt: string; caption?: string };
 interface Props {
   title: string;
   description: string;
@@ -14,8 +18,12 @@ interface Props {
   intro: string;
   extraSchema?: object[];
   faqs?: [string, string][]; // page-specific questions: shown on the page and sent as FAQPage schema
+  hero?: Pic;                // Cloudinary public id of the hero photo (our piece, luxury look)
+  gallery?: Pic[];           // 3-6 photos of our pieces for this page
+  galleryTitle?: string;
+  noindex?: boolean;         // previews only
 }
-const { title, description, path, eyebrow, heading, intro, extraSchema = [], faqs = [] } = Astro.props;
+const { title, description, path, eyebrow, heading, intro, extraSchema = [], faqs = [], hero, gallery = [], galleryTitle = 'From our showroom', noindex = false } = Astro.props;
 const faqSchema = faqs.length ? [{
   '@context': 'https://schema.org',
   '@type': 'FAQPage',
@@ -29,55 +37,200 @@ const crumbs = {
     { '@type': 'ListItem', position: 2, name: heading, item: 'https://vaishnavijewels.com' + path },
   ],
 };
+const ogImage = hero ? img(hero.id, 1200, '1.91') : undefined;
+const trust = [
+  { icon: 'diamond', title: 'Certified diamonds', text: 'Grading report with every piece' },
+  { icon: 'shield', title: 'BIS HUID hallmark', text: 'Check it yourself in BIS Care' },
+  { icon: 'craft', title: 'Our own manufacturing', text: 'Made in Surat, to your design' },
+  { icon: 'truck', title: 'Insured delivery', text: 'Free to major Indian cities' },
+];
 ---
-<BaseLayout title={title} description={description} canonicalPath={path} extraSchema={[crumbs, ...extraSchema, ...faqSchema]}>
+<BaseLayout title={title} description={description} canonicalPath={path} ogImage={ogImage} noindex={noindex} extraSchema={[crumbs, ...extraSchema, ...faqSchema]}>
   <SiteHeader />
   <main>
     <article class="info">
-      <div class="container info-head">
-        <p class="eyebrow">{eyebrow}</p>
-        <h1>{heading}</h1>
-        <p class="lead">{intro}</p>
-      </div>
-      <div class="container">
-        <div class="prose">
-          <slot />
-          {faqs.length > 0 && (
-            <section class="page-faq">
-              <h2>Questions we are often asked</h2>
-              <dl>{faqs.map(([q, a]) => (<><dt>{q}</dt><dd>{a}</dd></>))}</dl>
-            </section>
+      <header class:list={['info-hero', { 'has-img': !!hero }]}>
+        <div class="container hero-grid">
+          <div class="hero-text">
+            <p class="eyebrow">{eyebrow}</p>
+            <h1>{heading}</h1>
+            <span class="rule" aria-hidden="true"></span>
+            <p class="lead">{intro}</p>
+            <div class="hero-cta">
+              <a class="btn btn-solid" href={business.whatsapp} target="_blank" rel="noopener">Ask on WhatsApp</a>
+              <a class="btn btn-outline" href="/visit-us">Visit the showroom</a>
+            </div>
+          </div>
+          {hero && (
+            <figure class="hero-pic">
+              <img src={img(hero.id, 900)} srcset={srcset(hero.id)} sizes="(max-width: 860px) 92vw, 480px"
+                   width="900" height="1125" alt={hero.alt} fetchpriority="high" decoding="async" />
+            </figure>
           )}
         </div>
-        <aside class="cta">
-          <p class="cta-title">See it in person or on a video call</p>
-          <p class="cta-text">{business.addressText} &middot; {business.hoursText}</p>
-          <div class="cta-row">
-            <a class="btn btn-solid" href={business.whatsapp} target="_blank" rel="noopener">WhatsApp {business.phone}</a>
-            <a class="btn btn-outline" href={business.mapsUrl} target="_blank" rel="noopener">Get Directions</a>
-          </div>
-        </aside>
+      </header>
+
+      <section class="trust" aria-label="Why buy from Vaishnavi Jewels">
+        <ul class="container trust-row">
+          {trust.map((t) => (
+            <li>
+              <svg viewBox="0 0 24 24" aria-hidden="true" class="ti">
+                {t.icon === 'diamond' && <path d="M6 3h12l4 6-10 12L2 9l4-6zm-1.5 6h15M9 3l3 6 3-6M12 9v12" />}
+                {t.icon === 'shield' && <path d="M12 2l8 3v6c0 5-3.5 9-8 11-4.5-2-8-6-8-11V5l8-3zm-3.5 10l2.5 2.5 4.5-5" />}
+                {t.icon === 'craft' && <path d="M3 21h18M5 21V10l7-5 7 5v11M9 21v-6h6v6" />}
+                {t.icon === 'truck' && <path d="M2 6h12v10H2zM14 10h4l3 3v3h-7M6 19a2 2 0 100-4 2 2 0 000 4zm11 0a2 2 0 100-4 2 2 0 000 4z" />}
+              </svg>
+              <span><b>{t.title}</b><small>{t.text}</small></span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <div class="container body-grid">
+        <div class="prose">
+          <slot />
+        </div>
       </div>
+
+      {gallery.length > 0 && (
+        <section class="gallery">
+          <div class="container">
+            <p class="eyebrow center">OUR DESIGNS</p>
+            <h2 class="center">{galleryTitle}</h2>
+            <span class="rule center" aria-hidden="true"></span>
+            <div class="grid" style={`--cols:${Math.min(gallery.length, 4)}`}>
+              {gallery.map((g) => (
+                <figure>
+                  <div class="frame">
+                    <img src={img(g.id, 640)} srcset={srcset(g.id, [320, 480, 640, 900])}
+                         sizes="(max-width: 640px) 46vw, (max-width: 1000px) 30vw, 260px"
+                         width="640" height="800" alt={g.alt} loading="lazy" decoding="async" />
+                  </div>
+                  {g.caption && <figcaption>{g.caption}</figcaption>}
+                </figure>
+              ))}
+            </div>
+            <p class="note center">Every piece can be made to your choice of design, gold and diamond quality.</p>
+          </div>
+        </section>
+      )}
+
+      {faqs.length > 0 && (
+        <section class="container page-faq">
+          <h2>Questions we are often asked</h2>
+          <span class="rule" aria-hidden="true"></span>
+          <div class="faq-list">
+            {faqs.map(([q, a], i) => (
+              <details open={i === 0}>
+                <summary>{q}</summary>
+                <p>{a}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section class="cta-band">
+        <div class="container cta-inner">
+          <div>
+            <p class="eyebrow light">VAISHNAVI JEWELS · SURAT</p>
+            <p class="cta-title">See it in person or on a video call</p>
+            <p class="cta-text">{business.addressText} · {business.hoursText}</p>
+          </div>
+          <div class="cta-row">
+            <a class="btn btn-gold" href={business.whatsapp} target="_blank" rel="noopener">WhatsApp {business.phone}</a>
+            <a class="btn btn-ghost" href={business.mapsUrl} target="_blank" rel="noopener">Get Directions</a>
+          </div>
+        </div>
+      </section>
     </article>
   </main>
   <SiteFooter />
 </BaseLayout>
 
 <style>
-  .info-head { padding: 56px 24px 24px; max-width: 800px; }
-  .info-head h1 { font-size: clamp(32px, 5vw, 50px); margin: 12px 0 16px; }
+  /* Hero */
+  .info-hero { background: radial-gradient(120% 80% at 85% 20%, #F6EBD3 0%, var(--color-ivory) 60%); border-bottom: 1px solid var(--color-line); }
+  .hero-grid { display: grid; grid-template-columns: 1fr; gap: 32px; padding-top: 56px; padding-bottom: 48px; align-items: center; }
+  .has-img .hero-grid { grid-template-columns: 1.1fr 0.9fr; gap: 56px; }
+  .hero-text { max-width: 620px; }
+  .info-hero h1 { font-size: clamp(34px, 5vw, 56px); margin: 12px 0 18px; }
+  .rule { display: block; width: 64px; height: 1px; background: var(--color-gold); margin: 0 0 22px; position: relative; }
+  .rule::after { content: ''; position: absolute; left: 50%; top: -3px; width: 7px; height: 7px; background: var(--color-gold); transform: translateX(-50%) rotate(45deg); }
+  .rule.center { margin-left: auto; margin-right: auto; }
   .lead { font-size: 19px; color: var(--color-ink-soft); }
-  .prose { max-width: 740px; font-size: 17px; line-height: 1.75; }
-  .prose :global(h2) { font-size: 28px; margin: 40px 0 14px; }
+  .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 26px; }
+  .hero-pic { margin: 0; position: relative; justify-self: end; width: 100%; max-width: 480px; }
+  .hero-pic::before { content: ''; position: absolute; inset: 18px -18px -18px 18px; border: 1px solid var(--color-gold); z-index: 0; }
+  .hero-pic img { position: relative; z-index: 1; width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; box-shadow: 0 24px 60px rgba(58, 15, 26, 0.25); }
+
+  /* Trust strip */
+  .trust { background: var(--color-maroon); color: #F3E7CF; }
+  .trust-row { list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding-top: 22px; padding-bottom: 22px; margin: 0 auto; }
+  .trust li { display: flex; align-items: center; gap: 12px; }
+  .ti { width: 30px; height: 30px; flex: none; fill: none; stroke: var(--color-gold-light); stroke-width: 1.3; stroke-linejoin: round; stroke-linecap: round; }
+  .trust b { display: block; font-weight: 500; font-size: 15px; letter-spacing: 0.02em; }
+  .trust small { display: block; font-size: 12.5px; opacity: 0.75; }
+
+  /* Body copy */
+  .body-grid { padding-top: 24px; }
+  .prose { max-width: 760px; margin: 0 auto; font-size: 17px; line-height: 1.8; }
+  .prose :global(h2) { font-size: clamp(26px, 3.4vw, 34px); margin: 48px 0 14px; padding-top: 18px; position: relative; }
+  .prose :global(h2)::before { content: ''; position: absolute; top: 0; left: 0; width: 40px; height: 2px; background: var(--color-gold); }
   .prose :global(h3) { font-size: 21px; margin: 28px 0 10px; }
   .prose :global(p), .prose :global(li) { color: var(--color-ink-soft); }
   .prose :global(ul) { padding-left: 22px; margin-bottom: 20px; }
-  .prose :global(a) { color: var(--color-gold-deep); text-decoration: underline; }
-  .prose :global(dt) { font-weight: 600; color: var(--color-ink); margin-top: 18px; }
-  .prose :global(dd) { margin: 4px 0 0; color: var(--color-ink-soft); }
-  .cta { max-width: 740px; margin: 48px 0 24px; padding: 28px; background: var(--color-ivory-deep); border: 1px solid var(--color-line); }
-  .cta-title { font-family: var(--font-display); font-size: 24px; margin-bottom: 6px; color: var(--color-ink); }
-  .cta-text { font-size: 14px; color: var(--color-ink-soft); }
+  .prose :global(a) { color: var(--color-gold-deep); text-decoration: underline; text-underline-offset: 3px; }
+
+  /* Gallery */
+  .gallery { margin-top: 64px; padding: 64px 0 56px; background: linear-gradient(180deg, var(--color-ivory-deep), var(--color-ivory)); border-top: 1px solid var(--color-line); border-bottom: 1px solid var(--color-line); }
+  .center { text-align: center; }
+  .gallery h2 { font-size: clamp(28px, 4vw, 40px); margin: 8px 0 16px; }
+  .grid { display: grid; grid-template-columns: repeat(var(--cols, 4), 1fr); gap: 22px; margin-top: 30px; max-width: calc(var(--cols, 4) * 290px); margin-left: auto; margin-right: auto; }
+  .grid figure { margin: 0; }
+  .frame { overflow: hidden; background: #2b0b13; box-shadow: 0 10px 30px rgba(58, 15, 26, 0.18); }
+  .frame img { width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; transition: transform 0.6s ease; }
+  .grid figure:hover img { transform: scale(1.05); }
+  .grid figcaption { font-family: var(--font-display); font-size: 18px; text-align: center; margin-top: 12px; color: var(--color-ink); }
+  .note { margin-top: 28px; font-size: 14px; color: var(--color-ink-soft); }
+
+  /* FAQ */
+  .page-faq { max-width: 808px; margin: 64px auto 0; }
+  .page-faq h2 { font-size: clamp(26px, 3.4vw, 34px); margin-bottom: 14px; }
+  .faq-list details { border-top: 1px solid var(--color-line); padding: 6px 0; }
+  .faq-list details:last-child { border-bottom: 1px solid var(--color-line); }
+  .faq-list summary { cursor: pointer; list-style: none; padding: 14px 36px 14px 0; font-weight: 500; font-size: 17px; position: relative; }
+  .faq-list summary::-webkit-details-marker { display: none; }
+  .faq-list summary::after { content: '+'; position: absolute; right: 4px; top: 8px; font-size: 26px; color: var(--color-gold); font-weight: 300; }
+  .faq-list details[open] summary::after { content: '–'; }
+  .faq-list p { margin: 0 0 16px; color: var(--color-ink-soft); line-height: 1.75; }
+
+  /* CTA band */
+  .cta-band { margin-top: 72px; background: linear-gradient(120deg, #2B0B13 0%, var(--color-maroon) 55%, #5A1A28 100%); color: #F3E7CF; }
+  .cta-inner { display: flex; align-items: center; justify-content: space-between; gap: 28px; padding-top: 48px; padding-bottom: 48px; flex-wrap: wrap; }
+  .eyebrow.light { color: var(--color-gold-light); }
+  .cta-title { font-family: var(--font-display); font-size: clamp(26px, 3.4vw, 36px); margin: 6px 0; color: #FFF8EA; }
+  .cta-text { font-size: 14px; opacity: 0.8; margin: 0; }
   .cta-row { display: flex; gap: 12px; flex-wrap: wrap; }
-  @media (max-width: 640px) { .cta-row { flex-direction: column; } .cta-row .btn { text-align: center; } }
+  .btn-gold { background: var(--color-gold-light); border-color: var(--color-gold-light); color: #2B0B13; }
+  .btn-gold:hover { background: #fff3d6; }
+  .btn-ghost { border-color: rgba(243, 231, 207, 0.6); color: #F3E7CF; }
+  .btn-ghost:hover { background: rgba(243, 231, 207, 0.1); }
+
+  @media (max-width: 1000px) {
+    .grid { grid-template-columns: repeat(2, 1fr); }
+    .grid figure:last-child:nth-child(odd) { grid-column: 1 / -1; justify-self: center; width: calc(50% - 11px); }
+    .trust-row { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 860px) {
+    .has-img .hero-grid { grid-template-columns: 1fr; gap: 36px; padding-top: 36px; }
+    .hero-pic { justify-self: center; max-width: 420px; width: calc(100% - 18px); }
+  }
+  @media (max-width: 640px) {
+    .grid { gap: 12px; }
+    .grid figcaption { font-size: 15px; }
+    .trust-row { gap: 14px 10px; }
+    .trust small { display: none; }
+    .hero-cta .btn, .cta-row .btn { flex: 1 1 100%; text-align: center; }
+  }
 </style>
