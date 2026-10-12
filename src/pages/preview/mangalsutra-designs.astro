@@ -1,0 +1,42 @@
+---
+// Team review page for new AI mangalsutra designs (C-20261012-MANGALNEW). Hidden: noindex, not in the sitemap.
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { img } from '../../data/images.js';
+const designs = [
+  ['mangal_new_01_20261012181005', 'Daily-wear halo solitaire', 'Single black-bead strand with gold links, round diamond in a diamond halo.'],
+  ['mangal_new_02_20261012181102', 'Pear blossom, double strand', 'Two black-bead strands meeting in a flower of pear and marquise diamonds with a pear drop.'],
+  ['mangal_new_03_20261012181209', 'Minimal diamond bar', 'Fine gold chain with black-bead stations and a slim diamond bar, for office wear.'],
+  ['mangal_new_04_20261012181357', 'Twin vati, diamond edged', 'Traditional double strand with two gold vatis, each ringed with diamonds.'],
+  ['mangal_new_05_20261012181559', 'Bridal three-strand floral', 'Graduated black-bead strands gathered into a diamond flower with a pear drop.'],
+  ['mangal_new_06_20261012181807', 'Rose gold heart', 'Black beads with rose gold, an open diamond heart with a centre diamond.'],
+  ['mangal_new_07_20261012182004', 'Polki flower with emerald', 'Double strand with an uncut polki flower pendant and an emerald centre.'],
+  ['mangal_new_08_20261012182225', 'Two lives joined', 'Interlocking diamond and gold circles on a short black-bead strand.'],
+];
+---
+<BaseLayout title="New mangalsutra designs – team review" description="Internal review page" canonicalPath="/preview/mangalsutra-designs" noindex={true}>
+  <main class="wrap">
+    <p class="eyebrow">VAISHNAVI JEWELS · TEAM REVIEW</p>
+    <h1>New mangalsutra designs</h1>
+    <p class="lead">8 new designs made with AI for our website and social posts, shown as designs we can craft. Reply to Aashvi on WhatsApp with the design number and your suggestion (for example "3 – make the bar shorter" or "drop 6") by <b>Wednesday 14 October, 12 noon</b>. If there are no suggestions, they go ahead.</p>
+    <div class="grid">
+      {designs.map(([id, name, note], i) => (
+        <figure>
+          <img src={img('vj/concept/' + id, 720)} width="720" height="900" alt={name} loading={i < 2 ? 'eager' : 'lazy'} />
+          <figcaption><b>{i + 1}. {name}</b><span>{note}</span></figcaption>
+        </figure>
+      ))}
+    </div>
+  </main>
+</BaseLayout>
+
+<style>
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 40px 18px 64px; }
+  h1 { font-size: clamp(32px, 5vw, 48px); margin: 10px 0 14px; }
+  .lead { color: var(--color-ink-soft); max-width: 720px; font-size: 17px; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 22px; margin-top: 28px; }
+  figure { margin: 0; }
+  img { width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; box-shadow: 0 10px 30px rgba(58, 15, 26, 0.18); }
+  figcaption { margin-top: 10px; font-size: 14px; color: var(--color-ink-soft); }
+  figcaption b { display: block; font-family: var(--font-display); font-size: 20px; font-weight: 500; color: var(--color-ink); }
+  @media (max-width: 900px) { .grid { grid-template-columns: repeat(2, 1fr); gap: 14px; } }
+</style>
