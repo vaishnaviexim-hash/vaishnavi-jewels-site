@@ -3,22 +3,22 @@ import InfoPage from '../layouts/InfoPage.astro';
 import { business as b } from '../data/business.js';
 const faqs: [string, string][] = [
   ['Which is the best bridal jewellery shop in Surat?', 'Surat has many fine jewellers, so choose one that makes its own jewellery, certifies its diamonds and can customise designs. Vaishnavi Jewels at Rajhans Ornate, Parle Point, has made bridal jewellery in-house since 2005, in certified natural and lab-grown diamonds and Polki, with BIS HUID hallmarked gold and certified diamonds.'],
-  ['Why do families come to Surat for bridal jewellery?', 'Surat is the world\'s diamond-cutting centre, so families find a wide choice of certified diamond and Polki designs, makers who can customise any piece, and pricing direct from the workshop.'],
+  ['Why do families come to Surat for bridal jewellery?', 'Surat is the world\'s diamond-cutting centre, so families find a wide choice of certified diamond and Polki designs and makers who can customise any piece in their own manufacturing unit.'],
   ['Can I get a custom bridal set made in Surat?', 'Yes. We manufacture in-house, so we can create your design from a photo or sketch, or change gold karat, diamond quality, stone colours, size and layout to suit your outfits. Most custom bridal pieces take 2 to 4 weeks depending on the design, and we have delivered some in as little as 8 days.'],
   ['Do you offer bridal jewellery in both natural and lab-grown diamonds?', 'Yes. We make bridal sets in both, and the certificate for every diamond piece clearly states the type of diamond.'],
   ['Can we plan jewellery for the whole family, not only the bride?', 'Yes. We can plan jewellery for the bride, mothers, sisters and the groom together, so the looks work well across the wedding functions.'],
-  ['Do we need an appointment for bridal shopping?', 'Walk-ins are welcome every day, Sundays included, until 7 November (11 AM to 8 PM), and Monday to Saturday after that. For bridal shopping, especially if you are travelling to Surat, a WhatsApp message a day or two ahead lets us keep a shortlist ready and give your family a private consultation.'],
+  ['Do we need an appointment for bridal shopping?', `Walk-ins are welcome during opening hours: ${b.hoursText} For bridal shopping, especially if you are travelling to Surat, a WhatsApp message a day or two ahead lets us keep a shortlist ready and give your family a private consultation.`],
   ['How early should we start planning?', 'As early as you can. Most custom pieces take 2 to 4 weeks, so message us with your wedding dates and we will confirm the timeline for the designs you choose.'],
   ['We are not in Surat. Can we still plan bridal jewellery with you?', 'Yes. We plan bridal jewellery on video calls with families across India, take payment by NEFT or UPI and deliver with free insured shipping to major Indian cities. Many families shortlist on a video call and then visit once to finalise.'],
 ];
 ---
 <InfoPage
-  title="Bridal Jewellery Shop in Surat Since 2005 | Certified Diamond & Polki Sets | Vaishnavi Jewels"
-  description="Planning bridal jewellery shopping in Surat? Vaishnavi Jewels, Parle Point: certified diamond and Polki bridal sets, solitaires and mangalsutras made in-house since 2005, custom designs in 2 to 4 weeks, private appointments."
+  title="Bridal Jewellery Surat | Polki & Kundan Sets | Vaishnavi Jewels"
+  description="Bridal jewellery in Surat: Polki and Kundan sets, certified diamond sets and mangalsutras, made in our own unit since 2005. Rajhans Ornate Mall, Parle Point."
   path="/bridal-jewellery"
   eyebrow="BRIDAL"
   heading="Bridal Jewellery in Surat"
-  intro="Complete bridal looks in certified diamonds and Polki &ndash; planned with you, made in our own workshop at Parle Point, Surat, since 2005."
+  intro="Complete bridal looks in Polki, Kundan and certified diamonds &ndash; planned with you, made in our own manufacturing unit in Surat since 2005."
   faqs={faqs}
 >
   <h2>Choosing a bridal jewellery shop in Surat</h2>
@@ -27,7 +27,7 @@ const faqs: [string, string][] = [
   <h2>What brides choose from</h2>
   <ul>
     <li>Diamond necklace sets, in natural or lab-grown diamonds</li>
-    <li><a href="/polki-jewellery">Polki</a> and <a href="/jadau-jewellery">Jadau</a> chokers, long necklaces (raani haar) and full sets</li>
+    <li><a href="/polki-jewellery">Polki</a>, Kundan and <a href="/jadau-jewellery">Jadau</a> chokers, long necklaces (raani haar) and full sets</li>
     <li>Mangalsutras, engagement and wedding rings, and <a href="/solitaire-rings">certified solitaires</a></li>
     <li>Earrings, jhumkas, maang tikkas, bangles, kadas and bracelets</li>
   </ul>
@@ -54,5 +54,5 @@ const faqs: [string, string][] = [
   <p>Diamonds come with certificates from recognised laboratories such as IGI, TGL and EGL where applicable; gold jewellery is BIS HUID hallmarked. Every Vaishnavi solitaire is laser-inscribed with its report number, which you can verify online.</p>
 
   <h2>Families outside Surat</h2>
-  <p>We regularly help families from Ahmedabad, Vadodara, Mathura and other cities through video calls, with NEFT or UPI payment and free insured delivery to major Indian cities. See <a href="/visit-us">Visit our showroom</a> and <a href="/delivery-across-india">Delivery across India</a>.</p>
+  <p>We regularly help families from Ahmedabad, Vadodara, Mathura and other cities through video calls, with NEFT or UPI payment and free insured delivery to major Indian cities. See <a href="/visit-us">Visit our showroom</a>, <a href="/delivery-across-india">Delivery across India</a> and our <a href="/faq">FAQ</a>. For outfit ideas, read <a href="/blog/what-jewellery-goes-with-red-bridal-lehenga">What jewellery goes with a red bridal lehenga?</a></p>
 </InfoPage>

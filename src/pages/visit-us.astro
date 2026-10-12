@@ -3,7 +3,7 @@ import InfoPage from '../layouts/InfoPage.astro';
 import { business as b } from '../data/business.js';
 const faqs: [string, string][] = [
   ['Where exactly is the Vaishnavi Jewels showroom?', `Shop UG120, Rajhans Ornate - High Street Retail Mall, Parle Point, Surat, Gujarat 395007. Tap "Get Directions" on this page to open it in Google Maps.`],
-  ['What are your opening hours?', 'Open every day, Sundays included, 11 AM to 8 PM until 7 November 2026; after that Monday to Saturday, 11 AM to 8 PM. Festival closures are shown on our Google profile.'],
+  ['What are your opening hours?', b.hoursText],
   ['Do I need an appointment?', 'Walk-ins are welcome during opening hours. For bridal shopping or a larger family visit, a WhatsApp message a day or two ahead helps us keep a shortlist ready for you.'],
   ['We live in Ahmedabad, Vadodara or Mathura. Can we shop without travelling?', 'Yes. We show pieces live on video calls, share photos, videos and certificate details on WhatsApp, take payment by NEFT or UPI and send free insured delivery to major Indian cities.'],
   ['Can we see a piece on a video call first and then visit to finalise?', 'Yes. You can shortlist on a video call and then visit once to see the final pieces in person. Tell us your visit date and we will keep your shortlist ready.'],
@@ -11,18 +11,18 @@ const faqs: [string, string][] = [
 const pageSchema = {
   '@context': 'https://schema.org',
   '@type': 'WebPage',
-  name: 'Visit Vaishnavi Jewels at Parle Point, Surat',
+  name: 'Jewellers near Parle Point, Surat: visit Vaishnavi Jewels',
   url: 'https://vaishnavijewels.com/visit-us',
   about: { '@id': 'https://vaishnavijewels.com/#store' },
   mentions: ['Ahmedabad', 'Vadodara', 'Mathura'].map((c) => ({ '@type': 'City', name: c })),
 };
 ---
 <InfoPage
-  title="Jewellery Showroom at Parle Point, Surat | Visit Vaishnavi Jewels"
-  description="Visit Vaishnavi Jewels at Rajhans Ornate Mall, Parle Point, Surat: hours, directions and how families from Ahmedabad, Vadodara and Mathura shop with us."
+  title="Jewellers near Parle Point, Surat | Diamond Jewellery Showroom | Vaishnavi Jewels"
+  description="Diamond jewellery showroom near Parle Point, Surat, since 2005: Rajhans Ornate Mall. Hours, directions, video-call shopping and insured delivery across India."
   path="/visit-us"
   eyebrow="VISIT US"
-  heading="Our Showroom at Parle Point, Surat"
+  heading="Jewellers near Parle Point, Surat"
   intro="A 2,500 sq ft showroom of our own, with over 3,000 designs in certified natural and lab-grown diamonds and Polki."
   extraSchema={[pageSchema]}
   faqs={faqs}
@@ -31,8 +31,17 @@ const pageSchema = {
   <p><strong>{b.addressText}</strong><br />{b.hoursText}</p>
   <p>We are inside Rajhans Ornate &ndash; High Street Retail Mall at Parle Point, one of the best-known landmarks in Surat. Use the <a href={b.mapsUrl} target="_blank" rel="noopener">Get Directions</a> link to open the route in Google Maps from wherever you are.</p>
 
+  <h2>Why families trust us</h2>
+  <ul>
+    <li><strong>Since 2005.</strong> A self-owned showroom serving families since {b.foundedText}.</li>
+    <li><strong>A Parle Point landmark.</strong> Inside Rajhans Ornate &ndash; High Street Retail Mall, Parle Point, Surat.</li>
+    <li><strong>Certified and hallmarked.</strong> Diamond reports from IGI, EGL or TGL, and BIS HUID hallmarked gold you can check in the BIS Care app. See our <a href="/faq">FAQ</a>.</li>
+    <li><strong>Our own manufacturing unit.</strong> Any design can be made or changed to your choice.</li>
+    <li><strong>Shop from anywhere.</strong> Video-call shopping and free insured delivery across India. See <a href="/delivery-across-india">Delivery across India</a>.</li>
+  </ul>
+
   <h2>What you will see</h2>
-  <p>Our showroom is self-owned and has been serving families since {b.foundedText}. Everything is made in our own workshop, so you can see a design, then ask us to change the gold karat, diamond quality or the design itself. We show certified natural and lab-grown diamond jewellery, solitaire rings and Polki, from daily-wear pieces to complete bridal sets.</p>
+  <p>Our showroom is self-owned and has been serving families since {b.foundedText}. Everything is made in our own manufacturing unit, so you can see a design, then ask us to change the gold karat, diamond quality or the design itself. We show certified natural and lab-grown diamond jewellery, solitaire rings and Polki, from daily-wear pieces to complete bridal sets.</p>
 
   <h2>Planning your visit</h2>
   <ul>
@@ -50,5 +59,5 @@ const pageSchema = {
   <h2>Families from Mathura</h2>
   <p>We have a strong base of customers in Mathura, and you can shop with us fully from home: we show pieces live on video calls, share certificate details on WhatsApp, take payment by NEFT or UPI and send the jewellery with free insured delivery. If you are visiting Gujarat, tell us your dates and we will keep your shortlist ready at the showroom.</p>
 
-  <p>Shopping from somewhere else in India? See <a href="/delivery-across-india">Delivery across India</a>.</p>
+  <p>Shopping from somewhere else in India? See <a href="/delivery-across-india">Delivery across India</a>. Browse our collections: <a href="/natural-diamond-jewellery">Natural diamond jewellery</a>, <a href="/lab-grown-diamond-jewellery">Lab-grown diamond jewellery</a>, <a href="/solitaire-rings">Solitaire rings</a>, <a href="/bridal-jewellery">Bridal jewellery</a> and <a href="/polki-jewellery">Polki jewellery</a>.</p>
 </InfoPage>

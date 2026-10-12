@@ -1,5 +1,6 @@
 ---
 import InfoPage from '../layouts/InfoPage.astro';
+import { business as b } from '../data/business.js';
 
 // Answer-first FAQ: the first sentence of every answer is the direct answer,
 // so search engines and AI assistants can quote it as-is.
@@ -33,12 +34,15 @@ const groups = [
     faqs: [
       ['Where is Vaishnavi Jewels located?', 'Our showroom is at UG120, Rajhans Ornate - High Street Retail Mall, Parle Point, Surat, Gujarat 395007.'],
       ['Where can I buy certified diamond jewellery in Surat?', 'At Vaishnavi Jewels, Rajhans Ornate Mall, Parle Point, Surat. We have sold certified natural and lab-grown diamond jewellery since 2005, and we show you the grading report and the inscription before you buy.'],
-      ['What are your opening hours?', 'Open every day, Sundays included, 11 AM to 8 PM until 7 November 2026; after that Monday to Saturday, 11 AM to 8 PM. Festival closures are shown on our Google profile.'],
+      ['Where can I buy Polki jewellery in Surat?', 'At Vaishnavi Jewels, Rajhans Ornate Mall, Parle Point, Surat. We make Polki chokers, long necklaces, earrings and full bridal sets in our own manufacturing unit, and you can see them in the showroom or on a video call.'],
+      ['Where can I buy bridal jewellery in Surat?', 'At Vaishnavi Jewels, Rajhans Ornate Mall, Parle Point, Surat. We make Polki and Kundan bridal sets, certified diamond necklace sets, solitaires and mangalsutras in our own manufacturing unit, and we can plan the jewellery for every wedding function with you.'],
+      ['How long has Vaishnavi Jewels been in business?', 'Since 1 June 2005. Vaishnavi Jewels is a brand of Vaishnavi Gem & Jewel Pvt Ltd, founded by Shilpi Agarwal.'],
+      ['What are your opening hours?', b.hoursText],
       ['What kind of jewellery do you sell?', 'Natural diamond jewellery, lab-grown diamond jewellery, Polki and Jadau, including bridal sets, necklaces, rings, earrings, bangles, bracelets, pendants and mangalsutras. We have over 3,000 designs.'],
-      ['Do you deliver outside Surat?', 'Yes. We offer free insured delivery to major Indian cities. For other locations, message us and we will confirm the options.'],
-      ['Can I see the jewellery before buying if I am not in Surat?', 'Yes. We show pieces on video calls and share photos, videos and grading report details on WhatsApp.'],
-      ['How can I pay?', 'We accept payment by NEFT and UPI.'],
-      ['Do you offer exchange and buyback?', 'Yes. Exchange and buyback are available on jewellery bought from us. The value is calculated after deducting labour, certification and other applicable charges. Please ask us for the current terms for your piece.'],
+      ['Do you ship across India?', 'Yes. We offer free insured delivery to major Indian cities, with the certificate and invoice. For other locations, message us and we will confirm the options.'],
+      ['Can I see the jewellery on a video call before buying?', 'Yes. We show pieces live on video calls and share photos, videos and grading report details on WhatsApp, so you can decide before you pay.'],
+      ['How can I pay?', 'We accept NEFT, UPI and cash. We do not offer EMI.'],
+      ['Do you offer exchange and buyback?', 'Yes. A piece bought from us can be exchanged at its value less the making charges. Buyback is also available: the value is worked out after deducting making and other applicable charges, and gold is valued at the market rate on the day of return. Please ask us for the terms for your piece.'],
       ['How do I contact you?', 'Call or WhatsApp +91 75674 00099, or email vaishnaviexim@gmail.com.'],
     ],
   },
@@ -52,8 +56,8 @@ const faqSchema = {
 };
 ---
 <InfoPage
-  title="FAQ: Certificates, HUID, Custom Jewellery | Vaishnavi Jewels, Surat"
-  description="Straight answers on grading reports, HUID checks, natural and lab-grown diamonds, custom bridal timelines, resizing, delivery and payment at Vaishnavi Jewels, Surat."
+  title="Jewellery FAQ: Certificates, HUID, Delivery | Vaishnavi Jewels, Surat"
+  description="Answers on IGI, EGL and TGL reports, BIS HUID, Polki and bridal jewellery in Surat, video-call shopping, insured delivery across India, exchange and payment."
   path="/faq"
   eyebrow="QUESTIONS"
   heading="Frequently Asked Questions"

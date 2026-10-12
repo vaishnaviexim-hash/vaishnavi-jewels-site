@@ -34,5 +34,8 @@ is exactly the kind of work our own manufacturing unit has
 specialised in for two
 decades.
 
+See our [Polki jewellery](/polki-jewellery), [Jadau jewellery](/jadau-jewellery)
+and [bridal jewellery](/bridal-jewellery) pages, or read the [FAQ](/faq).
+
 *Visit us at Rajhans Ornate Mall, Parle Point, Surat to see both styles in
 person, or [WhatsApp us](https://wa.me/917567400099) for a consultation.*
