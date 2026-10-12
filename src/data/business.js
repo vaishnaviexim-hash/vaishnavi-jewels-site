@@ -46,6 +46,8 @@ export const infoPages = [
   { path: '/lab-grown-diamond-jewellery', label: 'Lab-Grown Diamond Jewellery' },
   { path: '/polki-jewellery', label: 'Polki Jewellery' },
   { path: '/bridal-jewellery', label: 'Bridal Jewellery' },
+  { path: '/diamond-mangalsutra', label: 'Diamond Mangalsutra' },
+  { path: '/diamond-earrings', label: 'Diamond Earrings' },
   { path: '/visit-us', label: 'Visit Our Showroom' },
   { path: '/delivery-across-india', label: 'Delivery Across India' },
   { path: '/faq', label: 'FAQ' },

@@ -1,0 +1,44 @@
+---
+import InfoPage from '../layouts/InfoPage.astro';
+import { business as b } from '../data/business.js';
+const faqs: [string, string][] = [
+  ['What kinds of diamond earrings do you make?', 'Solitaire studs, cluster studs, drops and danglers, hoops and huggies, ear cuffs, and fuller earrings for the wedding, in natural diamonds or lab-grown diamonds, and Polki earrings for bridal and festive wear.'],
+  ['Do diamond earrings come with a certificate?', 'Yes. Solitaire earrings come with an individual grading report for each stone. Earrings with many small diamonds come with a jewellery grading report that states the total diamond weight, number and quality, and whether they are natural or lab-grown.'],
+  ['Is the gold hallmarked?', 'Yes. Our gold jewellery carries a BIS HUID hallmark, a 6-character code you can check yourself in the BIS Care app.'],
+  ['Can I get diamond earrings made to my own design?', 'Yes. We manufacture in our own unit in Surat, so you can choose the design, the gold karat and colour, the diamond quality and the back (screw or push), or bring a photo of a design you like. Custom pieces usually take 2 to 4 weeks.'],
+  ['Can I match earrings to my necklace or mangalsutra?', 'Yes. We can make earrings to match a necklace, pendant or mangalsutra you buy from us, or design a matching set for the wedding.'],
+  ['Can I buy diamond earrings from outside Surat?', 'Yes. We show the earrings live on a video call, share the report details on WhatsApp before you pay, accept NEFT or UPI and send them with free insured delivery to major Indian cities.'],
+];
+const pageSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: 'Diamond Earrings in Surat',
+  url: 'https://vaishnavijewels.com/diamond-earrings',
+  about: { '@id': 'https://vaishnavijewels.com/#store' },
+};
+---
+<InfoPage
+  title="Diamond Earrings in Surat | Certified Studs, Drops & Bridal | Vaishnavi Jewels"
+  description="Certified diamond earrings made in Surat, the diamond city: solitaire studs, drops, hoops and bridal earrings in natural or lab-grown diamonds, with a grading report and BIS HUID hallmarked gold. Custom designs and delivery across India."
+  path="/diamond-earrings"
+  eyebrow="DIAMOND EARRINGS"
+  heading="Diamond Earrings in Surat"
+  intro="Certified diamond earrings for daily wear, gifting and the wedding, made in our own manufacturing unit in Surat."
+  extraSchema={[pageSchema]}
+  faqs={faqs}
+>
+  <h2>Earrings for every day and every occasion</h2>
+  <p>Our showroom holds diamond earrings from small studs you can wear every day to fuller pieces for the wedding. Solitaire studs, cluster studs, drops and danglers, hoops and huggies, and ear cuffs are all made in our own unit in Surat, along with <a href="/polki-jewellery">Polki earrings</a> for bridal and festive wear.</p>
+
+  <h2>Certified diamonds, hallmarked gold</h2>
+  <p>Solitaire earrings come with an individual grading report for each stone from a recognised laboratory such as IGI, EGL or TGL, and the report number is laser-inscribed on the diamond. Earrings set with many small diamonds come with a jewellery grading report that states the total diamond weight, number and quality, and whether they are natural or lab-grown. The gold carries a BIS HUID hallmark you can verify in the BIS Care app. See <a href="/solitaire-rings">how to verify a solitaire</a>.</p>
+
+  <h2>Natural or lab-grown diamonds</h2>
+  <p>Diamond earrings can be made in <a href="/natural-diamond-jewellery">natural diamonds</a> or <a href="/lab-grown-diamond-jewellery">lab-grown diamonds</a>. Whichever you choose, the report states clearly what the diamonds are.</p>
+
+  <h2>Made to your choice, and to match</h2>
+  <p>Because we manufacture ourselves, you can choose the design, the gold karat and colour, the diamond quality and the type of back, or bring a photo of a design you like. Earrings can also be made to match a necklace, pendant or <a href="/diamond-mangalsutra">diamond mangalsutra</a>, or as part of your <a href="/bridal-jewellery">bridal jewellery</a>. Most custom pieces are ready in 2 to 4 weeks.</p>
+
+  <h2>See them before you decide</h2>
+  <p>Visit us at {b.addressText} ({b.hoursText}) or ask for a video call on WhatsApp at <a href={b.whatsapp} target="_blank" rel="noopener">{b.phone}</a>. Shopping from another city? See <a href="/delivery-across-india">Delivery across India</a>.</p>
+</InfoPage>

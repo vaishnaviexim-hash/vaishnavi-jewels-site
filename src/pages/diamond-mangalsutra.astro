@@ -1,0 +1,44 @@
+---
+import InfoPage from '../layouts/InfoPage.astro';
+import { business as b } from '../data/business.js';
+const faqs: [string, string][] = [
+  ['Do you make diamond mangalsutras?', 'Yes. We make diamond mangalsutras in our own manufacturing unit in Surat, from light daily-wear designs to fuller bridal pieces, in natural diamonds or lab-grown diamonds.'],
+  ['Is a diamond mangalsutra certified?', 'Yes. The diamonds come with a jewellery grading report that states their total weight, number and quality, and whether they are natural or lab-grown. The gold carries a BIS HUID hallmark you can check in the BIS Care app.'],
+  ['Can I get a mangalsutra made to my own design?', 'Yes. You can choose the pendant design, the chain or black-bead length, the gold karat and colour, and the diamond quality, or bring a photo of a design you like. Custom pieces usually take 2 to 4 weeks.'],
+  ['Which gold do you use for mangalsutras?', 'We make mangalsutras in 18K gold, and in other karats on request. The karat is stamped and hallmarked on the piece and stated on your invoice.'],
+  ['Can I buy a mangalsutra from outside Surat?', 'Yes. We show the piece live on a video call, share its report details on WhatsApp before you pay, accept NEFT or UPI and send it with free insured delivery to major Indian cities.'],
+  ['Can a mangalsutra be shortened, lengthened or repaired later?', 'Yes. We adjust length, re-string black beads, resize and polish our pieces. A manufacturing defect found right away is fixed free of cost; later work is charged at actual cost.'],
+];
+const pageSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'WebPage',
+  name: 'Diamond Mangalsutra in Surat',
+  url: 'https://vaishnavijewels.com/diamond-mangalsutra',
+  about: { '@id': 'https://vaishnavijewels.com/#store' },
+};
+---
+<InfoPage
+  title="Diamond Mangalsutra in Surat | Certified, Hallmarked, Made to Order | Vaishnavi Jewels"
+  description="Certified diamond mangalsutras made in Surat, the diamond city: natural or lab-grown diamonds with a grading report, BIS HUID hallmarked gold, daily-wear and bridal designs, custom designs and insured delivery across India."
+  path="/diamond-mangalsutra"
+  eyebrow="DIAMOND MANGALSUTRA"
+  heading="Diamond Mangalsutra in Surat"
+  intro="Certified diamond mangalsutras for every day and for the wedding, made in our own manufacturing unit in Surat."
+  extraSchema={[pageSchema]}
+  faqs={faqs}
+>
+  <h2>A mangalsutra you can wear every day</h2>
+  <p>A mangalsutra is worn for years, so it should be comfortable and well made. We make diamond mangalsutras in our own unit in Surat, from slim daily-wear designs with a small diamond pendant to fuller pieces for the wedding day. Short and long lengths, single and double black-bead strings, and chain styles can all be made.</p>
+
+  <h2>Certified diamonds, hallmarked gold</h2>
+  <p>Every diamond mangalsutra comes with a jewellery grading report from a recognised laboratory such as IGI, EGL or TGL. The report states the total diamond weight, the number of diamonds and their quality, and whether they are natural or lab-grown. The gold carries a BIS HUID hallmark, a 6-character code you can verify in the BIS Care app. Read more in our <a href="/faq">FAQ on certificates and HUID</a>.</p>
+
+  <h2>Natural or lab-grown diamonds</h2>
+  <p>You can choose <a href="/natural-diamond-jewellery">natural diamonds</a> or <a href="/lab-grown-diamond-jewellery">lab-grown diamonds</a> for your mangalsutra. Whichever you choose, the report states clearly what the diamonds are.</p>
+
+  <h2>Made to your choice</h2>
+  <p>Because we manufacture ourselves, you can choose the pendant design, the length, the gold karat and colour, and the diamond quality, or bring a photo of a design you like. Most custom pieces are ready in 2 to 4 weeks. For the wedding, the mangalsutra can be planned together with the rest of your <a href="/bridal-jewellery">bridal jewellery</a> and <a href="/solitaire-rings">engagement ring</a>.</p>
+
+  <h2>See it before you decide</h2>
+  <p>Visit us at {b.addressText} ({b.hoursText}) or ask for a video call on WhatsApp at <a href={b.whatsapp} target="_blank" rel="noopener">{b.phone}</a>. Shopping from another city? See <a href="/delivery-across-india">Delivery across India</a>.</p>
+</InfoPage>
