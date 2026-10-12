@@ -17,6 +17,8 @@
   --color-gold-deep: #8C6E24;
   --color-line: #DCD1B4;
   --color-white: #FFFFFF;
+  --color-maroon: #3A0F1A;   /* matches the social 'maroon velvet' theme */
+  --color-gold-light: #E3C27A;
 
   /* Type */
   --font-display: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;

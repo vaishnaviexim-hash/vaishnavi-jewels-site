@@ -15,6 +15,7 @@ interface Props {
   isArticle?: boolean;
   pubDate?: Date;
   extraSchema?: object[];
+  noindex?: boolean; // previews only
 }
 
 const {
@@ -25,6 +26,7 @@ const {
   isArticle = false,
   pubDate,
   extraSchema = [],
+  noindex = false,
 } = Astro.props;
 
 const siteUrl = 'https://vaishnavijewels.com';
@@ -42,7 +44,7 @@ const absoluteOgImage = ogImage.startsWith('http') ? ogImage : new URL(ogImage, 
   <!-- SEO Meta Tags -->
   <meta name="description" content={description} />
   <meta name="author" content="Vaishnavi Gem & Jewel Pvt Ltd" />
-  <meta name="robots" content="index, follow" />
+  <meta name="robots" content={noindex ? 'noindex, nofollow' : 'index, follow'} />
   <meta name="geo.region" content="IN-GJ" />
   <meta name="geo.placename" content="Surat, Gujarat, India" />
 
