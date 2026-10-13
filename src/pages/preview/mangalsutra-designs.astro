@@ -3,29 +3,29 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { img } from '../../data/images.js';
 const designs = [
-  ['mangal_new_01_20261012181005', 'Daily-wear halo solitaire', 'Single black-bead strand with gold links, round diamond in a diamond halo.'],
-  ['mangal_new_02_20261012181102', 'Pear blossom, double strand', 'Two black-bead strands meeting in a flower of pear and marquise diamonds with a pear drop.'],
-  ['mangal_new_03_20261012181209', 'Minimal diamond bar', 'Fine gold chain with black-bead stations and a slim diamond bar, for office wear.'],
-  ['mangal_new_04_20261012181357', 'Twin vati, diamond edged', 'Traditional double strand with two gold vatis, each ringed with diamonds.'],
-  ['mangal_new_05_20261012181559', 'Bridal three-strand floral', 'Graduated black-bead strands gathered into a diamond flower with a pear drop.'],
-  ['mangal_new_06_20261012181807', 'Rose gold heart', 'Black beads with rose gold, an open diamond heart with a centre diamond.'],
-  ['mangal_new_07_20261012182004', 'Polki flower with emerald', 'Double strand with an uncut polki flower pendant and an emerald centre.'],
-  ['mangal_new_08_20261012182225', 'Two lives joined', 'Interlocking diamond and gold circles on a short black-bead strand.'],
-  ['mangal_new_09_20261012182814', 'Single round solitaire', 'One round solitaire in a classic four-prong gold setting on a black-bead strand.'],
-  ['mangal_new_10_20261012183031', 'Two solitaires, side by side', 'Two equal round solitaires for the couple, on a double black-bead strand.'],
-  ['mangal_new_11_20261012183248', 'Toi et moi: pear and oval', 'Two solitaires of different shapes, a pear and an oval, facing each other.'],
-  ['mangal_new_12_20261012183504', 'Oval solitaire, rose gold', 'One oval solitaire in a fine rose gold setting, black beads with rose gold.'],
+  ['mangal_new_01_chain_20261013152619', 'Daily-wear halo solitaire', 'Round diamond in a diamond halo on our fine black-bead chain.'],
+  ['mangal_new_02_chain_20261013152812', 'Pear blossom', 'A flower of pear and marquise diamonds with a pear drop, on our fine black-bead chain.'],
+  ['mangal_new_03_chain_20261013152929', 'Minimal diamond bar', 'A slim diamond bar on our fine black-bead chain, for office wear.'],
+  ['mangal_new_04_chain_20261013153045', 'Twin vati, diamond edged', 'Two gold vatis, each ringed with diamonds, on our fine black-bead chain.'],
+  ['mangal_new_05_chain_20261013153200', 'Bridal floral', 'A diamond flower with a pear drop, on our fine black-bead chain.'],
+  ['mangal_new_06_chain_20261013153317', 'Rose gold heart', 'An open diamond heart with a centre diamond, black beads with rose gold.'],
+  ['mangal_new_07_chain2_20261013154516', 'Polki flower with emerald', 'An uncut polki flower pendant with an emerald centre, on our fine black-bead chain.'],
+  ['mangal_new_08_chain_20261013153550', 'Two lives joined', 'Interlocking diamond and gold circles on our fine black-bead chain.'],
+  ['mangal_new_09_chain_20261013153707', 'Single round solitaire', 'One round solitaire in a classic four-prong gold setting on our fine black-bead chain.'],
+  ['mangal_new_10_chain2_20261013154403', 'Two solitaires, side by side', 'Two equal round solitaires for the couple, on our fine black-bead chain.'],
+  ['mangal_new_11_chain_20261013153939', 'Toi et moi: pear and oval', 'Two solitaires of different shapes, a pear and an oval, facing each other.'],
+  ['mangal_new_12_chain2_20261013154629', 'Oval solitaire, rose gold', 'One oval solitaire in a fine rose gold setting, black beads with rose gold.'],
 ];
 ---
 <BaseLayout title="New mangalsutra designs – team review" description="Internal review page" canonicalPath="/preview/mangalsutra-designs" noindex={true}>
   <main class="wrap">
     <p class="eyebrow">VAISHNAVI JEWELS · TEAM REVIEW</p>
     <h1>New mangalsutra designs</h1>
-    <p class="lead">12 new designs made with AI for our website and social posts, shown as designs we can craft. Reply to Aashvi on WhatsApp with the design number and your suggestion (for example "3 – make the bar shorter" or "drop 6") by <b>Wednesday 14 October, 12 noon</b>. If there are no suggestions, they go ahead.</p>
+    <p class="lead">12 new designs made with AI for our website and social posts, shown as designs we can craft. Updated 13 October with the fine black-bead chain we use on our diamond mangalsutras. Reply to Aashvi on WhatsApp with the design number and your suggestion (for example "3 – make the bar shorter" or "drop 6") by <b>Wednesday 14 October, 12 noon</b>. If there are no suggestions, they go ahead.</p>
     <div class="grid">
       {designs.map(([id, name, note], i) => (
         <figure>
-          <img src={img('vj/concept/' + id, 720)} width="720" height="900" alt={name} loading={i < 2 ? 'eager' : 'lazy'} />
+          <img src={img('vj/design_gemini/' + id, 720)} width="720" height="900" alt={name} loading={i < 2 ? 'eager' : 'lazy'} />
           <figcaption><b>{i + 1}. {name}</b><span>{note}</span></figcaption>
         </figure>
       ))}
