@@ -36,8 +36,8 @@
   const tags = () => (window.VJ_TAGS ? window.VJ_TAGS() : []);
   function find(q) {
     q = String(q || "").trim().toUpperCase().replace(/\s+/g, ""); if (!q) return [];
-    const all = tags();
-    const exact = all.filter(t => String(t.designNo || "").toUpperCase() === q || String(t.label || "").toUpperCase() === q || String(t.no) === q && /^\d+$/.test(q) || String(t.label || "").toUpperCase().replace("/", "") === q.replace("/", ""));
+    const all = tags(), n = x => String(x || "").toUpperCase().replace(/[^A-Z0-9]/g, ""), nq = n(q);   // 14/10: DZGR139 = DZ-GR-139
+    const exact = all.filter(t => String(t.no) === q && /^\d+$/.test(q) || nq && (n(t.designNo) === nq || n(t.label) === nq));
     return exact.slice(0, 12);
   }
 
@@ -143,7 +143,7 @@
       doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(80);
       // owner 14/10: weights printed unless the "Show gold weight & diamond carats" box is unticked
       const ct = (t.dias || []).filter(d => !NON_DIAMOND.test(d.q || "")).reduce((a, d) => a + (d.ct || 0), 0);
-      const goldTxt = t.kind === "sample" ? (q.weights ? "14K gold " + ((t.metal && t.metal.net) || 0).toFixed(3) + " g" : "14K gold") + ", made to order (about 2-4 weeks)"
+      const goldTxt = t.kind === "sample" ? (q.weights ? "14K gold " + ((t.metal && t.metal.net) || 0).toFixed(3) + " g" : "14K gold") // owner 14/10: no "made to order" line
         : [...new Set((t.gold || []).map(g => g.k))].length && !q.weights ? [...new Set((t.gold || []).map(g => g.k))].join(" + ") + " gold" : (t.gold || []).map(g => g.k + " gold " + g.net.toFixed(3) + " g").join(" + ");
       doc.text(`${goldTxt}${ct ? (q.weights ? ", diamonds " + ct.toFixed(2) + " ct" : ", diamonds") : ""}`, x, y + 12); doc.setTextColor(20);
       doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.text(fmt(t.price), W - M, y + 8, { align: "right" });

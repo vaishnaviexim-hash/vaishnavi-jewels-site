@@ -162,10 +162,20 @@
     document.addEventListener("focusin", e => { const el = e.target; if (el && (el.id === "cq" || el.id === "qq")) { armed = el; setTimeout(() => sel(el), 0); } });
     document.addEventListener("click", e => { const el = e.target; if (el && el === armed) { sel(el); armed = null; } });
     document.addEventListener("focusout", e => { if (e.target === armed) armed = null; }); } catch (e) {}
+  // 14/10/2026 owner: on Price check, "dzgr139" must find DZ-GR-139 (and "svbn235" SVBN/235): before the page looks the
+  // text up, swap it for the design no. / label it matches when dashes, slashes and spaces are ignored.
+  try { const fixQ = () => { const el = document.getElementById("cq"); if (!el) return; const raw = el.value.trim();
+      if (!raw || raw.includes("#") || /^\d+$/.test(raw) || /^[a-z]{3}\d+[a-z]{3}$/i.test(raw)) return;
+      const n = x => String(x || "").toUpperCase().replace(/[^A-Z0-9]/g, ""), nq = n(raw); if (!nq) return;
+      const all = [...cache.entries()].filter(([p]) => p.startsWith("tags/")).map(([, e]) => e.data);
+      const d = all.find(t => n(t.designNo) === nq), l = d ? null : all.find(t => n(t.label) === nq);
+      const hit = d ? d.designNo : l ? l.label : null; if (hit && hit !== raw) el.value = hit; };
+    document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target && e.target.id === "cq") fixQ(); }, true);
+    document.addEventListener("click", e => { if (e.target && e.target.id === "cgo") fixQ(); }, true); } catch (e) {}
   // Read-only helpers for the Quote tab (quote.js): the current stock list and settings from this page's copy.
   window.VJ_TAGS = () => [...cache.entries()].filter(([p]) => p.startsWith("tags/")).map(([p, e]) => Object.assign({ id: p.slice(5) }, clone(e.data)));
   window.VJ_SETTINGS = () => { const e = cache.get("settings/main"); return e ? clone(e.data) : {}; };
-  start().then(() => { if (me && me.role !== "sales") ["/tags/quote.js", "/tags/find.js"].forEach(src => { const s = document.createElement("script"); s.src = src; document.body.appendChild(s); }); }).catch(() => {});
+  start().then(() => { if (me && me.role !== "sales") ["/tags/quote.js", "/tags/find.js"].concat(me.role === "admin" ? ["/tags/edit.js"] : []).forEach(src => { const s = document.createElement("script"); s.src = src; document.body.appendChild(s); }); }).catch(() => {});
   const caps = { db, user, assets, downloads, sample };
   window.VJ_WEBSITE = true;
   window.claude = Object.freeze({
