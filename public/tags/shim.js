@@ -134,6 +134,24 @@
       catch (e) { throw errOf(e.code === "http_429" ? "rate_limited" : (e.message || e.code)); }
     }
   };
+  // 14/10/2026: the one-time import sends 8 photos per request, which is too much work for one server call on the free plan
+  // (server 503). Split photo batches into one request per photo and add up the results; documents go through unchanged.
+  const _fetch = window.fetch.bind(window);
+  window.fetch = async (u, o) => {
+    if (String(u) === "/api/vj/import" && o && typeof o.body === "string" && o.body.length > 300000) {
+      let b; try { b = JSON.parse(o.body); } catch (e) { return _fetch(u, o); }
+      if (!Array.isArray(b.photos) || b.photos.length < 2 || (b.docs && b.docs.length)) return _fetch(u, o);
+      let photos = 0;
+      for (const p of b.photos) {
+        let r;
+        for (let a = 0; a < 3; a++) { r = await _fetch(u, Object.assign({}, o, { body: JSON.stringify({ photos: [p] }) })); if (r.ok) break; await new Promise(z => setTimeout(z, 1500 * (a + 1))); }
+        if (!r.ok) return r;
+        photos += ((await r.json()).photos || 0);
+      }
+      return new Response(JSON.stringify({ ok: true, docs: 0, photos }), { status: 200, headers: { "content-type": "application/json" } });
+    }
+    return _fetch(u, o);
+  };
   const caps = { db, user, assets, downloads, sample };
   window.VJ_WEBSITE = true;
   window.claude = Object.freeze({
