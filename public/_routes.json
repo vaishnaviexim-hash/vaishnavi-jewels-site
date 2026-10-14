@@ -1,1 +1,1 @@
-{"version":1,"include":["/hooks/*"],"exclude":[]}
+{"version": 1, "include": ["/hooks/*", "/tags", "/tags.html", "/tags/*", "/api/vj/*", "/_blob/*"], "exclude": []}
