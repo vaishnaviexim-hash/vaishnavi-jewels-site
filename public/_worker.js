@@ -80,7 +80,7 @@ async function onPost(request, env) {
 //  5. No cost price is ever stored (F-025). Stock data lives in D1 + R2 in the owner's Cloudflare account,
 //     never in the public website files or on GitHub.
 // Bindings / variables (set in Cloudflare Pages > Settings): DB (D1), PHOTOS (KV namespace or R2 bucket), ACCESS_TEAM, ACCESS_AUD,
-// OWNER_EMAILS (comma list), GOLD_PUSH_SECRET (encrypted), ANTHROPIC_API_KEY (encrypted, photo search). ACCESS_CERTS_URL / VJ_DEV only for local tests.
+// OWNER_EMAILS (comma list), GOLD_PUSH_SECRET (encrypted), ANTHROPIC_API_KEY (encrypted, photo search), VJ_QUOTE_HOOK (encrypted, quote follow-up). ACCESS_CERTS_URL / VJ_DEV only for local tests.
 // ---------------------------------------------------------------------------------------------
 const VJ_HOST = 'vaishnavijewels.com';
 const VJ_JSON_H = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow' };
@@ -181,7 +181,7 @@ async function vjSync(request, env, who, ctx) {
   const del = since ? ((await env.DB.prepare('SELECT path FROM tomb WHERE deleted_at > ?').bind(since).all()).results || []).map(r => r.path) : [];
   const out = docs.map(r => {
     const data = JSON.parse(r.data);
-    if (who.role === 'sales' && r.path === 'counters/main') return null;
+    if (who.role === 'sales' && (r.path === 'counters/main' || r.path.startsWith('quotes/'))) return null;
     return { path: r.path, data, version: r.version };
   }).filter(Boolean);
   // 'now - 2000' so a write landing in the same millisecond is never missed on the next poll
@@ -356,6 +356,34 @@ async function vjPhotoSearch(request, env, who) {
   return vjJson({ matches: out });
 }
 
+// Quotations (owner 14/10/2026, Brain F-069): staff build the quote on the page; the server gives it a number, saves it as
+// quotes/<no> (never sent to 'sales' logins) and tells Core through the Make hook VJ_QUOTE_HOOK (encrypted secret) so Aashvi
+// WhatsApps Abhinav, Shilpi and Mihir to call the client. The PDF itself is made on the staff phone and sent from their WhatsApp.
+const vjClean = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, n);
+async function vjQuote(request, env, who, ctx) {
+  if (who.role === 'sales') return vjDeny(403, 'read only');
+  const len = Number(request.headers.get('content-length') || 0);
+  if (len > 20000) return vjDeny(413, 'too large');
+  let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+  const name = vjClean(b && b.name, 60), city = vjClean(b && b.city, 40), mobile = String(b && b.mobile || '').replace(/\D/g, '');
+  const option = ['Natural VS GH', 'Natural VS IJ', 'Lab-grown'].includes(b && b.option) ? b.option : '';
+  const items = Array.isArray(b && b.items) ? b.items.slice(0, 20).map(i => ({ id: vjClean(i && i.id, 60), label: vjClean(i && i.label, 40), design: vjClean(i && i.design, 30), price: Math.max(0, Math.round(Number(i && i.price) || 0)) })).filter(i => /^[A-Za-z0-9_\-.~]{1,60}$/.test(i.id)) : [];
+  const total = Math.max(0, Math.round(Number(b && b.total) || 0));
+  if (!name || !city || !/^(91)?[6-9]\d{9}$/.test(mobile) || !option || !items.length || !total) return vjDeny(400, 'name, 10-digit mobile, city, option and at least one piece are required');
+  const ist = new Date(Date.now() + 5.5 * 3600e3), d = ist.toISOString().slice(2, 10).replace(/-/g, '');
+  const qno = 'Q-' + d + '-' + [...crypto.getRandomValues(new Uint8Array(4))].map(x => '23456789ABCDEFGHJKMNPQRSTUVWXYZ'[x % 31]).join('');
+  const doc = { qno, name, mobile: mobile.slice(-10), city, option, items, total, gold24g: Number(b && b.gold24g) || null, by: who.email, at: new Date().toISOString() };
+  await env.DB.prepare('INSERT INTO docs (path, data, version, updated_at, updated_by) VALUES (?, ?, 1, ?, ?)').bind('quotes/' + qno, JSON.stringify(doc), Date.now(), who.email).run();
+  await vjAudit(env, who, 'quote', 'quotes/' + qno, name + ' ' + doc.mobile + ' ' + total);
+  if (env.VJ_QUOTE_HOOK && /^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_QUOTE_HOOK)) {
+    const inr = n => 'Rs ' + Number(n).toLocaleString('en-IN');
+    ctx.waitUntil(fetch(env.VJ_QUOTE_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000),
+      body: JSON.stringify({ qno, name, mobile: '+91 ' + doc.mobile, city, option, total: inr(total) + ' incl. GST', by: who.name && who.name !== 'Owner' ? who.name : who.email,
+        items: items.map(i => (i.design ? i.design + ' (' + i.label + ')' : i.label) + ' ' + inr(i.price)).join('; ') }) }).catch(() => {}));
+  }
+  return vjJson({ ok: true, qno });
+}
+
 async function vjHandle(request, env, ctx, url) {
   const p = url.pathname;
   const dev = env.VJ_DEV === '1';
@@ -368,6 +396,7 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/photo' && request.method === 'POST') return vjPhotoUpload(request, env, who);
   if (p === '/api/vj/import' && request.method === 'POST') return vjImport(request, env, who);
   if (p === '/api/vj/photosearch' && request.method === 'POST') return vjPhotoSearch(request, env, who);
+  if (p === '/api/vj/quote' && request.method === 'POST') return vjQuote(request, env, who, ctx);
   if (p.startsWith('/_blob/') && request.method === 'GET') return vjBlob(p.slice(7), env);
   if ((p === '/tags' || p === '/tags.html' || p.startsWith('/tags/')) && request.method === 'GET') {
     const r = await env.ASSETS.fetch(request);
