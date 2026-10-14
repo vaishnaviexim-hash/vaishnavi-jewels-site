@@ -11,6 +11,22 @@
   const loadImg = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
   const b64of = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(blob); });
   const canvasB64 = (c, q) => c.toDataURL("image/jpeg", q).split(",")[1];
+  // 14/10/2026 owner: a progress bar + seconds counter so the search never looks stuck. While Claude is thinking the bar
+  // creeps slowly towards the end of the current stage, and jumps when each answer arrives.
+  function progress(box) {
+    const wrap = document.createElement("div"); wrap.style.cssText = "margin:10px 0 4px";
+    const bar = document.createElement("div"); bar.style.cssText = "height:12px;border-radius:6px;background:var(--line,#e5e0d6);overflow:hidden";
+    const fill = document.createElement("div"); fill.style.cssText = "height:100%;width:0;background:#b8963e;border-radius:6px;transition:width .4s ease";
+    const txt = document.createElement("div"); txt.className = "hint"; txt.style.marginTop = "6px";
+    bar.appendChild(fill); wrap.append(bar, txt); box.appendChild(wrap);
+    const t0 = Date.now(); let pct = 0, cap = 0, label = "";
+    const draw = () => { fill.style.width = pct.toFixed(1) + "%"; txt.textContent = `${label} · ${Math.round(pct)}% · ${Math.round((Date.now() - t0) / 1000)} s`; };
+    const tick = setInterval(() => { if (pct < cap) pct = Math.min(cap, pct + Math.max(0.15, (cap - pct) * 0.04)); draw(); }, 400);
+    return {
+      set(p, text, creepTo) { pct = Math.max(pct, p); cap = Math.max(pct, creepTo || p); if (text) label = text; draw(); },
+      done() { clearInterval(tick); wrap.remove(); }
+    };
+  }
 
   async function makeSheet(list) {
     const cols = Math.min(3, list.length), rows = Math.ceil(list.length / 3);
@@ -56,27 +72,32 @@
     if (!c.length) { head.textContent = "No piece with a saved photo matches this category" + (w > 0 ? " and weight" : "") + ". Try Any category, or search by weight above."; return; }
     if (c.length > MAX_POOL) { head.textContent = `${c.length} photographed pieces match. Choose the category, or type the weight, so the search checks every one of them (up to ${MAX_POOL} at a time).`; return; }
     const btn = g("fpgo"); btn.disabled = true;
+    const pr = progress(box);
     try {
       const photo = await b64of(S.lostPhoto);
       const groups = []; for (let i = 0; i < c.length; i += PER_SHEET) groups.push(c.slice(i, i + PER_SHEET));
-      head.textContent = `Preparing ${c.length} photo${c.length === 1 ? "" : "s"}…`;
-      const sheets = []; for (let i = 0; i < groups.length; i++) { const sh = await makeSheet(groups[i]); if (sh) sheets.push(sh); head.textContent = `Preparing photos… ${Math.min(c.length, (i + 1) * PER_SHEET)} of ${c.length}`; }
-      head.textContent = `Comparing with all ${c.length} photographed piece${c.length === 1 ? "" : "s"}… this can take up to a minute.`;
+      head.textContent = `Searching ${c.length} photographed piece${c.length === 1 ? "" : "s"}… please keep this page open.`;
+      pr.set(2, `Loading photos 0 of ${c.length}`);
+      const sheets = []; for (let i = 0; i < groups.length; i++) { const sh = await makeSheet(groups[i]); if (sh) sheets.push(sh); const n = Math.min(c.length, (i + 1) * PER_SHEET); pr.set(2 + 33 * n / c.length, `Loading photos ${n} of ${c.length}`); }
       const calls = []; for (let i = 0; i < sheets.length; i += PER_CALL) calls.push(sheets.slice(i, i + PER_CALL));
-      let found = (await Promise.all(calls.map(cs => ask(photo, cs)))).flat();
+      let doneCalls = 0;
+      pr.set(35, `Claude is comparing ${c.length} pieces (0 of ${calls.length} batches done)`, 80);
+      let found = (await Promise.all(calls.map(cs => ask(photo, cs).then(r => { doneCalls++; pr.set(35 + 45 * doneCalls / calls.length, `Claude is comparing ${c.length} pieces (${doneCalls} of ${calls.length} batches done)`, 80); return r; })))).flat();
       // second look: the best few, one clear photo each
       const best = [...new Map(found.sort((a, b) => b.confidence - a.confidence).map(m => [m.id, m])).values()].slice(0, 6)
         .map(m => S.tags.find(t => t.id === m.id)).filter(Boolean);
       if (best.length > 1 || (best.length === 1 && c.length > PER_SHEET)) {
-        head.textContent = `Checking the ${best.length} closest piece${best.length === 1 ? "" : "s"} again…`;
+        pr.set(82, `Second look at the ${best.length} closest piece${best.length === 1 ? "" : "s"}`, 97);
         const singles = []; for (const t of best) { try { singles.push(await single(t)); } catch (e) {} }
         if (singles.length) found = await ask(photo, singles);
       }
       found = [...new Map(found.sort((a, b) => b.confidence - a.confidence).map(m => [m.id, m])).values()];
+      pr.set(100, "Done"); pr.done();
       head.textContent = found.length ? `Best matches by photo, out of ${c.length} checked. Check the diamonds and weight, then tap Reprint tag:` :
         `None of the ${c.length} photographed pieces looks like the same design. Try another photo (piece flat, good light), a different category, or search by weight.`;
       found.slice(0, 3).forEach(m => { const t = S.tags.find(x => x.id === m.id); if (t) box.appendChild(lostCard(t, `${Math.round(m.confidence)}% match · ${m.why || ""}`)); });
     } catch (e) {
+      pr.done();
       head.textContent = e.status === 429 ? (e.message || "Too many searches just now - wait a minute and try again.") : e.status === 402 ? "The Claude API credit is used up - tell Abhinav." : "Photo search did not work this time (" + (e.message || "error") + "). Try again, or search by weight.";
     }
     btn.disabled = !S.lostPhoto;
