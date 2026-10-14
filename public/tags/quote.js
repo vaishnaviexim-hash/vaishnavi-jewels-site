@@ -156,7 +156,8 @@
       const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("server " + r.status));
       m.textContent = "Making the PDF…";
       const blob = await makePdf({ qno: j.qno, name, city, option: OPTS[Q.option], items, total: Q.total, photos: $("qphoto").checked });
-      const fname = `Vaishnavi_Jewels_${j.qno}.pdf`, text = `Dear ${name}, thank you for your interest in Vaishnavi Jewels. Please find your quotation ${j.qno} attached. Our team will call you shortly.`;
+      const fname = `${name.replace(/[^A-Za-z0-9 .\-]/g, "").trim().slice(0, 40) || "Quote"} ${{ gh: "VSGH", ij: "VSIJ", lgd: "LGD" }[Q.option]}.pdf`, // owner 14/10: file named e.g. "Krishna VSGH.pdf"
+        text = `Dear ${name}, thank you for your interest in Vaishnavi Jewels. Please find your quotation ${j.qno} attached. Our team will call you shortly.`;
       const file = new File([blob], fname, { type: "application/pdf" });
       // 14/10/2026: the share sheet only on phones; on a computer (Windows share box has no WhatsApp) download + open WhatsApp
       const phone = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
