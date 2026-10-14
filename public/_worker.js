@@ -438,6 +438,59 @@ async function vjQuote(request, env, who, ctx) {
   return vjJson({ ok: true, qno });
 }
 
+// Daily new-tags report (owner 14/10/2026): one WhatsApp from Aashvi to Abhinav at 6 pm IST listing the tags made today,
+// pieces with missing details first. A Make schedule just "rings the bell" (GET /hooks/vj-daily, no data returned, no secret
+// needed); this worker builds the report itself and sends it ONLY to the existing quote hook (VJ_QUOTE_HOOK, encrypted), whose
+// scenario forwards kind=daily-report to Abhinav's number only. Works only after 17:55 IST and once per day, so a stranger
+// ringing the bell can at most make the owner's own report arrive a few minutes early. Nothing is sent on days with no new tags.
+async function vjDailyReport(env) {
+  const ist = new Date(Date.now() + 5.5 * 3600e3), mins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+  if (mins < 17 * 60 + 55) return reply('not yet', 200);
+  if (!env.DB || !env.VJ_QUOTE_HOOK || !/^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_QUOTE_HOOK)) return reply('not set up', 503);
+  const ymd = ist.toISOString().slice(0, 10), dayStart = Date.parse(ymd + 'T00:00:00Z') - 5.5 * 3600e3;
+  await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_meta (k TEXT PRIMARY KEY, v TEXT)').run();
+  const key = 'daily-report:' + ymd;
+  const claim = await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO NOTHING').bind(key, new Date().toISOString()).run();
+  if (!claim.meta || claim.meta.changes !== 1) return reply('already done today', 200);
+  try {
+    const made = ((await env.DB.prepare("SELECT path, email, MIN(ts) AS ts FROM audit WHERE action = 'create' AND path LIKE 'tags/%' AND ts >= ? GROUP BY path ORDER BY ts").bind(dayStart).all()).results) || [];
+    if (!made.length) return reply('no new tags today', 200);
+    const users = ((await env.DB.prepare('SELECT email, name FROM users').all()).results) || [];
+    const owners = String(env.OWNER_EMAILS || '').toLowerCase().split(',').map(s => s.trim());
+    const who = e => e === 'vaishnavijewels@gmail.com' ? 'Shilpiji' : owners.includes(e) ? 'Abhinav' : ((users.find(u => u.email === e) || {}).name || e.split('@')[0]);
+    const all = ((await env.DB.prepare("SELECT path, data FROM docs WHERE path LIKE 'tags/%'").all()).results) || [];
+    const byPath = new Map(all.map(r => [r.path, JSON.parse(r.data)]));
+    const noPhotoAll = [...byPath.values()].filter(t => !t.photo).length;
+    const bad = [], good = [], byWho = {}; let stock = 0, samples = 0, gone = 0;
+    for (const m of made) {
+      const t = byPath.get(m.path), name = who(m.email); byWho[name] = (byWho[name] || 0) + 1;
+      if (!t) { gone++; continue; }
+      const label = t.label || m.path.slice(5), sample = t.kind === 'sample'; sample ? samples++ : stock++;
+      const miss = [];
+      if (!t.photo) miss.push('no photo');
+      if (!t.designNo) miss.push('no design no.');
+      const wt = sample ? (t.metal && t.metal.net > 0) : (t.gold || []).some(g => g.net > 0);
+      if (!wt && !(t.other && t.other.amt > 0)) miss.push('no weight');
+      if (!(t.dias || []).length) miss.push('no diamonds');
+      if (!t.printedAt) miss.push('not printed');
+      const d = `${label}${t.catName ? ' ' + t.catName : ''}${t.designNo ? ' · D.No ' + t.designNo : ''}`;
+      (miss.length ? bad : good).push(miss.length ? `• ${d} - ${miss.join(', ')} (${name})` : label);
+    }
+    const day = ist.toUTCString().slice(0, 11);
+    let text = `VJ Tags - daily report, ${day}\nNew tags today: ${made.length} (stock ${stock}, samples ${samples}${gone ? ', deleted since ' + gone : ''})\nMade by: ${Object.entries(byWho).map(([k, v]) => k + ' ' + v).join(', ')}\n`;
+    text += bad.length ? `\n⚠️ Needs attention (${bad.length}):\n${bad.join('\n')}\n` : '\n✅ All new tags have photo, design no., weight and are printed.\n';
+    if (good.length) text += `\nComplete (${good.length}): ${good.join(', ')}\n`;
+    text += `\nAll stock without a photo: ${noPhotoAll} of ${byPath.size}.\nFix on vaishnavijewels.com/tags (Price check → Edit tag / Take photo).`;
+    if (text.length > 3800) text = text.slice(0, 3760) + '\n… (list cut - open VJ Tags for the rest)';
+    const r = await fetch(env.VJ_QUOTE_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000), body: JSON.stringify({ kind: 'daily-report', text }) });
+    if (!r.ok) throw new Error('hook ' + r.status);
+    return reply('sent ' + made.length, 200);
+  } catch (e) {
+    await env.DB.prepare('DELETE FROM vj_meta WHERE k = ?').bind(key).run(); // let a later bell try again
+    return reply('failed', 502);
+  }
+}
+
 async function vjHandle(request, env, ctx, url) {
   const p = url.pathname;
   const dev = env.VJ_DEV === '1';
@@ -465,6 +518,7 @@ export default {
     const url = new URL(request.url);
     const p = url.pathname;
     if (p === '/tags' || p === '/tags.html' || p.startsWith('/tags/') || p.startsWith('/api/vj/') || p.startsWith('/_blob/')) return vjHandle(request, env, ctx, url);
+    if (p === '/hooks/vj-daily') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjDailyReport(env) : reply('Method not allowed', 405);
     // gold rate pushed by Make (secret header); outside Cloudflare Access like the WhatsApp hook
     if (p === '/hooks/vj-gold') return (request.method === 'POST' && (url.hostname === VJ_HOST || env.VJ_DEV === '1')) ? vjGoldPush(request, env) : reply('Method not allowed', 405);
     if (url.pathname === '/hooks/whatsapp') {
