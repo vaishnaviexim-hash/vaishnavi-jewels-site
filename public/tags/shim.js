@@ -5,6 +5,10 @@
   "use strict";
   // 14/10/2026: some sections use display:flex/grid, which overrides the hidden attribute - force it
   try { const st = document.createElement("style"); st.textContent = "[hidden]{display:none!important}"; document.head.appendChild(st); } catch (e) {}
+  // 14/10/2026 owner: "why so many tags?" - one Reprint showed the same tag on many pages. The print style only made the page
+  // invisible (it still took up its full height) and the tag was "fixed", which Chrome repeats on every printed page. Now the
+  // rest of the page is removed from the printout, so exactly one label per tag is printed.
+  try { const sp = document.createElement("style"); sp.textContent = "@media print{html body>*:not(#printArea){display:none!important}html body #printArea{position:static!important}}"; document.head.appendChild(sp); } catch (e) {}
   const cache = new Map();            // path -> {data, version}
   const docL = new Map();             // path -> Set(listener)
   const qL = new Set();               // {coll, filters, lim, next}
