@@ -148,7 +148,7 @@
     if (!name || !city || !/^[6-9]\d{9}$/.test(mob)) { m.textContent = "Enter the customer's name, 10-digit mobile and city."; return; }
     const items = Q.items.map(t => Object.assign({}, t, { price: (priceFor(t, Q.option) || {}).final || 0 }));
     if (items.some(i => !i.price)) { m.textContent = "A piece has no price - check the gold rate and the default diamond rates."; return; }
-    if ($("qshare")) $("qshare").hidden = true;
+    if ($("qsharebox")) $("qsharebox").hidden = true;
     $("qsend").disabled = true; m.textContent = "Saving the quote…";
     try {
       const r = await fetch("/api/vj/quote", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
@@ -161,20 +161,31 @@
       const file = new File([blob], fname, { type: "application/pdf" });
       // 14/10/2026: the share sheet only on phones; on a computer (Windows share box has no WhatsApp) download + open WhatsApp
       const phone = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
-      if (phone && navigator.canShare && navigator.canShare({ files: [file] })) {
-        // iPhone (Safari) only opens the share box straight after a tap, and saving + making the PDF takes a few seconds,
-        // so the PDF is made first and a second button opens the share box at once (works on Android too).
+      const canFile = (() => { try { return !!(navigator.canShare && navigator.canShare({ files: [file] })); } catch (e) { return false; } })();
+      if (phone) {
+        // Phones (14/10/2026, iPhone fix): the PDF is made first, then a green button. Its tap is a fresh tap, which iPhone needs
+        // to open the share box. If this browser cannot share files (e.g. Chrome or an in-app browser on iPhone) the tap opens
+        // the PDF itself, which has the iPhone share icon; a second link opens the customer's WhatsApp chat.
         m.textContent = `Quote ${j.qno} saved. Core has been told to call ${name}. Now tap the green button to send the PDF.`;
-        let sb = $("qshare"); if (!sb) { sb = document.createElement("button"); sb.type = "button"; sb.id = "qshare"; sb.className = "btn"; sb.style.cssText = "background:#1f8f4e;border-color:#1f8f4e;color:#fff;margin-top:8px"; m.after(sb); }
-        sb.hidden = false; sb.textContent = `Send ${j.qno} PDF on WhatsApp`;
+        let box = $("qsharebox");
+        if (!box) { box = document.createElement("div"); box.id = "qsharebox"; box.className = "actions"; m.after(box); }
+        box.textContent = ""; box.hidden = false;
+        const sb = document.createElement("button"); sb.type = "button"; sb.className = "btn"; sb.style.cssText = "background:#1f8f4e;border-color:#1f8f4e;color:#fff";
+        sb.textContent = canFile ? "Send PDF on WhatsApp" : "Open PDF to send";
+        const url = URL.createObjectURL(file);
+        const wa = document.createElement("a"); wa.className = "btn ghost"; wa.href = "https://wa.me/91" + mob + "?text=" + encodeURIComponent(text); wa.target = "_blank"; wa.rel = "noopener"; wa.textContent = "Open " + name + "'s WhatsApp chat";
         sb.onclick = async () => {
-          try { await navigator.share(/iPhone|iPad|iPod/i.test(navigator.userAgent || "") ? { files: [file] } : { files: [file], text }); m.textContent = `Quote ${j.qno} shared with ${name}. Core has been told to call.`; sb.hidden = true; }
-          catch (e) { if (e && e.name === "AbortError") m.textContent = `Sharing was cancelled - tap the green button again.`;
-            else { const u = URL.createObjectURL(blob); window.open(u, "_blank"); m.textContent = `The PDF opened in a new tab - tap the share icon there and choose WhatsApp.`; } }
+          if (canFile) {
+            try { await navigator.share(/iPhone|iPad|iPod/i.test(navigator.userAgent || "") ? { files: [file] } : { files: [file], text }); m.textContent = `Quote ${j.qno} sent to ${name}. Core has been told to call.`; return; }
+            catch (e) { if (e && e.name === "AbortError") { m.textContent = "Sharing was cancelled - tap the green button again."; return; } }
+          }
+          window.open(url, "_blank");
+          m.textContent = "The PDF is open in a new tab: tap the share icon (square with arrow) > WhatsApp > choose " + name + ".";
         };
+        box.append(sb, wa);
       } else {
         const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = fname; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
-        window.open((phone ? "https://wa.me/91" + mob + "?" : "https://web.whatsapp.com/send?phone=91" + mob + "&") + "text=" + encodeURIComponent(text), "_blank", "noopener");
+        window.open("https://web.whatsapp.com/send?phone=91" + mob + "&text=" + encodeURIComponent(text), "_blank", "noopener");
         m.textContent = `Quote ${j.qno} saved and the PDF downloaded. Attach ${fname} in the WhatsApp chat that opened. Core has been told to call ${name}.`;
       }
     } catch (e) { m.textContent = "Could not send: " + (e.message || e) + "."; }
