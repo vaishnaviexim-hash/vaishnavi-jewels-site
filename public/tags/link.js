@@ -168,15 +168,20 @@
       if (r.related) later.push([f, r.hits]); else take(f, r.hits);
     }
     for (const [f, hits] of later) take(f, hits);
-    let done = 0, fail = 0, i = 0; const fails = [];
-    m.textContent = `${files.length} photos read: ${jobs.length} to save, ${kept.length} pieces already have a photo, ${noTag.length} with no matching tag.`;
-    const worker = async () => { while (i < jobs.length) { const [f, t] = jobs[i++];
+    // Cloudflare free plan: 1,000 photo saves a day for the whole shop. Save at most 900 per run so "Take photo" keeps working,
+    // and stop at once if Cloudflare refuses (daily limit reached) - the rest is done by choosing the folder again tomorrow.
+    const LIMIT = 900, rest = Math.max(0, jobs.length - LIMIT); if (rest) jobs.length = LIMIT;
+    let done = 0, fail = 0, i = 0, stop = false, inRow = 0; const fails = [];
+    m.textContent = `${files.length} photos read: ${jobs.length} to save${rest ? " now (" + rest + " more next day - daily limit)" : ""}, ${kept.length} pieces already have a photo, ${noTag.length} with no matching tag.`;
+    const worker = async () => { while (i < jobs.length && !stop) { const [f, t] = jobs[i++];
       try { const blob = await shrink(f); const up = await assets.upload(blob, { type: "image/jpeg" });
-        await db.doc("tags/" + t.id).update({ photo: up.id, photoAt: new Date().toISOString(), photoBy: "Drive: " + f.name.slice(0, 60) }); done++; }
-      catch (e) { fail++; fails.push([f.name, t.label, e.message || e.code || "error"]); }
+        await db.doc("tags/" + t.id).update({ photo: up.id, photoAt: new Date().toISOString(), photoBy: "Drive: " + f.name.slice(0, 60) }); done++; inRow = 0; }
+      catch (e) { fail++; fails.push([f.name, t.label, e.message || e.code || "error"]); if (++inRow >= 5) stop = true; }
       bar(done + fail, jobs.length); m.textContent = `Saving photos: ${done + fail} of ${jobs.length}${fail ? " (" + fail + " failed)" : ""}…`; } };
     await Promise.all([worker(), worker(), worker()]);
-    m.textContent = `Done: ${done} photos saved on their tags${fail ? ", " + fail + " failed (choose them again)" : ""}. ${kept.length} pieces kept their photo. ${noTag.length} photos have no tag yet.`;
+    const left = jobs.length - done - fail + rest;
+    m.textContent = stop ? `Stopped after ${done} photos: Cloudflare is refusing new photos (daily limit, resets 5:30 AM). Choose the folder again after 5:30 AM - saved photos are skipped.`
+      : `Done: ${done} photos saved on their tags${fail ? ", " + fail + " failed (choose them again)" : ""}.${left ? " " + left + " more to do - choose the folder again tomorrow after 5:30 AM." : ""} ${kept.length} pieces kept their photo. ${noTag.length} photos have no tag yet.`;
     if (noTag.length) { const p = document.createElement("div"); p.className = "actions"; p.append("Photos without a tag: ", csvLink("photos-without-tag.csv", [["File", "Design no.", "Why"]].concat(noTag))); out.append(p); }
     if (fails.length) { const p = document.createElement("div"); p.className = "actions"; p.append("Failed: ", csvLink("photos-failed.csv", [["File", "Tag", "Error"]].concat(fails))); out.append(p); }
   }
