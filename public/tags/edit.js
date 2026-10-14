@@ -15,9 +15,9 @@
     const old = document.getElementById("vjEdit"); if (old) old.remove();
     const wrap = el("div", { id: "vjEdit", className: "card" }); wrap.style.cssText = "border:2px solid #b8963e;border-radius:var(--r,10px);padding:14px;margin-top:10px;display:flex;flex-direction:column;gap:10px";
     wrap.append(el("h2", { textContent: "Edit " + t.label }));
-    const fDesign = inp(t.designNo, 140), fRemark = inp(t.remark, 220), fOther = inp((t.other && t.other.amt) || 0, 110, "number");
+    const fDesign = inp(t.designNo, 140), fRemark = inp(t.remark, 220), fOther = inp((t.other && t.other.amt) || 0, 110, "number"), fBox = inp(t.box, 200);
     const row = (label, f) => el("label", { style: "display:flex;flex-direction:column;gap:4px" }, [label, f]);
-    wrap.append(el("div", { className: "row", style: "display:flex;gap:10px;flex-wrap:wrap" }, [row("Design no.", fDesign), row("Remark", fRemark), row("Other charges (Rs)", fOther)]));
+    wrap.append(el("div", { className: "row", style: "display:flex;gap:10px;flex-wrap:wrap" }, [row("Design no.", fDesign), row("Remark", fRemark), row("Other charges (Rs)", fOther), row("Packet / box", fBox)]));
     let fMetal = null;
     if (t.kind === "sample") { fMetal = inp((t.metal && t.metal.net) || 0, 110, "number"); wrap.append(row("Sample weight (g, priced as 14K)", fMetal)); }
     // gold lines
@@ -43,7 +43,7 @@
       const gold = [...gBox.children].map(r => r._get()).filter(g => g.net > 0);
       const dias = [...dBox.children].map(r => r._get()).filter(d => d.q && (d.ct > 0 || d.pcs > 0));
       if (gold.some(g => g.net > 500) || dias.some(d => d.ct > 200 || d.rate > 5e6)) { note.textContent = "A weight or rate looks wrong - check the numbers."; return; }
-      const data = { designNo: fDesign.value.trim().slice(0, 30), remark: fRemark.value.trim().slice(0, 120), other: Object.assign({}, t.other || {}, { amt: Math.max(0, num(fOther.value)) }), dias };
+      const data = { designNo: fDesign.value.trim().slice(0, 30), remark: fRemark.value.trim().slice(0, 120), box: fBox.value.trim().slice(0, 60), other: Object.assign({}, t.other || {}, { amt: Math.max(0, num(fOther.value)) }), dias };
       if (t.kind === "sample") data.metal = Object.assign({}, t.metal || {}, { net: Math.max(0, num(fMetal.value)) }); else data.gold = gold;
       const priceChanged = JSON.stringify([t.gold || [], t.dias || [], (t.other && t.other.amt) || 0, (t.metal && t.metal.net) || 0])
         !== JSON.stringify([data.gold || t.gold || [], dias, data.other.amt, (data.metal && data.metal.net) || (t.metal && t.metal.net) || 0]);
