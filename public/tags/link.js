@@ -48,11 +48,14 @@
         <label style="flex-direction:row;align-items:center;gap:6px;color:var(--fg)"><input type="checkbox" id="lkStock" style="width:auto"> also stock pieces (not only samples) with the same design no.</label></div>
       <div class="actions"><label class="btn ghost" style="cursor:pointer">3 · Check karigar register (CSV)<input type="file" id="lkReg" accept=".csv,text/csv" hidden></label></div>
       <p class="hint" id="lkRegMsg"></p>
+      <div class="actions"><button type="button" class="btn ghost" id="lkNoPh">4 · Report: pieces without a photo</button></div>
+      <p class="hint" id="lkNoPhMsg"></p>
       <div id="lkBarW" hidden style="height:10px;background:#eee;border-radius:5px;overflow:hidden"><div id="lkBar" style="height:100%;width:0;background:#b8963e;transition:width .3s"></div></div>
       <p class="hint" id="lkPhMsg"></p>
       <div id="lkOut"></div>`;
     host.appendChild(c);
     $("lkPk").addEventListener("change", e => { const f = e.target.files && e.target.files[0]; if (f) applyPackets(f); e.target.value = ""; });
+    $("lkNoPh").addEventListener("click", noPhotoReport);
     $("lkReg").addEventListener("change", e => { const f = e.target.files && e.target.files[0]; if (f) checkRegister(f); e.target.value = ""; });
     $("lkDir").addEventListener("change", e => linkPhotos([...e.target.files]));
     $("lkFiles").addEventListener("change", e => linkPhotos([...e.target.files]));
@@ -172,6 +175,19 @@
       const miss = res.filter(x => x[6] === "NOT TAGGED").slice(0, 40).map(x => x[0] + " " + x[1]).join(", ");
       if (miss) { const q = document.createElement("p"); q.className = "hint"; q.textContent = "Not tagged: " + miss + (missing > 40 ? " …" : ""); out.append(q); }
     } catch (e) { m.textContent = "Could not read the register: " + (e.message || e) + "."; }
+  }
+
+  /* ---------- 6. Pieces without a photo (owner 14/10/2026: "full report of missing images") ---------- */
+  function noPhotoReport() {
+    const all = tags(), none = all.filter(t => !t.photo).sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "sample" ? 1 : -1) || String(a.box || "").localeCompare(String(b.box || ""), "en", { numeric: true }) || a.label.localeCompare(b.label, "en", { numeric: true }));
+    const m = $("lkNoPhMsg"), out = $("lkOut"); out.textContent = "";
+    const st = none.filter(t => t.kind !== "sample").length;
+    m.textContent = `${none.length} of ${all.length} pieces have no photo (${st} stock, ${none.length - st} samples).`;
+    if (!none.length) return;
+    const p = document.createElement("div"); p.className = "actions";
+    p.append("Pieces without a photo: ", csvLink("pieces-without-photo.csv", [["Label", "Design no.", "Category", "Stock / sample", "Packet / box", "Remark", "Printed"]].concat(
+      none.map(t => [t.label, t.designNo || "", t.catName || "", t.kind === "sample" ? "sample" : "stock", t.box || "", t.remark || "", t.printedAt ? "yes" : "no"]))));
+    out.append(p);
   }
 
   /* ---------- 4. Print by box (owner 14/10/2026: "print tags by box numbers") ----------
