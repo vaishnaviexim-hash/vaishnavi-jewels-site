@@ -106,7 +106,7 @@
     canEdit: async () => { await start(); return !!me && me.role === "admin"; },
     can: async () => { await start(); return !!me && me.role !== "sales"; },
     id: async () => { await start(); return me && me.email; },
-    me: async () => { await start(); return { name: me ? (me.role === "admin" ? "Abhinav" : me.name + " · " + me.role) : "" }; },
+    me: async () => { await start(); return { name: me ? (me.role === "admin" ? (me.email === "vaishnavijewels@gmail.com" ? "Shilpiji" : "Abhinav") : me.name + " · " + me.role) : "" }; }, // 14/10: two owners
     profiles: async ids => { const o = {}; (ids || []).forEach(i => { o[i] = { name: String(i).split("@")[0] }; }); return o; }
   };
   const assets = {
