@@ -62,6 +62,7 @@
         <label>Mobile (10 digits) <input id="qmob" inputmode="tel" autocomplete="off" maxlength="14" placeholder="98xxxxxxxx"></label>
         <label>City <input id="qcity" autocomplete="off" maxlength="40"></label></div>
       <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg)"><input type="checkbox" id="qphoto" checked style="width:auto"> Show piece photos in the PDF</label>
+      <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg)"><input type="checkbox" id="qwt" checked style="width:auto"> Show gold weight &amp; diamond carats in the PDF</label>
       <table class="sum"><tr class="total"><td>Total (incl. GST)</td><td id="qtotal">—</td></tr></table>
       <p class="hint" id="qnote"></p>
       <div class="actions"><button type="button" class="btn" id="qsend">Make PDF &amp; send on WhatsApp</button><button type="button" class="btn ghost" id="qclear">Clear</button></div>
@@ -129,9 +130,11 @@
       const x = q.photos && t.photo ? M + 38 : M;
       doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.text(`${t.catName || "Piece"} - design ${t.designNo || t.label}`, x, y + 6);
       doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(80);
-      const goldTxt = t.kind === "sample" ? "14K gold, made to order (about 2-4 weeks)" : (t.gold || []).map(g => g.k + " gold " + g.net.toFixed(2) + " g").join(" + ");
+      // owner 14/10: weights printed unless the "Show gold weight & diamond carats" box is unticked
       const ct = (t.dias || []).filter(d => !NON_DIAMOND.test(d.q || "")).reduce((a, d) => a + (d.ct || 0), 0);
-      doc.text(`${goldTxt}${ct ? ", diamonds " + ct.toFixed(2) + " ct" : ""}`, x, y + 12); doc.setTextColor(20);
+      const goldTxt = t.kind === "sample" ? (q.weights ? "14K gold " + ((t.metal && t.metal.net) || 0).toFixed(3) + " g" : "14K gold") + ", made to order (about 2-4 weeks)"
+        : [...new Set((t.gold || []).map(g => g.k))].length && !q.weights ? [...new Set((t.gold || []).map(g => g.k))].join(" + ") + " gold" : (t.gold || []).map(g => g.k + " gold " + g.net.toFixed(3) + " g").join(" + ");
+      doc.text(`${goldTxt}${ct ? (q.weights ? ", diamonds " + ct.toFixed(2) + " ct" : ", diamonds") : ""}`, x, y + 12); doc.setTextColor(20);
       doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.text(fmt(t.price), W - M, y + 8, { align: "right" });
       y += h + 4; doc.setDrawColor(225); doc.line(M, y - 2, W - M, y - 2);
     }
@@ -155,7 +158,7 @@
         body: JSON.stringify({ name, mobile: mob, city, option: OPTS[Q.option], total: Q.total, gold24g: st.g, items: items.map(i => ({ id: i.id, label: i.label, design: i.designNo || "", price: i.price })) }) });
       const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("server " + r.status));
       m.textContent = "Making the PDF…";
-      const blob = await makePdf({ qno: j.qno, name, city, option: OPTS[Q.option], items, total: Q.total, photos: $("qphoto").checked });
+      const blob = await makePdf({ qno: j.qno, name, city, option: OPTS[Q.option], items, total: Q.total, photos: $("qphoto").checked, weights: $("qwt").checked });
       const fname = `${name.replace(/[^A-Za-z0-9 .\-]/g, "").trim().slice(0, 40) || "Quote"} ${{ gh: "VSGH", ij: "VSIJ", lgd: "LGD" }[Q.option]}.pdf`, // owner 14/10: file named e.g. "Krishna VSGH.pdf"
         text = `Dear ${name}, thank you for your interest in Vaishnavi Jewels. Please find your quotation ${j.qno} attached. Our team will call you shortly.`;
       const file = new File([blob], fname, { type: "application/pdf" });
