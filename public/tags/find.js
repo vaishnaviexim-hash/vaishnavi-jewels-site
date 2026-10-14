@@ -7,7 +7,7 @@
   "use strict";
   const g = id => document.getElementById(id);
   const MAX_POOL = 216;          // 3 calls x 72 pieces; more than that -> ask for a category or the weight first
-  const PER_CALL = 8, PER_SHEET = 9, TILE = 300;
+  const PER_CALL = 3, PER_SHEET = 9, TILE = 300, PARALLEL = 2;   // 14/10: 3 sheets (~0.5 MB) per request - 8 was too big ("Load failed")
   const loadImg = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
   const b64of = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(blob); });
   const canvasB64 = (c, q) => c.toDataURL("image/jpeg", q).split(",")[1];
@@ -47,7 +47,7 @@
     }
     if (!ok.some(Boolean)) return null;
     // a tile whose photo failed keeps its number but is sent with a placeholder id that cannot match
-    return { b64: canvasB64(c, 0.8), ids: ok.map((t, i) => t ? t.id : "none-" + i) };
+    return { b64: canvasB64(c, 0.72), ids: ok.map((t, i) => t ? t.id : "none-" + i) };
   }
   async function single(t) {
     const im = await loadImg("/_blob/" + t.photo); const sc = Math.min(1, 700 / Math.max(im.width, im.height));
@@ -55,11 +55,27 @@
     c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); return { b64: canvasB64(c, 0.85), ids: [t.id] };
   }
   async function ask(photo, sheets) {
-    const r = await fetch("/api/vj/photosearch", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ photo, type: "image/jpeg", sheets }) });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw Object.assign(new Error(j.error || ("server " + r.status)), { status: r.status });
-    return (j.matches || []).filter(m => !/^none-/.test(m.id));
+    const body = JSON.stringify({ photo, type: "image/jpeg", sheets });
+    let last;
+    for (let a = 0; a < 3; a++) {          // retry a dropped connection or a busy server twice
+      if (a) await new Promise(z => setTimeout(z, 2000 * a));
+      let r;
+      try { r = await fetch("/api/vj/photosearch", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body }); }
+      catch (e) { last = Object.assign(new Error("connection dropped"), { status: 0 }); continue; }
+      if (r.redirected || (r.headers.get("content-type") || "").indexOf("json") < 0) throw Object.assign(new Error("signed out - reload the page and sign in again"), { status: 401 });
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) return (j.matches || []).filter(m => !/^none-/.test(m.id));
+      last = Object.assign(new Error(j.error || ("server " + r.status)), { status: r.status });
+      if (!(r.status >= 500 || r.status === 429 && /busy/.test(j.error || ""))) break;
+    }
+    throw last;
+  }
+  // run the batches two at a time, reporting each one as it finishes
+  async function pool(jobs, onDone) {
+    const out = []; let i = 0;
+    const worker = async () => { while (i < jobs.length) { const k = i++; out[k] = await jobs[k](); onDone(); } };
+    await Promise.all(Array.from({ length: Math.min(PARALLEL, jobs.length) }, worker));
+    return out;
   }
 
   async function run() {
@@ -82,14 +98,14 @@
       const calls = []; for (let i = 0; i < sheets.length; i += PER_CALL) calls.push(sheets.slice(i, i + PER_CALL));
       let doneCalls = 0;
       pr.set(35, `Claude is comparing ${c.length} pieces (0 of ${calls.length} batches done)`, 80);
-      let found = (await Promise.all(calls.map(cs => ask(photo, cs).then(r => { doneCalls++; pr.set(35 + 45 * doneCalls / calls.length, `Claude is comparing ${c.length} pieces (${doneCalls} of ${calls.length} batches done)`, 80); return r; })))).flat();
+      let found = (await pool(calls.map(cs => () => ask(photo, cs)), () => { doneCalls++; pr.set(35 + 45 * doneCalls / calls.length, `Claude is comparing ${c.length} pieces (${doneCalls} of ${calls.length} batches done)`, 80); })).flat();
       // second look: the best few, one clear photo each
       const best = [...new Map(found.sort((a, b) => b.confidence - a.confidence).map(m => [m.id, m])).values()].slice(0, 6)
         .map(m => S.tags.find(t => t.id === m.id)).filter(Boolean);
       if (best.length > 1 || (best.length === 1 && c.length > PER_SHEET)) {
         pr.set(82, `Second look at the ${best.length} closest piece${best.length === 1 ? "" : "s"}`, 97);
         const singles = []; for (const t of best) { try { singles.push(await single(t)); } catch (e) {} }
-        if (singles.length) found = await ask(photo, singles);
+        if (singles.length) { try { found = await ask(photo, singles); } catch (e) { /* keep the first-round matches */ } }
       }
       found = [...new Map(found.sort((a, b) => b.confidence - a.confidence).map(m => [m.id, m])).values()];
       pr.set(100, "Done"); pr.done();
@@ -98,7 +114,7 @@
       found.slice(0, 3).forEach(m => { const t = S.tags.find(x => x.id === m.id); if (t) box.appendChild(lostCard(t, `${Math.round(m.confidence)}% match · ${m.why || ""}`)); });
     } catch (e) {
       pr.done();
-      head.textContent = e.status === 429 ? (e.message || "Too many searches just now - wait a minute and try again.") : e.status === 402 ? "The Claude API credit is used up - tell Abhinav." : "Photo search did not work this time (" + (e.message || "error") + "). Try again, or search by weight.";
+      head.textContent = e.status === 429 ? (e.message || "Too many searches just now - wait a minute and try again.") : e.status === 402 ? "The Claude API credit is used up - tell Abhinav." : "Photo search did not work this time (" + (e.message || "error") + (e.status ? ", " + e.status : "") + "). Check the internet, keep this page open, and try again - or search by weight.";
     }
     btn.disabled = !S.lostPhoto;
   }
