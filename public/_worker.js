@@ -80,7 +80,7 @@ async function onPost(request, env) {
 //  5. No cost price is ever stored (F-025). Stock data lives in D1 + R2 in the owner's Cloudflare account,
 //     never in the public website files or on GitHub.
 // Bindings / variables (set in Cloudflare Pages > Settings): DB (D1), PHOTOS (KV namespace or R2 bucket), ACCESS_TEAM, ACCESS_AUD,
-// OWNER_EMAILS (comma list), GOLD_PUSH_SECRET (encrypted), ANTHROPIC_API_KEY (encrypted, photo search), VJ_QUOTE_HOOK (encrypted, quote follow-up). ACCESS_CERTS_URL / VJ_DEV only for local tests.
+// OWNER_EMAILS (comma list), GOLD_PUSH_SECRET (encrypted), VJ_GOLD_HOOK (encrypted, gold relay), ANTHROPIC_API_KEY (encrypted, photo search), VJ_QUOTE_HOOK (encrypted, quote follow-up). ACCESS_CERTS_URL / VJ_DEV only for local tests.
 // ---------------------------------------------------------------------------------------------
 const VJ_HOST = 'vaishnavijewels.com';
 const VJ_JSON_H = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow' };
@@ -164,13 +164,30 @@ async function vjSaveGold(env, per10, source) {
   await env.DB.prepare('INSERT INTO docs (path, data, version, updated_at, updated_by) VALUES (?, ?, ?, ?, ?) ON CONFLICT(path) DO UPDATE SET data = excluded.data, version = excluded.version, updated_at = excluded.updated_at, updated_by = excluded.updated_by')
     .bind('settings/main', JSON.stringify(next), v, Date.now(), 'gold-feed').run();
 }
+// 14/10/2026 owner: "gold rates not auto updated". Cloudflare cannot reach the NR feed (port 7768), so the scheduled gold
+// tasks (Mon-Sat 13:00, 15:30, 17:00 IST) put the NR rate in the Make data store VJ_Gold, and the website collects it here
+// through the Make relay VJ_GOLD_HOOK (encrypted variable; the relay only returns {per10g, at}). It asks a few minutes after
+// each task time, only if nobody saved a rate since then, at most once every 10 minutes - a few Make operations a day.
+// A rate typed by the owner after the task time is never overwritten.
+let vjGoldAskedAt = 0;
 async function vjMaybeRefreshGold(env) {
-  const ist = new Date(Date.now() + 5.5 * 3600e3), h = ist.getUTCHours(), d = ist.getUTCDay();
-  if (d === 0 || h < 10 || h > 19) return;
+  if (!env.VJ_GOLD_HOOK || !/^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_GOLD_HOOK)) return;
+  const ist = new Date(Date.now() + 5.5 * 3600e3), d = ist.getUTCDay(), m = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+  if (d === 0) return;
+  const slots = [13 * 60 + 4, 15 * 60 + 36, 17 * 60 + 4].filter(s => s <= m);
+  if (!slots.length || Date.now() - vjGoldAskedAt < 10 * 60e3) return;
+  const slotAt = Date.now() - (m - slots[slots.length - 1]) * 60e3;
   const row = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first();
-  const at = row ? Date.parse(JSON.parse(row.data).goldAt || 0) : 0;
-  if (Date.now() - at < 2.5 * 3600e3) return;
-  try { const p = await vjGoldFromFeed(); await vjSaveGold(env, p, 'NR Jewellers GOLD 999 IMP T+2 sell (website, auto)'); } catch (e) {}
+  const goldAt = row ? Date.parse(JSON.parse(row.data).goldAt || 0) || 0 : 0;
+  if (goldAt >= slotAt) return;
+  vjGoldAskedAt = Date.now();
+  try {
+    const r = await fetch(env.VJ_GOLD_HOOK, { signal: AbortSignal.timeout(8000) });
+    const j = await r.json();
+    const per10 = Number(j && j.per10g), at = Date.parse(j && j.at) || 0;
+    if (per10 >= 50000 && per10 <= 400000 && at > goldAt && Date.now() - at < 12 * 3600e3)
+      await vjSaveGold(env, per10, `NR Jewellers GOLD 999 IMP T+2 sell ${per10} per 10 g (scheduled task ${new Date(at + 5.5 * 3600e3).toISOString().slice(11, 16)} IST)`);
+  } catch (e) {}
 }
 
 async function vjSync(request, env, who, ctx) {
