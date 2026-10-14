@@ -157,6 +157,11 @@
     box.querySelectorAll("table.sum tr").forEach(tr => { const td = tr.firstElementChild; if (td && td.textContent === "Sample") tr.remove(); });
     box.querySelectorAll(".hint").forEach(h => { const t = h.textContent; if (/ · sample$/.test(t)) h.textContent = t.split(" · ")[0]; });
   }).observe(document.body, { childList: true, subtree: true }); } catch (e) {}
+  // 14/10/2026 owner: tapping the tag-number box (Price check, Quote) selects what is in it, so the next number just replaces it.
+  try { let armed = null; const sel = el => { try { el.setSelectionRange(0, el.value.length); } catch (e) { try { el.select(); } catch (x) {} } };
+    document.addEventListener("focusin", e => { const el = e.target; if (el && (el.id === "cq" || el.id === "qq")) { armed = el; setTimeout(() => sel(el), 0); } });
+    document.addEventListener("click", e => { const el = e.target; if (el && el === armed) { sel(el); armed = null; } });
+    document.addEventListener("focusout", e => { if (e.target === armed) armed = null; }); } catch (e) {}
   // Read-only helpers for the Quote tab (quote.js): the current stock list and settings from this page's copy.
   window.VJ_TAGS = () => [...cache.entries()].filter(([p]) => p.startsWith("tags/")).map(([p, e]) => Object.assign({ id: p.slice(5) }, clone(e.data)));
   window.VJ_SETTINGS = () => { const e = cache.get("settings/main"); return e ? clone(e.data) : {}; };
