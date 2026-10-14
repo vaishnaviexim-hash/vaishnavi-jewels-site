@@ -310,7 +310,7 @@ async function vjImport(request, env, who) {
 // and up to 9 candidate piece ids; the server loads the candidates' saved photos itself, builds a fixed prompt and asks Claude
 // (key ANTHROPIC_API_KEY, encrypted Pages secret, never sent to the browser). Not a general AI proxy: the prompt is fixed here.
 // Limit 30 searches a day for everyone together; each search is logged in audit.
-const VJ_PS_MODEL = 'claude-sonnet-5-5', VJ_PS_DAY = 60; // 14/10: 60 Claude calls a day (one photo search = 1-4 calls)
+const VJ_PS_MODEL = 'claude-sonnet-5-5', VJ_PS_DAY = 150; // 14/10: 150 Claude calls a day (one photo search of ~200 pieces = about 9 small calls)
 function vjB64(buf) { const u = new Uint8Array(buf); let s = ''; for (let i = 0; i < u.length; i += 32768) s += String.fromCharCode.apply(null, u.subarray(i, i + 32768)); return btoa(s); }
 async function vjPhotoSearch(request, env, who) {
   if (who.role === 'sales') return vjDeny(403, 'read only');
@@ -367,9 +367,9 @@ async function vjAskClaude(env, content, ok) {
 async function vjPhotoSheets(b, env, who) {
   const photo = typeof b.photo === 'string' ? b.photo : '', type = /^image\/(jpeg|png|webp)$/.test(b.type) ? b.type : 'image/jpeg';
   const okId = x => typeof x === 'string' && /^[A-Za-z0-9_\-.~]{1,60}$/.test(x);
-  const sheets = b.sheets.slice(0, 9).filter(sh => sh && typeof sh.b64 === 'string' && sh.b64.length <= 900000 && /^[A-Za-z0-9+/=]+$/.test(sh.b64)
+  const sheets = b.sheets.slice(0, 9).filter(sh => sh && typeof sh.b64 === 'string' && sh.b64.length <= 900000 && /^[A-Za-z0-9+/]{16}/.test(sh.b64)
     && Array.isArray(sh.ids) && sh.ids.length >= 1 && sh.ids.length <= 9 && sh.ids.every(okId));
-  if (!photo || photo.length > 1.5e6 || !/^[A-Za-z0-9+/=]+$/.test(photo) || !sheets.length) return vjDeny(400, 'bad request');
+  if (!photo || photo.length > 1.5e6 || !/^[A-Za-z0-9+/]{16}/.test(photo) || !sheets.length) return vjDeny(400, 'bad request');
   const since = Date.now() - 24 * 3600e3;
   const used = await env.DB.prepare("SELECT count(*) AS n FROM audit WHERE action = 'photosearch' AND ts > ?").bind(since).first();
   if (used && used.n >= VJ_PS_DAY) return vjDeny(429, 'daily limit reached (' + VJ_PS_DAY + ' photo checks in 24 hours)');
