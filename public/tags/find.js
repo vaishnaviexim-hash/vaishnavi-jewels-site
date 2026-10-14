@@ -57,16 +57,18 @@
   async function ask(photo, sheets) {
     const body = JSON.stringify({ photo, type: "image/jpeg", sheets });
     let last;
-    for (let a = 0; a < 3; a++) {          // retry a dropped connection or a busy server twice
+    for (let a = 0; a < 4; a++) {          // retry a dropped connection or a busy server (502/503) up to 3 times
       if (a) await new Promise(z => setTimeout(z, 2000 * a));
       let r;
       try { r = await fetch("/api/vj/photosearch", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body }); }
       catch (e) { last = Object.assign(new Error("connection dropped"), { status: 0 }); continue; }
-      if (r.redirected || (r.headers.get("content-type") || "").indexOf("json") < 0) throw Object.assign(new Error("signed out - reload the page and sign in again"), { status: 401 });
+      const isJson = (r.headers.get("content-type") || "").indexOf("json") >= 0;
+      if (r.status >= 500) { const j = isJson ? await r.json().catch(() => ({})) : {}; last = Object.assign(new Error(j.error || "server busy (" + r.status + ")"), { status: r.status }); continue; }
+      if (r.redirected || !isJson) throw Object.assign(new Error("signed out - reload the page and sign in again"), { status: 401 });
       const j = await r.json().catch(() => ({}));
       if (r.ok) return (j.matches || []).filter(m => !/^none-/.test(m.id));
       last = Object.assign(new Error(j.error || ("server " + r.status)), { status: r.status });
-      if (!(r.status >= 500 || r.status === 429 && /busy/.test(j.error || ""))) break;
+      if (!(r.status === 429 && /busy/.test(j.error || ""))) break;
     }
     throw last;
   }
@@ -114,7 +116,7 @@
       found.slice(0, 3).forEach(m => { const t = S.tags.find(x => x.id === m.id); if (t) box.appendChild(lostCard(t, `${Math.round(m.confidence)}% match · ${m.why || ""}`)); });
     } catch (e) {
       pr.done();
-      head.textContent = e.status === 429 ? (e.message || "Too many searches just now - wait a minute and try again.") : e.status === 402 ? "The Claude API credit is used up - tell Abhinav." : "Photo search did not work this time (" + (e.message || "error") + (e.status ? ", " + e.status : "") + "). Check the internet, keep this page open, and try again - or search by weight.";
+      head.textContent = e.status === 429 ? (e.message || "Too many searches just now - wait a minute and try again.") : e.status === 402 ? "The Claude API credit is used up - tell Abhinav." : "Photo search did not work this time (" + (e.message || "error") + (e.status ? ", " + e.status : "") + "). Check the internet, keep this page open, and try again - or search by weight. [v4]";
     }
     btn.disabled = !S.lostPhoto;
   }
