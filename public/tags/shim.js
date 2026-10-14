@@ -165,7 +165,7 @@
   // Read-only helpers for the Quote tab (quote.js): the current stock list and settings from this page's copy.
   window.VJ_TAGS = () => [...cache.entries()].filter(([p]) => p.startsWith("tags/")).map(([p, e]) => Object.assign({ id: p.slice(5) }, clone(e.data)));
   window.VJ_SETTINGS = () => { const e = cache.get("settings/main"); return e ? clone(e.data) : {}; };
-  start().then(() => { if (me && me.role !== "sales") { const s = document.createElement("script"); s.src = "/tags/quote.js"; document.body.appendChild(s); } }).catch(() => {});
+  start().then(() => { if (me && me.role !== "sales") ["/tags/quote.js", "/tags/find.js"].forEach(src => { const s = document.createElement("script"); s.src = src; document.body.appendChild(s); }); }).catch(() => {});
   const caps = { db, user, assets, downloads, sample };
   window.VJ_WEBSITE = true;
   window.claude = Object.freeze({
