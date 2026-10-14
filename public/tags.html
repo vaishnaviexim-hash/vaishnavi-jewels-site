@@ -1,0 +1,878 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>VJ Tags · Vaishnavi Jewels</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=Cormorant+SC:wght@600&display=swap">
+<style>
+html,body{margin:0}
+
+/* Layout: workbench — a slim header, three tabs, form on the left and a live tag/price panel on the right; one column on phones */
+:root{
+  --bg:#f5f4f1; --surface:#ffffff; --sunk:#ece9e3; --line:#d9d4ca; --fg:#1f2328; --muted:#5f6670;
+  --gold:#8a6a22; --gold-soft:#f3ead6; --ok:#1d7a4a; --ok-soft:#e3f2ea; --warn:#9a5b00; --warn-soft:#fbefd9; --bad:#b0302a; --bad-soft:#f8e2e0;
+  --tag:#ffffff; --tag-ink:#111111;
+  --f-display:"Cormorant SC", Georgia, serif; --f-body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; --f-mono:"IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#15171a; --surface:#1d2024; --sunk:#25292e; --line:#363b42; --fg:#e8e6e1; --muted:#a0a6ae;
+  --gold:#d9b25e; --gold-soft:#33291a; --ok:#5ec48d; --ok-soft:#183025; --warn:#e3a54b; --warn-soft:#33270f; --bad:#ef7d75; --bad-soft:#3a1d1b;
+  --tag:#f7f7f5; --tag-ink:#111111; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#15171a; --surface:#1d2024; --sunk:#25292e; --line:#363b42; --fg:#e8e6e1; --muted:#a0a6ae;
+  --gold:#d9b25e; --gold-soft:#33291a; --ok:#5ec48d; --ok-soft:#183025; --warn:#e3a54b; --warn-soft:#33270f; --bad:#ef7d75; --bad-soft:#3a1d1b;
+  --tag:#f7f7f5; --tag-ink:#111111; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:16px;padding-block:14px 48px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 16px;padding-block:6px 12px;border-bottom:1px solid var(--line)}
+header h1{font-family:var(--f-display);font-size:30px;font-weight:600;letter-spacing:.02em;margin:0;color:var(--gold)}
+header .sub{color:var(--muted);font-size:13px}
+header .who{margin-left:auto;font-size:13px;color:var(--muted)}
+nav{display:flex;gap:4px;margin-block:14px;flex-wrap:wrap}
+nav button{font:inherit;font-weight:500;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:8px 14px;border-radius:999px;cursor:pointer}
+nav button[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+nav button:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.banner{padding:10px 14px;border-radius:var(--r);font-size:14px;margin-block:0 12px}
+.banner.warn{background:var(--warn-soft);color:var(--warn)} .banner.bad{background:var(--bad-soft);color:var(--bad)} .banner.ok{background:var(--ok-soft);color:var(--ok)}
+.grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}}
+section.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:600}
+.row{display:flex;flex-wrap:wrap;gap:12px}
+.row>label{flex:1 1 130px;min-width:0}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+input,select{font:inherit;font-size:15px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;width:100%;min-width:0}
+input[type=number]{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+input[readonly]{background:var(--sunk);color:var(--muted)}
+.seg{display:flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.seg label{flex:1;flex-direction:row;justify-content:center;align-items:center;padding:8px;cursor:pointer;color:var(--fg);font-size:14px;gap:6px}
+.seg input{width:auto}
+.seg label:has(input:checked){background:var(--gold-soft);color:var(--gold);font-weight:600}
+.photo{display:grid;grid-template-columns:120px minmax(0,1fr);gap:12px;align-items:center}
+.photo .thumb{width:120px;height:120px;border:1px dashed var(--line);border-radius:var(--r);background:var(--sunk);display:grid;place-items:center;color:var(--muted);font-size:12px;text-align:center;overflow:hidden}
+.photo .thumb img{width:100%;height:100%;object-fit:cover}
+.lines{display:flex;flex-direction:column;gap:8px}
+.ln{display:grid;gap:8px;align-items:end}
+.ln.g{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr) auto}
+.ln.d{grid-template-columns:minmax(0,1fr) minmax(0,1.1fr) minmax(0,.8fr) minmax(0,.7fr) minmax(0,1fr) minmax(0,1fr) auto}
+.ln.o{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+.ln .val{font-family:var(--f-mono);font-size:13px;color:var(--muted);padding-bottom:9px;font-variant-numeric:tabular-nums;text-align:right}
+.ln .x{font:inherit;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:var(--r);padding:7px 10px;cursor:pointer;margin-bottom:1px}
+button.add{align-self:flex-start;font:inherit;font-size:14px;border:1px dashed var(--line);background:transparent;color:var(--gold);border-radius:var(--r);padding:7px 12px;cursor:pointer}
+@media (max-width:640px){.ln.d{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)}.ln.g{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.ln .val{text-align:left;padding-bottom:0}}
+.labelno{font-family:var(--f-mono);font-size:22px;font-weight:500;color:var(--gold)}
+table.sum{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+table.sum td{padding:5px 0;border-bottom:1px solid var(--line)}
+table.sum td:last-child{text-align:right;font-family:var(--f-mono)}
+table.sum tr.total td{font-weight:600;border-bottom:none;font-size:17px}
+.code{font-family:var(--f-mono);letter-spacing:.06em}
+.tagbox{background:var(--sunk);border-radius:var(--r);padding:12px;overflow-x:auto}
+.tagbox svg{display:block;width:100%;max-width:560px;height:auto;filter:drop-shadow(0 1px 2px rgba(0,0,0,.18))}
+.hint{font-size:13px;color:var(--muted)}
+.actions{display:flex;flex-wrap:wrap;gap:10px}
+button.btn{font:inherit;font-weight:600;border-radius:var(--r);padding:10px 16px;cursor:pointer;border:1px solid var(--fg);background:var(--fg);color:var(--bg)}
+button.btn.ghost{background:transparent;color:var(--fg);border-color:var(--line)}
+button.btn.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+button.btn:disabled{opacity:.45;cursor:not-allowed}
+.list{overflow-x:auto}
+table.items{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums;min-width:720px}
+table.items th{text-align:left;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:8px;border-bottom:1px solid var(--line)}
+table.items td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.items td.num{font-family:var(--f-mono);text-align:right}
+table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;background:var(--sunk)}
+.pill{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--sunk);color:var(--muted)}
+.pill.s{background:var(--gold-soft);color:var(--gold)}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+.rates td input{padding:6px 8px}
+.confirm{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+@media (prefers-reduced-motion:no-preference){button.btn{transition:transform .08s}button.btn:active{transform:translateY(1px)}}
+#printArea{display:none}
+@media print{#printArea .pg{page-break-after:always;break-after:page}#printArea .pg:last-child{page-break-after:auto;break-after:auto}}
+@media print{body *{visibility:hidden!important}#printArea,#printArea *{visibility:visible!important}#printArea{display:block!important;position:fixed;left:0;top:0;margin:0;padding:0}html,body{margin:0!important;padding:0!important;background:#fff!important}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>VJ Inventory</h1>
+    <span class="sub">Vaishnavi Jewels · stock tagging</span>
+    <span class="who" id="who">Connecting…</span>
+  </header>
+
+  <nav role="tablist">
+    <button role="tab" id="t-new" aria-selected="true" data-tab="new">New tag</button>
+    <button role="tab" id="t-check" aria-selected="false" data-tab="check">Price check</button>
+    <button role="tab" id="t-list" aria-selected="false" data-tab="list">Tagged pieces</button>
+    <button role="tab" id="t-find" aria-selected="false" data-tab="find">Find lost tag</button>
+    <button role="tab" id="t-rates" aria-selected="false" data-tab="rates">Gold rate &amp; settings</button>
+  </nav>
+
+  <div id="msg"></div>
+
+  <!-- NEW TAG -->
+  <div id="p-new" class="grid">
+    <section class="card">
+      <h2>1 · Design photo</h2>
+      <div class="photo">
+        <div class="thumb" id="thumb">No photo yet</div>
+        <label>Photo of the piece
+          <input type="file" id="photo" accept="image/*" capture="environment">
+          <span class="hint">Take it on the tray, in good light. Or skip it here: scan the printed tag's QR with your phone and tap <b>Take photo</b>.</span>
+        </label>
+      </div>
+
+      <h2>2 · Piece</h2>
+      <div class="seg" role="radiogroup" aria-label="Type">
+        <label><input type="radio" name="kind" id="k-sale" value="sale" checked> Stock</label>
+        <label><input type="radio" name="kind" id="k-sample" value="sample"> Sample</label>
+      </div>
+      <div class="row">
+        <label>Category <select id="cat"></select></label>
+        <label>Design number <input id="designNo" autocomplete="off" placeholder="e.g. 1436" required></label>
+        <label>Certificate / remark <input id="remark" autocomplete="off" placeholder="e.g. tgl, IGI, HUID"></label>
+      </div>
+
+      <h2>3 · Gold</h2>
+      <div class="lines" id="goldLines"></div>
+      <button type="button" class="add" id="addGold">+ Add gold line</button>
+
+      <h2>4 · Diamonds</h2>
+      <div class="lines" id="diaLines"></div>
+      <button type="button" class="add" id="addDia">+ Add diamond line</button>
+
+      <h2>5 · Other charges</h2>
+      <div class="row"><label>Colour stones and other charges (₹) <input type="number" id="otherAmt" min="0" step="1" placeholder="0"></label></div>
+    </section>
+
+    <section class="card" id="side">
+      <h2>Tag</h2>
+      <div><span class="hint">Label number</span><div class="labelno" id="lblPreview">—</div></div>
+      <div class="tagbox" id="tagbox"></div>
+      <p class="hint" id="tagHint"></p>
+      <h2>Price at today's gold rate</h2>
+      <table class="sum" id="sum"></table>
+      <p class="hint" id="rateNote"></p>
+      <div class="actions">
+        <button type="button" class="btn" id="save">Save &amp; print tag</button>
+        <button type="button" class="btn ghost" id="reset">Clear form</button>
+      </div>
+      <p class="hint" id="saveHint"></p>
+    </section>
+  </div>
+
+  <!-- PRICE CHECK -->
+  <section id="p-check" class="card" hidden>
+    <div class="row" style="align-items:end">
+      <label style="flex:2 1 220px">Code on the tag, tag number or design number <input id="cq" autocomplete="off" placeholder="e.g. abc270xyz, 809 or design 1436" inputmode="text"></label>
+      <div><button type="button" class="btn" id="cgo">Check price</button></div>
+    </div>
+    <p class="hint">Or scan the QR code on the tag with your phone camera. It opens this page on the piece (only for people with access).</p>
+    <div id="cres"></div>
+  </section>
+
+  <!-- FIND LOST TAG -->
+  <section id="p-find" class="card" hidden>
+    <h2>Find a piece whose tag is lost</h2>
+    <p class="hint">Weigh the piece and choose its category. The closest pieces by weight come first; check the diamonds and photo, then reprint its tag with the same old number.</p>
+    <div class="row" style="align-items:end">
+      <label style="flex:1 1 160px">Category <select id="fcat"></select></label>
+      <label style="flex:1 1 120px">Type <select id="fkd"><option value="">Stock or sample</option><option value="sale">Stock</option><option value="sample">Sample</option></select></label>
+      <label style="flex:1 1 140px">Weight on the scale (g) <input type="number" id="fwt" step="0.001" min="0" inputmode="decimal" placeholder="e.g. 7.880"></label>
+      <label style="flex:1 1 120px">Within <select id="ftol"><option value="0.02">± 0.02 g</option><option value="0.05" selected>± 0.05 g</option><option value="0.1">± 0.10 g</option><option value="0.25">± 0.25 g</option><option value="1">± 1 g</option></select></label>
+      <div><button type="button" class="btn" id="fgo">Find</button></div>
+    </div>
+    <div class="row" style="align-items:end;margin-top:14px" id="fphotoRow">
+      <label style="flex:2 1 240px">Or search by photo (compares with pieces that have a saved photo)
+        <input type="file" id="fphoto" accept="image/*" capture="environment"></label>
+      <div><button type="button" class="btn" id="fpgo" disabled>Search by photo</button></div>
+    </div>
+    <p class="hint" id="fphint" hidden></p>
+    <div id="fres" style="display:flex;flex-direction:column;gap:10px;margin-top:12px"></div>
+  </section>
+
+  <!-- LIST -->
+  <section id="p-list" class="card" hidden>
+    <div class="row" style="align-items:end">
+      <label style="flex:2 1 220px">Search <input id="q" placeholder="Label, design no. (e.g. 1122), category, remark"></label>
+      <label style="flex:1 1 140px">Show <select id="fkind"><option value="">All</option><option value="sale">Stock</option><option value="sample">Samples</option><option value="nophoto">Photo pending</option></select></label>
+    </div>
+    <div class="row" style="align-items:center;gap:8px;margin:10px 0">
+      <button type="button" class="btn" id="printQ" hidden>Print queue</button>
+      <button type="button" class="btn" id="printSel" disabled>Print selected</button>
+      <button type="button" class="btn ghost" id="selShown">Select all shown</button>
+      <button type="button" class="btn ghost" id="selClear">Clear</button>
+      <span class="hint" id="listMore"></span>
+    </div>
+    <div id="importBox" class="banner warn" hidden></div>
+    <div class="list"><table class="items"><thead><tr><th></th><th></th><th>Design · label</th><th>Category</th><th>Gold (net g)</th><th>Diamonds</th><th>Price when tagged</th><th>Price today</th><th>Added</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+    <div class="empty" id="listEmpty">No pieces tagged here yet. Tag the first one under <b>New tag</b>. The Onnet stock will be imported into this list in the next step.</div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="p-rates" class="card" hidden>
+    <p class="banner warn" id="ownerOnly" hidden>Only Abhinav can change the gold rate and settings. You can see them here.</p>
+    <h2>Gold rate</h2>
+    <div class="row">
+      <label>24K gold rate, ₹ per gram <input type="number" id="gold" step="1" min="0"></label>
+      <label>Last updated <input id="goldAt" readonly></label>
+    </div>
+    <p class="hint">Updated by the Brain three times a day (1:00, 3:30 and 5:00 PM). Abhinav can also set it here. Diamond rates stay as entered on each tag; only gold and making move with this rate.</p>
+    <h2>Purity factors (billing workbook)</h2>
+    <div class="row">
+      <label>22K <input type="number" id="pf22" step="0.001"></label>
+      <label>18K <input type="number" id="pf18" step="0.001"></label>
+      <label>14K <input type="number" id="pf14" step="0.001"></label>
+      <label>9K <input type="number" id="pf9" step="0.001"></label>
+    </div>
+    <h2>Making charge</h2>
+    <div class="row">
+      <label>₹ per g (first gold line over the limit) <input type="number" id="mkBase" step="1"></label>
+      <label>₹ per g (first gold line up to the limit) <input type="number" id="mkSmall" step="1"></label>
+      <label>Limit (g of gold) <input type="number" id="mkLimit" step="0.1"></label>
+      <label>Plus % of karat gold rate per g <input type="number" id="mkPct" step="0.1"></label>
+    </div>
+    <p class="hint">Making per g is rounded up to ₹100. Total is rounded up to ₹100, then 3% GST, then rounded up to ₹10,000 (no-gold pieces: ₹10).</p>
+    <h2>Default diamond rates (₹ per ct)</h2>
+    <p class="hint">Used when the special rate is left blank on a tag. Blank here means staff must enter a rate.</p>
+    <div class="list"><table class="items rates" style="min-width:520px"><thead><tr><th>Quality</th><th>Round</th><th>Choki</th><th>Fancy</th><th>Solitaire</th></tr></thead><tbody id="defRows"></tbody></table></div>
+    <h2>Tag size</h2>
+    <div class="row">
+      <label>Tag width (mm) <input type="number" id="tw" step="1"></label>
+      <label>Tag height (mm) <input type="number" id="th" step="1"></label>
+      <label>Print area width (mm) <input type="number" id="tp" step="1"></label>
+    </div>
+    <p class="hint">Current Onnet roll: 100 × 15 mm, 70 mm print area, 30 mm tail on the right. Change these when the RFID tags arrive.</p>
+    <div class="actions"><button type="button" class="btn" id="saveRates">Save gold rate &amp; settings</button></div>
+    <div id="importCard" hidden style="margin-top:24px;border-top:1px solid var(--line);padding-top:16px">
+      <h2>Move stock from VJ Inventory (one time)</h2>
+      <p class="hint">Choose the file vjtags_import.json.gz that Claude sent. Pieces already here are kept; only missing ones are added.</p>
+      <div class="row" style="align-items:end"><label style="flex:2 1 240px">Import file <input type="file" id="impFile" accept=".gz,.json,application/gzip,application/json"></label>
+      <div><button type="button" class="btn" id="impGo" disabled>Import</button></div></div>
+      <p class="hint" id="impMsg"></p>
+    </div>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="/tags/shim.js"></script>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+/* Categories: names per Brain F-016; label prefixes continue the Onnet numbering */
+const CATS=[
+ {id:"VLR",name:"Ring (VLR)",code:"VLR",s:"SVLR"},
+ {id:"VER",name:"Earrings (VER)",code:"VER",s:"SVER"},
+ {id:"VBR",name:"Bracelet (VBR)",code:"VBR",s:"SVBR"},
+ {id:"VBN",name:"Bangle (Vban)",code:"VBN",s:"SVBN"},
+ {id:"VP",name:"Pendant (VP)",code:"VP",s:"SVP"},
+ {id:"VPS",name:"Pendant Set (VPS)",code:"VPS",s:"SVPS"},
+ {id:"VNS",name:"Necklace Set (VNS)",code:"VNS",s:"SNS"},
+ {id:"VMN",name:"Mangalsutra (VMan)",code:"VMN",s:"SVMN"},
+ {id:"CH",name:"Chain (Ch)",code:"CH",s:"SCH"},
+ {id:"VNP",name:"Nose Pin (VNP)",code:"VNP",s:"SVNP"}
+];
+const KARATS=["22K","18K","14K","9K"],KNUM={"22K":"22","18K":"18","14K":"14","9K":"9"};
+const SHAPES=["Round","Choki","Fancy","Solitaire"],QUALS=["CVD","VS GH","VVS EF","VS HI","VS IJ","Other"];
+const DEF_RATES={"CVD|Round":23000,"CVD|Choki":23000,"CVD|Fancy":23000,"CVD|Solitaire":23000,"VS GH|Round":46000,"VS GH|Choki":46000,"VS GH|Fancy":85000,"VS HI|Round":40000,"VS HI|Choki":40000,"VS IJ|Round":35000,"VS IJ|Choki":35000};
+function defRate(shape,q){const r=(S.settings&&S.settings.defaultRates)||DEF_RATES;const v=r[q+"|"+shape];return typeof v==="number"&&v>0?v:null}
+const DEF={gold24g:null,goldAt:null,purity:{"22K":0.92,"18K":0.76,"14K":0.60,"9K":0.40},making:{base:650,small:750,limit:5,pct:10},gst:3,tag:{w:100,h:15,printW:70}};
+const S={sel:new Set(),subs:{},parts:{},db:null,user:null,assets:null,dl:null,me:null,owner:false,canWrite:null,settings:null,counters:{},tags:[],photo:null,busy:false};
+const fmt=n=>"₹"+Math.round(n).toLocaleString("en-IN");
+const num=v=>{const x=parseFloat(v);return isFinite(x)?x:0};
+const up=(n,step)=>Math.ceil(Math.round(n*100)/100/step)*step;
+function st(){const s=S.settings||{};return {gold24g:s.gold24g??null,goldAt:s.goldAt??null,purity:Object.assign({},DEF.purity,s.purity||{}),making:Object.assign({},DEF.making,s.making||{}),gst:s.gst??DEF.gst,tag:Object.assign({},DEF.tag,s.tag||{})}}
+function msg(text,kind){const m=$("msg");m.textContent="";if(!text)return;const p=document.createElement("p");p.className="banner "+(kind||"warn");p.textContent=text;m.appendChild(p)}
+
+/* ---------- tabs ---------- */
+document.querySelectorAll("nav button").forEach(b=>b.addEventListener("click",()=>{
+  document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-selected",x===b?"true":"false"));
+  showTab(b.dataset.tab);
+}));
+async function runImport(){
+  const f=$("impFile").files&&$("impFile").files[0];if(!f)return;const m=$("impMsg");$("impGo").disabled=true;
+  try{
+    let txt;if(/\.gz$/i.test(f.name)){const ds=f.stream().pipeThrough(new DecompressionStream("gzip"));txt=await new Response(ds).text()}else txt=await f.text();
+    const j=JSON.parse(txt),docs=j.docs||[],photos=j.photos||[];let p=0;
+    const post=async body=>{const r=await fetch("/api/vj/import",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify(body)});if(!r.ok)throw new Error("server "+r.status);return r.json()};
+    for(let i=0;i<docs.length;i+=250){await post({docs:docs.slice(i,i+250)});m.textContent=`Pieces: ${Math.min(i+250,docs.length)} of ${docs.length}…`}
+    for(let i=0;i<photos.length;i+=8){const r=await post({photos:photos.slice(i,i+8)});p+=r.photos;m.textContent=`Photos: ${Math.min(i+8,photos.length)} of ${photos.length}…`}
+    m.textContent=`Done: ${docs.length} pieces and settings checked (new ones added), ${p} photos added. Reload the page.`;
+  }catch(e){m.textContent="Import stopped: "+(e&&e.message||e)+". Press Import again - nothing is added twice."}
+  $("impGo").disabled=false;
+}
+function applyRole(){
+  const r=S.role||"staff";
+  const hide=r==="admin"?[]:r==="staff"?["rates"]:["new","list","find","rates"];
+  hide.forEach(k=>{const b=document.querySelector('nav button[data-tab="'+k+'"]');if(b)b.hidden=true});
+  if(r==="sales")showTab("check");
+  if(r==="admin"){$("importCard").hidden=false;$("impFile").addEventListener("change",()=>{$("impGo").disabled=!($("impFile").files&&$("impFile").files[0])});$("impGo").addEventListener("click",runImport)}
+  /* photo search needs Claude; not on the website yet */
+  const fr=$("fphotoRow");if(fr&&!S.sample)fr.hidden=true;
+}
+function showTab(tab){
+  document.querySelectorAll("nav button").forEach(x=>x.setAttribute("aria-selected",x.dataset.tab===tab?"true":"false"));
+  ["new","check","list","find","rates"].forEach(k=>$("p-"+k).hidden=k!==tab);
+  if(tab==="list")renderList();
+  if(tab==="find"&&S.sample){const n=S.tags.filter(t=>t.photo).length;$("fphint").textContent=`Photo search can only find pieces that already have a saved photo (${n} of ${S.tags.length} today). Choosing the category and adding the weight makes it faster and surer.`}
+}
+const APP_URL="https://vaishnavijewels.com/tags";
+const tagId=label=>String(label).trim().toUpperCase().replace(/\s+/g,"").replace(/\//g,"-").replace(/[^A-Z0-9_\-.~]/g,"");
+function renderCheck(){
+  const box=$("cres");box.textContent="";const raw=$("cq").value;if(!raw.trim())return;
+  /* Owner 13/10/2026: type only the code printed on the tag (11 digits) or just the number (e.g. 809); the full label still works */
+  /* 13/10/2026: a scanner (Zebra RFD40 barcode side, HID keyboard mode) types the whole QR text "<app url>#<TAG-ID>": keep only the part after # */
+  let q=raw.trim().replace(/\s+/g,"");if(q.includes("#"))q=q.slice(q.lastIndexOf("#")+1);
+  const id=tagId(q);let t=null,many=[];
+  if(/^[a-z]{3}\d+[a-z]{3}$/i.test(q))t=S.tags.find(x=>x.code&&x.code.toLowerCase()===q.toLowerCase())||null;
+  else if(/^\d{1,6}$/.test(q)){many=S.tags.filter(x=>String(x.no)===String(+q)||String(x.designNo||"")===q);if(many.length===1){t=many[0];many=[]}}
+  else if(/^[A-Za-z0-9-]{2,20}$/.test(q)&&S.tags.some(x=>String(x.designNo||"").toUpperCase()===q.toUpperCase())&&!S.tags.some(x=>x.id===id||tagId(x.label)===id)){many=S.tags.filter(x=>String(x.designNo||"").toUpperCase()===q.toUpperCase());if(many.length===1){t=many[0];many=[]}}
+  else t=S.tags.find(x=>x.id===id||tagId(x.label)===id)||null;
+  const card=document.createElement("div");card.className="card";card.style.cssText="display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:var(--r);padding:14px";
+  if(many.length>1){const p=document.createElement("p");p.textContent=`${many.length} pieces match ${q} (tag number or design number). Tap the right one:`;card.appendChild(p);const w=document.createElement("div");w.style.cssText="display:flex;flex-wrap:wrap;gap:8px";
+    many.forEach(x=>{const b=document.createElement("button");b.type="button";b.className="btn ghost";b.textContent=(x.designNo?x.designNo+" · ":"")+x.label+(x.catName?" · "+x.catName:"");b.addEventListener("click",()=>{$("cq").value=x.label;renderCheck()});w.appendChild(b)});card.appendChild(w);box.appendChild(card);return}
+  if(!t){card.textContent=!S.tags.length?"Loading stock…":/^[a-z]{3}\d+[a-z]{3}$/i.test(q)?`No piece has the code ${q}. Pieces imported from Onnet get their code when their new tag is printed; until then type the tag number (e.g. 809).`:`No piece with tag ${raw.trim()} in VJ Inventory.`;box.appendChild(card);return}
+  const top=document.createElement("div");top.style.cssText="display:flex;gap:12px;align-items:center;flex-wrap:wrap";
+  if(t.photo){const im=document.createElement("img");im.alt="";im.src="/_blob/"+t.photo;im.style.cssText="width:96px;height:96px;object-fit:cover;border-radius:6px";top.appendChild(im)}
+  else{const ph=document.createElement("div");ph.className="hint";ph.style.cssText="width:96px;height:96px;display:flex;align-items:center;justify-content:center;text-align:center;border:1px dashed var(--line);border-radius:6px";ph.textContent="Photo pending";top.appendChild(ph)}
+  const h=document.createElement("div");const l=document.createElement("div");l.className="labelno";l.textContent=(t.designNo?t.designNo+" · ":"")+t.label;const c=document.createElement("div");c.className="hint";c.textContent=S.role==="sales"?(t.catName||""):(t.catName||"")+(t.remark?" · "+t.remark:"")+(t.kind==="sample"?" · sample":"");h.append(l,c);top.appendChild(h);card.appendChild(top);
+  const tb=document.createElement("table");tb.className="sum";const add=(a,b,cl)=>{const tr=document.createElement("tr");if(cl)tr.className=cl;const x=document.createElement("td"),y=document.createElement("td");x.textContent=a;y.textContent=b;tr.append(x,y);tb.appendChild(tr)};
+  const pin=priceInput(t);pin.gold.forEach(g=>add("Gold "+g.k,g.net.toFixed(3)+" g"));pin.dias.forEach(d=>add(`${d.shape} ${d.q}`,`${d.ct.toFixed(2)} ct (${d.pcs})`+(d.rate>0?` @ ${fmt(d.rate)}`:"")));
+  if(t.other&&t.other.amt)add("Other charges",fmt(t.other.amt));
+  const pr=price(priceInput(t)),s=st();
+  if(t.kind==="sample"&&S.role!=="sales")add("Sample","not for sale - order estimate at 14K below");
+  if(!pr)add("Price","gold rate not set","total");
+  else if(S.role==="sales"){add("Price today",fmt(pr.final),"total")}
+  else{add("Gold value",fmt(pr.gold));add("Making",fmt(pr.making));if(pr.dia)add("Diamonds",fmt(pr.dia));if(pr.oth)add("Other",fmt(pr.oth));add(`GST ${s.gst}%`,fmt(pr.gst));add("Price today",fmt(pr.final),"total")}
+  card.appendChild(tb);
+  const n=document.createElement("p");n.className="hint";n.textContent=pr?`At 24K ${fmt(s.gold24g)}/g${s.goldAt?", updated "+new Date(s.goldAt).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):""}.`+(t.priceAtTag?` Price when tagged: ${fmt(t.priceAtTag)}.`:""):"";card.appendChild(n);
+  const acts=document.createElement("div");acts.style.cssText="display:flex;gap:8px;flex-wrap:wrap";
+  const pb=photoButton(t,renderCheck);if(pb)acts.appendChild(pb);
+  if(S.role!=="sales"){const rp=document.createElement("button");rp.type="button";rp.className="btn ghost";rp.textContent="Reprint tag";rp.addEventListener("click",async()=>{if(await ensureCode(t))printOrPDF(t)});acts.appendChild(rp);}
+  card.appendChild(acts);
+  box.appendChild(card);
+}
+$("cgo").addEventListener("click",renderCheck);$("cq").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();renderCheck();$("cq").select()}});/* select after Enter so the next scan replaces the last one */
+function fromHash(){const h=(location.hash||"").replace(/^#/,"");if(/^[A-Za-z0-9][A-Za-z0-9_\-.~]{2,40}$/.test(h)&&/-\d+$/.test(h)){$("cq").value=h.replace(/-(\d+)$/,"/$1");showTab("check");renderCheck()}}
+window.addEventListener("hashchange",fromHash);
+
+/* ---------- form lines ---------- */
+let lineSeq=0;
+function opt(sel,vals,cur){vals.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=v;sel.appendChild(o)});if(cur)sel.value=cur}
+function addGold(k,net){
+  const id=++lineSeq,d=document.createElement("div");d.className="ln g";d.dataset.id=id;
+  d.innerHTML=`<label>Karat<select id="gk${id}"></select></label><label>Net gold wt (g)<input type="number" id="gn${id}" step="0.001" min="0" placeholder="0.000"></label><div class="val" id="gv${id}"></div><button type="button" class="x" aria-label="Remove gold line">✕</button>`;
+  $("goldLines").appendChild(d);opt($("gk"+id),KARATS,k||"18K");if(net)$("gn"+id).value=net;
+  d.querySelector(".x").addEventListener("click",()=>{if($("goldLines").children.length>1){d.remove();update()}});
+  update();
+}
+function addDia(){
+  const id=++lineSeq,d=document.createElement("div");d.className="ln d";d.dataset.id=id;
+  d.innerHTML=`<label>Shape<select id="ds${id}"></select></label><label>Quality<select id="dq${id}"></select><input id="dqo${id}" autocomplete="off" maxlength="24" placeholder="Type quality" hidden></label><label>Ct<input type="number" id="dc${id}" step="0.01" min="0" placeholder="0.00"></label><label>Pcs<input type="number" id="dp${id}" step="1" min="0" placeholder="0"></label><label>Special rate ₹/ct<input type="number" id="dr${id}" step="100" min="0" placeholder="default"></label><div class="val" id="dv${id}"></div><button type="button" class="x" aria-label="Remove diamond line">✕</button>`;
+  $("diaLines").appendChild(d);opt($("ds"+id),SHAPES,"Round");opt($("dq"+id),QUALS,"CVD");
+  d.querySelector(".x").addEventListener("click",()=>{d.remove();update()});
+  $("dq"+id).addEventListener("change",()=>{const o=$("dq"+id).value==="Other";$("dqo"+id).hidden=!o;if(o)$("dqo"+id).focus()});
+  update();
+}
+$("addGold").addEventListener("click",()=>addGold());
+$("addDia").addEventListener("click",()=>addDia());
+["goldLines","diaLines"].forEach(id=>{$(id).addEventListener("input",update);$(id).addEventListener("change",update)});
+["cat","remark","otherAmt"].forEach(id=>{$(id).addEventListener("input",update);$(id).addEventListener("change",update)});
+document.querySelectorAll('input[name=kind]').forEach(r=>r.addEventListener("change",update));
+CATS.forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=c.name;$("cat").appendChild(o)});
+
+/* ---------- read form ---------- */
+function kind(){return document.querySelector('input[name=kind]:checked').value}
+function readForm(){
+  const k=kind(),cat=CATS.find(c=>c.id===$("cat").value)||CATS[0];
+  const gold=[...$("goldLines").children].map(r=>({k:$("gk"+r.dataset.id).value,net:num($("gn"+r.dataset.id).value)}));
+  const dias=[...$("diaLines").children].map(r=>{const i=r.dataset.id;const qq=$("dq"+i).value==="Other"?($("dqo"+i).value.trim().toUpperCase()||"OTHER?"):$("dq"+i).value;const sp=num($("dr"+i).value),sh=$("ds"+i).value,def=defRate(sh,qq);return {shape:sh,q:qq,ct:num($("dc"+i).value),pcs:Math.round(num($("dp"+i).value)),rate:sp>0?sp:(def||0),special:sp>0}}).filter(d=>d.ct>0||d.pcs>0||d.special);
+  const mainK=(gold.find(g=>g.net>0)||gold[0]||{k:"18K"}).k;
+  const prefix=k==="sample"?cat.s:cat.code+KNUM[mainK];
+  return {kind:k,cat:cat.id,prefix,catName:cat.name.replace(/\s*\(.*\)$/,""),mainK,gold,dias,
+    remark:$("remark").value.trim(),designNo:$("designNo").value.trim().toUpperCase(),other:{amt:num($("otherAmt").value)}};
+}
+/* ---------- price (Brain F-025 / F-044) ---------- */
+function price(t){
+  const s=st(),r24=s.gold24g;if(!r24)return null;
+  /* Bills workbook, Nett mode: one making rate per piece, taken from the FIRST gold line
+     (R-Making: Rs 650/g if that line is over 5 g, else 750; plus 10% of its karat rate; rounded up to Rs 100),
+     charged on all gold lines together. */
+  const m=s.making,g0=t.gold.find(g=>g.net>0);let gold=0,making=0;const lines=[];
+  if(!g0){ /* no gold (e.g. Moti mala): fixed amount + diamonds, +GST, rounded up to Rs 10 (owner 13/10/2026) */
+    const dia0=t.dias.reduce((a,d)=>a+d.ct*d.rate,0),oth0=(t.other&&t.other.amt)||0,sub0=up(dia0+oth0,10),gst0=sub0*s.gst/100;
+    return {gold:0,making:0,dia:dia0,oth:oth0,sub:sub0,gst:gst0,final:sub0>0?up(sub0+gst0,10):0,lines,r24,mk:0};}
+  const mk=up((g0.net>m.limit?m.base:m.small)+r24*(s.purity[g0.k]||0)*m.pct/100,100);
+  t.gold.forEach(g=>{if(!(g.net>0))return;const kr=r24*(s.purity[g.k]||0);gold+=g.net*kr;making+=g.net*mk;lines.push({k:g.k,net:g.net,kr,mk});});
+  const dia=t.dias.reduce((a,d)=>a+d.ct*d.rate,0),oth=t.other.amt||0;
+  const sub=up(gold+making+dia+oth,100),gst=sub*s.gst/100,final=up(sub+gst,10000); /* owner 13/10/2026: final price rounded UP to the nearest Rs 10,000 */
+  return {gold,making,dia,oth,sub,gst,final,lines,r24,mk};
+}
+function problems(t){
+  const p=[],s=st();
+  if(!t.designNo)p.push("Enter the design number.");
+  if(!t.gold.some(g=>g.net>0))p.push("Enter the net gold weight.");
+  t.dias.forEach((d,i)=>{if(d.q==="OTHER?")p.push(`Diamond line ${i+1}: type the quality.`);if(!(d.ct>0))p.push(`Diamond line ${i+1}: enter the carat weight.`);if(t.kind==="sale"&&!(d.rate>0))p.push(`Diamond line ${i+1}: no default rate for ${d.shape} ${d.q}. Enter the special rate.`)});
+  if(t.kind==="sale"&&!s.gold24g)p.push("Today's gold rate is not set (Gold rate & settings).");
+  return p;
+}
+function nextNo(prefix){let mx=S.counters[prefix]||0;S.tags.forEach(t=>{if(t.prefix===prefix&&t.no>mx)mx=t.no});return mx+1}
+/* Tag price code (owner 13/10/2026): 3 random letters + price in thousands + 3 random letters, e.g. abc270xyz = Rs 2,70,000 */
+function codeFor(final){const k=Math.max(1,Math.ceil(final/1000));const a="abcdefghijkmnprstuvwxyz",r3=()=>{let o="";const b=new Uint32Array(3);crypto.getRandomValues(b);b.forEach(x=>o+=a[x%a.length]);return o};return r3()+k+r3()}
+
+/* ---------- tag drawing (one layout for preview and PDF, per Brain F-043) ---------- */
+function diaText(d){const sh={Round:"",Choki:"Ch ",Fancy:"F ",Solitaire:"Sol "}[d.shape]??"";return `${sh}${d.q} ${d.ct.toFixed(2)}(${d.pcs})${d.rate?Math.round(d.rate):""}`}
+/* rate for a sample's stone line (Onnet code like RVS-SI-GH, BVS.SI.GH, MVS-SI-GH): today's default rate for that shape + colour,
+   never below the F-066 minimums. Shown on the tag only; samples are not priced. */
+const MINR={Round:{EF:75000,FG:65000,GH:46000,HI:40000,IJ:35000,JK:33000},Choki:{EF:75000,FG:65000,GH:46000,HI:40000,IJ:40000,JK:40000},Fancy:{EF:95000,FG:90000,GH:85000,HI:85000,IJ:75000,JK:65000}};
+function sampleRate(d){
+  const c=String(d.code||d.q||"").toUpperCase().replace(/\./g,"-");
+  if(/^(CVD|C-|SOL)/.test(c))return defRate(d.shape,"CVD")||23000;
+  const m=c.match(/(EF|FG|GH|HI|IJ|JK)\b/)||c.match(/(EF|FG|GH|HI|IJ|JK)$/);if(!m)return 0;
+  const sh=MINR[d.shape]?d.shape:"Round",col=m[1],def=defRate(sh,(/VVS/.test(c)?"VVS ":"VS ")+col)||0;
+  return Math.max(def,MINR[sh][col]||0);
+}
+/* owner 13/10/2026: a sample's recorded weight is already converted to gold weight; its estimate is priced as 14K */
+function priceInput(t){
+  if(t.kind==="sample")return {gold:[{k:"14K",net:(t.metal&&t.metal.net)||0}],dias:(t.dias||[]).map(d=>d.rate>0?d:Object.assign({},d,{rate:sampleRate(d)})),other:t.other||{amt:0}};
+  return {gold:t.gold||[],dias:t.dias||[],other:t.other||{amt:0}};
+}
+function tagPrims(t){
+  const s=st(),{h,printW:p}=s.tag,pad=1,half=p/2,pr=[];
+  const q=Math.min(h-2*pad,12.5);pr.push({k:"qr",x:pad,y:(h-q)/2,s:q,text:APP_URL+"#"+tagId(t.label)});
+  const lx=pad+q+1.2,lw=half-lx-0.8,rx=half+0.8,rw=p-rx-pad;
+  const n=5,lh=(h-2*pad)/n,y=i=>pad+lh*(i+0.78);
+  /* owner 13/10/2026: a sample's tag must look like any stock tag - no "Silver", no "SAMPLE", no remark (remarks say "sam..."), weight as G.Wt., diamond rates shown */
+  const smp=t.kind==="sample";
+  const gl=(t.gold||[]).filter(g=>g.net>0),karats=gl.length?[...new Set(gl.map(g=>KNUM[g.k]+"kt"))].join("+"):(smp?"14kt":"");
+  const L=[{t:t.designNo?t.designNo:t.label,b:1,sz:7},{t:t.designNo?"("+t.label+")":"",sz:5.4},{t:karats,sz:5.4},{t:smp?"":t.remark,sz:5.2}];
+  L.forEach((l,i)=>{if(l.t)pr.push({k:"t",x:lx,y:y(i),t:l.t,b:l.b,sz:l.sz,maxW:lw})});
+  const net=gl.reduce((a,g)=>a+g.net,0),mw=!gl.length&&t.metal&&t.metal.net?t.metal.net:0;
+  const R=[{t:"G.Wt. "+(mw||net).toFixed(3),sz:5.6,b:1}];
+  const tail=[];if(t.other&&t.other.amt)tail.push({t:"Other "+Math.round(t.other.amt),sz:5});
+  tail.push({t:t.code||"···········",sz:5.8,b:1});
+  const room=n-1-tail.length;let dl=t.dias.map(d=>({t:diaText(smp&&!(d.rate>0)?Object.assign({},d,{rate:sampleRate(d)}):d),sz:5}));
+  if(dl.length>room){const more=dl.length-(room-1);dl=dl.slice(0,room-1);dl.push({t:"+"+more+" more lines",sz:5})}
+  R.push(...dl,...tail);
+  R.slice(0,n).forEach((l,i)=>pr.push({k:"t",x:rx,y:y(i),t:l.t,b:l.b,sz:l.sz,maxW:rw}));
+  pr.push({k:"fold",x:half});
+  return pr;
+}
+function qrMatrix(text){const q=qrcode(0,"L");q.addData(text);q.make();const n=q.getModuleCount(),m=[];for(let r=0;r<n;r++){m.push([]);for(let c=0;c<n;c++)m[r].push(q.isDark(r,c))}return m}
+let measureCtx=null;
+function fit(text,sz,bold,maxW){
+  if(!measureCtx)measureCtx=document.createElement("canvas").getContext("2d");
+  measureCtx.font=(bold?"700 ":"400 ")+(sz*0.3528*10)+"px Helvetica, Arial, sans-serif";
+  let s=text;while(s.length>3&&measureCtx.measureText(s).width/10>maxW)s=s.slice(0,-1);return s;
+}
+function tagSVG(t){
+  const {w,h,printW:p}=st().tag,NS="http://www.w3.org/2000/svg";
+  const el=(n,a)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);return e};
+  const svg=el("svg",{viewBox:`0 0 ${w} ${h}`,role:"img","aria-label":"Tag preview "+t.label});
+  svg.appendChild(el("rect",{width:w,height:h,rx:1.5,fill:"#ffffff"}));
+  svg.appendChild(el("line",{x1:p,x2:p,y1:0,y2:h,stroke:"#bbbbbb","stroke-width":.2,"stroke-dasharray":"1 1"}));
+  const tl=el("text",{x:p+(w-p)/2,y:h/2+1,"font-size":2.6,"text-anchor":"middle",fill:"#9a9a9a","font-family":"Helvetica, Arial, sans-serif",class:"preview-only"});tl.textContent="tail";svg.appendChild(tl);
+  tagPrims(t).forEach(o=>{
+    if(o.k==="qr"){const m=qrMatrix(o.text),n=m.length,cs=o.s/n;let d="";
+      m.forEach((r,ri)=>r.forEach((v,ci)=>{if(v)d+=`M${(o.x+ci*cs).toFixed(3)} ${(o.y+ri*cs).toFixed(3)}h${cs.toFixed(3)}v${cs.toFixed(3)}h-${cs.toFixed(3)}z`}));
+      svg.appendChild(el("path",{d,fill:"#111111"}));}
+    else if(o.k==="fold"){svg.appendChild(el("line",{x1:o.x,x2:o.x,y1:.8,y2:h-.8,stroke:"#d0d0d0","stroke-width":.15}))}
+    else{const e=el("text",{x:o.x,y:o.y,"font-size":(o.sz*0.3528).toFixed(3),"font-family":"Helvetica, Arial, sans-serif","font-weight":o.b?"700":"400",fill:"#111111"});
+      e.textContent=fit(o.t,o.sz,o.b,o.maxW);svg.appendChild(e);}
+  });
+  return svg;
+}
+function tagPDF(t){
+  const list=Array.isArray(t)?t:[t];
+  const {jsPDF}=window.jspdf,{w,h}=st().tag;
+  const doc=new jsPDF({orientation:w>=h?"landscape":"portrait",unit:"mm",format:[w,h],compress:true});
+  doc.setProperties({title:list[0].label});
+  list.forEach((t,pi)=>{if(pi)doc.addPage([w,h],w>=h?"landscape":"portrait");
+  tagPrims(t).forEach(o=>{
+    if(o.k==="qr"){const m=qrMatrix(o.text),n=m.length,cs=o.s/n;doc.setFillColor(0,0,0);
+      m.forEach((r,ri)=>r.forEach((v,ci)=>{if(v)doc.rect(o.x+ci*cs,o.y+ri*cs,cs+0.01,cs+0.01,"F")}));}
+    else if(o.k==="fold"){}
+    else{doc.setFont("helvetica",o.b?"bold":"normal");doc.setFontSize(o.sz);doc.setTextColor(0,0,0);
+      let s=o.t;while(s.length>3&&doc.getTextWidth(s)>o.maxW)s=s.slice(0,-1);doc.text(s,o.x,o.y);}
+  });
+  });
+  return doc.output("blob");
+}
+
+/* ---------- live update ---------- */
+function update(){
+  if(!S.settings)return;
+  const t=readForm(),s=st(),pr=t.kind==="sale"?price(t):null;
+  [...$("goldLines").children].forEach(r=>{const i=r.dataset.id,net=num($("gn"+i).value),k=$("gk"+i).value;
+    $("gv"+i).textContent=s.gold24g&&net>0?fmt(net*s.gold24g*(s.purity[k]||0)):""});
+  [...$("diaLines").children].forEach(r=>{const i=r.dataset.id,qq=$("dq"+i).value==="Other"?$("dqo"+i).value.trim().toUpperCase():$("dq"+i).value,def=defRate($("ds"+i).value,qq),sp=num($("dr"+i).value),rate=sp>0?sp:def,ct=num($("dc"+i).value);
+    $("dr"+i).placeholder=def?"default "+def.toLocaleString("en-IN"):"enter rate";
+    $("dv"+i).textContent=(rate&&ct>0?fmt(ct*rate):"")+(sp>0?" · special":(def&&ct>0?" · default":""));});
+  t.no=nextNo(t.prefix);t.label=t.prefix+"/"+t.no;t.code="";
+  $("lblPreview").textContent=t.label;
+  const sum=$("sum");sum.textContent="";
+  const add=(a,b,c)=>{const tr=document.createElement("tr");if(c)tr.className=c;const x=document.createElement("td"),y=document.createElement("td");x.textContent=a;y.textContent=b;tr.append(x,y);sum.appendChild(tr)};
+  if(t.kind==="sample"){add("Sample","not priced");$("rateNote").textContent="Samples are never sold, so they carry no price code."}
+  else if(!pr){add("Gold rate","not set");$("rateNote").textContent="Set today's 24K gold rate under Gold rate & settings."}
+  else{
+    pr.lines.forEach(l=>add(`Gold ${l.k} ${l.net.toFixed(3)} g × ${fmt(l.kr)}/g`,fmt(l.net*l.kr)));
+    add(`Making ${fmt(pr.mk)}/g × ${pr.lines.reduce((a,l)=>a+l.net,0).toFixed(3)} g`,fmt(pr.making));
+    if(pr.dia)add("Diamonds",fmt(pr.dia));if(pr.oth)add("Other charges",fmt(pr.oth));
+    add("Total (rounded up to ₹100)",fmt(pr.sub));add(`GST ${s.gst}%`,fmt(pr.gst));add("Price (rounded up to ₹10,000)",fmt(pr.final),"total");
+    $("rateNote").textContent=`24K gold at ${fmt(s.gold24g)}/g${s.goldAt?", set "+new Date(s.goldAt).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):""}. Diamond rates on the tag are final; only gold and making move with the rate.`;
+  }
+  const box=$("tagbox");box.textContent="";box.appendChild(tagSVG(t));
+  $("tagHint").textContent=`${s.tag.w} × ${s.tag.h} mm tag, printing on the left ${s.tag.printW} mm. The price code appears when you save.`;
+  const pb=problems(t);$("save").disabled=S.busy||pb.length>0||S.canWrite===false;
+  $("saveHint").textContent=S.canWrite===false?"You can view this page but not add tags. Ask Abhinav for editor access.":(pb.length?pb[0]:"Saving gives the piece its label number. Then open the PDF and print it on the TVS LP-45 at actual size.");
+}
+
+/* ---------- photo ---------- */
+async function shrinkPhoto(f){
+  const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(f)});
+  const mx=1600,sc=Math.min(1,mx/Math.max(img.width,img.height));
+  const c=document.createElement("canvas");c.width=Math.round(img.width*sc);c.height=Math.round(img.height*sc);
+  c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+  return await new Promise(r=>c.toBlob(r,"image/jpeg",0.85));
+}
+/* phone: add or replace the photo of a saved piece (owner 13/10/2026: details on the laptop, photo from the mobile) */
+function photoButton(t,after){
+  if(!S.db||!S.assets)return null;
+  const lab=document.createElement("label");lab.className="btn";lab.style.cssText="display:inline-flex;align-items:center;gap:6px;cursor:pointer";
+  const inp=document.createElement("input");inp.type="file";inp.accept="image/*";inp.setAttribute("capture","environment");inp.hidden=true;
+  lab.append(t.photo?"Replace photo":"Take photo",inp);
+  inp.addEventListener("change",async()=>{const f=inp.files&&inp.files[0];if(!f)return;
+    msg(`Saving the photo of ${t.label}…`,"ok");
+    try{const blob=await shrinkPhoto(f);const up=await S.assets.upload(blob,{type:"image/jpeg"});
+      await S.db.doc("tags/"+t.id).update({photo:up.id,photoAt:new Date().toISOString(),photoBy:S.me||null});
+      t.photo=up.id;msg(`Photo saved for ${t.label}.`,"ok");if(after)after()}
+    catch(e){msg(`The photo of ${t.label} could not be saved (${e&&e.code||"error"}). Try again.`,"bad")}});
+  return lab;
+}
+$("photo").addEventListener("change",async e=>{
+  const f=e.target.files&&e.target.files[0];if(!f)return;
+  try{
+    S.photo=await shrinkPhoto(f);
+    const th=$("thumb");th.textContent="";const im=document.createElement("img");im.alt="Design photo";im.src=URL.createObjectURL(S.photo);th.appendChild(im);
+  }catch(err){S.photo=null;msg("That file could not be read as a photo. Try a JPG or PNG.","bad")}
+  update();
+});
+
+/* ---------- loading all stock ----------
+   One query returns at most 1000 documents, so the stock is loaded per label prefix (VLR14, SVLR, ...),
+   in number ranges of 900 where a prefix is long. Prefixes come from counters/main. */
+const SAMPLE_PREFIXES=CATS.map(c=>c.s);
+function resub(){
+  if(!S.db)return;S.nOf=S.nOf||{};
+  const pre=new Set([...Object.keys(S.counters||{}),...SAMPLE_PREFIXES]);
+  pre.forEach(p=>{const last=(S.counters||{})[p]||0,n=Math.floor(last/900)+1;
+    if(S.nOf[p]===n)return;
+    /* new prefix, or a prefix that grew past 900 more numbers: (re)subscribe its ranges */
+    Object.keys(S.subs).filter(k=>k.split("|")[0]===p).forEach(k=>{try{S.subs[k]()}catch(e){}delete S.subs[k];delete S.parts[k]});
+    S.nOf[p]=n;
+    for(let k=0;k<n;k++){const key=p+"|"+k;
+      let q=S.db.collection("tags").where("prefix","==",p);
+      if(n>1){if(k>0)q=q.where("no",">=",k*900);if(k<n-1)q=q.where("no","<",(k+1)*900)}
+      S.subs[key]=q.limit(1000).onSnapshot(s=>{S.parts[key]=s.docs.map(d=>Object.assign({id:d.id},d.data()));retag()},()=>msg("Lost connection to the stock list. Reload the page.","bad"));}
+  });
+}
+let retagT=null;
+function retag(){if(retagT)return;retagT=setTimeout(()=>{retagT=null;
+  const m=new Map();Object.values(S.parts).forEach(a=>a.forEach(t=>m.set(t.id,t)));
+  S.tags=[...m.values()].sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))||String(a.label).localeCompare(String(b.label),"en",{numeric:true}));
+  update();renderImport();updQ();if(!$("p-list").hidden)renderList();if(!$("p-check").hidden)renderCheck()},400)}
+
+/* ---------- one-time import of the Onnet samples (owner only; C-20261013 'total stock chahiye') ---------- */
+const SAMPLE_TOTAL=2618;
+function renderImport(){
+  const box=$("importBox");if(!box)return;const have=S.tags.filter(t=>t.kind==="sample"&&String(t.source||"").includes("samples")).length;
+  box.hidden=true;return;
+  if(S.importing)return;
+  box.hidden=false;box.textContent="";
+  box.append(`Onnet samples in this list: ${have} of ${SAMPLE_TOTAL}. `);
+  const b=document.createElement("button");b.type="button";b.className="btn";b.textContent=have?"Add the remaining samples":"Add all samples ("+SAMPLE_TOTAL.toLocaleString("en-IN")+")";
+  b.addEventListener("click",importSamples);box.appendChild(b);
+}
+async function importSamples(){
+  const box=$("importBox");S.importing=true;box.textContent="Loading the sample list…";
+  try{
+    const r=await fetch("samples.json",{cache:"no-store"});if(!r.ok)throw new Error("sample list not found ("+r.status+")");
+    const data=await r.json(),ids=Object.keys(data);
+    /* counters first, so the list subscribes to the sample prefixes */
+    const cref=S.db.doc("counters/main"),snap=await cref.get(),last=Object.assign({},(snap.exists&&snap.data().last)||{});
+    ids.forEach(id=>{const t=data[id];last[t.prefix]=Math.max(last[t.prefix]||0,t.no)});await cref.set({last});
+    let done=0,skip=0,fail=0,i=0;
+    const work=async()=>{while(i<ids.length){const id=ids[i++],ref=S.db.doc("tags/"+id);
+      for(let a=0;a<3;a++){try{const ex=await ref.get();if(ex.exists){skip++;break}await ref.set(data[id]);done++;break}
+        catch(e){if(a===2){fail++;break}await new Promise(z=>setTimeout(z,1500*(a+1)))}}
+      if((done+skip+fail)%25===0)box.textContent=`Adding samples… ${done+skip+fail} of ${ids.length}`}};
+    await Promise.all([work(),work(),work(),work()]);
+    box.textContent=`Samples added: ${done}. Already there: ${skip}. Failed: ${fail}${fail?" (press the button again to retry)":""}.`;
+  }catch(e){box.textContent="Could not add the samples: "+(e&&e.message||e&&e.code||"error")+". Reload and try again."}
+  S.importing=false;setTimeout(renderImport,4000);
+}
+
+/* ---------- save ---------- */
+async function allocateAndSave(t,photoId){
+  const cref=S.db.doc("counters/main"),me=S.me||"tab"+Math.random();
+  let lease=await cref.acquire({holder:me,ttlMs:8000});
+  for(let i=0;i<5&&!lease.acquired;i++){await new Promise(r=>setTimeout(r,700+Math.random()*500));lease=await cref.acquire({holder:me,ttlMs:8000})}
+  if(!lease.acquired)throw {message:"Someone else is saving a tag right now. Try again in a few seconds."};
+  const snap=await cref.get(),seeds=(snap.exists&&snap.data().last)||{};S.counters=Object.assign({},seeds);
+  let no=nextNo(t.prefix);
+  for(;;){const id=(t.prefix+"-"+no).replace(/[^A-Za-z0-9_\-.~:@+]/g,"_");if(!(await S.db.doc("tags/"+id).get()).exists){t.id=id;break}no++}
+  t.no=no;t.label=t.prefix+"/"+no;
+  const pr=t.kind==="sale"?price(t):null;
+  const body={label:t.label,prefix:t.prefix,no:t.no,kind:t.kind,cat:t.cat,catName:t.catName,gold:t.gold.filter(g=>g.net>0),
+    dias:t.dias,other:t.other,remark:t.remark,designNo:t.designNo||"",photo:photoId,status:t.kind==="sample"?"sample":"in_stock",createdBy:S.me||null,createdAt:new Date().toISOString(),
+    gold24gAtTag:pr?pr.r24:null,priceAtTag:pr?pr.final:null,code:pr?codeFor(pr.final):null};
+  await S.db.doc("tags/"+t.id).set(body);
+  const last=Object.assign({},seeds);last[t.prefix]=Math.max(last[t.prefix]||0,t.no);await cref.set({last});S.counters=last;
+  return Object.assign({id:t.id},body);
+}
+$("save").addEventListener("click",async()=>{
+  const t=readForm(),pb=problems(t);if(pb.length){msg(pb[0]);return}
+  if(!S.db||!S.assets){msg("Saving needs editor access to this page. Ask Abhinav to add you as an editor.","bad");return}
+  S.busy=true;update();msg("Saving…","ok");
+  try{
+    let upr=null;if(S.photo)try{upr=await S.assets.upload(S.photo,{type:"image/jpeg"})}catch(e){throw {message:e&&e.code==="too_large"?"The photo is too large. Retake it.":"The photo could not be uploaded ("+(e&&e.code||"error")+"). Try again."}}
+    const saved=await allocateAndSave(t,upr?upr.id:null);
+    msg(`Saved ${saved.label}. Printing the tag…`,"ok");
+    await printOrPDF(saved);resetForm(true);
+  }catch(e){msg((e&&e.message)||"Could not save. Try again.","bad")}
+  S.busy=false;update();
+});
+/* 13/10/2026 owner: print straight to the tag printer. Opens the browser print box with the tag at exact size;
+   on a shop laptop set up with Chrome --kiosk-printing and the TVS LP-45 as default printer it prints with no box at all.
+   If this view blocks printing, it falls back to the PDF download. */
+function printTag(t){
+  const list=Array.isArray(t)?t:[t];
+  return new Promise(res=>{
+    const {w,h}=st().tag;let area=$("printArea");
+    if(!area){area=document.createElement("div");area.id="printArea";document.body.appendChild(area)}
+    area.textContent="";
+    list.forEach(x=>{const pg=document.createElement("div");pg.className="pg";pg.style.cssText=`width:${w}mm;height:${h}mm;overflow:hidden`;
+      const svg=tagSVG(x);svg.querySelectorAll("line,.preview-only").forEach(l=>l.remove());svg.setAttribute("width",w+"mm");svg.setAttribute("height",h+"mm");pg.appendChild(svg);area.appendChild(pg)});
+    let ps=$("printPage");if(!ps){ps=document.createElement("style");ps.id="printPage";document.head.appendChild(ps)}
+    ps.textContent=`@page{size:${w}mm ${h}mm;margin:0}`;
+    let fired=false;const on=()=>{fired=true};window.addEventListener("beforeprint",on,{once:true});
+    try{window.print()}catch(e){}
+    setTimeout(()=>{window.removeEventListener("beforeprint",on);res(fired)},fired?0:1200);
+  });
+}
+async function printOrPDF(t){
+  const list=Array.isArray(t)?t:[t],name=list.length===1?list[0].label:list.length+" tags";
+  const ok=await printTag(list);
+  if(ok){msg(`${name}: sent to the printer. If nothing printed, use Reprint in Tagged pieces.`,"ok");return}
+  msg(`${name}: this view cannot print directly, so here is the PDF.`,"warn");await offerPDF(list);
+}
+/* imported Onnet pieces get their price code the first time their new tag is printed */
+async function ensureCode(t){
+  if(t.code||!S.db)return true;
+  const pr=price(priceInput(t));
+  if(!pr){msg("Set today's gold rate first (Gold rate & settings), so the tag gets its price code.","warn");return false}
+  const code=codeFor(pr.final);
+  try{const ref=S.db.doc("tags/"+t.id),snap=await ref.get();if(!snap.exists)throw {code:"missing"};const cur=snap.data();
+    if(cur.code){t.code=cur.code;t.priceAtTag=cur.priceAtTag;return true}
+    await ref.set(Object.assign({},cur,{code,priceAtTag:pr.final,gold24gAtTag:pr.r24}));t.code=code;t.priceAtTag=pr.final;return true}
+  catch(e){msg(t.label+": could not save the price code ("+(e&&e.code||"error")+"). Try again.","bad");return false}
+}
+async function offerPDF(t){
+  const list=Array.isArray(t)?t:[t];t=list[0];
+  if(!S.dl){msg(`Saved ${t.label}, but this view cannot download files. Open the page in a browser or the Claude app to get the PDF.`,"warn");return}
+  try{await S.dl.save({filename:(list.length===1?t.label.replace("/","-"):"VJ_tags_"+list.length)+".pdf",data:tagPDF(list)})}
+  catch(e){if(e&&e.code==="declined")msg(`${t.label}: download skipped. Reprint it any time from Tagged pieces.`,"warn");else msg(`${t.label}: the PDF could not be offered (${e&&e.code||"error"}). Reprint it from Tagged pieces.`,"warn")}
+}
+function resetForm(keepKind){
+  ["remark","otherAmt","designNo"].forEach(id=>$(id).value="");
+  $("goldLines").textContent="";$("diaLines").textContent="";addGold();addDia();
+  S.photo=null;$("photo").value="";$("thumb").textContent="No photo yet";if(!keepKind)$("k-sale").checked=true;update();
+}
+$("reset").addEventListener("click",()=>resetForm(false));
+
+/* ---------- list ---------- */
+async function renderList(){
+  const body=$("rows");body.textContent="";
+  const q=$("q").value.trim().toLowerCase(),fk=$("fkind").value;
+  const qq=q.replace(/\s+/g,"");
+  const all=S.tags.filter(t=>(!fk||(fk==='nophoto'?!t.photo:t.kind===fk))&&(!q||[t.label,t.catName,t.remark,t.designNo].join(" ").toLowerCase().includes(q)||(qq&&String(t.designNo||"")===qq)||(qq&&String(t.label).toLowerCase().replace("/","")===qq.replace("/",""))));
+  /* exact design number or label first */
+  all.sort((a,b)=>((String(b.designNo)===qq||String(b.label).toLowerCase()===q)?1:0)-((String(a.designNo)===qq||String(a.label).toLowerCase()===q)?1:0));
+  const items=all.slice(0,300);
+  $("listEmpty").hidden=items.length>0;
+  $("listMore").textContent=all.length>items.length?`Showing ${items.length} of ${all.length}. Type a label, design number or category to narrow.`:`${all.length} piece${all.length===1?"":"s"}`;
+  updSel();
+  const ids=[...new Set(items.map(t=>t.createdBy).filter(Boolean))];let ps={};try{if(S.user&&ids.length)ps=await S.user.profiles(ids)}catch(e){}
+  items.forEach(t=>{
+    const tr=document.createElement("tr"),c=(txt,cls)=>{const td=document.createElement("td");if(cls)td.className=cls;td.textContent=txt;tr.appendChild(td);return td};
+    const cb=document.createElement("td");const ck=document.createElement("input");ck.type="checkbox";ck.checked=S.sel.has(t.id);ck.setAttribute("aria-label","Select "+t.label);
+    ck.addEventListener("change",()=>{if(ck.checked)S.sel.add(t.id);else S.sel.delete(t.id);updSel()});cb.appendChild(ck);tr.appendChild(cb);
+    const ph=document.createElement("td");if(t.photo){const im=document.createElement("img");im.alt="";im.loading="lazy";im.src="/_blob/"+t.photo;ph.appendChild(im)}tr.appendChild(ph);
+    const lc=c((t.designNo?t.designNo+" · ":"")+t.label);lc.style.fontFamily="var(--f-mono)";
+    const it=c(t.catName||"");if(t.kind==="sample"){const s=document.createElement("span");s.className="pill s";s.textContent="sample";it.append(" ",s)}
+    c((t.gold||[]).length?(t.gold||[]).map(g=>g.k+" "+g.net.toFixed(3)).join(" + "):(t.metal&&t.metal.net?t.metal.k+" "+t.metal.net.toFixed(3):"—"),"num");
+    c((t.dias||[]).map(d=>d.q+" "+d.ct.toFixed(2)).join(", ")||"—");
+    c(t.priceAtTag?fmt(t.priceAtTag):"—","num");
+    const pt=price(priceInput(t));c(pt?fmt(pt.final):"—","num");
+    const who=t.createdBy&&ps[t.createdBy]?ps[t.createdBy].name:"";c(new Date(t.createdAt).toLocaleDateString("en-IN",{day:"2-digit",month:"short"})+(who?" · "+who:""));
+    const act=document.createElement("td");act.style.whiteSpace="nowrap";
+    const rp=document.createElement("button");rp.type="button";rp.className="btn ghost";rp.textContent="Reprint";rp.addEventListener("click",async()=>{if(await ensureCode(t))printOrPDF(t)});act.appendChild(rp);
+    if(S.owner){const del=document.createElement("button");del.type="button";del.className="btn ghost";del.textContent="Delete";
+      del.addEventListener("click",()=>{act.textContent="";const box=document.createElement("span");box.className="confirm";box.append("Delete "+t.label+"?");
+        const y=document.createElement("button");y.type="button";y.className="btn danger";y.textContent="Delete";const n=document.createElement("button");n.type="button";n.className="btn ghost";n.textContent="Keep";
+        y.addEventListener("click",async()=>{try{await S.db.doc("tags/"+t.id).delete();if(t.photo&&S.assets){try{await S.assets.delete(t.photo)}catch(e){}}msg("Deleted "+t.label+".","ok")}catch(e){msg("Could not delete. Try again.","bad")}});
+        n.addEventListener("click",renderList);box.append(y,n);act.appendChild(box)});act.appendChild(del)}
+    tr.appendChild(act);body.appendChild(tr);
+  });
+}
+function updQ(){const q=S.tags.filter(t=>t.queue);const b=$("printQ");if(!b)return;b.hidden=!q.length;b.textContent=`Print queue (${q.length})`}
+/* print queue: Claude marks pieces (queue:true) after reading the photos of their old tags; one press prints them all with their old numbers */
+$("printQ").addEventListener("click",async()=>{
+  const list=S.tags.filter(t=>t.queue).sort((a,b)=>(a.queueAt||"").localeCompare(b.queueAt||"")||a.label.localeCompare(b.label,"en",{numeric:true}));if(!list.length)return;
+  msg(`Preparing ${list.length} tags…`,"ok");
+  for(const t of list){if(!(await ensureCode(t)))return}
+  await printOrPDF(list);
+  const done=document.createElement("p");done.className="banner ok";done.append(`Did all ${list.length} tags print correctly? `);
+  const y=document.createElement("button");y.type="button";y.className="btn";y.textContent="Yes, clear the queue";
+  y.addEventListener("click",async()=>{let f=0;for(const t of list){try{await S.db.doc("tags/"+t.id).update({queue:false,printedAt:new Date().toISOString()})}catch(e){f++}}msg(f?`Cleared, except ${f} that could not be updated. Press again.`:`Queue cleared (${list.length} tags).`,f?"warn":"ok")});
+  done.appendChild(y);$("msg").appendChild(done);
+});
+function updSel(){updQ();const n=S.sel.size;$("printSel").disabled=!n;$("printSel").textContent=n?`Print selected (${n})`:"Print selected";}
+$("selClear").addEventListener("click",()=>{S.sel.clear();renderList()});
+$("selShown").addEventListener("click",()=>{$("rows").querySelectorAll("input[type=checkbox]").forEach(c=>{c.checked=true;c.dispatchEvent(new Event("change"))})});
+$("printSel").addEventListener("click",async()=>{
+  const list=S.tags.filter(t=>S.sel.has(t.id)).sort((a,b)=>a.label.localeCompare(b.label,"en",{numeric:true}));if(!list.length)return;
+  msg(`Preparing ${list.length} tags…`,"ok");
+  for(const t of list){if(!(await ensureCode(t)))return}
+  await printOrPDF(list);
+});
+/* ---------- find lost tag (by weight within a category) ---------- */
+(function(){const sel=$("fcat");const o=document.createElement("option");o.value="";o.textContent="Any category";sel.appendChild(o);
+  CATS.forEach(c=>{const x=document.createElement("option");x.value=c.id;x.textContent=c.name;sel.appendChild(x)});
+  const m=document.createElement("option");m.value="MALA";m.textContent="Moti mala";sel.appendChild(m)})();
+function wtOf(t){const g=(t.gold||[]).reduce((a,x)=>a+(x.net||0),0);const net=g>0?g:(t.metal&&t.metal.net)||0;const ct=(t.dias||[]).reduce((a,d)=>a+(d.ct||0),0);return {net,gross:net+ct*0.2,ct}}
+function findLost(){
+  const box=$("fres");box.textContent="";const w=num($("fwt").value),tol=num($("ftol").value),cat=$("fcat").value,kd=$("fkd").value;
+  if(!(w>0)){box.textContent="Enter the weight from the scale.";return}
+  const c=S.tags.filter(t=>(!cat||t.cat===cat)&&(!kd||t.kind===kd)).map(t=>{const x=wtOf(t);return {t,x,d:Math.min(Math.abs(x.net-w),Math.abs(x.gross-w))}}).sort((a,b)=>a.d-b.d);
+  const hit=c.filter(r=>r.d<=tol+1e-9),show=(hit.length?hit:c.slice(0,5)).slice(0,12);
+  const head=document.createElement("p");head.className="hint";head.textContent=hit.length?`${hit.length} piece${hit.length===1?"":"s"} within ± ${tol} g${hit.length>12?" (closest 12 shown)":""}.`:`Nothing within ± ${tol} g. The 5 closest:`;box.appendChild(head);
+  show.forEach(({t,x,d})=>{
+    const card=document.createElement("div");card.style.cssText="display:flex;gap:12px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);border-radius:var(--r);padding:10px";
+    if(t.photo){const im=document.createElement("img");im.alt="";im.loading="lazy";im.src="/_blob/"+t.photo;im.style.cssText="width:88px;height:88px;object-fit:cover;border-radius:6px";card.appendChild(im)}
+    else{const ph=document.createElement("div");ph.className="hint";ph.style.cssText="width:88px;height:88px;display:flex;align-items:center;justify-content:center;border:1px dashed var(--line);border-radius:6px;text-align:center";ph.textContent="no photo";card.appendChild(ph)}
+    const info=document.createElement("div");info.style.cssText="flex:1 1 220px;min-width:0";
+    const l=document.createElement("div");l.className="labelno";l.textContent=t.label;info.appendChild(l);
+    const a=document.createElement("div");a.className="hint";a.textContent=[(t.catName||""),t.kind==="sample"?"sample":"",t.designNo?"design "+t.designNo:"",t.remark||""].filter(Boolean).join(" · ");info.appendChild(a);
+    const b=document.createElement("div");b.textContent=`Net ${x.net.toFixed(3)} g · with diamonds ≈ ${x.gross.toFixed(3)} g · off by ${d.toFixed(3)} g`;info.appendChild(b);
+    const di=document.createElement("div");di.className="hint";di.textContent=(t.dias||[]).map(z=>`${z.q} ${z.ct.toFixed(2)} ct (${z.pcs} pcs)`).join(", ")||"no diamonds";info.appendChild(di);
+    card.appendChild(info);
+    const acts=document.createElement("div");acts.style.cssText="display:flex;gap:8px;flex-wrap:wrap";
+    const rp=document.createElement("button");rp.type="button";rp.className="btn";rp.textContent="Reprint tag";rp.addEventListener("click",async()=>{if(await ensureCode(t))printOrPDF(t)});acts.appendChild(rp);
+    const pb=photoButton(t,findLost);if(pb){pb.classList.add("ghost");acts.appendChild(pb)}
+    card.appendChild(acts);box.appendChild(card)});
+}
+/* ---------- find lost tag by photo (owner 13/10/2026): Claude compares the new photo with saved photos of likely pieces ---------- */
+function lostCard(t,extra){
+  const x=wtOf(t);const card=document.createElement("div");card.style.cssText="display:flex;gap:12px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);border-radius:var(--r);padding:10px";
+  if(t.photo){const im=document.createElement("img");im.alt="";im.loading="lazy";im.src="/_blob/"+t.photo;im.style.cssText="width:96px;height:96px;object-fit:cover;border-radius:6px";card.appendChild(im)}
+  const info=document.createElement("div");info.style.cssText="flex:1 1 220px;min-width:0";
+  const l=document.createElement("div");l.className="labelno";l.textContent=(t.designNo?t.designNo+" · ":"")+t.label;info.appendChild(l);
+  if(extra){const e=document.createElement("div");e.style.fontWeight="600";e.textContent=extra;info.appendChild(e)}
+  const b=document.createElement("div");b.textContent=`${t.catName||""} · G.Wt. ${x.net.toFixed(3)} g`;info.appendChild(b);
+  const di=document.createElement("div");di.className="hint";di.textContent=(t.dias||[]).map(z=>`${z.q} ${z.ct.toFixed(2)} ct (${z.pcs} pcs)`).join(", ")||"no diamonds";info.appendChild(di);
+  card.appendChild(info);
+  const rp=document.createElement("button");rp.type="button";rp.className="btn";rp.textContent="Reprint tag";rp.addEventListener("click",async()=>{if(await ensureCode(t))printOrPDF(t)});card.appendChild(rp);
+  return card;
+}
+async function smallBlob(src,mx){
+  const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=src});
+  const sc=Math.min(1,mx/Math.max(img.width,img.height)),c=document.createElement("canvas");c.width=Math.round(img.width*sc);c.height=Math.round(img.height*sc);
+  c.getContext("2d").drawImage(img,0,0,c.width,c.height);return await new Promise(r=>c.toBlob(r,"image/jpeg",0.82));
+}
+S.lostPhoto=null;
+$("fphoto").addEventListener("change",async()=>{const f=$("fphoto").files&&$("fphoto").files[0];const box=$("fres");box.textContent=f?"Reading the photo…":"";
+  S.lostPhoto=f?await smallBlob(URL.createObjectURL(f),900).catch(()=>null):null;$("fpgo").disabled=!S.lostPhoto;
+  box.textContent=!f?"":S.lostPhoto?"Photo ready. Tap Search by photo.":"That photo could not be read. Try again with the camera, or a JPG.";});
+async function findByPhoto(){
+  const box=$("fres");box.textContent="";
+  if(!S.lostPhoto){box.textContent="Take or choose a photo first.";return}
+  if(!S.sample){box.textContent="Photo search is not available in this view"+(S.sampleWhy?" ("+S.sampleWhy+")":"")+". Please reload the page and sign in again with your approved email.";return}
+  const cat=$("fcat").value,kd=$("fkd").value,w=num($("fwt").value);
+  let c=S.tags.filter(t=>t.photo&&(!cat||t.cat===cat)&&(!kd||t.kind===kd));
+  if(w>0)c=c.map(t=>({t,d:Math.abs(wtOf(t).net-w)})).filter(r=>r.d<=1.5).sort((a,b)=>a.d-b.d).map(r=>r.t);
+  const head=document.createElement("p");head.className="hint";box.appendChild(head);
+  if(!c.length){head.textContent="No piece with a saved photo matches this category"+(w>0?" and weight":"")+". Try Any category, or search by weight above.";return}
+  const per=Math.max(2,Math.min(((S.sampleLimits&&S.sampleLimits.images&&S.sampleLimits.images.maxCount)||10)-1,12));
+  const pool=c.slice(0,per*4);
+  head.textContent=`Comparing with ${pool.length} piece${pool.length===1?"":"s"} that have a photo${c.length>pool.length?` (closest ${pool.length} of ${c.length}; add the weight to narrow)`:""}… this can take up to a minute.`;
+  const ask=async(list)=>{
+    const imgs=[S.lostPhoto];for(const t of list){try{imgs.push(await smallBlob("/_blob/"+t.photo,700))}catch(e){imgs.push(null)}}
+    const ok=list.filter((t,i)=>imgs[i+1]);const send=[S.lostPhoto,...imgs.slice(1).filter(Boolean)];
+    const prompt=`You are matching jewellery for a shop's stock system. Image 1 is a NEW photo of a piece whose tag is lost. Images 2 to ${send.length} are saved catalogue photos of stock pieces, in this order: ${ok.map((t,i)=>`image ${i+2} = ${t.id}`).join("; ")}. Decide which catalogue photo shows the SAME physical design as image 1 (same shape, stone layout, metal colour and setting - not merely a similar style). Lighting, angle, background and old tags may differ. Reply with JSON only: {"matches":[{"id":"<id>","confidence":0-100,"why":"<max 12 words>"}]} listing at most 3, best first; an empty list if none is the same design.`;
+    const r=await S.sample.json(prompt,{images:send,modelTier:"default"});
+    return ((r&&r.matches)||[]).filter(m=>ok.some(t=>t.id===m.id));
+  };
+  try{
+    let found=[];for(let i=0;i<pool.length;i+=per){found=found.concat(await ask(pool.slice(i,i+per)))}
+    if(pool.length>per&&found.length>1){const fin=found.sort((a,b)=>b.confidence-a.confidence).slice(0,per).map(m=>S.tags.find(t=>t.id===m.id)).filter(Boolean);found=await ask(fin)}
+    found.sort((a,b)=>b.confidence-a.confidence);
+    head.textContent=found.length?`Best matches by photo (check the diamonds and weight before reprinting):`:`No saved photo looks like the same design. Try another photo, a different category, or search by weight.`;
+    found.slice(0,3).forEach(m=>{const t=S.tags.find(x=>x.id===m.id);if(t)box.appendChild(lostCard(t,`${Math.round(m.confidence)}% match · ${m.why||""}`))});
+  }catch(e){head.textContent=e&&e.code==="not_granted"?"Photo search needs your OK to ask Claude. Reload and allow it when asked.":e&&e.code==="rate_limited"?"Too many searches just now. Wait a minute and try again.":"Photo search did not work this time ("+(e&&e.code||"error")+"). Try again, or search by weight."}
+}
+$("fpgo").addEventListener("click",findByPhoto);
+$("fgo").addEventListener("click",findLost);$("fwt").addEventListener("keydown",e=>{if(e.key==="Enter")findLost()});
+$("q").addEventListener("input",renderList);$("fkind").addEventListener("change",renderList);
+
+/* ---------- settings ---------- */
+function renderDefRates(ro){
+  const tb=$("defRows");tb.textContent="";const r=(S.settings&&S.settings.defaultRates)||DEF_RATES;
+  QUALS.filter(q=>q!=="Other").forEach(q=>{const tr=document.createElement("tr");const a=document.createElement("td");a.textContent=q;tr.appendChild(a);
+    SHAPES.forEach(sh=>{const td=document.createElement("td");const i=document.createElement("input");i.type="number";i.min="0";i.step="100";i.dataset.k=q+"|"+sh;i.id="def-"+q.replace(/\W/g,"")+"-"+sh;const v=r[q+"|"+sh];i.value=typeof v==="number"&&v>0?v:"";i.placeholder="—";i.readOnly=ro;td.appendChild(i);tr.appendChild(td)});tb.appendChild(tr)});
+}
+function renderRates(){
+  const s=st(),ro=!S.owner;$("ownerOnly").hidden=!ro;
+  $("gold").value=s.gold24g||"";$("goldAt").value=s.goldAt?new Date(s.goldAt).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):"not set";
+  $("pf22").value=s.purity["22K"];$("pf18").value=s.purity["18K"];$("pf14").value=s.purity["14K"];$("pf9").value=s.purity["9K"];
+  $("mkBase").value=s.making.base;$("mkSmall").value=s.making.small;$("mkLimit").value=s.making.limit;$("mkPct").value=s.making.pct;
+  $("tw").value=s.tag.w;$("th").value=s.tag.h;$("tp").value=s.tag.printW;
+  ["gold","pf22","pf18","pf14","pf9","mkBase","mkSmall","mkLimit","mkPct","tw","th","tp"].forEach(id=>$(id).readOnly=ro);$("saveRates").hidden=ro;renderDefRates(ro);
+}
+$("saveRates").addEventListener("click",async()=>{
+  if(!S.owner||!S.db)return;const s=st(),g=num($("gold").value);
+  const body={gold24g:g||null,goldAt:g&&g!==s.gold24g?new Date().toISOString():s.goldAt,
+    purity:{"22K":num($("pf22").value),"18K":num($("pf18").value),"14K":num($("pf14").value),"9K":num($("pf9").value)},
+    making:{base:num($("mkBase").value),small:num($("mkSmall").value),limit:num($("mkLimit").value),pct:num($("mkPct").value)},gst:s.gst,
+    tag:{w:num($("tw").value)||100,h:num($("th").value)||15,printW:num($("tp").value)||70},
+    defaultRates:Object.fromEntries([...$("defRows").querySelectorAll("input[data-k]")].map(i=>[i.dataset.k,i.value===""?null:num(i.value)]))};
+  try{await S.db.doc("settings/main").set(body);msg("Gold rate and settings saved.","ok")}catch(e){msg("Could not save. Only Abhinav's account can change these.","bad")}
+});
+
+/* ---------- boot ---------- */
+addGold();addDia();fromHash();
+(async function boot(){
+  if(!window.claude||!window.claude.use){$("who").textContent="Not signed in";msg("Could not start. Reload the page.","bad");return}
+  const [db,user]=await Promise.all([claude.use("db"),claude.use("user")]);S.db=db;S.user=user;
+  if(!db){$("who").textContent="Not connected";msg(window.VJ_SIGNIN_ERROR&&window.VJ_SIGNIN_ERROR.code==="not_signed_in"?"Your email is not on the VJ Tags list. Ask Abhinav to add it.":"Could not reach the stock list. Check the internet and reload.","bad");return}
+  if(user){try{S.role=user.role?await user.role():null;S.owner=await user.isOwner();S.me=await user.id();S.canWrite=await user.can("data.write");const me=await user.me();$("who").textContent=(me.name||"Signed in")+(S.owner?" · owner":"")}catch(e){}}
+  applyRole();
+  claude.use("assets").then(a=>{S.assets=a;update()});claude.use("downloads").then(d=>{S.dl=d});
+  claude.use("sample").then(async sm=>{if(!sm){S.sampleWhy="Claude not reachable from this view";return}let lim=null;try{lim=await sm.limits()}catch(e){S.sampleWhy="limits: "+(e&&e.code||"error")}if(!lim||!lim.images){S.sampleWhy=S.sampleWhy||"images not allowed in this view";return}S.sample=sm;S.sampleLimits=lim;
+    const n=S.tags.filter(t=>t.photo).length;const h=$("fphint");h.hidden=false;h.textContent=`Photo search can only find pieces that already have a saved photo (${n} of ${S.tags.length} today). Choosing the category and adding the weight makes it faster and surer.`});
+  db.doc("settings/main").onSnapshot(s=>{S.settings=s.exists?s.data():{};renderRates();update();if(!$("p-list").hidden)renderList();if(!$("p-check").hidden)renderCheck()},()=>msg("Lost connection to the gold rate. Reload the page.","bad"));
+  db.doc("counters/main").onSnapshot(s=>{S.counters=(s.exists&&s.data().last)||{};update();resub()},()=>{});
+  resub();
+})();
+})();
+</script>
+</body>
+</html>
