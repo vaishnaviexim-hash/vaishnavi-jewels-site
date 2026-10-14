@@ -11,7 +11,8 @@
   const PUR = { "22K": 0.92, "18K": 0.76, "14K": 0.60, "9K": 0.40 };
   const fmt = n => "Rs " + Math.round(n).toLocaleString("en-IN");
   const up = (n, s) => Math.ceil(Math.round(n * 100) / 100 / s) * s;
-  const Q = { items: [], option: "gh" };
+  const Q = { items: [], option: "gh", mk: "std" }; // mk: "std" = settings making + 10% wastage, "flat" = Rs 1,600/g (owner 14/10)
+  const FLAT_MK = 1600;
 
   function settings() { const s = (window.VJ_SETTINGS && window.VJ_SETTINGS()) || {}; return {
     g: s.gold24g || null, at: s.goldAt || null, pur: Object.assign({}, PUR, s.purity || {}),
@@ -26,7 +27,7 @@
     const st = settings(); if (!st.g) return null;
     const gold = t.kind === "sample" ? [{ k: "14K", net: (t.metal && t.metal.net) || 0 }] : (t.gold || []);
     const g0 = gold.find(g => g.net > 0); if (!g0) return null;
-    const mk = up((g0.net > st.mk.limit ? st.mk.base : st.mk.small) + st.g * (st.pur[g0.k] || 0) * st.mk.pct / 100, 100);
+    const mk = Q.mk === "flat" ? FLAT_MK : up((g0.net > st.mk.limit ? st.mk.base : st.mk.small) + st.g * (st.pur[g0.k] || 0) * st.mk.pct / 100, 100);
     let gv = 0, mv = 0; gold.forEach(g => { if (g.net > 0) { gv += g.net * st.g * (st.pur[g.k] || 0); mv += g.net * mk; } });
     let dv = 0, missing = false; (t.dias || []).forEach(d => { const r = optRate(d, opt, st); if (!(r > 0) && !NON_DIAMOND.test(d.q || "")) missing = true; dv += (d.ct || 0) * r; });
     const sub = up(gv + mv + dv + ((t.other && t.other.amt) || 0), 100);
@@ -56,6 +57,9 @@
         <label><input type="radio" name="qopt" value="gh" checked> Natural VS GH</label>
         <label><input type="radio" name="qopt" value="ij"> Natural VS IJ</label>
         <label><input type="radio" name="qopt" value="lgd"> Lab-grown</label></div>
+      <div class="seg" role="radiogroup" aria-label="Making" style="margin-top:8px">
+        <label><input type="radio" name="qmk" value="std" checked> <span id="qmkstd">Making Rs 650/g + 10% wastage on gold</span></label>
+        <label><input type="radio" name="qmk" value="flat"> Making Rs 1,600/g</label></div>
       <h2>3 · Customer</h2>
       <div class="actions" id="qcbox" hidden><button type="button" class="btn ghost" id="qcontact">Pick from phone contacts</button></div>
       <div class="row"><label>Name <input id="qname" autocomplete="off" maxlength="60"></label>
@@ -74,7 +78,8 @@
     }));
     $("qadd").addEventListener("click", pick); $("qq").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); pick(); } });
     document.querySelectorAll('input[name=qopt]').forEach(r => r.addEventListener("change", () => { Q.option = r.value; render(); }));
-    $("qclear").addEventListener("click", () => { Q.items = []; ["qname", "qmob", "qcity", "qq"].forEach(i => $(i).value = ""); $("qmsg").textContent = ""; render(); });
+    document.querySelectorAll('input[name=qmk]').forEach(r => r.addEventListener("change", () => { Q.mk = r.value; render(); }));
+    $("qclear").addEventListener("click", () => { Q.items = []; Q.mk = "std"; document.querySelector('input[name=qmk][value=std]').checked = true; ["qname", "qmob", "qcity", "qq"].forEach(i => $(i).value = ""); $("qmsg").textContent = ""; render(); });
     $("qsend").addEventListener("click", send);
     // 14/10/2026 owner: pick the customer from the phone's contact book (Chrome on Android only; iPhone/computers type it).
     // The browser shows its own picker; only the ONE contact tapped is read, on the phone, nothing is uploaded.
@@ -105,12 +110,18 @@
       const x = document.createElement("td"); const rm = document.createElement("button"); rm.type = "button"; rm.className = "btn ghost"; rm.textContent = "Remove"; rm.addEventListener("click", () => { Q.items.splice(i, 1); render(); }); x.appendChild(rm); tr.appendChild(x);
       body.appendChild(tr);
     });
-    const st = settings();
+    const st = settings(); $("qmkstd").textContent = mkText(st, null, "std");
     $("qtotal").textContent = Q.items.length && st.g ? fmt(total) : "—";
     $("qnote").textContent = !st.g ? "Today's gold rate is not set (Gold rate & settings) - prices cannot be worked out." :
       (miss ? "Some diamond lines have no rate in the default table for this option - fill the table under Gold rate & settings. " : "") +
       `At 24K ${fmt(st.g)}/g${st.at ? ", " + new Date(st.at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : ""}. ${OPTS[Q.option]}${Q.option === "lgd" ? " at Rs 23,000 per ct" : ""}. Approximate, valid today.`;
     Q.total = total;
+  }
+  // the making line shown on screen and printed in the PDF (std uses the rates in Gold rate & settings)
+  function mkText(st, items, kind) {
+    if ((kind || Q.mk) === "flat") return "Making Rs " + FLAT_MK.toLocaleString("en-IN") + "/g";
+    const small = (items || Q.items).some(t => { const g = t.kind === "sample" ? [{ net: (t.metal && t.metal.net) || 0 }] : (t.gold || []); const g0 = g.find(x => x.net > 0); return g0 && !(g0.net > st.mk.limit); });
+    return `Making Rs ${st.mk.base}/g${small ? ` (Rs ${st.mk.small}/g for pieces up to ${st.mk.limit} g)` : ""} + ${st.mk.pct}% wastage on gold`;
   }
   async function dataUrl(src) { const r = await fetch(src, { credentials: "same-origin" }); if (!r.ok) throw new Error("img"); const b = await r.blob(); return await new Promise((res, rej) => { const f = new FileReader(); f.onload = () => res(f.result); f.onerror = rej; f.readAsDataURL(b); }); }
   async function makePdf(q) {
@@ -122,7 +133,7 @@
     y += 26; doc.setDrawColor(180, 150, 80); doc.line(M, y, W - M, y); y += 9;
     doc.setTextColor(20); doc.setFont("helvetica", "bold"); doc.setFontSize(15); doc.text("Quotation", M, y);
     doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.text(`${q.qno}   ·   ${new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`, W - M, y, { align: "right" });
-    y += 8; doc.text(`For: ${q.name}, ${q.city}`, M, y); y += 6; doc.text(`Option: ${q.option} diamonds, gold as per piece`, M, y); y += 8;
+    y += 8; doc.text(`For: ${q.name}, ${q.city}`, M, y); y += 6; doc.text(`Option: ${q.option} diamonds, gold as per piece`, M, y); y += 6; doc.text(q.making, M, y); y += 8;
     for (const t of q.items) {
       if (y > 250) { doc.addPage(); y = 20; }
       const h = q.photos && t.photo ? 34 : 14;
@@ -158,7 +169,7 @@
         body: JSON.stringify({ name, mobile: mob, city, option: OPTS[Q.option], total: Q.total, gold24g: st.g, items: items.map(i => ({ id: i.id, label: i.label, design: i.designNo || "", price: i.price })) }) });
       const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("server " + r.status));
       m.textContent = "Making the PDF…";
-      const blob = await makePdf({ qno: j.qno, name, city, option: OPTS[Q.option], items, total: Q.total, photos: $("qphoto").checked, weights: $("qwt").checked });
+      const blob = await makePdf({ qno: j.qno, name, city, option: OPTS[Q.option], items, total: Q.total, photos: $("qphoto").checked, weights: $("qwt").checked, making: mkText(st, items) });
       const fname = `${name.replace(/[^A-Za-z0-9 .\-]/g, "").trim().slice(0, 40) || "Quote"} ${{ gh: "VSGH", ij: "VSIJ", lgd: "LGD" }[Q.option]}.pdf`, // owner 14/10: file named e.g. "Krishna VSGH.pdf"
         text = `Dear ${name}, thank you for your interest in Vaishnavi Jewels. Please find your quotation ${j.qno} attached. Our team will call you shortly.`;
       const file = new File([blob], fname, { type: "application/pdf" });
