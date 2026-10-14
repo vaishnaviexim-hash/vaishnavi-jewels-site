@@ -3,6 +3,8 @@
    Brain C-20261013-VJTAGSWEB. The server checks the sign-in and the role on every call; nothing here is trusted. */
 (function () {
   "use strict";
+  // 14/10/2026: some sections use display:flex/grid, which overrides the hidden attribute - force it
+  try { const st = document.createElement("style"); st.textContent = "[hidden]{display:none!important}"; document.head.appendChild(st); } catch (e) {}
   const cache = new Map();            // path -> {data, version}
   const docL = new Map();             // path -> Set(listener)
   const qL = new Set();               // {coll, filters, lim, next}
@@ -131,4 +133,3 @@
     }
   });
 })();
-
