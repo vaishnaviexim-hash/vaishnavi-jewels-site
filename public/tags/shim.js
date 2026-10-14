@@ -122,13 +122,25 @@
       document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
     }
   };
-  const caps = { db, user, assets, downloads };
+  // Photo search: the page asks with a prompt + images; only the lost-piece photo and the candidate ids are sent -
+  // the server loads the saved photos and writes the prompt itself.
+  const blobB64 = b => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1]); r.onerror = rej; r.readAsDataURL(b); });
+  const sample = {
+    limits: async () => { const row = document.getElementById("fphotoRow"); if (row) row.hidden = false; return { images: { maxCount: 10 } }; },
+    json: async (prompt, opt) => {
+      const imgs = (opt && opt.images) || [], ids = [...String(prompt).matchAll(/image \d+ = ([A-Za-z0-9_\-.~]+)/g)].map(m => m[1]);
+      if (!imgs[0] || !ids.length) return { matches: [] };
+      try { return await api("/api/vj/photosearch", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ photo: await blobB64(imgs[0]), type: imgs[0].type || "image/jpeg", ids }) }); }
+      catch (e) { throw errOf(e.code === "http_429" ? "rate_limited" : (e.message || e.code)); }
+    }
+  };
+  const caps = { db, user, assets, downloads, sample };
   window.VJ_WEBSITE = true;
   window.claude = Object.freeze({
     use: async name => {
       if (!(name in caps)) return null;
       try { await start(); } catch (e) { window.VJ_SIGNIN_ERROR = e; return null; }
-      if (name === "assets" && me && me.role === "sales") return null;
+      if ((name === "assets" || name === "sample") && me && me.role === "sales") return null;
       return caps[name];
     }
   });
