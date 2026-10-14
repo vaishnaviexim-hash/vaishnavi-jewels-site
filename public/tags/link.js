@@ -46,11 +46,14 @@
         <label class="btn ghost" style="cursor:pointer">or choose photos<input type="file" id="lkFiles" accept="image/jpeg,image/png,image/webp" multiple hidden></label>
         <label style="flex-direction:row;align-items:center;gap:6px;color:var(--fg)"><input type="checkbox" id="lkRep" style="width:auto"> replace photos that pieces already have</label>
         <label style="flex-direction:row;align-items:center;gap:6px;color:var(--fg)"><input type="checkbox" id="lkStock" style="width:auto"> also stock pieces (not only samples) with the same design no.</label></div>
+      <div class="actions"><label class="btn ghost" style="cursor:pointer">3 · Check karigar register (CSV)<input type="file" id="lkReg" accept=".csv,text/csv" hidden></label></div>
+      <p class="hint" id="lkRegMsg"></p>
       <div id="lkBarW" hidden style="height:10px;background:#eee;border-radius:5px;overflow:hidden"><div id="lkBar" style="height:100%;width:0;background:#b8963e;transition:width .3s"></div></div>
       <p class="hint" id="lkPhMsg"></p>
       <div id="lkOut"></div>`;
     host.appendChild(c);
     $("lkPk").addEventListener("change", e => { const f = e.target.files && e.target.files[0]; if (f) applyPackets(f); e.target.value = ""; });
+    $("lkReg").addEventListener("change", e => { const f = e.target.files && e.target.files[0]; if (f) checkRegister(f); e.target.value = ""; });
     $("lkDir").addEventListener("change", e => linkPhotos([...e.target.files]));
     $("lkFiles").addEventListener("change", e => linkPhotos([...e.target.files]));
   }
@@ -126,6 +129,49 @@
     m.textContent = `Done: ${done} photos saved on their tags${fail ? ", " + fail + " failed (choose them again)" : ""}. ${kept.length} pieces kept their photo. ${noTag.length} photos have no tag yet.`;
     if (noTag.length) { const p = document.createElement("div"); p.className = "actions"; p.append("Photos without a tag: ", csvLink("photos-without-tag.csv", [["File", "Design no.", "Why"]].concat(noTag))); out.append(p); }
     if (fails.length) { const p = document.createElement("div"); p.className = "actions"; p.append("Failed: ", csvLink("photos-failed.csv", [["File", "Tag", "Error"]].concat(fails))); out.append(p); }
+  }
+
+  /* ---------- 5. Check the karigar register (owner 14/10/2026) ----------
+     CSV typed from the handwritten register: Code,Product,Karigar,Date,Page,Note. A code counts as tagged when a tag has it as
+     design no., or it appears in the tag's remark / certificate. Struck-out lines are only reported, never counted as missing. */
+  function parseCsv(txt) {
+    const rows = []; let row = [], cur = "", q = false;
+    for (let i = 0; i < txt.length; i++) { const ch = txt[i];
+      if (q) { if (ch === '"') { if (txt[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch; }
+      else if (ch === '"') q = true; else if (ch === ",") { row.push(cur); cur = ""; }
+      else if (ch === "\n" || ch === "\r") { if (ch === "\r" && txt[i + 1] === "\n") i++; row.push(cur); rows.push(row); row = []; cur = ""; }
+      else cur += ch; }
+    if (cur || row.length) { row.push(cur); rows.push(row); }
+    return rows.filter(r => r.some(c => c.trim()));
+  }
+  async function checkRegister(file) {
+    const m = $("lkRegMsg"), out = $("lkOut"); out.textContent = "";
+    try {
+      if (file.size > 2e6) throw new Error("file too large");
+      const rows = parseCsv((await file.text()).replace(/^﻿/, "")); const head = rows.shift().map(h => h.trim().toLowerCase());
+      const ix = k => head.indexOf(k); if (ix("code") < 0) throw new Error("no Code column");
+      const all = tags(), byDn = new Map();
+      all.forEach(t => { const k = n(t.designNo); if (k) { if (!byDn.has(k)) byDn.set(k, []); byDn.get(k).push(t); } });
+      const inText = code => all.filter(t => new RegExp("(^|[^0-9])" + code + "([^0-9]|$)").test(String(t.remark || "") + " " + String(t.cert || "")));
+      const res = [], seen = new Set(); let tagged = 0, missing = 0, struck = 0;
+      for (const r of rows) {
+        const code = String(r[ix("code")] || "").trim(); if (!code) continue; const note = ix("note") >= 0 ? (r[ix("note")] || "") : "";
+        const isStruck = /struck|crossed/i.test(note); const k = n(code); seen.add(k);
+        const hits = (byDn.get(k) || []).concat(byDn.has(k) ? [] : inText(k));
+        const status = isStruck ? "struck out in register" : hits.length ? "TAGGED" : "NOT TAGGED";
+        if (isStruck) struck++; else if (hits.length) tagged++; else missing++;
+        res.push([code, r[ix("product")] || "", r[ix("karigar")] || "", r[ix("date")] || "", r[ix("page")] || "", note, status, hits.map(t => t.label).join(" "), hits.map(t => t.catName || "").join(" ")]);
+      }
+      const extra = all.filter(t => /^7[0-9]{4}$/.test(n(t.designNo)) && !seen.has(n(t.designNo)));
+      m.textContent = `Register: ${tagged} codes tagged, ${missing} NOT tagged, ${struck} struck-out lines. ${extra.length} tags have a 7xxxx design no. that is not in this register.`;
+      const p = document.createElement("div"); p.className = "actions";
+      p.append("Register check: ", csvLink("register-check.csv", [["Code", "Product", "Karigar", "Date", "Page", "Register note", "Status", "Tag label", "Tag category"]].concat(
+        res.sort((a, b) => (a[6] === "NOT TAGGED" ? 0 : a[6] === "TAGGED" ? 1 : 2) - (b[6] === "NOT TAGGED" ? 0 : b[6] === "TAGGED" ? 1 : 2) || a[0].localeCompare(b[0], "en", { numeric: true })))));
+      if (extra.length) p.append(" ", csvLink("tagged-not-in-register.csv", [["Label", "Design no.", "Category"]].concat(extra.map(t => [t.label, t.designNo, t.catName]))));
+      out.append(p);
+      const miss = res.filter(x => x[6] === "NOT TAGGED").slice(0, 40).map(x => x[0] + " " + x[1]).join(", ");
+      if (miss) { const q = document.createElement("p"); q.className = "hint"; q.textContent = "Not tagged: " + miss + (missing > 40 ? " …" : ""); out.append(q); }
+    } catch (e) { m.textContent = "Could not read the register: " + (e.message || e) + "."; }
   }
 
   /* ---------- 4. Print by box (owner 14/10/2026: "print tags by box numbers") ----------
