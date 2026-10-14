@@ -57,6 +57,7 @@
         <label><input type="radio" name="qopt" value="ij"> Natural VS IJ</label>
         <label><input type="radio" name="qopt" value="lgd"> Lab-grown</label></div>
       <h2>3 · Customer</h2>
+      <div class="actions" id="qcbox" hidden><button type="button" class="btn ghost" id="qcontact">Pick from phone contacts</button></div>
       <div class="row"><label>Name <input id="qname" autocomplete="off" maxlength="60"></label>
         <label>Mobile (10 digits) <input id="qmob" inputmode="tel" autocomplete="off" maxlength="14" placeholder="98xxxxxxxx"></label>
         <label>City <input id="qcity" autocomplete="off" maxlength="40"></label></div>
@@ -74,6 +75,15 @@
     document.querySelectorAll('input[name=qopt]').forEach(r => r.addEventListener("change", () => { Q.option = r.value; render(); }));
     $("qclear").addEventListener("click", () => { Q.items = []; ["qname", "qmob", "qcity", "qq"].forEach(i => $(i).value = ""); $("qmsg").textContent = ""; render(); });
     $("qsend").addEventListener("click", send);
+    // 14/10/2026 owner: pick the customer from the phone's contact book (Chrome on Android only; iPhone/computers type it).
+    // The browser shows its own picker; only the ONE contact tapped is read, on the phone, nothing is uploaded.
+    if (navigator.contacts && navigator.contacts.select) { $("qcbox").hidden = false; $("qcontact").addEventListener("click", async () => {
+      try { const [c] = await navigator.contacts.select(["name", "tel"], { multiple: false }); if (!c) return;
+        if (c.name && c.name[0]) $("qname").value = String(c.name[0]).slice(0, 60);
+        const nums = (c.tel || []).map(t => String(t).replace(/\D/g, "").replace(/^0+/, "").replace(/^91(?=\d{10}$)/, "")).filter(t => /^[6-9]\d{9}$/.test(t));
+        $("qmob").value = nums[0] || ""; $("qmsg").textContent = nums.length ? (nums.length > 1 ? "This contact has more than one mobile - check the number." : "") : "That contact has no Indian mobile number - type it.";
+        if (!$("qcity").value) $("qcity").focus();
+      } catch (e) { $("qmsg").textContent = "Could not open contacts - type the details."; } }); }
   }
   function pick() {
     const box = $("qpick"); box.textContent = ""; const r = find($("qq").value);
@@ -147,12 +157,14 @@
       const blob = await makePdf({ qno: j.qno, name, city, option: OPTS[Q.option], items, total: Q.total, photos: $("qphoto").checked });
       const fname = `Vaishnavi_Jewels_${j.qno}.pdf`, text = `Dear ${name}, thank you for your interest in Vaishnavi Jewels. Please find your quotation ${j.qno} attached. Our team will call you shortly.`;
       const file = new File([blob], fname, { type: "application/pdf" });
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      // 14/10/2026: the share sheet only on phones; on a computer (Windows share box has no WhatsApp) download + open WhatsApp
+      const phone = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
+      if (phone && navigator.canShare && navigator.canShare({ files: [file] })) {
         try { await navigator.share({ files: [file], text }); m.textContent = `Quote ${j.qno} shared. Core has been told to call ${name}.`; }
         catch (e) { m.textContent = `Quote ${j.qno} saved - sharing was cancelled. Press the button again to share the PDF.`; }
       } else {
         const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = fname; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
-        window.open("https://wa.me/91" + mob + "?text=" + encodeURIComponent(text), "_blank", "noopener");
+        window.open("https://web.whatsapp.com/send?phone=91" + mob + "&text=" + encodeURIComponent(text), "_blank", "noopener");
         m.textContent = `Quote ${j.qno} saved and the PDF downloaded. Attach ${fname} in the WhatsApp chat that opened. Core has been told to call ${name}.`;
       }
     } catch (e) { m.textContent = "Could not send: " + (e.message || e) + "."; }
