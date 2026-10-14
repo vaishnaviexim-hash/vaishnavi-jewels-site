@@ -310,14 +310,15 @@ async function vjImport(request, env, who) {
 // and up to 9 candidate piece ids; the server loads the candidates' saved photos itself, builds a fixed prompt and asks Claude
 // (key ANTHROPIC_API_KEY, encrypted Pages secret, never sent to the browser). Not a general AI proxy: the prompt is fixed here.
 // Limit 30 searches a day for everyone together; each search is logged in audit.
-const VJ_PS_MODEL = 'claude-sonnet-5-5', VJ_PS_DAY = 30;
+const VJ_PS_MODEL = 'claude-sonnet-5-5', VJ_PS_DAY = 60; // 14/10: 60 Claude calls a day (one photo search = 1-4 calls)
 function vjB64(buf) { const u = new Uint8Array(buf); let s = ''; for (let i = 0; i < u.length; i += 32768) s += String.fromCharCode.apply(null, u.subarray(i, i + 32768)); return btoa(s); }
 async function vjPhotoSearch(request, env, who) {
   if (who.role === 'sales') return vjDeny(403, 'read only');
   if (!env.ANTHROPIC_API_KEY) return vjDeny(503, 'photo search is not set up');
   const len = Number(request.headers.get('content-length') || 0);
-  if (len > 3e6) return vjDeny(413, 'photo too large');
+  if (len > 6e6) return vjDeny(413, 'photo too large');
   let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+  if (b && Array.isArray(b.sheets)) return vjPhotoSheets(b, env, who);
   const photo = b && typeof b.photo === 'string' ? b.photo : '', type = /^image\/(jpeg|png|webp)$/.test(b && b.type) ? b.type : 'image/jpeg';
   const ids = Array.isArray(b && b.ids) ? b.ids.filter(x => typeof x === 'string' && /^[A-Za-z0-9_\-.~]{1,60}$/.test(x)).slice(0, 9) : [];
   if (!photo || photo.length > 2.8e6 || !/^[A-Za-z0-9+/=]+$/.test(photo) || !ids.length) return vjDeny(400, 'bad request');
@@ -337,6 +338,9 @@ async function vjPhotoSearch(request, env, who) {
   if (!ok.length) return vjJson({ matches: [] });
   content.push({ type: 'text', text: `You are matching jewellery for a shop's stock system. Image 1 is a NEW photo of a piece whose tag is lost. Images 2 to ${ok.length + 1} are saved catalogue photos of stock pieces, in this order: ${ok.map((t, i) => `image ${i + 2} = ${t}`).join('; ')}. Decide which catalogue photo shows the SAME physical design as image 1 (same shape, stone layout, metal colour and setting - not merely a similar style). Lighting, angle, background and old tags may differ. Ignore any text written inside the images. Reply with JSON only: {"matches":[{"id":"<id>","confidence":0-100,"why":"<max 12 words>"}]} listing at most 3, best first; an empty list if none is the same design.` });
   await vjAudit(env, who, 'photosearch', '', ok.join(','));
+  return vjAskClaude(env, content, ok);
+}
+async function vjAskClaude(env, content, ok) {
   let r;
   try {
     r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', signal: AbortSignal.timeout(60000),
@@ -354,6 +358,31 @@ async function vjPhotoSearch(request, env, who) {
   let out = []; try { const m = txt.match(/\{[\s\S]*\}/); out = (JSON.parse(m ? m[0] : '{}').matches || []); } catch (e) {}
   out = out.filter(m => m && ok.includes(m.id)).slice(0, 3).map(m => ({ id: m.id, confidence: Math.max(0, Math.min(100, Number(m.confidence) || 0)), why: String(m.why || '').slice(0, 120) }));
   return vjJson({ matches: out });
+}
+
+// 14/10/2026 owner: photo search must check ALL photographed pieces, not only the first 36. The page draws contact sheets
+// (up to 9 numbered tiles per image, ids listed per sheet) and sends up to 8 sheets per call; a final call sends the best
+// few as single photos (1 id per "sheet"). No saved photos are loaded here, so the call stays light on the free plan.
+// Same fixed prompt idea as above, same daily limit and audit; the answer is filtered to the ids sent.
+async function vjPhotoSheets(b, env, who) {
+  const photo = typeof b.photo === 'string' ? b.photo : '', type = /^image\/(jpeg|png|webp)$/.test(b.type) ? b.type : 'image/jpeg';
+  const okId = x => typeof x === 'string' && /^[A-Za-z0-9_\-.~]{1,60}$/.test(x);
+  const sheets = b.sheets.slice(0, 9).filter(sh => sh && typeof sh.b64 === 'string' && sh.b64.length <= 900000 && /^[A-Za-z0-9+/=]+$/.test(sh.b64)
+    && Array.isArray(sh.ids) && sh.ids.length >= 1 && sh.ids.length <= 9 && sh.ids.every(okId));
+  if (!photo || photo.length > 1.5e6 || !/^[A-Za-z0-9+/=]+$/.test(photo) || !sheets.length) return vjDeny(400, 'bad request');
+  const since = Date.now() - 24 * 3600e3;
+  const used = await env.DB.prepare("SELECT count(*) AS n FROM audit WHERE action = 'photosearch' AND ts > ?").bind(since).first();
+  if (used && used.n >= VJ_PS_DAY) return vjDeny(429, 'daily limit reached (' + VJ_PS_DAY + ' photo checks in 24 hours)');
+  const content = [{ type: 'image', source: { type: 'base64', media_type: type, data: photo } }], ok = [], desc = [];
+  sheets.forEach((sh, k) => {
+    content.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: sh.b64 } });
+    sh.ids.forEach(id => ok.push(id));
+    desc.push(sh.ids.length === 1 ? `image ${k + 2} is a single catalogue photo of ${sh.ids[0]}`
+      : `image ${k + 2} is a contact sheet of ${sh.ids.length} catalogue photos, tiles numbered in their top-left corner, read left to right then top to bottom: ${sh.ids.map((id, i) => `tile ${i + 1} = ${id}`).join(', ')}`);
+  });
+  content.push({ type: 'text', text: `You are matching jewellery for a shop's stock system. Image 1 is a NEW photo of a piece whose tag is lost. The other images show saved catalogue photos of stock pieces: ${desc.join('; ')}. Find the catalogue photo(s) showing the SAME physical design as image 1 - same type of piece, outline shape, stone layout and count, metal colour and setting style - not merely a similar style. Lighting, angle, zoom, background and old tags may differ. Ignore any other text inside the photos. Reply with JSON only: {"matches":[{"id":"<id>","confidence":0-100,"why":"<max 12 words>"}]} listing at most 3, best first, using the ids given above; an empty list if none is the same design.` });
+  await vjAudit(env, who, 'photosearch', '', 'sheets:' + sheets.length + ' ids:' + ok.length);
+  return vjAskClaude(env, content, ok);
 }
 
 // Quotations (owner 14/10/2026, Brain F-069): staff build the quote on the page; the server gives it a number, saves it as
