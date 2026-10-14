@@ -14,7 +14,7 @@
   const n = x => String(x == null ? "" : x).toUpperCase().replace(/[^A-Z0-9]/g, "");
   const tags = () => (window.VJ_TAGS ? window.VJ_TAGS() : []);
   // item word in the sheet / photo name  ->  VJ Tags category id
-  const ITEM_CAT = [[/^(SV)?ER|EAR/, "VER"], [/^(SV)?LR|RING/, "VLR"], [/^(SV)?BR|BRAC|BRCL/, "VBR"], [/^(SV)?BA?N|BANG/, "VBN"],
+  const ITEM_CAT = [[/^(SV)?ER|EAR/, "VER"], [/^(SV|SA)?[LG]R|RING/, "VLR"], [/^(SV)?BR|BRAC|BRCL/, "VBR"], [/^(SV)?BA?N|BANG/, "VBN"],
     [/^S?VPS|^PSET|PENDANTSET/, "VPS"], [/^MS|^SMS|^S?VMN|MANG/, "VMN"], [/^S?V?NS|NECK/, "VNS"], [/^S?CH|CHAIN/, "CH"], [/^S?VP|PEND/, "VP"]];
   const SHEET_CAT = { Rings: "VLR", Earrings: "VER", Bracelet: "VBR", Bangles: "VBN", Pendant: "VP", "Pendant set": "VPS", Necklace: "VNS", Mangalsutra: "VMN" };
   const catOfItem = it => { const s = n(it); for (const [re, c] of ITEM_CAT) if (re.test(s)) return c; return null; };
@@ -95,11 +95,55 @@
     } catch (e) { m.textContent = "Stopped: " + (e.message || e) + ". Load the file again - nothing is done twice."; }
   }
 
-  // "1105 SVBAN.jpeg" -> {code:"1105", item:"SVBAN"};  "DZ-BAN-19 svbn (2).jpg" -> {code:"DZ-BAN-19", item:"svbn"}
+  // Photo names (owner 14/10/2026): "1105 SVBAN.jpeg", "SVER 1251.jpg", "SVLR-3253.jpg", "1535SVBN.jpg", "SVNS75195.jpeg",
+  // "1338-1339 SVPS.jpeg" (pendant + earring of a set), "1342(N) 1341(ER).JPG", "68 AZ-TM" (= AZ-TM-68), "DZ-BAN-19 svbn (2).jpg".
+  // -> { codes: [...design nos], cat: category from the item word, extra: true for "(2)" / "Copy of" extra views }
+  const IT = "S?L?V?A?(?:ER|LR|GR|BR|BAN|BN|PS|NS|MN|MS|CH|P)";
+  const ITEM_WORD = new RegExp("^(COPY|OF|S?V?A?(ER|LR|GR|BR|BAN|BN|PS|P|NS|MN|MS|CH|NP)\\d?|BAN|BANG|R|L|T|F|B|S|N|H|C|ER|RING|SET|TENNIS|\\d)$", "i");
   function parseName(fn) {
-    const base = fn.replace(/\.[a-z0-9]+$/i, "").replace(/\(\d+\)/g, " ").replace(/[_]+/g, " ").trim();
-    const parts = base.split(/\s+/); const code = parts[0] || ""; const item = parts.slice(1).join(" ");
-    return { code, item, extra: /\(\d+\)|\s-\s?\d+$/.test(fn) };
+    let b = fn.replace(/\.(jpe?g|png|webp|heic|gif)$/i, "");
+    const extra = /\(\d+\)|copy/i.test(b);
+    b = b.replace(/\(\d+\)/g, " ").replace(/\((N|ER|E|P|PS|R)\)/gi, " $1 ").replace(/^IMG[_ -]?\d+/i, "").replace(/_/g, " ");
+    const raw = b.trim().split(/\s+/).filter(Boolean), toks = [];
+    for (const t of raw) { let m;
+      if ((m = t.match(/^-?(AZ|DZ)-(TM|MS)$/i)) && toks.length && /^-?\d+-?$/.test(toks[toks.length - 1])) { toks[toks.length - 1] = m[1] + "-" + m[2] + "-" + toks[toks.length - 1].replace(/-/g, ""); continue; }
+      if ((m = t.match(/^(\d+)-(AZ|DZ)-(TM|MS)$/i))) { toks.push(m[2] + "-" + m[3] + "-" + m[1]); continue; }
+      if ((m = t.match(new RegExp("^(\\d{3,6})[-.]?(" + IT + ")(-?[A-Z])?$", "i")))) { toks.push(m[1], m[2]); continue; }
+      if ((m = t.match(new RegExp("^(" + IT + ")(\\d{3,6})$", "i")))) { toks.push(m[1], m[2]); continue; }
+      if (/^IMG/i.test(t)) continue;
+      if ((m = t.match(/^(\d{3,6})\.\d$/))) { toks.push(m[1]); continue; }
+      toks.push(t); }
+    const codes = [], items = [];
+    for (const t of toks) { let m;
+      if ((m = t.match(new RegExp("^(" + IT + ")-(\\d+)$", "i")))) { items.push(m[1]); codes.push(m[2]); continue; }
+      if (ITEM_WORD.test(t) && !/^\d{2,}$/.test(t)) { items.push(t); continue; }
+      if (/^\d+-\d+$/.test(t)) { codes.push(t, ...t.split("-")); continue; }
+      if (/\d/.test(t) || /^[A-Z]{2,}-/i.test(t)) { codes.push(t); continue; }
+      items.push(t); }
+    let cat = null; for (const w of items) { cat = /^N$/i.test(w) ? "VNS" : catOfItem(w); if (cat) break; }
+    return { codes, cat, extra, code: codes[0] || "", item: items.join(" ") };
+  }
+  // category from the Drive folder the photo sits in ("EAR RING SAMPLES/ER HANG/...") - used when the name has no item word
+  function catOfPath(p) {
+    const segs = String(p || "").toUpperCase().split("/").slice(0, -1);
+    for (const s of segs) {
+      if (/EAR/.test(s)) return "VER"; if (/PENDANT\s*SET/.test(s)) return "VPS"; if (/PENDANT/.test(s)) return "VP";
+      if (/NECKLACE/.test(s)) return "VNS"; if (/BANGLE/.test(s)) return "VBN"; if (/BRACELET/.test(s)) return "VBR";
+      if (/RING/.test(s)) return "VLR"; if (/^M\s?S\b|MANGAL/.test(s)) return "VMN"; if (/CHAIN/.test(s)) return "CH"; }
+    return null;
+  }
+  // a set photo may also stand for the pieces of the set; bangle and bracelet (kada) photos may be filed either way
+  const REL = { VPS: ["VP", "VER"], VNS: ["VER", "VP"], VBN: ["VBR"], VBR: ["VBN"], VP: ["VPS"], VER: ["VPS"] };
+  const zkeys = c => { const k = n(c); return k ? [...new Set([k, k.replace(/^0+/, "")])].filter(Boolean) : []; };
+  function matchPhoto(f, idx) {
+    const { codes, cat } = parseName(f.name), fcat = catOfPath(f.webkitRelativePath), use = cat || fcat;
+    const hits = []; let related = false;
+    for (const c of codes) for (const k of zkeys(c)) { const list = idx.get(k); if (!list) continue;
+      let h = use ? list.filter(t => t.cat === use) : list;
+      if (!h.length && fcat && fcat !== use) h = list.filter(t => t.cat === fcat);
+      if (!h.length && REL[use]) { h = list.filter(t => REL[use].includes(t.cat)); if (h.length) related = true; }
+      if (h.length) { h.forEach(t => { if (!hits.includes(t)) hits.push(t); }); break; } }
+    return { codes, hits, related };
   }
   async function shrink(file) {
     const bmp = await createImageBitmap(file); const max = 1400, s = Math.min(1, max / Math.max(bmp.width, bmp.height));
@@ -113,14 +157,17 @@
     if (!files.length) { m.textContent = "No JPG / PNG photos in what was chosen (HEIC iPhone photos must be saved as JPG first)."; return; }
     const db = await window.claude.use("db"), assets = await window.claude.use("assets"), rep = $("lkRep").checked, idx = byDesign(!$("lkStock").checked);
     const jobs = [], noTag = [], kept = [], used = new Set();
-    // first photo per tag wins (photos with "(2)" etc. are extra views and come later in the sort)
+    // first photo per tag wins: photos with "(2)" / "Copy of" are extra views and come later; set photos only fill pieces left without one
     files.sort((a, b) => (parseName(a.name).extra - parseName(b.name).extra) || a.name.localeCompare(b.name));
+    const later = [];
+    const take = (f, hits) => { for (const t of hits) { if (used.has(t.id)) continue; used.add(t.id); if (t.photo && !rep) { kept.push(t.label); continue; } jobs.push([f, t]); } };
     for (const f of files) {
-      const { code, item } = parseName(f.name); const k = n(code); if (!k) { noTag.push([f.name, "", "name has no design no."]); continue; }
-      const hits = pick(idx.get(k), catOfItem(item) || catOfItem((f.webkitRelativePath || "").toUpperCase()));
-      if (!hits.length) { noTag.push([f.name, code, "no tag with this design no."]); continue; }
-      for (const t of hits) { if (used.has(t.id)) continue; if (t.photo && !rep) { kept.push(t.label); used.add(t.id); continue; } used.add(t.id); jobs.push([f, t]); }
+      const r = matchPhoto(f, idx);
+      if (!r.codes.length) { noTag.push([f.name, "", "name has no design no."]); continue; }
+      if (!r.hits.length) { noTag.push([f.name, r.codes.join(" "), "no tag with this design no."]); continue; }
+      if (r.related) later.push([f, r.hits]); else take(f, r.hits);
     }
+    for (const [f, hits] of later) take(f, hits);
     let done = 0, fail = 0, i = 0; const fails = [];
     m.textContent = `${files.length} photos read: ${jobs.length} to save, ${kept.length} pieces already have a photo, ${noTag.length} with no matching tag.`;
     const worker = async () => { while (i < jobs.length) { const [f, t] = jobs[i++];
