@@ -6,6 +6,31 @@
 (function () {
   "use strict";
   const g = id => document.getElementById(id);
+  // Self-contained (the page is one closed function): our own copies of the few helpers we need.
+  const tagsNow = () => (window.VJ_TAGS ? window.VJ_TAGS() : []);
+  const numOf = v => { const x = parseFloat(v); return isFinite(x) ? x : 0; };
+  const wtOf = t => { const gsum = (t.gold || []).reduce((a, x) => a + (x.net || 0), 0); return { net: gsum > 0 ? gsum : (t.metal && t.metal.net) || 0 }; };
+  let lostPhoto = null;   // the photo chosen in "Or search by photo", made 900 px
+  async function readPhoto() {
+    const f = g("fphoto") && g("fphoto").files && g("fphoto").files[0]; if (!f) return null;
+    const url = URL.createObjectURL(f);
+    try { const im = await loadImg(url); const sc = Math.min(1, 900 / Math.max(im.width, im.height)); const c = document.createElement("canvas"); c.width = Math.round(im.width * sc); c.height = Math.round(im.height * sc);
+      c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); return await new Promise(r => c.toBlob(r, "image/jpeg", 0.82)); } catch (e) { return null; } finally { URL.revokeObjectURL(url); }
+  }
+  // result card: photo, label, weight, stones, and a button that opens the piece on Price check (which has Reprint tag)
+  function lostCard(t, extra) {
+    const card = document.createElement("div"); card.style.cssText = "display:flex;gap:12px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);border-radius:var(--r);padding:10px";
+    if (t.photo) { const im = document.createElement("img"); im.alt = ""; im.loading = "lazy"; im.src = "/_blob/" + t.photo; im.style.cssText = "width:96px;height:96px;object-fit:cover;border-radius:6px"; card.appendChild(im); }
+    const info = document.createElement("div"); info.style.cssText = "flex:1 1 220px;min-width:0";
+    const l = document.createElement("div"); l.className = "labelno"; l.textContent = (t.designNo ? t.designNo + " · " : "") + t.label; info.appendChild(l);
+    if (extra) { const e = document.createElement("div"); e.style.fontWeight = "600"; e.textContent = extra; info.appendChild(e); }
+    const w = document.createElement("div"); w.textContent = `${t.catName || ""} · G.Wt. ${wtOf(t).net.toFixed(3)} g`; info.appendChild(w);
+    const di = document.createElement("div"); di.className = "hint"; di.textContent = (t.dias || []).map(z => `${z.q} ${(z.ct || 0).toFixed(2)} ct (${z.pcs} pcs)`).join(", ") || "no diamonds"; info.appendChild(di);
+    card.appendChild(info);
+    const b = document.createElement("button"); b.type = "button"; b.className = "btn"; b.textContent = "Open & reprint tag";
+    b.addEventListener("click", () => { const tab = g("t-check"); if (tab) tab.click(); const q = g("cq"); if (q) { q.value = t.label; const go = g("cgo"); if (go) go.click(); q.scrollIntoView({ behavior: "smooth", block: "start" }); } });
+    card.appendChild(b); return card;
+  }
   const MAX_POOL = 216;          // 3 calls x 72 pieces; more than that -> ask for a category or the weight first
   const PER_CALL = 3, PER_SHEET = 9, TILE = 300, PARALLEL = 2;   // 14/10: 3 sheets (~0.5 MB) per request - 8 was too big ("Load failed")
   const loadImg = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
@@ -82,9 +107,10 @@
 
   async function run() {
     const box = g("fres"); box.textContent = "";
-    if (!S.lostPhoto) { box.textContent = "Take or choose a photo first."; return; }
-    const cat = g("fcat").value, kd = g("fkd").value, w = num(g("fwt").value);
-    let c = S.tags.filter(t => t.photo && /^[0-9a-f]{32}$/.test(t.photo) && (!cat || t.cat === cat) && (!kd || t.kind === kd));
+    lostPhoto = await readPhoto();
+    if (!lostPhoto) { box.textContent = "Take or choose a photo first."; return; }
+    const cat = g("fcat").value, kd = g("fkd").value, w = numOf(g("fwt").value);
+    let c = tagsNow().filter(t => t.photo && /^[0-9a-f]{32}$/.test(t.photo) && (!cat || t.cat === cat) && (!kd || t.kind === kd));
     if (w > 0) c = c.map(t => ({ t, d: Math.abs(wtOf(t).net - w) })).filter(r => r.d <= 1.5).sort((a, b) => a.d - b.d).map(r => r.t);
     const head = document.createElement("p"); head.className = "hint"; box.appendChild(head);
     if (!c.length) { head.textContent = "No piece with a saved photo matches this category" + (w > 0 ? " and weight" : "") + ". Try Any category, or search by weight above."; return; }
@@ -92,7 +118,7 @@
     const btn = g("fpgo"); btn.disabled = true;
     const pr = progress(box);
     try {
-      const photo = await b64of(S.lostPhoto);
+      const photo = await b64of(lostPhoto);
       const groups = []; for (let i = 0; i < c.length; i += PER_SHEET) groups.push(c.slice(i, i + PER_SHEET));
       head.textContent = `Searching ${c.length} photographed piece${c.length === 1 ? "" : "s"}… please keep this page open.`;
       pr.set(2, `Loading photos 0 of ${c.length}`);
@@ -103,7 +129,7 @@
       let found = (await pool(calls.map(cs => () => ask(photo, cs)), () => { doneCalls++; pr.set(35 + 45 * doneCalls / calls.length, `Claude is comparing ${c.length} pieces (${doneCalls} of ${calls.length} batches done)`, 80); })).flat();
       // second look: the best few, one clear photo each
       const best = [...new Map(found.sort((a, b) => b.confidence - a.confidence).map(m => [m.id, m])).values()].slice(0, 6)
-        .map(m => S.tags.find(t => t.id === m.id)).filter(Boolean);
+        .map(m => tagsNow().find(t => t.id === m.id)).filter(Boolean);
       if (best.length > 1 || (best.length === 1 && c.length > PER_SHEET)) {
         pr.set(82, `Second look at the ${best.length} closest piece${best.length === 1 ? "" : "s"}`, 97);
         const singles = []; for (const t of best) { try { singles.push(await single(t)); } catch (e) {} }
@@ -111,19 +137,19 @@
       }
       found = [...new Map(found.sort((a, b) => b.confidence - a.confidence).map(m => [m.id, m])).values()];
       pr.set(100, "Done"); pr.done();
-      head.textContent = found.length ? `Best matches by photo, out of ${c.length} checked. Check the diamonds and weight, then tap Reprint tag:` :
+      head.textContent = found.length ? `Best matches by photo, out of ${c.length} checked. Check the diamonds and weight, then tap Open & reprint tag:` :
         `None of the ${c.length} photographed pieces looks like the same design. Try another photo (piece flat, good light), a different category, or search by weight.`;
-      found.slice(0, 3).forEach(m => { const t = S.tags.find(x => x.id === m.id); if (t) box.appendChild(lostCard(t, `${Math.round(m.confidence)}% match · ${m.why || ""}`)); });
+      found.slice(0, 3).forEach(m => { const all = tagsNow(); const t = all.find(x => x.id === m.id); if (t) box.appendChild(lostCard(t, `${Math.round(m.confidence)}% match · ${m.why || ""}`)); });
     } catch (e) {
       pr.done();
       head.textContent = e.status === 429 ? (e.message || "Too many searches just now - wait a minute and try again.") : e.status === 402 ? "The Claude API credit is used up - tell Abhinav." : "Photo search did not work this time (" + (e.message || "error") + (e.status ? ", " + e.status : "") + "). Check the internet, keep this page open, and try again - or search by weight. [v4]";
     }
-    btn.disabled = !S.lostPhoto;
+    btn.disabled = false;
   }
   function boot() {
     const old = g("fpgo");
-    if (!old || typeof S === "undefined" || typeof lostCard !== "function") return setTimeout(boot, 300);
-    const nb = old.cloneNode(true); old.replaceWith(nb); nb.addEventListener("click", run);   // drop the page's old handler
+    if (!old || !window.VJ_TAGS) return setTimeout(boot, 300);
+    const nb = old.cloneNode(true); nb.disabled = false; old.replaceWith(nb); nb.addEventListener("click", run);   // drop the page's old handler
     const row = g("fphotoRow"); if (row) row.hidden = false;
   }
   boot();
