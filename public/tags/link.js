@@ -128,9 +128,55 @@
     if (fails.length) { const p = document.createElement("div"); p.className = "actions"; p.append("Failed: ", csvLink("photos-failed.csv", [["File", "Tag", "Error"]].concat(fails))); out.append(p); }
   }
 
+  /* ---------- 4. Print by box (owner 14/10/2026: "print tags by box numbers") ----------
+     Tagged pieces gets a box list; "Print" ticks exactly that box's pieces using the page's own tick boxes (one search per
+     label, so the page's own price-code and printing rules apply), then presses the page's "Print selected". */
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  function boxList() {
+    const sel = $("pbBox"); if (!sel) return; const cur = sel.value, cnt = {};
+    tags().forEach(t => { if (t.box) cnt[t.box] = (cnt[t.box] || 0) + 1; });
+    const keys = Object.keys(cnt).sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+    sel.textContent = ""; sel.append(new Option(keys.length ? "Choose a box / packet…" : "No boxes yet (owner: load the packet list)", ""));
+    keys.forEach(k => sel.append(new Option(`${k} (${cnt[k]})`, k))); sel.value = keys.includes(cur) ? cur : "";
+    $("pbGo").disabled = !sel.value;
+  }
+  function printBar() {
+    const host = $("p-list"); if (!host || $("pbBox")) return;
+    const row = document.createElement("div"); row.className = "row"; row.style.cssText = "align-items:end;gap:8px;margin:8px 0";
+    row.innerHTML = `<label style="flex:2 1 220px">Print by box / packet <select id="pbBox"></select></label>
+      <div><button type="button" class="btn" id="pbGo" disabled>Print this box</button></div><span class="hint" id="pbMsg"></span>`;
+    const anchor = $("printSel") && $("printSel").parentNode; host.insertBefore(row, anchor || host.firstChild);
+    $("pbBox").addEventListener("focus", boxList);
+    $("pbBox").addEventListener("change", () => { $("pbGo").disabled = !$("pbBox").value; });
+    $("pbGo").addEventListener("click", printBox);
+    boxList();
+  }
+  async function printBox() {
+    const box = $("pbBox").value, m = $("pbMsg"), q = $("q"); if (!box || !q) return;
+    const list = tags().filter(t => t.box === box).sort((a, b) => a.label.localeCompare(b.label, "en", { numeric: true }));
+    if (!list.length) return;
+    $("pbGo").disabled = true; const fk = $("fkind"); if (fk && fk.value) { fk.value = ""; fk.dispatchEvent(new Event("change")); }
+    $("selClear") && $("selClear").click(); await wait(200);
+    let ok = 0; const miss = [];
+    for (const t of list) {
+      q.value = t.label; q.dispatchEvent(new Event("input"));
+      let ck = null;
+      for (let i = 0; i < 25 && !ck; i++) { await wait(60);
+        $("rows").querySelectorAll("tr").forEach(tr => { const c = tr.querySelector("input[type=checkbox]"), td = tr.children[2];
+          if (c && td && td.textContent.split(" · ").pop().trim() === t.label) ck = c; }); }
+      if (ck) { if (!ck.checked) { ck.checked = true; ck.dispatchEvent(new Event("change")); } ok++; } else miss.push(t.label);
+      m.textContent = `Selecting ${ok + miss.length} of ${list.length}…`;
+    }
+    q.value = ""; q.dispatchEvent(new Event("input"));
+    m.textContent = `${ok} tags of ${box} selected${miss.length ? " (not found: " + miss.join(", ") + ")" : ""} - printing…`;
+    await wait(300); if (ok && $("printSel")) $("printSel").click();
+    $("pbGo").disabled = false;
+  }
+
   async function boot() {
     const box = $("cres"); if (!box || !window.VJ_TAGS || !window.claude) return setTimeout(boot, 300);
     new MutationObserver(showBox).observe(box, { childList: true, subtree: true }); showBox();
+    printBar(); document.addEventListener("click", e => { if (e.target && e.target.dataset && e.target.dataset.tab === "list") setTimeout(boxList, 100); });
     try { const u = await window.claude.use("user"); if (u && await u.isOwner()) card(); } catch (e) {}
   }
   boot();
