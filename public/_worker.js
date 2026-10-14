@@ -165,18 +165,26 @@ async function vjSaveGold(env, per10, source) {
     .bind('settings/main', JSON.stringify(next), v, Date.now(), 'gold-feed').run();
 }
 // 14/10/2026 owner: "gold rates not auto updated". Cloudflare cannot reach the NR feed (port 7768), so the scheduled gold
-// tasks (Mon-Sat 13:00, 15:30, 17:00 IST) put the NR rate in the Make data store VJ_Gold, and the website collects it here
+// tasks (Mon-Fri 13:00, 15:30, 17:00 + Fri 20:00 IST) put the NR rate in the Make data store VJ_Gold, and the website collects it here
 // through the Make relay VJ_GOLD_HOOK (encrypted variable; the relay only returns {per10g, at}). It asks a few minutes after
 // each task time, only if nobody saved a rate since then, at most once every 10 minutes - a few Make operations a day.
 // A rate typed by the owner after the task time is never overwritten.
 let vjGoldAskedAt = 0;
 async function vjMaybeRefreshGold(env) {
   if (!env.VJ_GOLD_HOOK || !/^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_GOLD_HOOK)) return;
-  const ist = new Date(Date.now() + 5.5 * 3600e3), d = ist.getUTCDay(), m = ist.getUTCHours() * 60 + ist.getUTCMinutes();
-  if (d === 0) return;
-  const slots = [13 * 60 + 4, 15 * 60 + 36, 17 * 60 + 4].filter(s => s <= m);
-  if (!slots.length || Date.now() - vjGoldAskedAt < 10 * 60e3) return;
-  const slotAt = Date.now() - (m - slots[slots.length - 1]) * 60e3;
+  // 14/10/2026 owner: market days are Monday-Friday only; Friday has a last rate at 8 pm. So the tasks run Mon-Fri 13:00,
+  // 15:30, 17:00 and Fri 20:00 IST. Find the latest task time (looking back up to 3 days, so Sat/Sun/Monday morning still
+  // pick up Friday 8 pm).
+  if (Date.now() - vjGoldAskedAt < 10 * 60e3) return;
+  const ist = new Date(Date.now() + 5.5 * 3600e3), m = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+  let slotAt = 0;
+  for (let back = 0; back <= 3 && !slotAt; back++) {
+    const d = (ist.getUTCDay() - back + 7) % 7;
+    if (d === 0 || d === 6) continue;
+    const slots = [13 * 60 + 4, 15 * 60 + 36, 17 * 60 + 4].concat(d === 5 ? [20 * 60 + 4] : []).filter(s => back > 0 || s <= m);
+    if (slots.length) slotAt = Date.now() - (back * 1440 + m - slots[slots.length - 1]) * 60e3;
+  }
+  if (!slotAt) return;
   const row = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first();
   const goldAt = row ? Date.parse(JSON.parse(row.data).goldAt || 0) || 0 : 0;
   if (goldAt >= slotAt) return;
@@ -185,7 +193,7 @@ async function vjMaybeRefreshGold(env) {
     const r = await fetch(env.VJ_GOLD_HOOK, { signal: AbortSignal.timeout(8000) });
     const j = await r.json();
     const per10 = Number(j && j.per10g), at = Date.parse(j && j.at) || 0;
-    if (per10 >= 50000 && per10 <= 400000 && at > goldAt && Date.now() - at < 12 * 3600e3)
+    if (per10 >= 50000 && per10 <= 400000 && at > goldAt && Date.now() - at < 80 * 3600e3)
       await vjSaveGold(env, per10, `NR Jewellers GOLD 999 IMP T+2 sell ${per10} per 10 g (scheduled task ${new Date(at + 5.5 * 3600e3).toISOString().slice(11, 16)} IST)`);
   } catch (e) {}
 }
