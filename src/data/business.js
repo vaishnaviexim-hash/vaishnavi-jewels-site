@@ -20,7 +20,7 @@ export const business = {
   whatsappDisplay: '+91 99980 43886',
   whatsappE164: '+919998043886',
   whatsapp: 'https://wa.me/919998043886?text=Hi%20Vaishnavi%20Jewels%2C%20I%20found%20you%20on%20your%20website.',
-  email: 'vaishnaviexim@gmail.com',
+  email: 'surat@vaishnavijewels.com',
   // Normal hours: Monday to Saturday 11 AM-8 PM, closed Sunday. Every year the
   // showroom is also open on Sundays in the festive month before Diwali (R-065).
   // 2026: open every day until 7 Nov (F-020), closed 8-15 Nov, reopens Mon 16 Nov (F-017).
