@@ -42,11 +42,22 @@ const groups = [
       ['Do you ship across India?', 'Yes. We offer free insured delivery to major Indian cities, with the certificate and invoice. For other locations, message us and we will confirm the options.'],
       ['Can I see the jewellery on a video call before buying?', 'Yes. We show pieces live on video calls and share photos, videos and grading report details on WhatsApp, so you can decide before you pay.'],
       ['How can I pay?', 'We accept NEFT, UPI and cash. We do not offer EMI.'],
-      ['Do you offer exchange and buyback?', 'Yes. A piece bought from us can be exchanged at its value less the making charges. Buyback is also available: the value is worked out after deducting making and other applicable charges, and gold is valued at the market rate on the day of return. Please ask us for the terms for your piece.'],
       ['How do I contact you?', 'Call or WhatsApp +91 99980 43886, or email surat@vaishnavijewels.com.'],
     ],
   },
 ];
+
+groups.push({
+  title: 'Exchange, buyback and after-sales',
+  faqs: [
+    ['Do you offer exchange and buyback?', 'Yes. Jewellery bought from us can be exchanged or returned from 2 months up to 5 years after purchase, for both ready pieces and made-to-order pieces. The gold is taken at its full value at the day\'s gold rate, and natural diamonds at their diamond value less 10%. Making charges are not returned.'],
+    ['Can I exchange or return lab-grown diamond jewellery?', 'Yes, you can exchange it. There is no cash return on lab-grown diamonds, but we can make new jewellery for you using the same diamonds, and the gold is taken at its full value at the day\'s gold rate.'],
+    ['Can I upgrade my diamond jewellery later?', 'Yes. From 2 months up to 5 years after purchase you can exchange a piece bought from us towards a new or bigger piece, on the same exchange terms.'],
+    ['Do you accept old gold from other jewellers?', 'Yes. We accept old gold jewellery from other jewellers in exchange for new jewellery.'],
+    ['Is there a warranty on your jewellery?', 'Every piece is made in our own manufacturing unit. A manufacturing defect found when you receive the piece is fixed free of cost; later repairs are charged at actual cost.'],
+    ['Do you polish, repair and resize jewellery?', 'Yes. We do rhodium polishing, re-setting, resizing and repairs for diamond and gold jewellery, charged at actual cost.'],
+  ],
+});
 
 const all = groups.flatMap((g) => g.faqs);
 const faqSchema = {
@@ -57,11 +68,11 @@ const faqSchema = {
 ---
 <InfoPage
   title="Jewellery FAQ: Certificates, HUID, Delivery | Vaishnavi Jewels, Surat"
-  description="Answers on IGI, EGL and TGL reports, BIS HUID, Polki and bridal jewellery in Surat, video-call shopping, insured delivery across India, exchange and payment."
+  description="Answers on IGI, EGL and TGL reports, BIS HUID, exchange and buyback, after-sales, Polki and bridal jewellery in Surat, video-call shopping, insured delivery and payment."
   path="/faq"
   eyebrow="QUESTIONS"
   heading="Frequently Asked Questions"
-  intro="Straight answers to what customers ask us most: certificates, checking your diamond, custom work, visiting and delivery."
+  intro="Straight answers to what customers ask us most: certificates, checking your diamond, custom work, visiting, delivery, exchange and after-sales."
   extraSchema={[faqSchema]}
 >
   {groups.map((g) => (
