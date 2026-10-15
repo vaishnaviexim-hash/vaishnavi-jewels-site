@@ -16,7 +16,10 @@ export const business = {
   addressText: '120, Rajhans Ornate - High Street Retail Mall, Parle Point, Surat, Gujarat 395007',
   phone: '+91 75674 00099',
   phoneE164: '+917567400099',
-  whatsapp: 'https://wa.me/917567400099?text=Hi%20Vaishnavi%20Jewels%2C%20I%20found%20you%20on%20your%20website.',
+  // Calls stay on the showroom number; WhatsApp goes to Aashvi (Brain T-20261009-AASHVI-NUMBERSWITCH, 15 Oct 2026).
+  whatsappDisplay: '+91 99980 43886',
+  whatsappE164: '+919998043886',
+  whatsapp: 'https://wa.me/919998043886?text=Hi%20Vaishnavi%20Jewels%2C%20I%20found%20you%20on%20your%20website.',
   email: 'vaishnaviexim@gmail.com',
   // Normal hours: Monday to Saturday 11 AM-8 PM, closed Sunday. Every year the
   // showroom is also open on Sundays in the festive month before Diwali (R-065).
