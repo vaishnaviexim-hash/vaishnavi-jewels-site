@@ -14,9 +14,9 @@ export const business = {
   postalCode: '395007',
   country: 'IN',
   addressText: '120, Rajhans Ornate - High Street Retail Mall, Parle Point, Surat, Gujarat 395007',
-  phone: '+91 75674 00099',
-  phoneE164: '+917567400099',
-  // Calls stay on the showroom number; WhatsApp goes to Aashvi (Brain T-20261009-AASHVI-NUMBERSWITCH, 15 Oct 2026).
+  phone: '+91 99980 43886',
+  phoneE164: '+919998043886',
+  // Calls and WhatsApp both go to Aashvi's number, owner 15 Oct 2026 (Brain T-20261009-AASHVI-NUMBERSWITCH, 15 Oct 2026).
   whatsappDisplay: '+91 99980 43886',
   whatsappE164: '+919998043886',
   whatsapp: 'https://wa.me/919998043886?text=Hi%20Vaishnavi%20Jewels%2C%20I%20found%20you%20on%20your%20website.',
