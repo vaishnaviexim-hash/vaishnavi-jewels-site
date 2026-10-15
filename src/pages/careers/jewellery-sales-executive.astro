@@ -1,0 +1,57 @@
+---
+import InfoPage from '../../layouts/InfoPage.astro';
+import { business, SITE_URL } from '../../data/business.js';
+const description = `<p>Vaishnavi Jewels (Vaishnavi Gem &amp; Jewel Pvt Ltd) is a certified diamond jewellery showroom and manufacturer in Surat since 2005. We are hiring 3 to 4 full-time Jewellery Sales Executives for our 2,500 sq ft showroom at Parle Point, Surat.</p>
+<p><strong>Responsibilities:</strong> welcome customers and help them choose diamond, Polki, gold and bridal jewellery; explain certificates, diamond quality (4Cs) and BIS HUID hallmarking clearly and honestly; help customers try on pieces and take custom design orders; follow up enquiries on phone and WhatsApp; keep the counter, display and stock records accurate.</p>
+<p><strong>Requirements:</strong> experience in jewellery showroom sales is essential (diamond, gold or bridal jewellery); good product knowledge; confident, polite communication in Gujarati, Hindi and English; lives in Surat. Police verification and one local Surat reference (not a family member) are required before joining.</p>
+<p><strong>Salary:</strong> Rs 20,000 to 30,000 per month, based on ability and experience. <strong>Timings:</strong> 10:45 AM to 8:30 PM, Monday to Saturday.</p>
+<p><strong>How to apply:</strong> email your resume to hr@vaishnavijewels.com with the subject "Sales Executive - Surat". We hire directly; no placement agencies.</p>`;
+const jobPosting = {
+  '@context': 'https://schema.org',
+  '@type': 'JobPosting',
+  title: 'Jewellery Sales Executive (Showroom)',
+  description,
+  identifier: { '@type': 'PropertyValue', name: business.legalName, value: 'SAL-2026-10' },
+  datePosted: '2026-10-15',
+  validThrough: '2026-12-31T23:59',
+  employmentType: 'FULL_TIME',
+  totalJobOpenings: 4,
+  hiringOrganization: { '@type': 'Organization', name: business.name, sameAs: SITE_URL, logo: SITE_URL + '/logo_vaishnavi_jewels.png' },
+  jobLocation: { '@type': 'Place', address: { '@type': 'PostalAddress', streetAddress: business.street, addressLocality: business.city, addressRegion: business.region, postalCode: business.postalCode, addressCountry: business.country } },
+  baseSalary: { '@type': 'MonetaryAmount', currency: 'INR', value: { '@type': 'QuantitativeValue', minValue: 20000, maxValue: 30000, unitText: 'MONTH' } },
+  experienceRequirements: { '@type': 'OccupationalExperienceRequirements', monthsOfExperience: 12 },
+  skills: 'Jewellery showroom sales, diamond and gold jewellery knowledge, customer service, Gujarati, Hindi, English',
+  industry: 'Jewellery',
+};
+---
+<InfoPage
+  title="Jewellery Sales Executive Job in Surat (Showroom) | Vaishnavi Jewels"
+  description="Full-time Jewellery Sales Executive jobs at Vaishnavi Jewels, Parle Point, Surat: 3-4 openings, Rs 20,000-30,000 per month. Jewellery showroom sales experience required."
+  path="/careers/jewellery-sales-executive"
+  eyebrow="CAREERS · FULL-TIME · SURAT"
+  heading="Jewellery Sales Executive"
+  intro="3 to 4 openings. Full-time, on-site at our Parle Point showroom. Rs 20,000 to 30,000 per month, based on ability and experience."
+  extraSchema={[jobPosting]}
+>
+  <h2>What you will do</h2>
+  <ul>
+    <li>Welcome customers and help them choose diamond, Polki, gold and bridal jewellery</li>
+    <li>Explain certificates, diamond quality (4Cs) and BIS HUID hallmarking clearly and honestly</li>
+    <li>Help customers try on pieces, and take custom design orders</li>
+    <li>Follow up enquiries on phone and WhatsApp</li>
+    <li>Keep the counter, display and stock records accurate</li>
+  </ul>
+  <h2>What we are looking for</h2>
+  <ul>
+    <li>Experience in jewellery showroom sales (diamond, gold or bridal) is essential</li>
+    <li>Good product knowledge and a warm, honest way with customers</li>
+    <li>Confident Gujarati, Hindi and English</li>
+    <li>Lives in Surat</li>
+    <li>Police verification and one local Surat reference (not a family member) before joining</li>
+  </ul>
+  <h2>Details</h2>
+  <p>Full-time job. Timings 10:45 AM to 8:30 PM, Monday to Saturday. Salary Rs 20,000 to 30,000 per month, depending on ability and experience.</p>
+  <h2>How to apply</h2>
+  <p>Email your resume to <a href="mailto:hr@vaishnavijewels.com?subject=Sales%20Executive%20-%20Surat">hr@vaishnavijewels.com</a> with the subject "Sales Executive - Surat". We hire directly and never charge any fee; placement agencies, please do not contact us.</p>
+  <p><a href="/careers">All open positions</a></p>
+</InfoPage>
