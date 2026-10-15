@@ -1,0 +1,57 @@
+---
+import InfoPage from '../../layouts/InfoPage.astro';
+import { business, SITE_URL } from '../../data/business.js';
+const description = `<p>Vaishnavi Jewels (Vaishnavi Gem &amp; Jewel Pvt Ltd) is a certified diamond jewellery showroom and manufacturer in Surat since 2005. We are hiring a full-time Jewellery Designer to create new designs for our showroom collections and for customers' custom orders. Fresh designers are welcome.</p>
+<p><strong>Responsibilities:</strong> hand-sketch jewellery concepts (rings, earrings, pendants, necklaces, bangles and bridal sets); create detailed designs and renders in Procreate (iPad); turn customer ideas and reference photos into design options; work with our manufacturing team so every design is practical to make; keep an organised design library.</p>
+<p><strong>Requirements:</strong> strong manual jewellery sketching and/or Procreate jewellery design skills; a portfolio of your jewellery designs; a jewellery design course, diploma or degree is preferred. CAD basics (Rhino / MatrixGold) and knowledge of diamonds and gemstones are a plus. Police verification and one local Surat reference (not a family member) are required before joining.</p>
+<p><strong>Timings:</strong> 10:45 AM to 8:30 PM, Monday to Saturday. Full-time, on-site at Parle Point, Surat; candidates from other cities must be willing to relocate. Salary as per skills and experience.</p>
+<p><strong>How to apply:</strong> email your portfolio and resume to hr@vaishnavijewels.com with the subject "Jewellery Designer". We hire directly; no placement agencies.</p>`;
+const jobPosting = {
+  '@context': 'https://schema.org',
+  '@type': 'JobPosting',
+  title: 'Jewellery Designer (Manual Sketching / Procreate)',
+  description,
+  identifier: { '@type': 'PropertyValue', name: business.legalName, value: 'DES-2026-10' },
+  datePosted: '2026-10-15',
+  validThrough: '2026-12-31T23:59',
+  employmentType: 'FULL_TIME',
+  hiringOrganization: { '@type': 'Organization', name: business.name, sameAs: SITE_URL, logo: SITE_URL + '/logo_vaishnavi_jewels.png' },
+  jobLocation: { '@type': 'Place', address: { '@type': 'PostalAddress', streetAddress: business.street, addressLocality: business.city, addressRegion: business.region, postalCode: business.postalCode, addressCountry: business.country } },
+  educationRequirements: { '@type': 'EducationalOccupationalCredential', credentialCategory: 'professional certificate' },
+  experienceRequirements: 'no requirements',
+  skills: 'Manual jewellery sketching, Procreate jewellery design, jewellery portfolio',
+  industry: 'Jewellery',
+  occupationalCategory: '27-1021.00 Commercial and Industrial Designers',
+};
+---
+<InfoPage
+  title="Jewellery Designer Job in Surat (Manual Sketching / Procreate) | Vaishnavi Jewels"
+  description="Full-time Jewellery Designer job at Vaishnavi Jewels, Parle Point, Surat: manual jewellery sketching and Procreate. Fresh designers welcome. Apply with your portfolio."
+  path="/careers/jewellery-designer"
+  eyebrow="CAREERS · FULL-TIME · SURAT"
+  heading="Jewellery Designer"
+  intro="Manual sketching / Procreate. Full-time, on-site at our Parle Point showroom and manufacturing unit. Fresh designers welcome."
+  extraSchema={[jobPosting]}
+>
+  <h2>What you will do</h2>
+  <ul>
+    <li>Hand-sketch jewellery concepts: rings, earrings, pendants, necklaces, bangles and bridal sets</li>
+    <li>Create detailed designs and renders in Procreate (iPad)</li>
+    <li>Turn customer ideas and reference photos into design options for custom orders</li>
+    <li>Work with our manufacturing team so every design is practical to make</li>
+    <li>Keep an organised library of designs</li>
+  </ul>
+  <h2>What we are looking for</h2>
+  <ul>
+    <li>Strong manual jewellery sketching and/or Procreate jewellery design skills</li>
+    <li>A portfolio of your jewellery designs (required)</li>
+    <li>Jewellery design course, diploma or degree preferred; fresh designers welcome</li>
+    <li>Nice to have: CAD basics (Rhino / MatrixGold), knowledge of diamonds and gemstones</li>
+    <li>Police verification and one local Surat reference (not a family member) before joining</li>
+  </ul>
+  <h2>Details</h2>
+  <p>Full-time job (no internships). Timings 10:45 AM to 8:30 PM, Monday to Saturday. On-site at Parle Point, Surat; candidates from other cities must be willing to relocate. Salary as per skills and experience, discussed at the interview.</p>
+  <h2>How to apply</h2>
+  <p>Email your portfolio and resume to <a href="mailto:hr@vaishnavijewels.com?subject=Jewellery%20Designer">hr@vaishnavijewels.com</a> with the subject "Jewellery Designer", or message us on WhatsApp at <a href="https://wa.me/919998043886?text=Hi%2C%20I%20want%20to%20apply%20for%20the%20Jewellery%20Designer%20job">+91 99980 43886</a>. We hire directly and never charge any fee; placement agencies, please do not contact us.</p>
+  <p><a href="/careers">All open positions</a></p>
+</InfoPage>

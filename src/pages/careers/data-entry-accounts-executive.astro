@@ -1,0 +1,53 @@
+---
+import InfoPage from '../../layouts/InfoPage.astro';
+import { business, SITE_URL } from '../../data/business.js';
+const description = `<p>Vaishnavi Jewels (Vaishnavi Gem &amp; Jewel Pvt Ltd) is a certified diamond jewellery showroom and manufacturer in Surat since 2005. We are hiring a full-time Data Entry &amp; Accounts Executive (Tally + Excel) for our Parle Point showroom.</p>
+<p><strong>Responsibilities:</strong> daily entries in Tally Prime (sales, purchases, receipts, payments, journals); stock, billing and customer records in Excel; manual registers matched with Tally and Excel; stock tallying and reconciliation; GST invoices and records for our CA.</p>
+<p><strong>Requirements:</strong> Tally knowledge is essential (1+ year of hands-on Tally, or freshers with a Tally certificate); good Excel (VLOOKUP/XLOOKUP, filters, pivot tables); fast, accurate typing; Gujarati, Hindi and basic English; lives in Surat. B.Com preferred. Police verification and one local Surat reference (not a family member) are required before joining.</p>
+<p><strong>Salary:</strong> Rs 20,000 to 25,000 per month, based on skill and experience. <strong>Timings:</strong> 10:45 AM to 8:30 PM, Monday to Saturday.</p>
+<p><strong>How to apply:</strong> email your resume to hr@vaishnavijewels.com with the subject "Data Entry - Surat". We hire directly; no placement agencies.</p>`;
+const jobPosting = {
+  '@context': 'https://schema.org',
+  '@type': 'JobPosting',
+  title: 'Data Entry & Accounts Executive (Tally + Excel)',
+  description,
+  identifier: { '@type': 'PropertyValue', name: business.legalName, value: 'DE-2026-10' },
+  datePosted: '2026-10-15',
+  validThrough: '2026-12-31T23:59',
+  employmentType: 'FULL_TIME',
+  hiringOrganization: { '@type': 'Organization', name: business.name, sameAs: SITE_URL, logo: SITE_URL + '/logo_vaishnavi_jewels.png' },
+  jobLocation: { '@type': 'Place', address: { '@type': 'PostalAddress', streetAddress: business.street, addressLocality: business.city, addressRegion: business.region, postalCode: business.postalCode, addressCountry: business.country } },
+  baseSalary: { '@type': 'MonetaryAmount', currency: 'INR', value: { '@type': 'QuantitativeValue', minValue: 20000, maxValue: 25000, unitText: 'MONTH' } },
+  skills: 'Tally Prime, Excel, data entry, accounts',
+  industry: 'Jewellery',
+};
+---
+<InfoPage
+  title="Data Entry & Accounts Executive Job in Surat (Tally + Excel) | Vaishnavi Jewels"
+  description="Full-time Data Entry & Accounts Executive job at Vaishnavi Jewels, Parle Point, Surat: Tally Prime and Excel, Rs 20,000-25,000 per month. Surat residents only."
+  path="/careers/data-entry-accounts-executive"
+  eyebrow="CAREERS · FULL-TIME · SURAT"
+  heading="Data Entry & Accounts Executive"
+  intro="Tally + Excel. Full-time, on-site at our Parle Point showroom. Rs 20,000 to 25,000 per month."
+  extraSchema={[jobPosting]}
+>
+  <h2>What you will do</h2>
+  <ul>
+    <li>Daily entries in Tally Prime: sales, purchases, receipts, payments, journals</li>
+    <li>Maintain stock, billing and customer records in Excel</li>
+    <li>Maintain manual registers and match them with Tally and Excel</li>
+    <li>Help with stock tallying and reconciliation of jewellery items</li>
+    <li>Assist with GST invoices and records for our CA</li>
+  </ul>
+  <h2>What we are looking for</h2>
+  <ul>
+    <li>Tally knowledge is essential: 1+ year hands-on, or a fresher with a Tally certificate</li>
+    <li>Good Excel skills (VLOOKUP/XLOOKUP, filters, pivot tables)</li>
+    <li>Fast, accurate typing; careful with numbers</li>
+    <li>Gujarati, Hindi and basic English; lives in Surat</li>
+    <li>Police verification and one local Surat reference (not a family member) before joining</li>
+  </ul>
+  <h2>How to apply</h2>
+  <p>Email your resume to <a href="mailto:hr@vaishnavijewels.com?subject=Data%20Entry%20-%20Surat">hr@vaishnavijewels.com</a> with the subject "Data Entry - Surat". We hire directly and never charge any fee; placement agencies, please do not contact us.</p>
+  <p><a href="/careers">All open positions</a></p>
+</InfoPage>

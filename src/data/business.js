@@ -56,6 +56,7 @@ export const infoPages = [
   { path: '/faq', label: 'FAQ' },
   { path: '/facts', label: 'Facts' },
   { path: '/jadau-jewellery', label: 'Jadau Jewellery' },
+  { path: '/careers', label: 'Careers' },
 ];
 
 export function storeSchema(imageUrl) {
