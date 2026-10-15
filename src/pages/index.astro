@@ -97,9 +97,15 @@ const description = "Certified diamond jewellery made in Surat since 2005: natur
             <p class="contact-value">{b.addressText}<br/>{b.hoursText}</p>
           </div>
           <div class="contact-block">
-            <p class="contact-label">Phone / WhatsApp</p>
+            <p class="contact-label">Phone</p>
             <p class="contact-value">
               <a href="tel:+917567400099">+91 75674 00099</a>
+            </p>
+          </div>
+          <div class="contact-block">
+            <p class="contact-label">WhatsApp</p>
+            <p class="contact-value">
+              <a href={b.whatsapp} target="_blank" rel="noopener">{b.whatsappDisplay}</a>
             </p>
           </div>
           <div class="contact-block">
