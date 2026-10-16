@@ -130,8 +130,16 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
 
       <h2>2 · Piece</h2>
       <div class="seg" role="radiogroup" aria-label="Type">
+        <label><input type="radio" name="kind" id="k-order" value="order"> Order</label>
         <label><input type="radio" name="kind" id="k-sale" value="sale" checked> Stock</label>
         <label><input type="radio" name="kind" id="k-sample" value="sample"> Sample</label>
+      </div>
+      <!-- owner 16/10/2026 (C-20261016-ORDERS): a piece made for a customer's order -->
+      <div class="row" id="orderBox" hidden>
+        <label>Customer name <input id="oName" autocomplete="off" maxlength="60"></label>
+        <label>Mobile <input id="oMob" inputmode="tel" autocomplete="off" maxlength="14" placeholder="98xxxxxxxx"></label>
+        <label>City <input id="oCity" autocomplete="off" maxlength="40"></label>
+        <label>Delivery date <input id="oDue" type="date"></label>
       </div>
       <div class="row">
         <label>Category <select id="cat"></select></label>
@@ -183,7 +191,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
     <p class="hint">Weigh the piece and choose its category. The closest pieces by weight come first; check the diamonds and photo, then reprint its tag with the same old number.</p>
     <div class="row" style="align-items:end">
       <label style="flex:1 1 160px">Category <select id="fcat"></select></label>
-      <label style="flex:1 1 120px">Type <select id="fkd"><option value="">Stock or sample</option><option value="sale">Stock</option><option value="sample">Sample</option></select></label>
+      <label style="flex:1 1 120px">Type <select id="fkd"><option value="">Any</option><option value="order">Order</option><option value="sale">Stock</option><option value="sample">Sample</option></select></label>
       <label style="flex:1 1 140px">Weight on the scale (g) <input type="number" id="fwt" step="0.001" min="0" inputmode="decimal" placeholder="e.g. 7.880"></label>
       <label style="flex:1 1 120px">Within <select id="ftol"><option value="0.02">± 0.02 g</option><option value="0.05" selected>± 0.05 g</option><option value="0.1">± 0.10 g</option><option value="0.25">± 0.25 g</option><option value="1">± 1 g</option></select></label>
       <div><button type="button" class="btn" id="fgo">Find</button></div>
@@ -201,7 +209,8 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
   <section id="p-list" class="card" hidden>
     <div class="row" style="align-items:end">
       <label style="flex:2 1 220px">Search <input id="q" placeholder="Label, design no. (e.g. 1122), category, remark"></label>
-      <label style="flex:1 1 140px">Show <select id="fkind"><option value="">All</option><option value="sale">Stock</option><option value="sample">Samples</option><option value="nophoto">Photo pending</option></select></label>
+      <label style="flex:1 1 140px">Show <select id="fkind"><option value="">All</option><option value="order">Orders</option><option value="sale">Stock</option><option value="sample">Samples</option><option value="nophoto">Photo pending</option></select></label>
+      <div><button type="button" class="btn ghost" id="ordRep">Orders report (Excel)</button></div>
     </div>
     <div class="row" style="align-items:center;gap:8px;margin:10px 0">
       <button type="button" class="btn" id="printQ" hidden>Print queue</button>
@@ -347,7 +356,7 @@ function renderCheck(){
   else{const ph=document.createElement("div");ph.className="hint";ph.style.cssText="width:112px;height:112px;display:flex;align-items:center;justify-content:center;text-align:center;border:1px dashed var(--line);border-radius:6px";ph.textContent="Photo pending";pcol.appendChild(ph)}
   const pb=photoButton(t,renderCheck);if(pb){pb.style.justifyContent="center";pb.style.padding="6px 8px";if(t.photo)pb.classList.add("ghost");pcol.appendChild(pb)}
   top.appendChild(pcol);
-  const h=document.createElement("div");const l=document.createElement("div");l.className="labelno";l.textContent=(t.designNo?t.designNo+" · ":"")+t.label;const c=document.createElement("div");c.className="hint";c.textContent=S.role==="sales"?(t.catName||""):(t.catName||"")+(t.remark?" · "+t.remark:"")+(t.kind==="sample"?" · sample":"");h.append(l,c);top.appendChild(h);card.appendChild(top);
+  const h=document.createElement("div");const l=document.createElement("div");l.className="labelno";l.textContent=(t.designNo?t.designNo+" · ":"")+t.label;const c=document.createElement("div");c.className="hint";c.textContent=S.role==="sales"?(t.catName||""):(t.catName||"")+(t.remark?" · "+t.remark:"")+(t.kind==="sample"?" · sample":"")+(t.kind==="order"?" · order"+(t.order&&t.order.name?" for "+t.order.name:"")+(t.order&&t.order.due?", delivery "+t.order.due.split("-").reverse().join("-"):""):"");h.append(l,c);top.appendChild(h);card.appendChild(top);
   const tb=document.createElement("table");tb.className="sum";const add=(a,b,cl)=>{const tr=document.createElement("tr");if(cl)tr.className=cl;const x=document.createElement("td"),y=document.createElement("td");x.textContent=a;y.textContent=b;tr.append(x,y);tb.appendChild(tr)};
   const pin=priceInput(t);pin.gold.forEach(g=>add("Gold "+g.k,g.net.toFixed(3)+" g"));pin.dias.forEach(d=>add(`${d.shape} ${d.q}`,`${d.ct.toFixed(2)} ct (${d.pcs})`+(d.rate>0?` @ ${fmt(d.rate)}`:"")));
   if(t.other&&t.other.amt)add("Other charges",fmt(t.other.amt));
@@ -392,6 +401,7 @@ $("addDia").addEventListener("click",()=>addDia());
 ["goldLines","diaLines"].forEach(id=>{$(id).addEventListener("input",update);$(id).addEventListener("change",update)});
 ["cat","remark","otherAmt"].forEach(id=>{$(id).addEventListener("input",update);$(id).addEventListener("change",update)});
 document.querySelectorAll('input[name=kind]').forEach(r=>r.addEventListener("change",update));
+["oName","oMob","oCity","oDue"].forEach(id=>$(id).addEventListener("input",update));
 CATS.forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=c.name;$("cat").appendChild(o)});
 
 /* ---------- read form ---------- */
@@ -402,7 +412,8 @@ function readForm(){
   const dias=[...$("diaLines").children].map(r=>{const i=r.dataset.id;const qq=$("dq"+i).value==="Other"?($("dqo"+i).value.trim().toUpperCase()||"OTHER?"):$("dq"+i).value;const sp=num($("dr"+i).value),sh=$("ds"+i).value,def=defRate(sh,qq);return {shape:sh,q:qq,ct:num($("dc"+i).value),pcs:Math.round(num($("dp"+i).value)),rate:sp>0?sp:(def||0),special:sp>0}}).filter(d=>d.ct>0||d.pcs>0||d.special);
   const mainK=(gold.find(g=>g.net>0)||gold[0]||{k:"18K"}).k;
   const prefix=k==="sample"?cat.s:cat.code+KNUM[mainK];
-  return {kind:k,cat:cat.id,prefix,catName:cat.name.replace(/\s*\(.*\)$/,""),mainK,gold,dias,
+  const order=k==="order"?{name:$("oName").value.trim().slice(0,60),mobile:$("oMob").value.replace(/\D/g,"").replace(/^91(?=\d{10}$)/,""),city:$("oCity").value.trim().slice(0,40),due:$("oDue").value||""}:null;
+  return {kind:k,cat:cat.id,prefix,catName:cat.name.replace(/\s*\(.*\)$/,""),mainK,gold,dias,order,
     remark:$("remark").value.trim(),designNo:$("designNo").value.trim().toUpperCase(),other:{amt:num($("otherAmt").value)}};
 }
 /* ---------- price (Brain F-025 / F-044) ---------- */
@@ -423,10 +434,12 @@ function price(t){
 }
 function problems(t){
   const p=[],s=st();
+  if(t.kind==="order"&&!t.order.name)p.push("Enter the customer's name for this order.");
+  if(t.kind==="order"&&t.order.mobile&&!/^[6-9]\d{9}$/.test(t.order.mobile))p.push("Customer mobile must be 10 digits (or leave it empty).");
   if(!t.designNo)p.push("Enter the design number.");
   if(!t.gold.some(g=>g.net>0))p.push("Enter the net gold weight.");
-  t.dias.forEach((d,i)=>{if(d.q==="OTHER?")p.push(`Diamond line ${i+1}: type the quality.`);if(!(d.ct>0))p.push(`Diamond line ${i+1}: enter the carat weight.`);if(t.kind==="sale"&&!(d.rate>0))p.push(`Diamond line ${i+1}: no default rate for ${d.shape} ${d.q}. Enter the special rate.`)});
-  if(t.kind==="sale"&&!s.gold24g)p.push("Today's gold rate is not set (Gold rate & settings).");
+  t.dias.forEach((d,i)=>{if(d.q==="OTHER?")p.push(`Diamond line ${i+1}: type the quality.`);if(!(d.ct>0))p.push(`Diamond line ${i+1}: enter the carat weight.`);if(t.kind!=="sample"&&!(d.rate>0))p.push(`Diamond line ${i+1}: no default rate for ${d.shape} ${d.q}. Enter the special rate.`)});
+  if(t.kind!=="sample"&&!s.gold24g)p.push("Today's gold rate is not set (Gold rate & settings).");
   return p;
 }
 function nextNo(prefix){let mx=S.counters[prefix]||0;S.tags.forEach(t=>{if(t.prefix===prefix&&t.no>mx)mx=t.no});return mx+1}
@@ -515,7 +528,7 @@ function tagPDF(t){
 /* ---------- live update ---------- */
 function update(){
   if(!S.settings)return;
-  const t=readForm(),s=st(),pr=t.kind==="sale"?price(t):null;
+  const t=readForm(),s=st(),pr=t.kind!=="sample"?price(t):null;$("orderBox").hidden=t.kind!=="order";
   [...$("goldLines").children].forEach(r=>{const i=r.dataset.id,net=num($("gn"+i).value),k=$("gk"+i).value;
     $("gv"+i).textContent=s.gold24g&&net>0?fmt(net*s.gold24g*(s.purity[k]||0)):""});
   [...$("diaLines").children].forEach(r=>{const i=r.dataset.id,qq=$("dq"+i).value==="Other"?$("dqo"+i).value.trim().toUpperCase():$("dq"+i).value,def=defRate($("ds"+i).value,qq),sp=num($("dr"+i).value),rate=sp>0?sp:def,ct=num($("dc"+i).value);
@@ -653,10 +666,11 @@ async function allocateAndSave(t,photoId){
   let no=nextNo(t.prefix);
   for(;;){const id=(t.prefix+"-"+no).replace(/[^A-Za-z0-9_\-.~:@+]/g,"_");if(!(await S.db.doc("tags/"+id).get()).exists){t.id=id;break}no++}
   t.no=no;t.label=t.prefix+"/"+no;
-  const pr=t.kind==="sale"?price(t):null;
+  const pr=t.kind!=="sample"?price(t):null;
   const body={label:t.label,prefix:t.prefix,no:t.no,kind:t.kind,cat:t.cat,catName:t.catName,gold:t.gold.filter(g=>g.net>0),
-    dias:t.dias,other:t.other,remark:t.remark,designNo:t.designNo||"",photo:photoId,status:t.kind==="sample"?"sample":"in_stock",createdBy:S.me||null,createdAt:new Date().toISOString(),
+    dias:t.dias,other:t.other,remark:t.remark,designNo:t.designNo||"",photo:photoId,status:t.kind==="sample"?"sample":t.kind==="order"?"order":"in_stock",createdBy:S.me||null,createdAt:new Date().toISOString(),
     gold24gAtTag:pr?pr.r24:null,priceAtTag:pr?pr.final:null,code:pr?codeFor(pr.final):null};
+  if(t.kind==="order")body.order=t.order;
   await S.db.doc("tags/"+t.id).set(body);
   const last=Object.assign({},seeds);last[t.prefix]=Math.max(last[t.prefix]||0,t.no);await cref.set({last});S.counters=last;
   return Object.assign({id:t.id},body);
@@ -715,7 +729,7 @@ async function offerPDF(t){
   catch(e){if(e&&e.code==="declined")msg(`${t.label}: download skipped. Reprint it any time from Tagged pieces.`,"warn");else msg(`${t.label}: the PDF could not be offered (${e&&e.code||"error"}). Reprint it from Tagged pieces.`,"warn")}
 }
 function resetForm(keepKind){
-  ["remark","otherAmt","designNo"].forEach(id=>$(id).value="");
+  ["remark","otherAmt","designNo"].concat(keepKind?[]:["oName","oMob","oCity","oDue"]).forEach(id=>$(id).value=""); /* after a save the order customer stays, for the next piece of the same order */
   $("goldLines").textContent="";$("diaLines").textContent="";addGold();addDia();
   S.photo=null;$("photo").value="";$("thumb").textContent="No photo yet";if(!keepKind)$("k-sale").checked=true;update();
 }
@@ -723,10 +737,10 @@ $("reset").addEventListener("click",()=>resetForm(false));
 
 /* ---------- list ---------- */
 async function renderList(){
-  const body=$("rows");body.textContent="";
+  const body=$("rows");body.textContent="";$("ordRep").hidden=S.role==="sales";
   const q=$("q").value.trim().toLowerCase(),fk=$("fkind").value;
   const qq=q.replace(/\s+/g,"");
-  const all=S.tags.filter(t=>(!fk||(fk==='nophoto'?!t.photo:t.kind===fk))&&(!q||[t.label,t.catName,t.remark,t.designNo].join(" ").toLowerCase().includes(q)||(qq&&String(t.designNo||"")===qq)||(qq&&String(t.label).toLowerCase().replace("/","")===qq.replace("/",""))));
+  const all=S.tags.filter(t=>(!fk||(fk==='nophoto'?!t.photo:t.kind===fk))&&(!q||[t.label,t.catName,t.remark,t.designNo,t.order&&t.order.name,t.order&&t.order.mobile].join(" ").toLowerCase().includes(q)||(qq&&String(t.designNo||"")===qq)||(qq&&String(t.label).toLowerCase().replace("/","")===qq.replace("/",""))));
   /* exact design number or label first */
   all.sort((a,b)=>((String(b.designNo)===qq||String(b.label).toLowerCase()===q)?1:0)-((String(a.designNo)===qq||String(a.label).toLowerCase()===q)?1:0));
   const items=all.slice(0,300);
@@ -741,6 +755,7 @@ async function renderList(){
     const ph=document.createElement("td");if(t.photo){const im=document.createElement("img");im.alt="";im.loading="lazy";im.src="/_blob/"+t.photo;ph.appendChild(im)}tr.appendChild(ph);
     const lc=c((t.designNo?t.designNo+" · ":"")+t.label);lc.style.fontFamily="var(--f-mono)";
     const it=c(t.catName||"");if(t.kind==="sample"){const s=document.createElement("span");s.className="pill s";s.textContent="sample";it.append(" ",s)}
+    if(t.kind==="order"){const s=document.createElement("span");s.className="pill";s.textContent="order"+(t.order&&t.order.name?" · "+t.order.name:"");it.append(" ",s)}
     c((t.gold||[]).length?(t.gold||[]).map(g=>g.k+" "+g.net.toFixed(3)).join(" + "):(t.metal&&t.metal.net?t.metal.k+" "+t.metal.net.toFixed(3):"—"),"num");
     c((t.dias||[]).map(d=>d.q+" "+d.ct.toFixed(2)).join(", ")||"—");
     c(t.priceAtTag?fmt(t.priceAtTag):"—","num");
@@ -852,6 +867,12 @@ async function findByPhoto(){
 $("fpgo").addEventListener("click",findByPhoto);
 $("fgo").addEventListener("click",findLost);$("fwt").addEventListener("keydown",e=>{if(e.key==="Enter")findLost()});
 $("q").addEventListener("input",renderList);$("fkind").addEventListener("change",renderList);
+/* orders report (C-20261016-ORDERS): the server builds the Excel; owners and staff only */
+$("ordRep").addEventListener("click",async()=>{const b=$("ordRep");b.disabled=true;
+  try{const r=await fetch("/api/vj/orders",{credentials:"same-origin"});if(!r.ok)throw new Error(r.status===403?"not allowed":"server "+r.status);
+    const bl=await r.blob(),a=document.createElement("a");a.href=URL.createObjectURL(bl);a.download="VJ_Orders_"+new Date(Date.now()+5.5*3600e3).toISOString().slice(0,10).split("-").reverse().join("-")+".xlsx";
+    document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},3000);msg("Orders report downloaded.","ok")}
+  catch(e){msg("Could not make the orders report: "+(e.message||e)+".","bad")}b.disabled=false});
 
 /* ---------- settings ---------- */
 function renderDefRates(ro){
