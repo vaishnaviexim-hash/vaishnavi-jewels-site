@@ -86,7 +86,7 @@
       get: async () => { await start(); return snapDoc(path); },
       set: d => write("set", path, d, true),
       update: d => write("update", path, d, false),
-      delete: () => write("delete", path, undefined, true),
+      delete: reason => write("delete", path, reason ? { reason: String(reason) } : undefined, true), // tags need a reason (server checks)
       onSnapshot(next) { if (!docL.has(path)) docL.set(path, new Set()); docL.get(path).add(next); start().then(() => next(snapDoc(path))).catch(() => {}); return () => docL.get(path).delete(next); },
       acquire: async () => ({ acquired: true, release: async () => {} }) // the server's version check stops two people taking the same number
     };
