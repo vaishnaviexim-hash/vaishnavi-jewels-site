@@ -6,7 +6,7 @@
   "use strict";
   const $ = id => document.getElementById(id);
   const fmt = n => "Rs " + Math.round(n).toLocaleString("en-IN");
-  const B = { items: [], mode: "ws", settle: "fine", title: "Bill" };
+  const B = { items: [], mode: "ws", settle: "fine", title: "Bill", photos: true };
   const MODES = { ws: "W/s", nett: "Nett", g2g: "Gold to Gold", item: "Gold Item" };
   const fineMode = () => B.mode === "g2g" || B.mode === "item";
   const g3 = n => Number(n || 0).toFixed(3) + " g";
@@ -86,6 +86,7 @@
       <div class="seg" role="radiogroup" aria-label="Title" style="margin-top:8px">
         <label><input type="radio" name="btitle" value="Bill" checked> Bill</label>
         <label><input type="radio" name="btitle" value="Estimate"> Estimate</label></div>
+      <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg);margin-top:8px"><input type="checkbox" id="bphoto" checked style="width:auto"> Show piece photos on the bill</label>
       <h2>2 · Pieces</h2>
       <div class="row" style="align-items:end"><label style="flex:2 1 220px">Design number or tag number <input id="bq" autocomplete="off" placeholder="e.g. 1436 or VLR14/803"></label>
       <div><button type="button" class="btn" id="badd">Add piece</button></div></div>
@@ -105,7 +106,7 @@
     document.querySelectorAll("input[name=bmode]").forEach(r => r.addEventListener("change", () => { B.mode = r.value; render(); }));
     document.querySelectorAll("input[name=bset]").forEach(r => r.addEventListener("change", () => { B.settle = r.value; render(); }));
     document.querySelectorAll("input[name=btitle]").forEach(r => r.addEventListener("change", () => { B.title = r.value; }));
-    $("bF").addEventListener("input", render);
+    $("bF").addEventListener("input", render); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); });
     $("bclear").addEventListener("click", () => { B.items = []; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); render(); });
     $("bsave").addEventListener("click", save);
   }
@@ -129,6 +130,7 @@
     c.rows.forEach((r, i) => {
       const tr = document.createElement("tr"); const td = (x, cl) => { const e = document.createElement("td"); if (cl) e.className = cl; e.textContent = x; tr.appendChild(e); };
       td((r.design ? r.design + " · " : "") + r.label + (r.cat ? " · " + r.cat : "")); td(r.gold || "—");
+      const t0 = tags().find(t => t.id === r.id); if (B.photos && t0 && t0.photo) { const im = document.createElement("img"); im.alt = ""; im.src = "/_blob/" + t0.photo; im.style.cssText = "width:56px;height:56px;object-fit:cover;border-radius:4px;display:block;margin-bottom:4px"; tr.firstChild.prepend(im); }
       td(ok || c.settle === "fine" ? goldCell(r, c) : "—", "num"); td(ok ? mkCell(r, c) : "—", "num");
       td(r.ct ? r.ct.toFixed(2) + " ct · " + fmt(r.diaAmt) : "—", "num"); td(r.other ? fmt(r.other) : "—", "num"); td(ok ? fmt(r.amount) : "—", "num");
       const x = document.createElement("td"), rm = document.createElement("button"); rm.type = "button"; rm.className = "btn ghost"; rm.textContent = "Remove";
@@ -143,7 +145,11 @@
     $("bnote").textContent = !ok ? "Type the gold rate (F): fine 24K per gram." : noteText(B.mode) + "Diamond values are the rates saved on each tag.";
   }
   async function dataUrl(src) { const r = await fetch(src, { credentials: "same-origin" }); if (!r.ok) throw new Error("img"); const b = await r.blob(); return await new Promise((res, rej) => { const f = new FileReader(); f.onload = () => res(f.result); f.onerror = rej; f.readAsDataURL(b); }); }
-  async function makePdf(b) {
+  // photo for the PDF: drawn onto a small canvas and saved as JPEG, so PNG / WebP photos work too
+  async function thumb(id) { try { const u = await dataUrl("/_blob/" + id), im = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = u; });
+    const s = 360 / Math.max(im.width, im.height), c = document.createElement("canvas"); c.width = Math.round(im.width * Math.min(1, s)); c.height = Math.round(im.height * Math.min(1, s));
+    const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height); return { d: c.toDataURL("image/jpeg", 0.85), w: c.width, h: c.height }; } catch (e) { return null; } }
+  async function makePdf(b, photos) {
     const { jsPDF } = window.jspdf, doc = new jsPDF({ unit: "mm", format: "a4" });
     const W = 210, M = 14; let y = 14;
     try { doc.addImage(await dataUrl("/logo_vaishnavi_jewels.png"), "PNG", M, y, 42, 16); } catch (e) { doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.text("Vaishnavi Jewels", M, y + 10); }
@@ -155,15 +161,19 @@
     y += 10; doc.setFontSize(12);
     doc.text(`Name: ${b.name}`, M, y); y += 6.5; doc.text(`City: ${b.city || "-"}`, M, y); doc.text(`Mobile: ${b.mobile ? "+91 " + b.mobile : "-"}`, M + 90, y); y += 6.5;
     doc.text(`Gold Rate (F): ${fmt(b.F)} per g (24K)`, M, y); doc.text(`Gold Calculation: ${MODES[b.mode] || b.mode}${b.settle === "fine" ? " (fine gold)" : b.settle === "amount" ? " (in rupees)" : ""}`, M + 90, y); y += 9;
-    const cols = [["Piece", 42, "l"], ["Gold", 25, "l"], ["Gold value", 23, "r"], ["Making", 22, "r"], ["Diamonds", 24, "r"], ["Other", 20, "r"], ["Amount", 26, "r"]];
-    const row = (vals, bold, size) => { doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setFontSize(size || 10.5); let x = M, h = 0;
-      const lines = vals.map((v, i) => doc.splitTextToSize(String(v), cols[i][1] - 2)); lines.forEach(l => h = Math.max(h, l.length));
-      lines.forEach((l, i) => { const [, w, al] = cols[i]; doc.text(l, al === "r" ? x + w - 1 : x, y, al === "r" ? { align: "right" } : undefined); x += w; });
-      y += h * 5 + 2.5; };
+    const pics = {}; if (photos) for (const r of b.rows) if (r.photo) pics[r.id] = await thumb(r.photo);
+    const P = Object.values(pics).some(Boolean) ? 22 : 0; // photo column (mm) only when a piece has a photo
+    const cols = P ? [["Piece", 60, "l"], ["Gold", 23, "l"], ["Gold value", 21, "r"], ["Making", 20, "r"], ["Diamonds", 21, "r"], ["Other", 15, "r"], ["Amount", 22, "r"]] // 182 mm = page width less margins
+      : [["Piece", 42, "l"], ["Gold", 25, "l"], ["Gold value", 23, "r"], ["Making", 22, "r"], ["Diamonds", 24, "r"], ["Other", 20, "r"], ["Amount", 26, "r"]];
+    const row = (vals, bold, size, pic) => { doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setFontSize(size || 10.5); let x = M, h = 0;
+      const lines = vals.map((v, i) => doc.splitTextToSize(String(v), cols[i][1] - 2 - (i === 0 && pic !== undefined ? P : 0))); lines.forEach(l => h = Math.max(h, l.length));
+      if (pic) { const s = 20 / Math.max(pic.w, pic.h); doc.addImage(pic.d, "JPEG", M + (20 - pic.w * s) / 2, y - 3.5 + (20 - pic.h * s) / 2, pic.w * s, pic.h * s); }
+      lines.forEach((l, i) => { const [, w, al] = cols[i]; doc.text(l, al === "r" ? x + w - 1 : x + (i === 0 && pic !== undefined ? P : 0), y, al === "r" ? { align: "right" } : undefined); x += w; });
+      y += Math.max(h * 5, pic !== undefined && P ? 21 : 0) + 2.5; };
     doc.setFillColor(243, 230, 211); doc.rect(M, y - 5, W - 2 * M, 8, "F"); row(cols.map(c => c[0]), true); y += 1;
-    b.rows.forEach(r => { if (y > 255) { doc.addPage(); y = 20; }
+    b.rows.forEach(r => { if (y > 250) { doc.addPage(); y = 20; }
       row([(r.design ? r.design + " - " : "") + r.label + (r.cat ? "\n" + r.cat : ""), r.gold || "-", b.settle === "fine" ? g3(r.fine) + "\nfine" : fmt(r.goldAmt) + (b.settle ? "\n" + g3(r.fine) + " fine" : ""), b.mode === "item" ? "in gold" : fmt(r.making) + "\n@ " + r.mkRate + "/g",
-        r.ct ? r.ct.toFixed(2) + " ct\n" + fmt(r.diaAmt) : "-", r.other ? fmt(r.other) : "-", fmt(r.amount)]);
+        r.ct ? r.ct.toFixed(2) + " ct\n" + fmt(r.diaAmt) : "-", r.other ? fmt(r.other) : "-", fmt(r.amount)], false, 10.5, P ? (pics[r.id] || null) : undefined);
       doc.setDrawColor(225); doc.line(M, y - 3, W - M, y - 3); });
     y += 3; if (y > 240) { doc.addPage(); y = 20; }
     const tot = (l, v, big) => { doc.setFont("helvetica", big ? "bold" : "normal"); doc.setFontSize(big ? 15 : 12); doc.text(l, W - M - 50, y, { align: "right" }); doc.text(v, W - M, y, { align: "right" }); y += big ? 9 : 7; };
@@ -188,7 +198,7 @@
       const r = await fetch("/api/vj/bill", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("server " + r.status));
       const b = j.bill; m.textContent = "Making the PDF…";
-      const blob = await makePdf(b), fname = `${b.title} ${b.no.replace(/[^A-Z0-9\-]/g, "-")} ${b.name.replace(/[^A-Za-z0-9 .\-]/g, "").trim().slice(0, 40)}.pdf`;
+      const blob = await makePdf(b, B.photos), fname = `${b.title} ${b.no.replace(/[^A-Z0-9\-]/g, "-")} ${b.name.replace(/[^A-Za-z0-9 .\-]/g, "").trim().slice(0, 40)}.pdf`;
       const file = new File([blob], fname, { type: "application/pdf" }), url = URL.createObjectURL(file);
       m.textContent = `${b.title} ${b.no} saved: ${fmt(b.total)}${b.fine ? " + " + g3(b.fine) + " fine gold" : ""}.`;
       out.textContent = ""; out.hidden = false;
