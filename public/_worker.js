@@ -607,6 +607,36 @@ async function vjBillCancel(request, env, who) {
   return vjJson({ ok: true, bill });
 }
 
+// Permanent erase (C-20261016-BILLERASE, owner 16/10/2026): owners only, the bill number typed again to confirm. Removes the bill,
+// every tag on it, their photos, deleted-copies, change history and audit lines - no copy kept. One content-free trace line stays
+// (who and when, how many pieces; no customer, amount or tag), so an erase by anyone else would still be noticed.
+async function vjBillErase(request, env, who) {
+  if (who.role !== 'admin') return vjDeny(403, 'owner only');
+  let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+  const no = String(b && b.no || '').slice(0, 20);
+  if (!no || String(b && b.confirm || '').trim().toUpperCase() !== no.toUpperCase()) return vjDeny(400, 'type the bill number to confirm');
+  if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
+  await vjTables(env);
+  const row = await env.DB.prepare('SELECT data FROM vj_bills WHERE no = ?').bind(no).first();
+  if (!row) return vjDeny(404, 'not found');
+  const bill = JSON.parse(row.data), ids = [...new Set((bill.rows || []).map(r => String(r.id || '')).filter(i => /^[A-Za-z0-9_\-.~]{1,60}$/.test(i)))];
+  const photos = [], now = Date.now(), st = [env.DB.prepare('DELETE FROM vj_bills WHERE no = ?').bind(no), env.DB.prepare('DELETE FROM audit WHERE path = ?').bind('bills/' + no)];
+  for (const id of ids) {
+    const path = 'tags/' + id, t = await env.DB.prepare('SELECT data FROM docs WHERE path = ?').bind(path).first();
+    if (t) { const ph = JSON.parse(t.data).photo; if (typeof ph === 'string' && /^[0-9a-f]{32}$/.test(ph)) photos.push(ph); }
+    const dc = ((await env.DB.prepare('SELECT data FROM vj_deleted WHERE path = ?').bind(path).all()).results) || [];
+    dc.forEach(d => { try { const ph = JSON.parse(d.data).photo; if (typeof ph === 'string' && /^[0-9a-f]{32}$/.test(ph)) photos.push(ph); } catch (e) {} });
+    st.push(env.DB.prepare('DELETE FROM docs WHERE path = ?').bind(path),
+      env.DB.prepare('INSERT INTO tomb (path, deleted_at) VALUES (?, ?) ON CONFLICT(path) DO UPDATE SET deleted_at = excluded.deleted_at').bind(path, now), // phones drop it on next sync
+      env.DB.prepare('DELETE FROM vj_deleted WHERE path = ?').bind(path), env.DB.prepare('DELETE FROM vj_changes WHERE path = ?').bind(path),
+      env.DB.prepare('DELETE FROM audit WHERE path = ?').bind(path));
+  }
+  await env.DB.batch(st);
+  for (const ph of new Set(photos)) { try { await env.PHOTOS.delete(ph); } catch (e) {} }
+  await vjAudit(env, who, 'erase', 'erased', (bill.title === 'Estimate' ? 'estimate' : 'bill') + ' erased, ' + ids.length + ' piece' + (ids.length === 1 ? '' : 's'));
+  return vjJson({ ok: true, pieces: ids.length });
+}
+
 // Saved bills & estimates (C-20261016-BILLBOOK): month list, one bill for re-printing, or a summary Excel. Owners + staff only.
 async function vjBillBook(url, env, who) {
   if (who.role === 'sales') return vjDeny(403, 'not allowed');
@@ -865,6 +895,7 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/bill' && request.method === 'POST') return vjBill(request, env, who);
   if ((p === '/api/vj/bills' || p === '/api/vj/bills.xlsx' || p === '/api/vj/bill') && request.method === 'GET') return vjBillBook(url, env, who);
   if (p === '/api/vj/bill/cancel' && request.method === 'POST') return vjBillCancel(request, env, who);
+  if (p === '/api/vj/bill/erase' && request.method === 'POST') return vjBillErase(request, env, who);
   if (p === '/api/vj/orders' && request.method === 'GET') return vjOrdersReport(env, who);
   if (p.startsWith('/_blob/') && request.method === 'GET') return vjBlob(p.slice(7), env);
   if ((p === '/tags' || p === '/tags.html' || p.startsWith('/tags/')) && request.method === 'GET') {
