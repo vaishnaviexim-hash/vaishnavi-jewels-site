@@ -15,6 +15,12 @@ export async function GET() {
     { loc: '/', changefreq: 'weekly', priority: '1.0' },
     { loc: '/blog', changefreq: 'weekly', priority: '0.8' },
     ...infoPages.map((p) => ({ loc: p.path, changefreq: 'monthly', priority: '0.7' })),
+    // Every job page under /careers/ is listed automatically (C-20261016-SITEMAPJOBS):
+    // a new opening only needs its .astro file, nothing to add here by hand.
+    ...Object.keys(import.meta.glob('./careers/*.astro'))
+      .map((f) => f.replace('./careers/', '/careers/').replace(/\.astro$/, ''))
+      .sort()
+      .map((loc) => ({ loc, changefreq: 'weekly', priority: '0.5' })),
   ];
 
   const postUrls = posts.map((post) => ({
