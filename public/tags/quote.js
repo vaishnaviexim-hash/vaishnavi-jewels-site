@@ -31,7 +31,7 @@
     let gv = 0, mv = 0; gold.forEach(g => { if (g.net > 0) { gv += g.net * st.g * (st.pur[g.k] || 0); mv += g.net * mk; } });
     let dv = 0, missing = false; (t.dias || []).forEach(d => { const r = optRate(d, opt, st); if (!(r > 0) && !NON_DIAMOND.test(d.q || "")) missing = true; dv += (d.ct || 0) * r; });
     const sub = up(gv + mv + dv + ((t.other && t.other.amt) || 0), 100);
-    return { final: up(sub * (1 + st.gst / 100), 10000), missing };
+    return { final: up(sub * (1 + st.gst / 100), 1000), missing }; // owner 16/10/2026: nearest Rs 1,000 (was 10,000)
   }
   const tags = () => (window.VJ_TAGS ? window.VJ_TAGS() : []);
   function find(q) {
