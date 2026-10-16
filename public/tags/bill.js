@@ -204,10 +204,7 @@
   async function makePdf(b, photos) {
     const { jsPDF } = window.jspdf, doc = new jsPDF({ unit: "mm", format: "a4" });
     const W = 210, M = 14; let y = 14;
-    try { doc.addImage(await dataUrl("/logo_vaishnavi_jewels.png"), "PNG", M, y, 42, 16); } catch (e) { doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.text("Vaishnavi Jewels", M, y + 10); }
-    doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(90);
-    doc.text(["Vaishnavi Gem & Jewel Pvt Ltd", "120, Rajhans Ornate, Parle Point, Surat 395007", "vaishnavijewels.com"], W - M, y + 3, { align: "right" });
-    y += 24; doc.setDrawColor(180, 150, 80); doc.line(M, y, W - M, y); y += 10;
+    y += 6; // owner 16/10/2026 19:31: no company name, logo or address on bills / estimates
     doc.setTextColor(20); doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.text(b.title, M, y);
     doc.setFontSize(12); doc.text(`No. ${b.no}`, W - M, y - 3, { align: "right" }); doc.setFont("helvetica", "normal"); doc.text(`Date ${dmy(b.date)}`, W - M, y + 3, { align: "right" });
     y += 10; doc.setFontSize(12);
