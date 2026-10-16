@@ -470,6 +470,74 @@ async function vjQuote(request, env, who, ctx) {
   return vjJson({ ok: true, qno });
 }
 
+// VJ_BILL_CALC_START (same function in tags/bill.js - keep both copies identical)
+// Bills (owner 16/10/2026, C-20261016-BILLS), formulas from the owner's bills_and_estimates_1.xlsm sheet 'BILLS DIAMONDS':
+// karat rate = F (fine 24K per g, typed on the bill) x purity. W/s: gold = net x karat rate x 1.10 (10% wastage, none on 24K),
+// making per g = Rs 650 if the first gold line is over 5 g, else 750. Nett: gold = net x karat rate, making per g =
+// (650 or 750) + 10% of the karat rate, rounded up to Rs 100. Making is charged on all gold lines. Diamonds = ct x the tag's
+// rate, plus other charges. Bill total before GST rounded UP to Rs 1,000; GST rounded to the nearest rupee.
+function vjBillCalc(tags, o) {
+  const pur = Object.assign({ '24K': 1, '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.40 }, o.purity || {});
+  const m = Object.assign({ base: 650, small: 750, limit: 5, pct: 10 }, o.making || {}), F = Number(o.F) || 0, ws = o.mode === 'ws';
+  const gstPct = o.gst == null ? 3 : Number(o.gst);
+  const rows = tags.map(t => {
+    const gl = (t.kind === 'sample' ? [{ k: '14K', net: Number(t.metal && t.metal.net) || 0 }] : (Array.isArray(t.gold) ? t.gold : []))
+      .map(g => ({ k: String(g && g.k || ''), net: Number(g && g.net) || 0 })).filter(g => g.net > 0);
+    const kr = k => F * (Number(pur[k]) || 0), g0 = gl[0];
+    let mk = 0;
+    if (g0) { const b = g0.net > m.limit ? m.base : m.small; mk = ws ? b : Math.ceil(Math.round((b + kr(g0.k) * m.pct / 100) * 100) / 100 / 100) * 100; }
+    let gold = 0, net = 0; gl.forEach(g => { net += g.net; gold += g.net * kr(g.k) * (ws && g.k !== '24K' ? 1.1 : 1); });
+    const dl = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map(d => ({ q: String(d.q || ''), shape: String(d.shape || ''), ct: Number(d.ct) || 0, pcs: Number(d.pcs) || 0, rate: Number(d.rate) || 0 }));
+    const ct = dl.reduce((a, d) => a + d.ct, 0), dia = dl.reduce((a, d) => a + d.ct * d.rate, 0), oth = Number(t.other && t.other.amt) || 0;
+    const r = { id: t.id, label: String(t.label || ''), design: String(t.designNo || ''), cat: String(t.catName || ''),
+      gold: gl.map(g => g.k + ' ' + g.net.toFixed(3) + ' g').join(' + '), net: Math.round(net * 1000) / 1000, goldAmt: Math.round(gold),
+      mkRate: mk, making: Math.round(mk * net), ct: Math.round(ct * 100) / 100, diaAmt: Math.round(dia), other: Math.round(oth) };
+    r.amount = r.goldAmt + r.making + r.diaAmt + r.other;
+    return r;
+  });
+  const sum = rows.reduce((a, r) => a + r.amount, 0), sub = Math.ceil(sum / 1000) * 1000, gst = Math.round(sub * gstPct / 100);
+  return { rows, sum, roundOff: sub - sum, sub, gstPct, gst, total: sub + gst };
+}
+// VJ_BILL_CALC_END
+
+// Bill tab endpoint (C-20261016-BILLS). The page sends only the customer, number, date, gold rate, mode and the piece ids;
+// the server recomputes every figure from the tags in D1 and the saved settings, keeps the bill in vj_bills (never sent to the
+// sales role), and returns the saved figures, from which the page prints the PDF - so a bill on paper always matches the record.
+let vjBillsOk = false;
+async function vjBill(request, env, who) {
+  if (who.role === 'sales') return vjDeny(403, 'read only');
+  const len = Number(request.headers.get('content-length') || 0);
+  if (len > 20000) return vjDeny(413, 'too large');
+  let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+  if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
+  const no = String(b && b.no || '').trim().toUpperCase(), name = vjClean(b && b.name, 60), city = vjClean(b && b.city, 40);
+  const mobile = String(b && b.mobile || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
+  const date = String(b && b.date || ''), F = Math.round(Number(b && b.F) * 100) / 100, mode = b && b.mode === 'ws' ? 'ws' : b && b.mode === 'nett' ? 'nett' : '';
+  const title = b && b.title === 'Estimate' ? 'Estimate' : 'Bill';
+  const ids = Array.isArray(b && b.ids) ? [...new Set(b.ids.map(String))].slice(0, 25) : [];
+  if (!/^[A-Z0-9][A-Z0-9\-\/]{0,19}$/.test(no)) return vjDeny(400, 'bill number: letters, digits, - or / only');
+  if (!name) return vjDeny(400, 'customer name is required');
+  if (mobile && !/^[6-9]\d{9}$/.test(mobile)) return vjDeny(400, 'mobile must be 10 digits');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(Date.parse(date))) return vjDeny(400, 'bad date');
+  if (!(F >= 2000 && F <= 50000)) return vjDeny(400, 'gold rate (F) per g looks wrong');
+  if (!mode) return vjDeny(400, 'choose W/s or Nett');
+  if (!ids.length || ids.some(i => !/^[A-Za-z0-9_\-.~]{1,60}$/.test(i))) return vjDeny(400, 'add at least one piece');
+  const tags = [];
+  for (const id of ids) {
+    const row = await env.DB.prepare('SELECT data FROM docs WHERE path = ?').bind('tags/' + id).first();
+    if (!row) return vjDeny(404, 'a piece is no longer in stock: ' + id);
+    tags.push(Object.assign({ id }, JSON.parse(row.data)));
+  }
+  const sRow = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first();
+  const s = sRow ? JSON.parse(sRow.data) : {};
+  const calc = vjBillCalc(tags, { F, mode, purity: s.purity, making: s.making, gst: s.gst });
+  const bill = Object.assign({ no, title, date, name, city, mobile, F, mode, by: who.email, byName: who.name, at: new Date().toISOString() }, calc);
+  const res = await env.DB.prepare('INSERT INTO vj_bills (no, ts, email, data) VALUES (?, ?, ?, ?) ON CONFLICT(no) DO NOTHING').bind(no, Date.now(), who.email, JSON.stringify(bill)).run();
+  if (!res.meta || res.meta.changes !== 1) return vjJson({ error: 'bill number ' + no + ' is already used' }, 409);
+  await vjAudit(env, who, 'bill', 'bills/' + no, `${title} ${name} ${mobile} ${calc.total} | ${ids.join(',')}`);
+  return vjJson({ ok: true, bill });
+}
+
 // Daily tag report (owner 14/10/2026; evening Excel added 16/10/2026, C-20261016-TAGSDELETE). A Make schedule just "rings the
 // bell" (GET /hooks/vj-daily, no data returned, no secret needed) at 20:15 IST, after the showroom closes; this worker builds
 // everything itself and sends it ONLY to the existing quote hook (VJ_QUOTE_HOOK, encrypted), whose scenario forwards it to
@@ -653,6 +721,7 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/import' && request.method === 'POST') return vjImport(request, env, who);
   if (p === '/api/vj/photosearch' && request.method === 'POST') return vjPhotoSearch(request, env, who);
   if (p === '/api/vj/quote' && request.method === 'POST') return vjQuote(request, env, who, ctx);
+  if (p === '/api/vj/bill' && request.method === 'POST') return vjBill(request, env, who);
   if (p.startsWith('/_blob/') && request.method === 'GET') return vjBlob(p.slice(7), env);
   if ((p === '/tags' || p === '/tags.html' || p.startsWith('/tags/')) && request.method === 'GET') {
     const r = await env.ASSETS.fetch(request);
