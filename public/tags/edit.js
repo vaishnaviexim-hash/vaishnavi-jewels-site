@@ -22,7 +22,7 @@
     if (t.kind === "sample") { fMetal = inp((t.metal && t.metal.net) || 0, 110, "number"); wrap.append(row("Sample weight (g, priced as 14K)", fMetal)); }
     // gold lines
     const gBox = el("div", { style: "display:flex;flex-direction:column;gap:6px" });
-    const addGold = g => { const k = sel(KARATS, (g && g.k) || "18K", 80), n = inp(g ? g.net : "", 100, "number"), rm = el("button", { type: "button", className: "btn ghost", textContent: "Remove" });
+    const addGold = g => { const k = sel(KARATS, (g && g.k) || "14K", 80), n = inp(g ? g.net : "", 100, "number"), rm = el("button", { type: "button", className: "btn ghost", textContent: "Remove" });
       const r = el("div", { style: "display:flex;gap:6px;align-items:center;flex-wrap:wrap" }, [k, n, "g", rm]); r._get = () => ({ k: k.value, net: num(n.value) }); rm.onclick = () => r.remove(); gBox.append(r); };
     (t.gold || []).forEach(addGold);
     if (t.kind !== "sample") { wrap.append(el("strong", { textContent: "Gold" }), gBox, el("button", { type: "button", className: "btn ghost", textContent: "+ Gold line", onclick: () => addGold(null) })); }
