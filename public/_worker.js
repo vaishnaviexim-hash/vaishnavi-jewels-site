@@ -543,7 +543,7 @@ async function vjBill(request, env, who) {
   const title = b && b.title === 'Estimate' ? 'Estimate' : 'Bill';
   const ids = Array.isArray(b && b.ids) ? [...new Set(b.ids.map(String))].slice(0, 25) : [];
   const disc = {}; if (b && b.disc && typeof b.disc === 'object') for (const id of ids) if (b.disc[id] != null) disc[id] = String(b.disc[id]).slice(0, 12);
-  if (!/^[A-Z0-9][A-Z0-9\-\/]{0,19}$/.test(no)) return vjDeny(400, 'bill number: letters, digits, - or / only');
+  if (title !== 'Estimate' && !/^[A-Z0-9][A-Z0-9\-\/]{0,19}$/.test(no)) return vjDeny(400, 'bill number: letters, digits, - or / only');
   if (!name) return vjDeny(400, 'customer name is required');
   if (mobile && !/^[6-9]\d{9}$/.test(mobile)) return vjDeny(400, 'mobile must be 10 digits');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(Date.parse(date))) return vjDeny(400, 'bad date');
@@ -561,10 +561,50 @@ async function vjBill(request, env, who) {
   const calc = vjBillCalc(tags, { F, mode, settle, disc, purity: s.purity, making: s.making, gst: s.gst });
   calc.rows.forEach((r, i) => { const ph = tags[i].photo; if (typeof ph === 'string' && /^[0-9a-f]{32}$/.test(ph)) r.photo = ph; }); // owner 16/10: photo on the bill
   const bill = Object.assign({ no, title, date, name, city, mobile, F, by: who.email, byName: who.name, at: new Date().toISOString() }, calc);
-  const res = await env.DB.prepare('INSERT INTO vj_bills (no, ts, email, data) VALUES (?, ?, ?, ?) ON CONFLICT(no) DO NOTHING').bind(no, Date.now(), who.email, JSON.stringify(bill)).run();
-  if (!res.meta || res.meta.changes !== 1) return vjJson({ error: 'bill number ' + no + ' is already used' }, 409);
-  await vjAudit(env, who, 'bill', 'bills/' + no, `${title} ${mode}${calc.settle ? '/' + calc.settle : ''} ${name} ${mobile} ${calc.total}${calc.fine ? ' + ' + calc.fine + ' g fine' : ''}${calc.disc ? ' disc ' + calc.disc : ''} | ${ids.join(',')}`);
+  // C-20261016-BILLBOOK: estimates are numbered automatically, E-YYMM-NN, starting at 01 every month (by the estimate's date)
+  for (let i = 0; ; i++) {
+    if (title === 'Estimate') {
+      const px = 'E-' + date.slice(2, 4) + date.slice(5, 7) + '-';
+      const used = ((await env.DB.prepare('SELECT no FROM vj_bills WHERE no LIKE ?').bind(px + '%').all()).results) || [];
+      bill.no = px + String(used.reduce((a, r) => Math.max(a, parseInt(String(r.no).slice(px.length), 10) || 0), 0) + 1).padStart(2, '0');
+    }
+    const res = await env.DB.prepare('INSERT INTO vj_bills (no, ts, email, data) VALUES (?, ?, ?, ?) ON CONFLICT(no) DO NOTHING').bind(bill.no, Date.now(), who.email, JSON.stringify(bill)).run();
+    if (res.meta && res.meta.changes === 1) break;
+    if (title !== 'Estimate' || i >= 5) return vjJson({ error: 'bill number ' + bill.no + ' is already used' }, 409);
+  }
+  await vjAudit(env, who, 'bill', 'bills/' + bill.no, `${title} ${mode}${calc.settle ? '/' + calc.settle : ''} ${name} ${mobile} ${calc.total}${calc.fine ? ' + ' + calc.fine + ' g fine' : ''}${calc.disc ? ' disc ' + calc.disc : ''} | ${ids.join(',')}`);
   return vjJson({ ok: true, bill });
+}
+
+// Saved bills & estimates (C-20261016-BILLBOOK): month list, one bill for re-printing, or a summary Excel. Owners + staff only.
+async function vjBillBook(url, env, who) {
+  if (who.role === 'sales') return vjDeny(403, 'not allowed');
+  if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
+  if (url.pathname === '/api/vj/bill') {
+    const row = await env.DB.prepare('SELECT data FROM vj_bills WHERE no = ?').bind(String(url.searchParams.get('no') || '').slice(0, 20)).first();
+    return row ? vjJson({ ok: true, bill: JSON.parse(row.data) }) : vjDeny(404, 'not found');
+  }
+  const month = String(url.searchParams.get('month') || ''), all = month === 'all';
+  if (!all && !/^\d{4}-\d{2}$/.test(month)) return vjDeny(400, 'month as YYYY-MM or all');
+  const bills = (((await env.DB.prepare('SELECT data FROM vj_bills ORDER BY ts').all()).results) || []).map(r => JSON.parse(r.data))
+    .filter(b => all || String(b.date || '').startsWith(month)).sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.at).localeCompare(String(b.at)));
+  const MODE = { ws: 'W/s', nett: 'Nett', g2g: 'Gold to Gold', item: 'Gold Item' };
+  const dmy = d => String(d || '').split('-').reverse().join('-');
+  if (url.pathname === '/api/vj/bills') return vjJson({ ok: true, bills: bills.map(b => ({ no: b.no, title: b.title, date: b.date, name: b.name, city: b.city, mobile: b.mobile,
+    mode: b.mode, settle: b.settle || '', total: b.total, fine: b.fine || 0, disc: b.disc || 0, pieces: (b.rows || []).length, by: b.byName && b.byName !== 'Owner' ? b.byName : String(b.by || '').split('@')[0] })) });
+  const head = ['Date', 'Number', 'Type', 'Customer', 'Mobile', 'City', 'Gold calculation', 'Gold rate F (Rs/g)', 'Pieces', 'Total (Rs)', 'Discount (Rs)', 'After discount (Rs)', 'Rounded (Rs)', 'GST (Rs)', 'Bill total (Rs)', 'Fine gold to receive (g)', 'Made by'];
+  const rows = bills.map(b => [dmy(b.date), b.no, b.title, b.name, b.mobile ? '+91 ' + b.mobile : '', b.city || '', (MODE[b.mode] || b.mode) + (b.settle === 'fine' ? ' (fine gold)' : b.settle === 'amount' ? ' (in rupees)' : ''),
+    Number(b.F) || '', (b.rows || []).map(r => (r.design ? r.design + ' / ' : '') + r.label).join(', '), b.sum, b.disc || 0, b.after == null ? b.sum : b.after, b.sub, b.gst, b.total, b.fine || '', b.byName && b.byName !== 'Owner' ? b.byName : String(b.by || '').split('@')[0]]);
+  const tot = rows.reduce((a, r) => [a[0] + (r[9] || 0), a[1] + (r[10] || 0), a[2] + (r[13] || 0), a[3] + (r[14] || 0), a[4] + (Number(r[15]) || 0)], [0, 0, 0, 0, 0]);
+  if (rows.length) rows.push(['', '', '', 'TOTAL (' + rows.length + ')', '', '', '', '', '', tot[0], tot[1], '', '', tot[2], tot[3], Math.round(tot[4] * 1000) / 1000 || '', '']);
+  const pieces = []; bills.forEach(b => (b.rows || []).forEach(r => pieces.push([dmy(b.date), b.no, b.title, b.name, r.label, r.design || '', r.cat || '', r.gold || '', r.fine || '', r.goldAmt, r.making, r.ct || '', r.diaAmt, r.other || 0, r.amount, r.disc || 0, r.net == null ? r.amount : r.net])));
+  const xlsx = vjXlsx([
+    { name: 'Bills and estimates', head, rows, widths: [11, 12, 9, 22, 15, 12, 20, 10, 34, 12, 11, 12, 12, 10, 13, 12, 12], wrap: [8], mark: r => String(r[3]).startsWith('TOTAL') },
+    { name: 'Pieces', head: ['Date', 'Number', 'Type', 'Customer', 'Tag', 'Design no.', 'Category', 'Gold', 'Fine gold (g)', 'Gold value', 'Making', 'Diamonds (ct)', 'Diamond value', 'Other', 'Amount', 'Discount', 'Net'], rows: pieces,
+      widths: [11, 12, 9, 22, 14, 12, 14, 20, 10, 12, 10, 10, 12, 9, 12, 10, 12] }]);
+  const bin = atob(xlsx), out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  await vjAudit(env, who, 'bills-report', 'bills/', (all ? 'all' : month) + ' ' + bills.length);
+  return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_Bills.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
 }
 
 // Daily tag report (owner 14/10/2026; evening Excel added 16/10/2026, C-20261016-TAGSDELETE). A Make schedule just "rings the
@@ -770,6 +810,7 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/photosearch' && request.method === 'POST') return vjPhotoSearch(request, env, who);
   if (p === '/api/vj/quote' && request.method === 'POST') return vjQuote(request, env, who, ctx);
   if (p === '/api/vj/bill' && request.method === 'POST') return vjBill(request, env, who);
+  if ((p === '/api/vj/bills' || p === '/api/vj/bills.xlsx' || p === '/api/vj/bill') && request.method === 'GET') return vjBillBook(url, env, who);
   if (p === '/api/vj/orders' && request.method === 'GET') return vjOrdersReport(env, who);
   if (p.startsWith('/_blob/') && request.method === 'GET') return vjBlob(p.slice(7), env);
   if ((p === '/tags' || p === '/tags.html' || p.startsWith('/tags/')) && request.method === 'GET') {
