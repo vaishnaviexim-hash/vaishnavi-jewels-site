@@ -509,7 +509,8 @@ function vjBillCalc(tags, o) {
   const rows = tags.map(t => {
     const gl = (t.kind === 'sample' ? [{ k: '14K', net: Number(t.metal && t.metal.net) || 0 }] : (Array.isArray(t.gold) ? t.gold : []))
       .map(g => ({ k: String(g && g.k || ''), net: Number(g && g.net) || 0 })).filter(g => g.net > 0);
-    const Fr = t.kind === 'order' && Number(t.gold24gAtTag) > 0 ? Number(t.gold24gAtTag) : F; // an order keeps the gold rate of the day it was tagged (C-20261016-ORDERRATE)
+    const Fo = t.kind === 'order' && Number(t.gold24gAtTag) > 0 ? Number(t.gold24gAtTag) : F; // an order keeps the gold rate of the day it was tagged (C-20261016-ORDERRATE)
+    const Fx = Number(o.frates && o.frates[t.id]), Fr = Fx >= 2000 && Fx <= 50000 ? Fx : Fo; // rate typed for this piece on the bill (C-20261016-PIECERATE)
     const kr = k => Fr * (Number(pur[k]) || 0), g0 = gl[0];
     let mk = 0;
     if (g0 && mode !== 'item') { const b = g0.net > m.limit ? m.base : m.small; mk = mode === 'nett' ? Math.ceil(Math.round((b + kr(g0.k) * m.pct / 100) * 100) / 100 / 100) * 100 : b; }
@@ -523,7 +524,7 @@ function vjBillCalc(tags, o) {
     const dl = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map((d, i) => ({ q: String(d.q || ''), ct: Number(d.ct) || 0, tagRate: Number(d.rate) || 0, rate: Number(ov[i]) > 0 ? Number(ov[i]) : (Number(d.rate) || 0) }));
     const ct = dl.reduce((a, d) => a + d.ct, 0), dia = dl.reduce((a, d) => a + d.ct * d.rate, 0), oth = Number(t.other && t.other.amt) || 0;
     const r = { id: t.id, label: String(t.label || ''), design: String(t.designNo || ''), cat: String(t.catName || ''),
-      gold: gl.map(g => g.k + ' ' + g.net.toFixed(3) + ' g').join(' + '), F: Fr, orderRate: Fr !== F, net: Math.round(net * 1000) / 1000, fine, goldAmt: Math.round(gold),
+      gold: gl.map(g => g.k + ' ' + g.net.toFixed(3) + ' g').join(' + '), F: Fr, Fdef: Fo, orderRate: Fo !== F, rateEdited: Fr !== Fo, net: Math.round(net * 1000) / 1000, fine, goldAmt: Math.round(gold),
       mkRate: mk, making: Math.round(mk * net), ct: Math.round(ct * 100) / 100, diaAmt: Math.round(dia), other: Math.round(oth), dias: dl };
     r.amount = r.goldAmt + r.making + r.diaAmt + r.other;
     const dv = String(o.disc && o.disc[t.id] != null ? o.disc[t.id] : '').trim(), pm = dv.match(/^(\d+(?:\.\d+)?)\s*%$/), dn = Number(dv.replace(/[,\s]/g, ''));
@@ -555,6 +556,7 @@ async function vjBill(request, env, who) { // every login may make bills (owner 
   const title = b && b.title === 'Estimate' ? 'Estimate' : 'Bill';
   const ids = Array.isArray(b && b.ids) ? [...new Set(b.ids.map(String))].slice(0, 25) : [];
   const disc = {}; if (b && b.disc && typeof b.disc === 'object') for (const id of ids) if (b.disc[id] != null) disc[id] = String(b.disc[id]).slice(0, 12);
+  const frates = {}; if (b && b.frates && typeof b.frates === 'object') for (const id of ids) { const n = Math.round(Number(b.frates[id]) * 100) / 100; if (n >= 2000 && n <= 50000) frates[id] = n; }
   const rates = {}; if (b && b.rates && typeof b.rates === 'object') for (const id of ids) if (Array.isArray(b.rates[id])) rates[id] = b.rates[id].slice(0, 30).map(v => { const n = Number(v); return n > 0 && n <= 5000000 ? Math.round(n) : 0; });
   // owner 16/10/2026 20:03 'Bill no should be automatic. Every month starts with number 1': bills are numbered by the server too
   if (!name) return vjDeny(400, 'customer name is required');
@@ -571,7 +573,7 @@ async function vjBill(request, env, who) { // every login may make bills (owner 
   }
   const sRow = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first();
   const s = sRow ? JSON.parse(sRow.data) : {};
-  const calc = vjBillCalc(tags, { F, mode, settle, disc, rates, purity: s.purity, making: s.making, gst: s.gst });
+  const calc = vjBillCalc(tags, { F, mode, settle, disc, rates, frates, purity: s.purity, making: s.making, gst: s.gst });
   calc.rows.forEach((r, i) => { const ph = tags[i].photo; if (typeof ph === 'string' && /^[0-9a-f]{32}$/.test(ph)) r.photo = ph; }); // owner 16/10: photo on the bill
   const bill = Object.assign({ no, title, date, name, city, mobile, F, by: who.email, byName: who.name, at: new Date().toISOString() }, calc);
   // C-20261016-BILLBOOK / BILLAUTO: bills B-YYMM-NN and estimates E-YYMM-NN are numbered automatically, from 01 every month (by the date)
