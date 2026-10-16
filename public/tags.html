@@ -238,7 +238,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
       <label>Limit (g of gold) <input type="number" id="mkLimit" step="0.1"></label>
       <label>Plus % of karat gold rate per g <input type="number" id="mkPct" step="0.1"></label>
     </div>
-    <p class="hint">Making per g is rounded up to ₹100. Total is rounded up to ₹100, then 3% GST, then rounded up to ₹10,000 (no-gold pieces: ₹10).</p>
+    <p class="hint">Making per g is rounded up to ₹100. Total is rounded up to ₹100, then 3% GST, then rounded up to ₹1,000 (no-gold pieces: ₹10).</p>
     <h2>Default diamond rates (₹ per ct)</h2>
     <p class="hint">Used when the special rate is left blank on a tag. Blank here means staff must enter a rate.</p>
     <div class="list"><table class="items rates" style="min-width:520px"><thead><tr><th>Quality</th><th>Round</th><th>Choki</th><th>Fancy</th><th>Solitaire</th></tr></thead><tbody id="defRows"></tbody></table></div>
@@ -418,7 +418,7 @@ function price(t){
   const mk=up((g0.net>m.limit?m.base:m.small)+r24*(s.purity[g0.k]||0)*m.pct/100,100);
   t.gold.forEach(g=>{if(!(g.net>0))return;const kr=r24*(s.purity[g.k]||0);gold+=g.net*kr;making+=g.net*mk;lines.push({k:g.k,net:g.net,kr,mk});});
   const dia=t.dias.reduce((a,d)=>a+d.ct*d.rate,0),oth=t.other.amt||0;
-  const sub=up(gold+making+dia+oth,100),gst=sub*s.gst/100,final=up(sub+gst,10000); /* owner 13/10/2026: final price rounded UP to the nearest Rs 10,000 */
+  const sub=up(gold+making+dia+oth,100),gst=sub*s.gst/100,final=up(sub+gst,1000); /* owner 16/10/2026 (C-20261016-ROUND1000): final price rounded UP to the nearest Rs 1,000 (was Rs 10,000) */
   return {gold,making,dia,oth,sub,gst,final,lines,r24,mk};
 }
 function problems(t){
@@ -531,7 +531,7 @@ function update(){
     pr.lines.forEach(l=>add(`Gold ${l.k} ${l.net.toFixed(3)} g × ${fmt(l.kr)}/g`,fmt(l.net*l.kr)));
     add(`Making ${fmt(pr.mk)}/g × ${pr.lines.reduce((a,l)=>a+l.net,0).toFixed(3)} g`,fmt(pr.making));
     if(pr.dia)add("Diamonds",fmt(pr.dia));if(pr.oth)add("Other charges",fmt(pr.oth));
-    add("Total (rounded up to ₹100)",fmt(pr.sub));add(`GST ${s.gst}%`,fmt(pr.gst));add("Price (rounded up to ₹10,000)",fmt(pr.final),"total");
+    add("Total (rounded up to ₹100)",fmt(pr.sub));add(`GST ${s.gst}%`,fmt(pr.gst));add("Price (rounded up to ₹1,000)",fmt(pr.final),"total");
     $("rateNote").textContent=`24K gold at ${fmt(s.gold24g)}/g${s.goldAt?", set "+new Date(s.goldAt).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):""}. Diamond rates on the tag are final; only gold and making move with the rate.`;
   }
   const box=$("tagbox");box.textContent="";box.appendChild(tagSVG(t));
