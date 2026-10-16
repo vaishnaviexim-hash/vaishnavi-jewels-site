@@ -145,6 +145,22 @@ async function vjAudit(env, who, action, path, detail) {
   try { await env.DB.prepare('INSERT INTO audit (ts, email, action, path, detail) VALUES (?, ?, ?, ?, ?)').bind(Date.now(), who.email, action, path || '', String(detail || '').slice(0, 500)).run(); } catch (e) {}
 }
 
+// Owner 16/10/2026 (C-20261016-TAGSDELETE): a tag is deleted only by an owner (Abhinav or Shilpiji = OWNER_EMAILS), only with
+// one of these reasons (F-069), and a full copy of the deleted tag is kept in vj_deleted - for every reason - so nothing is lost.
+// vj_changes keeps old -> new for every field edited on a tag (staff and owner), for the evening Excel.
+const VJ_DEL_REASONS = ['Sold', 'Melted or broken', 'Approval', 'Wrong entry'];
+let vjTablesOk = false;
+async function vjTables(env) {
+  if (vjTablesOk) return;
+  await env.DB.batch([
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_deleted (ts INTEGER, email TEXT, path TEXT, reason TEXT, data TEXT)'),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_changes (ts INTEGER, email TEXT, path TEXT, field TEXT, old TEXT, new TEXT)'),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS vj_changes_ts ON vj_changes (ts)'),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS vj_deleted_ts ON vj_deleted (ts)')]);
+  vjTablesOk = true;
+}
+const vjStr = v => v === undefined ? '' : JSON.stringify(v);
+
 // Gold rate: 24K per g from NR Jewellers 'GOLD 999 IMP T+2' sell (per 10 g), same as the 3-a-day task.
 async function vjGoldFromFeed() {
   const r = await fetch('https://bcast.nrjewellers.com:7768/VOTSBroadcastStreaming/Services/xml/GetLiveRateByTemplateID/nrjewellers', { signal: AbortSignal.timeout(6000) });
@@ -229,9 +245,14 @@ async function vjWrite(request, env, who) {
   if (ifv !== null && (row ? row.version : 0) !== ifv) return vjJson({ error: 'conflict', version: row ? row.version : 0 }, 409);
   if (op === 'delete') {
     if (!row) return vjJson({ ok: true });
-    await env.DB.batch([env.DB.prepare('DELETE FROM docs WHERE path = ?').bind(path),
-      env.DB.prepare('INSERT INTO tomb (path, deleted_at) VALUES (?, ?) ON CONFLICT(path) DO UPDATE SET deleted_at = excluded.deleted_at').bind(path, Date.now())]);
-    await vjAudit(env, who, 'delete', path, row.data.slice(0, 300));
+    const isTag = path.startsWith('tags/');
+    const reason = isTag && data && typeof data === 'object' ? String(data.reason || '') : '';
+    if (isTag && !VJ_DEL_REASONS.includes(reason)) return vjDeny(400, 'reason required');
+    const now = Date.now(), stmts = [env.DB.prepare('DELETE FROM docs WHERE path = ?').bind(path),
+      env.DB.prepare('INSERT INTO tomb (path, deleted_at) VALUES (?, ?) ON CONFLICT(path) DO UPDATE SET deleted_at = excluded.deleted_at').bind(path, now)];
+    if (isTag) { await vjTables(env); stmts.unshift(env.DB.prepare('INSERT INTO vj_deleted (ts, email, path, reason, data) VALUES (?, ?, ?, ?, ?)').bind(now, who.email, path, reason, row.data)); }
+    await env.DB.batch(stmts); // the copy and the delete succeed or fail together
+    await vjAudit(env, who, 'delete', path, (reason ? reason + ' | ' : '') + row.data.slice(0, 300));
     return vjJson({ ok: true });
   }
   const cur = row ? JSON.parse(row.data) : null;
@@ -256,6 +277,17 @@ async function vjWrite(request, env, who) {
   if (!res.meta || res.meta.changes !== 1) return vjJson({ error: 'conflict' }, 409);
   await env.DB.prepare('DELETE FROM tomb WHERE path = ?').bind(path).run();
   await vjAudit(env, who, row ? op : 'create', path, op === 'update' ? Object.keys(data).join(',') : '');
+  if (cur && path.startsWith('tags/')) {
+    try {
+      await vjTables(env);
+      const ts = Date.now(), st = [];
+      for (const k of new Set([...Object.keys(cur), ...Object.keys(next)])) {
+        const a = vjStr(cur[k]), z = vjStr(next[k]);
+        if (a !== z && st.length < 40) st.push(env.DB.prepare('INSERT INTO vj_changes (ts, email, path, field, old, new) VALUES (?, ?, ?, ?, ?, ?)').bind(ts, who.email, path, k.slice(0, 40), a.slice(0, 400), z.slice(0, 400)));
+      }
+      if (st.length) await env.DB.batch(st);
+    } catch (e) {} // the change log never blocks a save
+  }
   return vjJson({ ok: true, version: v });
 }
 
@@ -438,55 +470,172 @@ async function vjQuote(request, env, who, ctx) {
   return vjJson({ ok: true, qno });
 }
 
-// Daily new-tags report (owner 14/10/2026): one WhatsApp from Aashvi to Abhinav at 6 pm IST listing the tags made today,
-// pieces with missing details first. A Make schedule just "rings the bell" (GET /hooks/vj-daily, no data returned, no secret
-// needed); this worker builds the report itself and sends it ONLY to the existing quote hook (VJ_QUOTE_HOOK, encrypted), whose
-// scenario forwards kind=daily-report to Abhinav's number only. Works only after 17:55 IST and once per day, so a stranger
-// ringing the bell can at most make the owner's own report arrive a few minutes early. Nothing is sent on days with no new tags.
+// Daily tag report (owner 14/10/2026; evening Excel added 16/10/2026, C-20261016-TAGSDELETE). A Make schedule just "rings the
+// bell" (GET /hooks/vj-daily, no data returned, no secret needed) at 20:15 IST, after the showroom closes; this worker builds
+// everything itself and sends it ONLY to the existing quote hook (VJ_QUOTE_HOOK, encrypted), whose scenario forwards it to
+// Abhinav's number only: (1) the WhatsApp text of new tags (as before), (2) an Excel of every tag added, edited or deleted today.
+// Works only after 20:10 IST and once per day, so a stranger ringing the bell can at most make the owner's own report arrive a few
+// minutes early. Nothing is sent on a day with no tag activity.
+const VJ_PHOTO_F = new Set(['photo', 'photoAt', 'photoBy']);
+const VJ_PRINT_F = new Set(['code', 'priceAtTag', 'gold24gAtTag', 'queue', 'queueAt', 'printedAt']);
+const VJ_FIELD_NAME = { designNo: 'Design no.', label: 'Tag', catName: 'Category', remark: 'Remark', gold: 'Gold', dias: 'Diamonds', other: 'Other charges',
+  metal: 'Sample weight', box: 'Packet / box', kind: 'Stock / sample', status: 'Status', photo: 'Photo', code: 'Price code', priceAtTag: 'Price when tagged' };
+const vjGoldTxt = t => t && t.kind === 'sample' ? ((t.metal && t.metal.net > 0) ? Number(t.metal.net).toFixed(3) + ' g (14K)' : '') : (Array.isArray(t && t.gold) ? t.gold.filter(g => g && g.net > 0).map(g => g.k + ' ' + Number(g.net).toFixed(3) + ' g').join('; ') : '');
+const vjDiaTxt = t => Array.isArray(t && t.dias) ? t.dias.filter(Boolean).map(d => `${d.shape || ''} ${d.q || ''} ${Number(d.ct || 0).toFixed(2)} ct${d.pcs ? ' (' + d.pcs + ')' : ''}`.replace(/\s+/g, ' ').trim()).join('; ') : '';
+function vjValTxt(field, raw) {
+  if (raw === '' || raw == null) return '(blank)';
+  let v; try { v = JSON.parse(raw); } catch (e) { return String(raw).slice(0, 120); }
+  if (field === 'gold') return vjGoldTxt({ gold: v }) || '(none)';
+  if (field === 'dias') return vjDiaTxt({ dias: v }) || '(none)';
+  if (field === 'metal') return v && v.net > 0 ? Number(v.net).toFixed(3) + ' g' : '(none)';
+  if (field === 'other') return v && v.amt ? 'Rs ' + Number(v.amt).toLocaleString('en-IN') : '0';
+  if (v && typeof v === 'object') return JSON.stringify(v).slice(0, 120);
+  return String(v).slice(0, 120);
+}
+
+// Minimal .xlsx writer (store-only zip, no libraries), same format as the hiring shortlist file.
+function vjXlsx(sheets) {
+  const enc = new TextEncoder();
+  const esc = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+  const col = n => { let s = ''; n++; while (n) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; };
+  const cell = (v, r, c, st) => typeof v === 'number' ? `<c r="${col(c)}${r}"${st ? ` s="${st}"` : ''}><v>${v}</v></c>` : `<c r="${col(c)}${r}" t="inlineStr"${st ? ` s="${st}"` : ''}><is><t xml:space="preserve">${esc(v == null ? '' : v)}</t></is></c>`;
+  const files = {
+    '[Content_Types].xml': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' + sheets.map((s, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('') + '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>',
+    '_rels/.rels': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
+    'xl/workbook.xml': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' + sheets.map((s, i) => `<sheet name="${esc(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('') + '</sheets></workbook>',
+    'xl/_rels/workbook.xml.rels': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' + sheets.map((s, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('') + `<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
+    'xl/styles.xml': '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFF3E6D3"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFBE1E1"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf/></cellStyleXfs><cellXfs count="5"><xf/><xf fontId="1" fillId="2" applyFont="1" applyFill="1"/><xf fillId="3" applyFill="1"/><xf applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf><xf fillId="3" applyFill="1" applyAlignment="1"><alignment wrapText="1" vertical="top"/></xf></cellXfs></styleSheet>'
+  };
+  sheets.forEach((s, i) => {
+    const rows = [s.head, ...s.rows].map((r, ri) => `<row r="${ri + 1}">${r.map((v, ci) => { const red = ri > 0 && s.mark && s.mark(r), wrap = ri > 0 && s.wrap && s.wrap.includes(ci); return cell(v, ri + 1, ci, ri === 0 ? 1 : red ? (wrap ? 4 : 2) : wrap ? 3 : 0); }).join('')}</row>`).join('');
+    files[`xl/worksheets/sheet${i + 1}.xml`] = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${s.widths.map((w, j) => `<col min="${j + 1}" max="${j + 1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${rows}</sheetData><autoFilter ref="A1:${col(s.head.length - 1)}${s.rows.length + 1}"/></worksheet>`;
+  });
+  const crcT = []; for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; crcT[n] = c >>> 0; }
+  const crc = b => { let c = 0xFFFFFFFF; for (const x of b) c = crcT[(c ^ x) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+  const chunks = [], central = []; let off = 0, cdLen = 0;
+  const u16 = (a, o, v) => { a[o] = v & 255; a[o + 1] = (v >>> 8) & 255; }, u32 = (a, o, v) => { a[o] = v & 255; a[o + 1] = (v >>> 8) & 255; a[o + 2] = (v >>> 16) & 255; a[o + 3] = (v >>> 24) & 255; };
+  for (const [nm, txt] of Object.entries(files)) {
+    const data = enc.encode(txt), name = enc.encode(nm), cr = crc(data);
+    const lh = new Uint8Array(30); u32(lh, 0, 0x04034b50); u16(lh, 4, 20); u32(lh, 14, cr); u32(lh, 18, data.length); u32(lh, 22, data.length); u16(lh, 26, name.length);
+    chunks.push(lh, name, data);
+    const ch = new Uint8Array(46); u32(ch, 0, 0x02014b50); u16(ch, 4, 20); u16(ch, 6, 20); u32(ch, 16, cr); u32(ch, 20, data.length); u32(ch, 24, data.length); u16(ch, 28, name.length); u32(ch, 42, off);
+    central.push(ch, name); cdLen += 46 + name.length;
+    off += 30 + name.length + data.length;
+  }
+  const end = new Uint8Array(22); u32(end, 0, 0x06054b50); u16(end, 8, Object.keys(files).length); u16(end, 10, Object.keys(files).length); u32(end, 12, cdLen); u32(end, 16, off);
+  const all = [...chunks, ...central, end], out = new Uint8Array(all.reduce((n, a) => n + a.length, 0));
+  let p = 0; for (const a of all) { out.set(a, p); p += a.length; }
+  let bin = ''; for (let i = 0; i < out.length; i += 0x8000) bin += String.fromCharCode.apply(null, out.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+// Builds the evening workbook from today's audit, change log and deleted copies. Pure function (tested offline).
+function vjBuildDayBook({ audit, changes, deleted, byPath, who, ymd }) {
+  const hm = ts => new Date(ts + 5.5 * 3600e3).toISOString().slice(11, 16);
+  const tags = new Map();
+  const get = path => { if (!tags.has(path)) tags.set(path, { path, made: false, del: null, detail: false, photo: false, print: false, by: new Set(), first: Infinity, last: 0, changes: [] }); return tags.get(path); };
+  const log = [];
+  for (const a of audit) {
+    const g = get(a.path); g.by.add(who(a.email)); g.first = Math.min(g.first, a.ts); g.last = Math.max(g.last, a.ts);
+    const keys = String(a.detail || '').split(',').map(s => s.trim()).filter(Boolean);
+    let act;
+    if (a.action === 'create') { g.made = true; act = 'Added'; }
+    else if (a.action === 'delete') { act = 'Deleted'; }
+    else {
+      const det = a.action === 'set' || !keys.length || keys.some(k => !VJ_PHOTO_F.has(k) && !VJ_PRINT_F.has(k));
+      const ph = keys.some(k => VJ_PHOTO_F.has(k)), pr = keys.some(k => VJ_PRINT_F.has(k));
+      if (det) g.detail = true; if (ph) g.photo = true; if (pr) g.print = true;
+      act = det ? 'Edited' : ph ? 'Photo added' : pr ? 'Printed / queued' : 'Edited';
+    }
+    log.push({ ts: a.ts, act, path: a.path, by: who(a.email), keys });
+  }
+  for (const d of deleted) { const g = get(d.path); g.del = d; g.by.add(who(d.email)); g.first = Math.min(g.first, d.ts); g.last = Math.max(g.last, d.ts); }
+  for (const c of changes) { if (VJ_PHOTO_F.has(c.field) || VJ_PRINT_F.has(c.field) || ['updatedAt', 'createdAt', 'createdBy'].includes(c.field)) continue; get(c.path).changes.push(c); }
+  const doc = g => { if (byPath.has(g.path)) return byPath.get(g.path); if (g.del) { try { return JSON.parse(g.del.data); } catch (e) {} } return {}; };
+  const status = g => g.del ? (g.made ? 'Added, then deleted' : 'Deleted') : g.made ? (g.detail ? 'Added + edited' : 'Added') : g.detail ? 'Edited' : g.photo ? 'Photo added' : g.print ? 'Printed / queued' : 'Edited';
+  const order = { 'Deleted': 0, 'Added, then deleted': 1, 'Edited': 2, 'Added + edited': 3, 'Added': 4, 'Photo added': 5, 'Printed / queued': 6 };
+  const list = [...tags.values()].sort((a, b) => (order[status(a)] - order[status(b)]) || (a.first - b.first));
+  const rows = list.map(g => {
+    const t = doc(g), changed = g.changes.sort((a, b) => a.ts - b.ts).map(c => `${VJ_FIELD_NAME[c.field] || c.field}: ${vjValTxt(c.field, c.old)} → ${vjValTxt(c.field, c.new)}`).join('\n');
+    return [status(g), t.label || g.path.slice(5), t.designNo || '', t.catName || '', t.kind === 'sample' ? 'Sample' : 'Stock', vjGoldTxt(t), vjDiaTxt(t),
+      t.photo ? 'Yes' : 'No', t.printedAt ? 'Yes' : 'No', [...g.by].join(', '), g.first === g.last ? hm(g.first) : hm(g.first) + ' - ' + hm(g.last), changed, g.del ? g.del.reason || '' : ''];
+  });
+  const logRows = log.concat(deleted.filter(d => !audit.some(a => a.action === 'delete' && a.path === d.path)).map(d => ({ ts: d.ts, act: 'Deleted', path: d.path, by: who(d.email), keys: [] })))
+    .sort((a, b) => a.ts - b.ts).map(l => {
+      const t = byPath.get(l.path) || (tags.get(l.path) && doc(tags.get(l.path))) || {}, dl = tags.get(l.path) && tags.get(l.path).del;
+      const det = l.act === 'Deleted' ? 'Reason: ' + ((dl && dl.reason) || '-') : l.act === 'Edited' ? l.keys.filter(k => !VJ_PHOTO_F.has(k) && !VJ_PRINT_F.has(k)).map(k => VJ_FIELD_NAME[k] || k).join(', ') : '';
+      return [hm(l.ts), l.act, t.label || l.path.slice(5), t.designNo || '', l.by, det];
+    });
+  const count = s => rows.filter(r => r[0] === s).length;
+  const made = rows.filter(r => r[0].startsWith('Added')).length, dels = rows.filter(r => r[0].includes('eleted')).length, eds = count('Edited') + count('Added + edited');
+  const dd = ymd.split('-').reverse().join('-');
+  const caption = `VJ Tags ${dd}: ${rows.length} tag${rows.length === 1 ? '' : 's'} with activity - ${made} added, ${eds} edited, ${dels} deleted${count('Photo added') ? ', ' + count('Photo added') + ' photo only' : ''}. Deleted and edited tags are listed first.`;
+  const xlsx = vjXlsx([
+    { name: 'Tags today', head: ['Status', 'Tag', 'Design no.', 'Category', 'Stock / sample', 'Gold', 'Diamonds', 'Photo', 'Printed', 'Done by', 'Time', 'What changed (old → new)', 'Delete reason'],
+      widths: [18, 16, 12, 16, 12, 22, 34, 7, 8, 18, 13, 60, 16], rows, mark: r => String(r[0]).includes('eleted'), wrap: [6, 11] },
+    { name: 'Activity log', head: ['Time', 'Action', 'Tag', 'Design no.', 'By', 'Details'], widths: [8, 16, 16, 12, 16, 50], rows: logRows, mark: r => r[1] === 'Deleted' }]);
+  return { count: rows.length, xlsx, fileName: `VJ_Tags_${dd}.xlsx`, caption };
+}
+
 async function vjDailyReport(env) {
   const ist = new Date(Date.now() + 5.5 * 3600e3), mins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
-  if (mins < 17 * 60 + 55) return reply('not yet', 200);
+  if (mins < 20 * 60 + 10) return reply('not yet', 200);
   if (!env.DB || !env.VJ_QUOTE_HOOK || !/^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_QUOTE_HOOK)) return reply('not set up', 503);
   const ymd = ist.toISOString().slice(0, 10), dayStart = Date.parse(ymd + 'T00:00:00Z') - 5.5 * 3600e3;
   await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_meta (k TEXT PRIMARY KEY, v TEXT)').run();
+  await vjTables(env);
   const key = 'daily-report:' + ymd;
   const claim = await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO NOTHING').bind(key, new Date().toISOString()).run();
   if (!claim.meta || claim.meta.changes !== 1) return reply('already done today', 200);
+  const post = body => fetch(env.VJ_QUOTE_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(20000), body: JSON.stringify(body) });
+  let sentText = false;
   try {
-    const made = ((await env.DB.prepare("SELECT path, email, MIN(ts) AS ts FROM audit WHERE action = 'create' AND path LIKE 'tags/%' AND ts >= ? GROUP BY path ORDER BY ts").bind(dayStart).all()).results) || [];
-    if (!made.length) return reply('no new tags today', 200);
+    const audit = ((await env.DB.prepare("SELECT ts, email, action, path, detail FROM audit WHERE path LIKE 'tags/%' AND action IN ('create', 'update', 'set', 'delete') AND ts >= ? ORDER BY ts").bind(dayStart).all()).results) || [];
+    const changes = ((await env.DB.prepare("SELECT ts, email, path, field, old, new FROM vj_changes WHERE ts >= ? ORDER BY ts").bind(dayStart).all()).results) || [];
+    const deleted = ((await env.DB.prepare("SELECT ts, email, path, reason, data FROM vj_deleted WHERE ts >= ? ORDER BY ts").bind(dayStart).all()).results) || [];
+    if (!audit.length && !deleted.length) return reply('no tag activity today', 200);
     const users = ((await env.DB.prepare('SELECT email, name FROM users').all()).results) || [];
     const owners = String(env.OWNER_EMAILS || '').toLowerCase().split(',').map(s => s.trim());
-    const who = e => e === 'vaishnavijewels@gmail.com' ? 'Shilpiji' : owners.includes(e) ? 'Abhinav' : ((users.find(u => u.email === e) || {}).name || e.split('@')[0]);
+    const who = e => e === 'vaishnavijewels@gmail.com' ? 'Shilpiji' : owners.includes(e) ? 'Abhinav' : ((users.find(u => u.email === e) || {}).name || String(e || '').split('@')[0]);
     const all = ((await env.DB.prepare("SELECT path, data FROM docs WHERE path LIKE 'tags/%'").all()).results) || [];
     const byPath = new Map(all.map(r => [r.path, JSON.parse(r.data)]));
-    const noPhotoAll = [...byPath.values()].filter(t => !t.photo).length;
-    const bad = [], good = [], byWho = {}; let stock = 0, samples = 0, gone = 0;
-    for (const m of made) {
-      const t = byPath.get(m.path), name = who(m.email); byWho[name] = (byWho[name] || 0) + 1;
-      if (!t) { gone++; continue; }
-      const label = t.label || m.path.slice(5), sample = t.kind === 'sample'; sample ? samples++ : stock++;
-      const miss = [];
-      if (!t.photo) miss.push('no photo');
-      if (!t.designNo) miss.push('no design no.');
-      const wt = sample ? (t.metal && t.metal.net > 0) : (t.gold || []).some(g => g.net > 0);
-      if (!wt && !(t.other && t.other.amt > 0)) miss.push('no weight');
-      if (!(t.dias || []).length) miss.push('no diamonds');
-      if (!t.printedAt) miss.push('not printed');
-      const d = `${label}${t.catName ? ' ' + t.catName : ''}${t.designNo ? ' · D.No ' + t.designNo : ''}`;
-      (miss.length ? bad : good).push(miss.length ? `• ${d} - ${miss.join(', ')} (${name})` : label);
+    // (1) WhatsApp text of today's new tags - unchanged, only when tags were made today
+    const madeMap = new Map(); for (const a of audit) if (a.action === 'create' && !madeMap.has(a.path)) madeMap.set(a.path, a);
+    const made = [...madeMap.values()];
+    if (made.length) {
+      const noPhotoAll = [...byPath.values()].filter(t => !t.photo).length;
+      const bad = [], good = [], byWho = {}; let stock = 0, samples = 0, gone = 0;
+      for (const m of made) {
+        const t = byPath.get(m.path), name = who(m.email); byWho[name] = (byWho[name] || 0) + 1;
+        if (!t) { gone++; continue; }
+        const label = t.label || m.path.slice(5), sample = t.kind === 'sample'; sample ? samples++ : stock++;
+        const miss = [];
+        if (!t.photo) miss.push('no photo');
+        if (!t.designNo) miss.push('no design no.');
+        const wt = sample ? (t.metal && t.metal.net > 0) : (t.gold || []).some(g => g.net > 0);
+        if (!wt && !(t.other && t.other.amt > 0)) miss.push('no weight');
+        if (!(t.dias || []).length) miss.push('no diamonds');
+        if (!t.printedAt) miss.push('not printed');
+        const d = `${label}${t.catName ? ' ' + t.catName : ''}${t.designNo ? ' · D.No ' + t.designNo : ''}`;
+        (miss.length ? bad : good).push(miss.length ? `• ${d} - ${miss.join(', ')} (${name})` : label);
+      }
+      const day = ist.toUTCString().slice(0, 11);
+      let text = `VJ Tags - daily report, ${day}\nNew tags today: ${made.length} (stock ${stock}, samples ${samples}${gone ? ', deleted since ' + gone : ''})\nMade by: ${Object.entries(byWho).map(([k, v]) => k + ' ' + v).join(', ')}\n`;
+      text += bad.length ? `\n⚠️ Needs attention (${bad.length}):\n${bad.join('\n')}\n` : '\n✅ All new tags have photo, design no., weight and are printed.\n';
+      if (good.length) text += `\nComplete (${good.length}): ${good.join(', ')}\n`;
+      text += `\nAll stock without a photo: ${noPhotoAll} of ${byPath.size}.\nFix on vaishnavijewels.com/tags (Price check → Edit tag / Add photo).`;
+      if (text.length > 3800) text = text.slice(0, 3760) + '\n… (list cut - open VJ Tags for the rest)';
+      const r = await post({ kind: 'daily-report', text });
+      if (!r.ok) throw new Error('hook ' + r.status);
+      sentText = true;
     }
-    const day = ist.toUTCString().slice(0, 11);
-    let text = `VJ Tags - daily report, ${day}\nNew tags today: ${made.length} (stock ${stock}, samples ${samples}${gone ? ', deleted since ' + gone : ''})\nMade by: ${Object.entries(byWho).map(([k, v]) => k + ' ' + v).join(', ')}\n`;
-    text += bad.length ? `\n⚠️ Needs attention (${bad.length}):\n${bad.join('\n')}\n` : '\n✅ All new tags have photo, design no., weight and are printed.\n';
-    if (good.length) text += `\nComplete (${good.length}): ${good.join(', ')}\n`;
-    text += `\nAll stock without a photo: ${noPhotoAll} of ${byPath.size}.\nFix on vaishnavijewels.com/tags (Price check → Edit tag / Take photo).`;
-    if (text.length > 3800) text = text.slice(0, 3760) + '\n… (list cut - open VJ Tags for the rest)';
-    const r = await fetch(env.VJ_QUOTE_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000), body: JSON.stringify({ kind: 'daily-report', text }) });
-    if (!r.ok) throw new Error('hook ' + r.status);
-    return reply('sent ' + made.length, 200);
+    // (2) the evening Excel of every tag added, edited or deleted today
+    const book = vjBuildDayBook({ audit, changes, deleted, byPath, who, ymd });
+    const r2 = await post({ kind: 'daily-xlsx', fileName: book.fileName, caption: book.caption, xlsx: book.xlsx });
+    if (!r2.ok) throw new Error('hook ' + r2.status);
+    return reply('sent ' + book.count, 200);
   } catch (e) {
-    await env.DB.prepare('DELETE FROM vj_meta WHERE k = ?').bind(key).run(); // let a later bell try again
+    if (!sentText) await env.DB.prepare('DELETE FROM vj_meta WHERE k = ?').bind(key).run(); // let a later bell try again (never repeat a sent text)
     return reply('failed', 502);
   }
 }
