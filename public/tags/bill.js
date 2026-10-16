@@ -138,6 +138,7 @@
         td(b.name + (b.city ? ", " + b.city : "")); td(fmt(b.total), "num"); td(b.fine ? g3(b.fine) : "—", "num"); td(b.by || "");
         const x = document.createElement("td"); x.style.whiteSpace = "nowrap"; const o = document.createElement("button"); o.type = "button"; o.className = "btn ghost"; o.textContent = "PDF"; o.addEventListener("click", () => reprint(b.no, o)); x.appendChild(o);
         if (j.canCancel && !b.cancelled) { const c = document.createElement("button"); c.type = "button"; c.className = "btn ghost"; c.style.color = "#a12b2b"; c.textContent = "Cancel"; c.addEventListener("click", () => cancelBox(b, x)); x.appendChild(c); }
+        if (j.canCancel) { const e = document.createElement("button"); e.type = "button"; e.className = "btn ghost"; e.style.color = "#a12b2b"; e.textContent = "Erase"; e.addEventListener("click", () => eraseBox(b, x)); x.appendChild(e); }
         tr.appendChild(x); body.appendChild(tr); });
       m.textContent = j.bills.length ? `${j.bills.length} in this month${nc ? " (" + nc + " cancelled)" : ""}, total ${fmt(tot)}${nc ? " without the cancelled ones" : ""}.` : "Nothing saved in this month.";
     } catch (e) { m.textContent = "Could not load the saved bills (" + (e.message || e) + ")."; }
@@ -157,6 +158,22 @@
         const why = sel.value; await loadBook(); $("bbookmsg").textContent = `${b.title} ${b.no} cancelled (${why}). It stays in the records. ` + $("bbookmsg").textContent;
       } catch (e) { $("bbookmsg").textContent = "Could not cancel: " + (e.message || e) + "."; y.disabled = false; } });
     const wrap = document.createElement("div"); wrap.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;align-items:center"; wrap.append(sel, note, y, n); cell.appendChild(wrap);
+  }
+  // owners only: erase a completed bill for good - the bill, its pieces' tags, photos and history (C-20261016-BILLERASE)
+  function eraseBox(b, cell) {
+    cell.textContent = ""; const w = document.createElement("div"); w.style.cssText = "display:flex;flex-direction:column;gap:6px;max-width:320px;white-space:normal";
+    const t = document.createElement("div"); t.style.cssText = "color:#a12b2b;font-weight:600"; t.textContent = `Erase ${b.title} ${b.no} for good? Its ${b.pieces} piece${b.pieces === 1 ? "" : "s"} (tags, codes, photos, history) are removed too. This cannot be undone.`;
+    const inp = document.createElement("input"); inp.placeholder = "type " + b.no + " to confirm"; inp.autocomplete = "off";
+    const row = document.createElement("div"); row.style.cssText = "display:flex;gap:6px";
+    const y = document.createElement("button"); y.type = "button"; y.className = "btn danger"; y.textContent = "Erase for good"; y.disabled = true;
+    const n = document.createElement("button"); n.type = "button"; n.className = "btn ghost"; n.textContent = "Keep";
+    inp.addEventListener("input", () => { y.disabled = inp.value.trim().toUpperCase() !== String(b.no).toUpperCase(); }); n.addEventListener("click", loadBook);
+    y.addEventListener("click", async () => { y.disabled = true;
+      try { const r = await fetch("/api/vj/bill/erase", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ no: b.no, confirm: inp.value.trim() }) });
+        const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(r.status === 403 ? "only Abhinav or Shilpiji can erase" : (j.error || r.status));
+        await loadBook(); $("bbookmsg").textContent = `${b.title} ${b.no} and its ${j.pieces} piece${j.pieces === 1 ? "" : "s"} were erased. ` + $("bbookmsg").textContent;
+      } catch (e) { $("bbookmsg").textContent = "Could not erase: " + (e.message || e) + "."; y.disabled = false; } });
+    row.append(y, n); w.append(t, inp, row); cell.appendChild(w); inp.focus();
   }
   async function reprint(no, btn) { btn.disabled = true;
     try { const r = await fetch("/api/vj/bill?no=" + encodeURIComponent(no), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
