@@ -34,7 +34,8 @@
     const rows = tags.map(t => {
       const gl = (t.kind === 'sample' ? [{ k: '14K', net: Number(t.metal && t.metal.net) || 0 }] : (Array.isArray(t.gold) ? t.gold : []))
         .map(g => ({ k: String(g && g.k || ''), net: Number(g && g.net) || 0 })).filter(g => g.net > 0);
-      const kr = k => F * (Number(pur[k]) || 0), g0 = gl[0];
+      const Fr = t.kind === 'order' && Number(t.gold24gAtTag) > 0 ? Number(t.gold24gAtTag) : F; // an order keeps the gold rate of the day it was tagged (C-20261016-ORDERRATE)
+      const kr = k => Fr * (Number(pur[k]) || 0), g0 = gl[0];
       let mk = 0;
       if (g0 && mode !== 'item') { const b = g0.net > m.limit ? m.base : m.small; mk = mode === 'nett' ? Math.ceil(Math.round((b + kr(g0.k) * m.pct / 100) * 100) / 100 / 100) * 100 : b; }
       let gold = 0, net = 0, fine = 0;
@@ -42,12 +43,12 @@
         if (fineMode) fine += g.net * (VJ_FINE[mode][g.k] || 0);
         else gold += g.net * kr(g.k) * (mode === 'ws' && g.k !== '24K' ? 1.1 : 1); });
       fine = Math.round(fine * 1000) / 1000;
-      if (settle === 'amount') gold = fine * F;
+      if (settle === 'amount') gold = fine * Fr;
       const ov = o.rates && Array.isArray(o.rates[t.id]) ? o.rates[t.id] : []; // rates edited on the bill (C-20261016-BILLALL); the tag is not changed
       const dl = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map((d, i) => ({ q: String(d.q || ''), ct: Number(d.ct) || 0, tagRate: Number(d.rate) || 0, rate: Number(ov[i]) > 0 ? Number(ov[i]) : (Number(d.rate) || 0) }));
       const ct = dl.reduce((a, d) => a + d.ct, 0), dia = dl.reduce((a, d) => a + d.ct * d.rate, 0), oth = Number(t.other && t.other.amt) || 0;
       const r = { id: t.id, label: String(t.label || ''), design: String(t.designNo || ''), cat: String(t.catName || ''),
-        gold: gl.map(g => g.k + ' ' + g.net.toFixed(3) + ' g').join(' + '), net: Math.round(net * 1000) / 1000, fine, goldAmt: Math.round(gold),
+        gold: gl.map(g => g.k + ' ' + g.net.toFixed(3) + ' g').join(' + '), F: Fr, orderRate: Fr !== F, net: Math.round(net * 1000) / 1000, fine, goldAmt: Math.round(gold),
         mkRate: mk, making: Math.round(mk * net), ct: Math.round(ct * 100) / 100, diaAmt: Math.round(dia), other: Math.round(oth), dias: dl };
       r.amount = r.goldAmt + r.making + r.diaAmt + r.other;
       const dv = String(o.disc && o.disc[t.id] != null ? o.disc[t.id] : '').trim(), pm = dv.match(/^(\d+(?:\.\d+)?)\s*%$/), dn = Number(dv.replace(/[,\s]/g, ''));
@@ -240,7 +241,7 @@
     const c = calcNow(), ok = F() >= 2000;
     c.rows.forEach((r, i) => {
       const tr = document.createElement("tr"); const td = (x, cl) => { const e = document.createElement("td"); if (cl) e.className = cl; e.textContent = x; tr.appendChild(e); };
-      td((r.design ? r.design + " · " : "") + r.label + (r.cat ? " · " + r.cat : "")); td(r.gold || "—");
+      td((r.design ? r.design + " · " : "") + r.label + (r.cat ? " · " + r.cat : "")); td((r.gold || "—") + (r.orderRate ? " · order rate " + fmt(r.F) + "/g" : ""));
       const t0 = tags().find(t => t.id === r.id); if (B.photos && t0 && t0.photo) { const im = document.createElement("img"); im.alt = ""; im.src = "/_blob/" + t0.photo; im.style.cssText = "width:56px;height:56px;object-fit:cover;border-radius:4px;display:block;margin-bottom:4px"; tr.firstChild.prepend(im); }
       td(ok || c.settle === "fine" ? goldCell(r, c) : "—", "num"); td(ok ? mkCell(r, c) : "—", "num");
       // diamonds: the rate saved on the tag, editable here for this bill only (C-20261016-BILLALL)
@@ -269,7 +270,7 @@
       g2g: "Fine gold = weight x 14K 0.66 / 18K 0.836 / 9K 0.4235 / 22K 1.06; making Rs 650/g (750 up to 5 g) in rupees.", item: "Fine gold = weight x 14K 0.74 / 18K 0.90 / 9K 0.54 / 22K 1.06; making included in the gold." }[B.mode];
     $("bsum").textContent = has ? fmt(c.sum) : "—"; $("bsub").textContent = has ? fmt(c.sub) : "—";
     $("bgstl").textContent = "GST " + c.gstPct + "%"; $("bgst").textContent = has ? fmt(c.gst) : "—"; $("btotal").textContent = has ? fmt(c.total) : "—";
-    $("bnote").textContent = !ok ? "Type the gold rate (F): fine 24K per gram." : noteText(B.mode) + "Diamond rates come from the tag; change them here for this bill if needed.";
+    $("bnote").textContent = !ok ? "Type the gold rate (F): fine 24K per gram." : noteText(B.mode) + "Diamond rates come from the tag; change them here for this bill if needed." + (c.rows.some(r => r.orderRate) ? " Order pieces use the gold rate of the day they were tagged." : "");
   }
   async function dataUrl(src) { const r = await fetch(src, { credentials: "same-origin" }); if (!r.ok) throw new Error("img"); const b = await r.blob(); return await new Promise((res, rej) => { const f = new FileReader(); f.onload = () => res(f.result); f.onerror = rej; f.readAsDataURL(b); }); }
   // photo for the PDF: drawn onto a small canvas and saved as JPEG, so PNG / WebP photos work too
@@ -304,7 +305,7 @@
     doc.setFillColor(243, 230, 211); doc.rect(M, y - 5, W - 2 * M, 8, "F"); row(cols.map(c => c[0]), true); y += 1;
     b.rows.forEach(r => { if (y > 250) { doc.addPage(); y = 20; }
       const dd = r.ct ? r.ct.toFixed(2) + " ct" + ((r.dias || []).length === 1 ? "\n@ " + Math.round(r.dias[0].rate).toLocaleString("en-IN") : "") + "\n" + fm(r.diaAmt) : "-";
-      const base = [(r.design ? r.design + " - " : "") + r.label + (r.cat ? "\n" + r.cat : ""), r.gold || "-", b.settle === "fine" ? g3(r.fine) + "\nfine" : fm(r.goldAmt) + (b.settle ? "\n" + g3(r.fine) + " fine" : ""), b.mode === "item" ? "in gold" : fm(r.making) + "\n@ " + r.mkRate + "/g", dd, r.other ? fm(r.other) : "-"];
+      const base = [(r.design ? r.design + " - " : "") + r.label + (r.cat ? "\n" + r.cat : ""), (r.gold || "-") + (r.orderRate ? "\norder rate " + Math.round(r.F).toLocaleString("en-IN") : ""), b.settle === "fine" ? g3(r.fine) + "\nfine" : fm(r.goldAmt) + (b.settle ? "\n" + g3(r.fine) + " fine" : ""), b.mode === "item" ? "in gold" : fm(r.making) + "\n@ " + r.mkRate + "/g", dd, r.other ? fm(r.other) : "-"];
       row(D ? base.concat([fm(r.amount), r.disc ? fm(r.disc) + (r.discTxt ? "\n(" + r.discTxt + ")" : "") : "-", fm(r.net)]) : base.concat([fm(r.amount)]), false, D ? 10 : 10.5, P ? (pics[r.id] || null) : undefined);
       doc.setDrawColor(225); doc.line(M, y - 3, W - M, y - 3); });
     y += 3; if (y > 240) { doc.addPage(); y = 20; }
