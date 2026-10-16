@@ -544,6 +544,7 @@ async function vjBill(request, env, who) {
   const sRow = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first();
   const s = sRow ? JSON.parse(sRow.data) : {};
   const calc = vjBillCalc(tags, { F, mode, settle, purity: s.purity, making: s.making, gst: s.gst });
+  calc.rows.forEach((r, i) => { const ph = tags[i].photo; if (typeof ph === 'string' && /^[0-9a-f]{32}$/.test(ph)) r.photo = ph; }); // owner 16/10: photo on the bill
   const bill = Object.assign({ no, title, date, name, city, mobile, F, by: who.email, byName: who.name, at: new Date().toISOString() }, calc);
   const res = await env.DB.prepare('INSERT INTO vj_bills (no, ts, email, data) VALUES (?, ?, ?, ?) ON CONFLICT(no) DO NOTHING').bind(no, Date.now(), who.email, JSON.stringify(bill)).run();
   if (!res.meta || res.meta.changes !== 1) return vjJson({ error: 'bill number ' + no + ' is already used' }, 409);
