@@ -65,6 +65,7 @@
   function find(q) {
     q = String(q || "").trim().toUpperCase().replace(/\s+/g, ""); if (!q) return [];
     const n = x => String(x || "").toUpperCase().replace(/[^A-Z0-9]/g, ""), nq = n(q);
+    if (/^[A-Z]{3}\d+[A-Z]{3}$/.test(q)) { const c = tags().filter(t => t.code && String(t.code).toUpperCase() === q); if (c.length) return c; } // price code on the tag (C-20261016-BILLCODE)
     return tags().filter(t => String(t.no) === q && /^\d+$/.test(q) || nq && (n(t.designNo) === nq || n(t.label) === nq)).slice(0, 12);
   }
   function build() {
@@ -73,7 +74,13 @@
     nav.insertBefore(b, nav.querySelector('[data-tab="rates"]'));
     const sec = document.createElement("section"); sec.id = "p-bill"; sec.className = "card"; sec.hidden = true;
     sec.innerHTML = `
-      <h2>1 · Customer</h2>
+      <h2>1 · Pieces</h2>
+      <div class="row" style="align-items:end"><label style="flex:2 1 220px">Code on the tag, tag number or design number <input id="bq" autocomplete="off" placeholder="e.g. abc270xyz, 803 or 1436"></label>
+      <div><button type="button" class="btn" id="badd">Add piece</button></div></div>
+      <div id="bpick" class="row" style="gap:8px"></div>
+      <div class="list"><table class="items" style="min-width:820px"><thead><tr><th>Piece</th><th>Gold</th><th>Gold value</th><th>Making</th><th>Diamonds</th><th>Other</th><th>Amount</th><th>Discount<br><span style="font-weight:400;text-transform:none">Rs or %</span></th><th>Net</th><th></th></tr></thead><tbody id="brows"></tbody></table></div>
+      <h2>2 · Customer &amp; bill</h2>
+      <p class="hint" id="bcusthint"></p>
       <div class="row"><label>Name <input id="bname" autocomplete="off" maxlength="60"></label>
         <label>City <input id="bcity" autocomplete="off" maxlength="40"></label>
         <label>Mobile No. <input id="bmob" inputmode="tel" autocomplete="off" maxlength="14" placeholder="98xxxxxxxx"></label></div>
@@ -93,11 +100,6 @@
         <label><input type="radio" name="btitle" value="Bill" checked> Bill</label>
         <label><input type="radio" name="btitle" value="Estimate"> Estimate</label></div>
       <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg);margin-top:8px"><input type="checkbox" id="bphoto" checked style="width:auto"> Show piece photos on the bill</label>
-      <h2>2 · Pieces</h2>
-      <div class="row" style="align-items:end"><label style="flex:2 1 220px">Design number or tag number <input id="bq" autocomplete="off" placeholder="e.g. 1436 or VLR14/803"></label>
-      <div><button type="button" class="btn" id="badd">Add piece</button></div></div>
-      <div id="bpick" class="row" style="gap:8px"></div>
-      <div class="list"><table class="items" style="min-width:820px"><thead><tr><th>Piece</th><th>Gold</th><th>Gold value</th><th>Making</th><th>Diamonds</th><th>Other</th><th>Amount</th><th>Discount<br><span style="font-weight:400;text-transform:none">Rs or %</span></th><th>Net</th><th></th></tr></thead><tbody id="brows"></tbody></table></div>
       <table class="sum"><tr id="bfinerow" hidden><td><b>Fine gold to receive</b></td><td id="bfine"><b>—</b></td></tr><tr><td>Total</td><td id="bsum">—</td></tr><tr id="bdiscrow" hidden><td>Less discount</td><td id="bdisc">—</td></tr><tr><td>Rounded up to Rs 1,000</td><td id="bsub">—</td></tr>
         <tr><td id="bgstl">GST 3%</td><td id="bgst">—</td></tr><tr class="total"><td>Bill total</td><td id="btotal">—</td></tr></table>
       <p class="hint" id="bnote"></p>
@@ -110,7 +112,7 @@
       <p class="hint" id="bbookmsg"></p>`;
     $("p-rates").parentNode.insertBefore(sec, $("p-rates"));
     document.querySelectorAll("nav button").forEach(x => x.addEventListener("click", () => {
-      const on = x.dataset.tab === "bill"; sec.hidden = !on; if (on) { document.querySelectorAll('[id^="p-"]').forEach(p => { if (p !== sec) p.hidden = true; }); prefill(); numField(); render(); loadBook(); }
+      const on = x.dataset.tab === "bill"; sec.hidden = !on; if (on) { document.querySelectorAll('[id^="p-"]').forEach(p => { if (p !== sec) p.hidden = true; }); prefill(); numField(); render(); loadBook(); setTimeout(() => $("bq").focus(), 50); }
       document.querySelectorAll("nav button").forEach(y => y.setAttribute("aria-selected", y === x ? "true" : "false"));
     }));
     $("badd").addEventListener("click", pick); $("bq").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); pick(); } });
@@ -120,7 +122,7 @@
     $("bmonth").value = today().slice(0, 7); $("bmonth").addEventListener("change", loadBook);
     $("bxl").addEventListener("click", () => xl($("bmonth").value || today().slice(0, 7))); $("bxlall").addEventListener("click", () => xl("all"));
     $("bF").addEventListener("input", render); $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); });
-    $("bclear").addEventListener("click", () => { B.items = []; B.disc = {}; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
+    $("bclear").addEventListener("click", () => { B.items = []; B.disc = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
     $("bsave").addEventListener("click", save);
   }
   // C-20261016-BILLBOOK: estimate numbers are given by the server (E-YYMM-NN, from 01 each month); bill numbers are typed
@@ -153,7 +155,13 @@
     if (r.length === 1) { add(r[0]); return; }
     r.forEach(t => { const b = document.createElement("button"); b.type = "button"; b.className = "btn ghost"; b.textContent = (t.designNo ? t.designNo + " · " : "") + t.label; b.addEventListener("click", () => { add(t); box.textContent = ""; }); box.appendChild(b); });
   }
-  function add(t) { if (!B.items.includes(t.id)) B.items.push(t.id); $("bq").value = ""; $("bpick").textContent = ""; render(); }
+  function add(t) { if (!B.items.includes(t.id)) B.items.push(t.id); $("bq").value = ""; $("bpick").textContent = ""; fillCustomer(t); render(); $("bq").focus(); }
+  // an Order piece brings its customer: only empty boxes are filled; a different customer is flagged, never overwritten
+  function fillCustomer(t) { const o = t.kind === "order" && t.order, h = $("bcusthint"); if (!o || !o.name) return;
+    const same = !$("bname").value.trim() || $("bname").value.trim().toLowerCase() === String(o.name).toLowerCase();
+    if (!same) { h.textContent = `Note: ${t.label} is an order for ${o.name}${o.mobile ? " (" + o.mobile + ")" : ""}, not ${$("bname").value.trim()}.`; return; }
+    if (!$("bname").value.trim()) $("bname").value = o.name; if (!$("bmob").value.trim() && o.mobile) $("bmob").value = o.mobile; if (!$("bcity").value.trim() && o.city) $("bcity").value = o.city;
+    h.textContent = `Filled from order ${t.label}: ${o.name}${o.mobile ? ", " + o.mobile : ""}${o.city ? ", " + o.city : ""}.`; }
   const F = () => Number(String($("bF").value).replace(/[^0-9.]/g, "")) || 0;
   function calcNow() { const s = settings(), all = tags(); const list = B.items.map(id => all.find(t => t.id === id)).filter(Boolean);
     return vjBillCalc(list, { F: F(), mode: B.mode, settle: B.settle, disc: B.disc, purity: s.purity, making: s.making, gst: s.gst }); }
@@ -181,7 +189,7 @@
     c = c || calcNow(); const ok = F() >= 2000, has = c.rows.length && ok;
     c.rows.forEach(r => { const n = document.querySelector('[data-net="' + r.id + '"]'); if (n) n.textContent = ok ? fmt(r.net) + (r.discTxt ? " (" + r.discTxt + ")" : "") : "—"; });
     $("bdiscrow").hidden = !c.disc; $("bdisc").textContent = "- " + fmt(c.disc);
-    $("bsettle").hidden = !fineMode(); $("bfinerow").hidden = !(c.settle === "fine" && c.rows.length); $("bfine").firstChild.textContent = g3(c.fine);
+    $("bsettle").hidden = !fineMode(); $("bsettle").style.display = fineMode() ? "" : "none"; /* .seg sets display:flex, which beats [hidden] */ $("bfinerow").hidden = !(c.settle === "fine" && c.rows.length); $("bfine").firstChild.textContent = g3(c.fine);
     $("bmodehint").textContent = { ws: "Gold x karat rate + 10% wastage; making Rs 650/g (750/g up to 5 g).", nett: "Gold x karat rate; making Rs 650/g (750 up to 5 g) + 10% of the karat rate.",
       g2g: "Fine gold = weight x 14K 0.66 / 18K 0.836 / 9K 0.4235 / 22K 1.06; making Rs 650/g (750 up to 5 g) in rupees.", item: "Fine gold = weight x 14K 0.74 / 18K 0.90 / 9K 0.54 / 22K 1.06; making included in the gold." }[B.mode];
     $("bsum").textContent = has ? fmt(c.sum) : "—"; $("bsub").textContent = has ? fmt(c.sub) : "—";
