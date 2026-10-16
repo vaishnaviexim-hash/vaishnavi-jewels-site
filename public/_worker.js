@@ -269,8 +269,8 @@ async function vjWrite(request, env, who) {
     if (next.order !== undefined) { // C-20261016-ORDERS: order customer, cleaned
       const o = next.order && typeof next.order === 'object' ? next.order : null;
       if (!o || next.kind !== 'order') delete next.order;
-      else { const mob = String(o.mobile || '').replace(/\D/g, '').slice(-10), due = String(o.due || '');
-        next.order = { name: vjClean(o.name, 60), mobile: /^[6-9]\d{9}$/.test(mob) ? mob : '', city: vjClean(o.city, 40), due: /^\d{4}-\d{2}-\d{2}$/.test(due) ? due : '' };
+      else { const mob = vjPhone(o.mobile), due = String(o.due || '');
+        next.order = { name: vjClean(o.name, 60), mobile: mob, city: vjClean(o.city, 40), due: /^\d{4}-\d{2}-\d{2}$/.test(due) ? due : '' };
         if (!next.order.name) return vjDeny(400, 'order needs the customer name'); }
     }
     if (!cur) next.createdBy = who.email;
@@ -453,6 +453,11 @@ async function vjPhotoSheets(b, env, who) {
 // Quotations (owner 14/10/2026, Brain F-069): staff build the quote on the page; the server gives it a number, saves it as
 // quotes/<no> (never sent to 'sales' logins) and tells Core through the Make hook VJ_QUOTE_HOOK (encrypted secret) so Aashvi
 // WhatsApps Abhinav, Shilpi and Mihir to call the client. The PDF itself is made on the staff phone and sent from their WhatsApp.
+// Phone as copied from a phone (owner 16/10/2026): '+91 98xxx xxxxx', spaces, dashes are fine. A normal 10-digit Indian mobile is kept
+// as 10 digits; anything else with 6-13 digits is kept exactly as typed (cleaned), so nothing the owner pasted is lost.
+const vjPhone = v => { const s = String(v == null ? '' : v).trim(); let d = s.replace(/\D/g, ''); if (d.length === 12 && d.startsWith('91')) d = d.slice(2); else if (d.length === 11 && d[0] === '0') d = d.slice(1);
+  if (/^[6-9]\d{9}$/.test(d)) return d; return d.length >= 6 && d.length <= 13 ? s.replace(/[^0-9+ \-]/g, '').replace(/\s+/g, ' ').slice(0, 18) : ''; };
+const vjPhoneTxt = m => /^\d{10}$/.test(String(m || '')) ? '+91 ' + m : String(m || '');
 const vjClean = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, n);
 async function vjQuote(request, env, who, ctx) {
   if (who.role === 'sales') return vjDeny(403, 'read only');
@@ -537,7 +542,7 @@ async function vjBill(request, env, who) {
   let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
   if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
   const no = String(b && b.no || '').trim().toUpperCase(), name = vjClean(b && b.name, 60), city = vjClean(b && b.city, 40);
-  const mobile = String(b && b.mobile || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
+  const mobile = vjPhone(b && b.mobile);
   const date = String(b && b.date || ''), F = Math.round(Number(b && b.F) * 100) / 100, mode = ['ws', 'nett', 'g2g', 'item'].includes(b && b.mode) ? b.mode : '';
   const settle = b && b.settle === 'amount' ? 'amount' : 'fine';
   const title = b && b.title === 'Estimate' ? 'Estimate' : 'Bill';
@@ -545,7 +550,7 @@ async function vjBill(request, env, who) {
   const disc = {}; if (b && b.disc && typeof b.disc === 'object') for (const id of ids) if (b.disc[id] != null) disc[id] = String(b.disc[id]).slice(0, 12);
   if (title !== 'Estimate' && !/^[A-Z0-9][A-Z0-9\-\/]{0,19}$/.test(no)) return vjDeny(400, 'bill number: letters, digits, - or / only');
   if (!name) return vjDeny(400, 'customer name is required');
-  if (mobile && !/^[6-9]\d{9}$/.test(mobile)) return vjDeny(400, 'mobile must be 10 digits');
+  if (b && b.mobile && String(b.mobile).trim() && !mobile) return vjDeny(400, 'mobile number not readable');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(Date.parse(date))) return vjDeny(400, 'bad date');
   if (!(F >= 2000 && F <= 50000)) return vjDeny(400, 'gold rate (F) per g looks wrong');
   if (!mode) return vjDeny(400, 'choose W/s, Nett, Gold to Gold or Gold Item');
@@ -593,7 +598,7 @@ async function vjBillBook(url, env, who) {
   if (url.pathname === '/api/vj/bills') return vjJson({ ok: true, bills: bills.map(b => ({ no: b.no, title: b.title, date: b.date, name: b.name, city: b.city, mobile: b.mobile,
     mode: b.mode, settle: b.settle || '', total: b.total, fine: b.fine || 0, disc: b.disc || 0, pieces: (b.rows || []).length, by: b.byName && b.byName !== 'Owner' ? b.byName : String(b.by || '').split('@')[0] })) });
   const head = ['Date', 'Number', 'Type', 'Customer', 'Mobile', 'City', 'Gold calculation', 'Gold rate F (Rs/g)', 'Pieces', 'Total (Rs)', 'Discount (Rs)', 'After discount (Rs)', 'Rounded (Rs)', 'GST (Rs)', 'Bill total (Rs)', 'Fine gold to receive (g)', 'Made by'];
-  const rows = bills.map(b => [dmy(b.date), b.no, b.title, b.name, b.mobile ? '+91 ' + b.mobile : '', b.city || '', (MODE[b.mode] || b.mode) + (b.settle === 'fine' ? ' (fine gold)' : b.settle === 'amount' ? ' (in rupees)' : ''),
+  const rows = bills.map(b => [dmy(b.date), b.no, b.title, b.name, vjPhoneTxt(b.mobile), b.city || '', (MODE[b.mode] || b.mode) + (b.settle === 'fine' ? ' (fine gold)' : b.settle === 'amount' ? ' (in rupees)' : ''),
     Number(b.F) || '', (b.rows || []).map(r => (r.design ? r.design + ' / ' : '') + r.label).join(', '), b.sum, b.disc || 0, b.after == null ? b.sum : b.after, b.sub, b.gst, b.total, b.fine || '', b.byName && b.byName !== 'Owner' ? b.byName : String(b.by || '').split('@')[0]]);
   const tot = rows.reduce((a, r) => [a[0] + (r[9] || 0), a[1] + (r[10] || 0), a[2] + (r[13] || 0), a[3] + (r[14] || 0), a[4] + (Number(r[15]) || 0)], [0, 0, 0, 0, 0]);
   if (rows.length) rows.push(['', '', '', 'TOTAL (' + rows.length + ')', '', '', '', '', '', tot[0], tot[1], '', '', tot[2], tot[3], Math.round(tot[4] * 1000) / 1000 || '', '']);
@@ -724,7 +729,7 @@ async function vjOrdersReport(env, who) {
   const dmy = d => d ? String(d).slice(0, 10).split('-').reverse().join('-') : '';
   const rows = all.map(r => JSON.parse(r.data)).filter(t => t.kind === 'order')
     .sort((a, b) => String((a.order || {}).due || '9999').localeCompare(String((b.order || {}).due || '9999')) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')))
-    .map(t => { const o = t.order || {}; return [o.name || '', o.mobile ? '+91 ' + o.mobile : '', o.city || '', dmy(o.due), t.label || '', t.designNo || '', t.catName || '',
+    .map(t => { const o = t.order || {}; return [o.name || '', vjPhoneTxt(o.mobile), o.city || '', dmy(o.due), t.label || '', t.designNo || '', t.catName || '',
       vjGoldTxt(t), vjDiaTxt(t), Number(t.priceAtTag) || '', t.photo ? 'Yes' : 'No', t.printedAt ? 'Yes' : 'No', by(t.createdBy), dmy(t.createdAt), t.remark || '']; });
   const xlsx = vjXlsx([{ name: 'Orders', head: ['Customer', 'Mobile', 'City', 'Delivery date', 'Tag', 'Design no.', 'Category', 'Gold', 'Diamonds', 'Price when tagged (Rs)', 'Photo', 'Printed', 'Made by', 'Tagged on', 'Remark'],
     widths: [24, 16, 14, 13, 14, 12, 16, 22, 34, 14, 7, 8, 14, 12, 18], rows, wrap: [8] }]);
