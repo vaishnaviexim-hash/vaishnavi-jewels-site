@@ -581,6 +581,26 @@ async function vjBill(request, env, who) {
   return vjJson({ ok: true, bill });
 }
 
+// Cancel a bill / estimate (C-20261016-BILLCANCEL): owners only, with a reason. Never deleted, number never reused; marked cancelled.
+const VJ_CANCEL_REASONS = ['Customer cancelled', 'Wrong entry', 'Made again', 'Other'];
+async function vjBillCancel(request, env, who) {
+  if (who.role !== 'admin') return vjDeny(403, 'owner only');
+  let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+  const no = String(b && b.no || '').slice(0, 20), reason = VJ_CANCEL_REASONS.includes(b && b.reason) ? b.reason : '', note = vjClean(b && b.note, 120);
+  if (!reason) return vjDeny(400, 'reason required');
+  if (reason === 'Other' && !note) return vjDeny(400, 'write the reason');
+  if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
+  const row = await env.DB.prepare('SELECT data FROM vj_bills WHERE no = ?').bind(no).first();
+  if (!row) return vjDeny(404, 'not found');
+  const bill = JSON.parse(row.data);
+  if (bill.cancelled) return vjJson({ error: 'already cancelled' }, 409);
+  bill.cancelled = { reason, note, by: who.email, byName: who.email === 'vaishnavijewels@gmail.com' ? 'Shilpiji' : 'Abhinav', at: new Date().toISOString() };
+  const res = await env.DB.prepare('UPDATE vj_bills SET data = ? WHERE no = ? AND data = ?').bind(JSON.stringify(bill), no, row.data).run();
+  if (!res.meta || res.meta.changes !== 1) return vjJson({ error: 'changed meanwhile, try again' }, 409);
+  await vjAudit(env, who, 'bill-cancel', 'bills/' + no, reason + (note ? ' - ' + note : '') + ' | ' + bill.total);
+  return vjJson({ ok: true, bill });
+}
+
 // Saved bills & estimates (C-20261016-BILLBOOK): month list, one bill for re-printing, or a summary Excel. Owners + staff only.
 async function vjBillBook(url, env, who) {
   if (who.role === 'sales') return vjDeny(403, 'not allowed');
@@ -596,17 +616,20 @@ async function vjBillBook(url, env, who) {
   const MODE = { ws: 'W/s', nett: 'Nett', g2g: 'Gold to Gold', item: 'Gold Item' };
   const dmy = d => String(d || '').split('-').reverse().join('-');
   if (url.pathname === '/api/vj/bills') return vjJson({ ok: true, bills: bills.map(b => ({ no: b.no, title: b.title, date: b.date, name: b.name, city: b.city, mobile: b.mobile,
-    mode: b.mode, settle: b.settle || '', total: b.total, fine: b.fine || 0, disc: b.disc || 0, pieces: (b.rows || []).length, by: b.byName && b.byName !== 'Owner' ? b.byName : String(b.by || '').split('@')[0] })) });
-  const head = ['Date', 'Number', 'Type', 'Customer', 'Mobile', 'City', 'Gold calculation', 'Gold rate F (Rs/g)', 'Pieces', 'Total (Rs)', 'Discount (Rs)', 'After discount (Rs)', 'Rounded (Rs)', 'GST (Rs)', 'Bill total (Rs)', 'Fine gold to receive (g)', 'Made by'];
-  const rows = bills.map(b => [dmy(b.date), b.no, b.title, b.name, vjPhoneTxt(b.mobile), b.city || '', (MODE[b.mode] || b.mode) + (b.settle === 'fine' ? ' (fine gold)' : b.settle === 'amount' ? ' (in rupees)' : ''),
+    mode: b.mode, settle: b.settle || '', total: b.total, fine: b.fine || 0, disc: b.disc || 0, pieces: (b.rows || []).length, by: b.byName && b.byName !== 'Owner' ? b.byName : String(b.by || '').split('@')[0],
+    cancelled: b.cancelled ? b.cancelled.reason + (b.cancelled.note ? ' - ' + b.cancelled.note : '') + ' (' + b.cancelled.byName + ')' : '' })), canCancel: who.role === 'admin' });
+  const head = ['Date', 'Number', 'Type', 'Status', 'Customer', 'Mobile', 'City', 'Gold calculation', 'Gold rate F (Rs/g)', 'Pieces', 'Total (Rs)', 'Discount (Rs)', 'After discount (Rs)', 'Rounded (Rs)', 'GST (Rs)', 'Bill total (Rs)', 'Fine gold to receive (g)', 'Made by'];
+  const cx = b => b.cancelled ? 'CANCELLED - ' + b.cancelled.reason + (b.cancelled.note ? ': ' + b.cancelled.note : '') + ' (' + b.cancelled.byName + ', ' + dmy(String(b.cancelled.at).slice(0, 10)) + ')' : 'Active';
+  const rows = bills.map(b => [dmy(b.date), b.no, b.title, cx(b), b.name, vjPhoneTxt(b.mobile), b.city || '', (MODE[b.mode] || b.mode) + (b.settle === 'fine' ? ' (fine gold)' : b.settle === 'amount' ? ' (in rupees)' : ''),
     Number(b.F) || '', (b.rows || []).map(r => (r.design ? r.design + ' / ' : '') + r.label).join(', '), b.sum, b.disc || 0, b.after == null ? b.sum : b.after, b.sub, b.gst, b.total, b.fine || '', b.byName && b.byName !== 'Owner' ? b.byName : String(b.by || '').split('@')[0]]);
-  const tot = rows.reduce((a, r) => [a[0] + (r[9] || 0), a[1] + (r[10] || 0), a[2] + (r[13] || 0), a[3] + (r[14] || 0), a[4] + (Number(r[15]) || 0)], [0, 0, 0, 0, 0]);
-  if (rows.length) rows.push(['', '', '', 'TOTAL (' + rows.length + ')', '', '', '', '', '', tot[0], tot[1], '', '', tot[2], tot[3], Math.round(tot[4] * 1000) / 1000 || '', '']);
-  const pieces = []; bills.forEach(b => (b.rows || []).forEach(r => pieces.push([dmy(b.date), b.no, b.title, b.name, r.label, r.design || '', r.cat || '', r.gold || '', r.fine || '', r.goldAmt, r.making, r.ct || '', r.diaAmt, r.other || 0, r.amount, r.disc || 0, r.net == null ? r.amount : r.net])));
+  const live = rows.filter(r => r[3] === 'Active'); // cancelled bills are left out of the totals
+  const tot = live.reduce((a, r) => [a[0] + (r[10] || 0), a[1] + (r[11] || 0), a[2] + (r[14] || 0), a[3] + (r[15] || 0), a[4] + (Number(r[16]) || 0)], [0, 0, 0, 0, 0]);
+  if (rows.length) rows.push(['', '', '', '', 'TOTAL (' + live.length + (live.length < rows.length ? ', ' + (rows.length - live.length) + ' cancelled left out' : '') + ')', '', '', '', '', '', tot[0], tot[1], '', '', tot[2], tot[3], Math.round(tot[4] * 1000) / 1000 || '', '']);
+  const pieces = []; bills.forEach(b => (b.rows || []).forEach(r => pieces.push([dmy(b.date), b.no, b.title, b.cancelled ? 'CANCELLED' : 'Active', b.name, r.label, r.design || '', r.cat || '', r.gold || '', r.fine || '', r.goldAmt, r.making, r.ct || '', r.diaAmt, r.other || 0, r.amount, r.disc || 0, r.net == null ? r.amount : r.net])));
   const xlsx = vjXlsx([
-    { name: 'Bills and estimates', head, rows, widths: [11, 12, 9, 22, 15, 12, 20, 10, 34, 12, 11, 12, 12, 10, 13, 12, 12], wrap: [8], mark: r => String(r[3]).startsWith('TOTAL') },
-    { name: 'Pieces', head: ['Date', 'Number', 'Type', 'Customer', 'Tag', 'Design no.', 'Category', 'Gold', 'Fine gold (g)', 'Gold value', 'Making', 'Diamonds (ct)', 'Diamond value', 'Other', 'Amount', 'Discount', 'Net'], rows: pieces,
-      widths: [11, 12, 9, 22, 14, 12, 14, 20, 10, 12, 10, 10, 12, 9, 12, 10, 12] }]);
+    { name: 'Bills and estimates', head, rows, widths: [11, 12, 9, 26, 22, 15, 12, 20, 10, 34, 12, 11, 12, 12, 10, 13, 12, 12], wrap: [3, 9], mark: r => String(r[3]).startsWith('CANCELLED') || String(r[4]).startsWith('TOTAL') },
+    { name: 'Pieces', mark: r => r[3] === 'CANCELLED', head: ['Date', 'Number', 'Type', 'Status', 'Customer', 'Tag', 'Design no.', 'Category', 'Gold', 'Fine gold (g)', 'Gold value', 'Making', 'Diamonds (ct)', 'Diamond value', 'Other', 'Amount', 'Discount', 'Net'], rows: pieces,
+      widths: [11, 12, 9, 11, 22, 14, 12, 14, 20, 10, 12, 10, 10, 12, 9, 12, 10, 12] }]);
   const bin = atob(xlsx), out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   await vjAudit(env, who, 'bills-report', 'bills/', (all ? 'all' : month) + ' ' + bills.length);
   return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_Bills.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
@@ -816,6 +839,7 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/quote' && request.method === 'POST') return vjQuote(request, env, who, ctx);
   if (p === '/api/vj/bill' && request.method === 'POST') return vjBill(request, env, who);
   if ((p === '/api/vj/bills' || p === '/api/vj/bills.xlsx' || p === '/api/vj/bill') && request.method === 'GET') return vjBillBook(url, env, who);
+  if (p === '/api/vj/bill/cancel' && request.method === 'POST') return vjBillCancel(request, env, who);
   if (p === '/api/vj/orders' && request.method === 'GET') return vjOrdersReport(env, who);
   if (p.startsWith('/_blob/') && request.method === 'GET') return vjBlob(p.slice(7), env);
   if ((p === '/tags' || p === '/tags.html' || p.startsWith('/tags/')) && request.method === 'GET') {
