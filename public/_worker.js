@@ -594,18 +594,31 @@ async function vjBillCancel(request, env, who) {
   if (who.role !== 'admin') return vjDeny(403, 'owner only');
   let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
   const no = String(b && b.no || '').slice(0, 20), reason = VJ_CANCEL_REASONS.includes(b && b.reason) ? b.reason : '', note = vjClean(b && b.note, 120);
-  if (!reason) return vjDeny(400, 'reason required');
-  if (reason === 'Other' && !note) return vjDeny(400, 'write the reason');
+  const stock = !!(b && b.stock); // C-20261016-BILL3WAY choice 3: also move the bill's order pieces to stock
   if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
   const row = await env.DB.prepare('SELECT data FROM vj_bills WHERE no = ?').bind(no).first();
   if (!row) return vjDeny(404, 'not found');
-  const bill = JSON.parse(row.data);
-  if (bill.cancelled) return vjJson({ error: 'already cancelled' }, 409);
-  bill.cancelled = { reason, note, by: who.email, byName: who.email === 'vaishnavijewels@gmail.com' ? 'Shilpiji' : 'Abhinav', at: new Date().toISOString() };
-  const res = await env.DB.prepare('UPDATE vj_bills SET data = ? WHERE no = ? AND data = ?').bind(JSON.stringify(bill), no, row.data).run();
-  if (!res.meta || res.meta.changes !== 1) return vjJson({ error: 'changed meanwhile, try again' }, 409);
-  await vjAudit(env, who, 'bill-cancel', 'bills/' + no, reason + (note ? ' - ' + note : '') + ' | ' + bill.total);
-  return vjJson({ ok: true, bill });
+  const bill = JSON.parse(row.data), byName = who.email === 'vaishnavijewels@gmail.com' ? 'Shilpiji' : 'Abhinav';
+  if (bill.cancelled && !stock) return vjJson({ error: 'already cancelled' }, 409);
+  if (!bill.cancelled) {
+    if (!reason) return vjDeny(400, 'reason required');
+    if (reason === 'Other' && !note) return vjDeny(400, 'write the reason');
+    bill.cancelled = { reason, note, by: who.email, byName, at: new Date().toISOString() };
+    const res = await env.DB.prepare('UPDATE vj_bills SET data = ? WHERE no = ? AND data = ?').bind(JSON.stringify(bill), no, row.data).run();
+    if (!res.meta || res.meta.changes !== 1) return vjJson({ error: 'changed meanwhile, try again' }, 409);
+    await vjAudit(env, who, 'bill-cancel', 'bills/' + no, reason + (note ? ' - ' + note : '') + ' | ' + bill.total);
+  }
+  let moved = 0;
+  if (stock) for (const id of [...new Set((bill.rows || []).map(r => String(r.id || '')))]) {
+    const path = 'tags/' + id, t = await env.DB.prepare('SELECT data, version FROM docs WHERE path = ?').bind(path).first();
+    if (!t) continue; const d = JSON.parse(t.data); if (d.kind !== 'order') continue;
+    const o = d.order || {};
+    d.orderCancelled = { name: vjClean(o.name, 60), mobile: vjPhone(o.mobile), city: vjClean(o.city, 40), due: /^\d{4}-\d{2}-\d{2}$/.test(String(o.due || '')) ? o.due : '', at: new Date().toISOString(), by: who.email };
+    delete d.order; d.kind = 'sale'; d.status = 'in_stock';
+    const r = await env.DB.prepare('UPDATE docs SET data = ?, version = ?, updated_at = ?, updated_by = ? WHERE path = ? AND version = ?').bind(JSON.stringify(d), t.version + 1, Date.now(), who.email, path, t.version).run();
+    if (r.meta && r.meta.changes === 1) { moved++; await vjAudit(env, who, 'update', path, 'kind,status,order,orderCancelled (bill ' + no + ' cancelled, moved to stock)'); }
+  }
+  return vjJson({ ok: true, bill, moved });
 }
 
 // Permanent erase (C-20261016-BILLERASE, owner 16/10/2026): owners only, the bill number typed again to confirm. Removes the bill,
