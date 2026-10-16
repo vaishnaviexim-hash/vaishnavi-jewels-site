@@ -122,7 +122,7 @@
     document.querySelectorAll("input[name=bmode]").forEach(r => r.addEventListener("change", () => { B.mode = r.value; render(); }));
     document.querySelectorAll("input[name=bset]").forEach(r => r.addEventListener("change", () => { B.settle = r.value; render(); }));
     document.querySelectorAll("input[name=btitle]").forEach(r => r.addEventListener("change", () => { B.title = r.value; numField(); }));
-    $("bmonth").value = today().slice(0, 7); $("bmonth").addEventListener("change", loadBook);
+    $("bmonth").value = today().slice(0, 7); $("bmonth").addEventListener("change", loadBook); if ($("bshowcx")) $("bshowcx").addEventListener("change", loadBook);
     $("bxl").addEventListener("click", () => xl($("bmonth").value || today().slice(0, 7))); $("bxlall").addEventListener("click", () => xl("all"));
     $("bF").addEventListener("input", render); $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); });
     $("bclear").addEventListener("click", () => { B.items = []; B.disc = {}; B.rates = {}; B.frates = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
