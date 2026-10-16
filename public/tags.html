@@ -137,7 +137,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
       <!-- owner 16/10/2026 (C-20261016-ORDERS): a piece made for a customer's order -->
       <div class="row" id="orderBox" hidden>
         <label>Customer name <input id="oName" autocomplete="off" maxlength="60"></label>
-        <label>Mobile <input id="oMob" inputmode="tel" autocomplete="off" maxlength="14" placeholder="98xxxxxxxx"></label>
+        <label>Mobile <input id="oMob" inputmode="tel" autocomplete="off" maxlength="20" placeholder="98xxxxxxxx"></label>
         <label>City <input id="oCity" autocomplete="off" maxlength="40"></label>
         <label>Delivery date <input id="oDue" type="date"></label>
       </div>
@@ -412,7 +412,7 @@ function readForm(){
   const dias=[...$("diaLines").children].map(r=>{const i=r.dataset.id;const qq=$("dq"+i).value==="Other"?($("dqo"+i).value.trim().toUpperCase()||"OTHER?"):$("dq"+i).value;const sp=num($("dr"+i).value),sh=$("ds"+i).value,def=defRate(sh,qq);return {shape:sh,q:qq,ct:num($("dc"+i).value),pcs:Math.round(num($("dp"+i).value)),rate:sp>0?sp:(def||0),special:sp>0}}).filter(d=>d.ct>0||d.pcs>0||d.special);
   const mainK=(gold.find(g=>g.net>0)||gold[0]||{k:"14K"}).k;
   const prefix=k==="sample"?cat.s:cat.code+KNUM[mainK];
-  const order=k==="order"?{name:$("oName").value.trim().slice(0,60),mobile:$("oMob").value.replace(/\D/g,"").replace(/^91(?=\d{10}$)/,""),city:$("oCity").value.trim().slice(0,40),due:$("oDue").value||""}:null;
+  const order=k==="order"?{name:$("oName").value.trim().slice(0,60),mobile:$("oMob").value.trim().slice(0,20),city:$("oCity").value.trim().slice(0,40),due:$("oDue").value||""}:null;
   return {kind:k,cat:cat.id,prefix,catName:cat.name.replace(/\s*\(.*\)$/,""),mainK,gold,dias,order,
     remark:$("remark").value.trim(),designNo:$("designNo").value.trim().toUpperCase(),other:{amt:num($("otherAmt").value)}};
 }
@@ -435,7 +435,6 @@ function price(t){
 function problems(t){
   const p=[],s=st();
   if(t.kind==="order"&&!t.order.name)p.push("Enter the customer's name for this order.");
-  if(t.kind==="order"&&t.order.mobile&&!/^[6-9]\d{9}$/.test(t.order.mobile))p.push("Customer mobile must be 10 digits (or leave it empty).");
   if(!t.designNo)p.push("Enter the design number.");
   if(!t.gold.some(g=>g.net>0))p.push("Enter the net gold weight.");
   t.dias.forEach((d,i)=>{if(d.q==="OTHER?")p.push(`Diamond line ${i+1}: type the quality.`);if(!(d.ct>0))p.push(`Diamond line ${i+1}: enter the carat weight.`);if(t.kind!=="sample"&&!(d.rate>0))p.push(`Diamond line ${i+1}: no default rate for ${d.shape} ${d.q}. Enter the special rate.`)});
