@@ -371,6 +371,15 @@ function renderCheck(){
   if(S.role!=="sales"){const rp=document.createElement("button");rp.type="button";rp.className="btn ghost";rp.textContent="Reprint tag";rp.addEventListener("click",async()=>{if(await ensureCode(t))printOrPDF(t)});acts.appendChild(rp);}
   if(S.owner){const dl=document.createElement("button");dl.type="button";dl.className="btn ghost";dl.style.color="#a12b2b";dl.textContent="Delete tag";
     dl.addEventListener("click",()=>{const hold=document.createElement("div");acts.replaceWith(hold);deleteBox(t,hold,renderCheck,renderCheck)});acts.appendChild(dl)}
+  /* owners: an order the customer cancelled becomes stock; the old customer stays on the piece as orderCancelled (C-20261016-ORDERSTOCK) */
+  if(S.owner&&t.kind==="order"){const ms=document.createElement("button");ms.type="button";ms.className="btn ghost";ms.textContent="Move to stock";
+    ms.addEventListener("click",()=>{const hold=document.createElement("div");acts.replaceWith(hold);
+      const box=document.createElement("div");box.className="confirm";box.style.cssText="display:flex;gap:8px;align-items:center;flex-wrap:wrap";
+      const q=document.createElement("b");q.textContent=`Order cancelled by ${t.order&&t.order.name||"the customer"}? Move ${t.label} to stock.`;
+      const y=document.createElement("button");y.type="button";y.className="btn";y.textContent="Move to stock";const n=document.createElement("button");n.type="button";n.className="btn ghost";n.textContent="Keep as order";
+      y.addEventListener("click",async()=>{y.disabled=true;try{await S.db.doc("tags/"+t.id).update({kind:"sale",status:"in_stock",order:null,orderCancelled:Object.assign({},t.order||{},{at:new Date().toISOString(),by:S.me||""})});
+        msg(`${t.label} is now stock. The cancelled order (${t.order&&t.order.name||""}) is kept in its record.`,"ok");renderCheck()}catch(e){y.disabled=false;msg("Could not move it: "+(e&&(e.code||e.message)||"error")+".","bad")}});
+      n.addEventListener("click",renderCheck);box.append(q,y,n);hold.appendChild(box)});acts.appendChild(ms)}
   card.appendChild(acts);
   box.appendChild(card);
 }
@@ -870,7 +879,7 @@ $("q").addEventListener("input",renderList);$("fkind").addEventListener("change"
 $("ordRep").addEventListener("click",async()=>{const b=$("ordRep");b.disabled=true;
   try{const r=await fetch("/api/vj/orders",{credentials:"same-origin"});if(!r.ok)throw new Error(r.status===403?"not allowed":"server "+r.status);
     const bl=await r.blob(),a=document.createElement("a");a.href=URL.createObjectURL(bl);a.download="VJ_Orders_"+new Date(Date.now()+5.5*3600e3).toISOString().slice(0,10).split("-").reverse().join("-")+".xlsx";
-    document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},3000);msg("Orders report downloaded.","ok")}
+    document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},3000);const pn=r.headers.get("x-pending");msg("Orders report downloaded"+(pn!==null?`: ${pn} pending order${pn==="1"?"":"s"} (not billed yet) on the first sheet.`:"."),"ok")}
   catch(e){msg("Could not make the orders report: "+(e.message||e)+".","bad")}b.disabled=false});
 
 /* ---------- settings ---------- */
