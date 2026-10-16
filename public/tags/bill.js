@@ -136,7 +136,8 @@
     try { const r = await fetch("/api/vj/bills?month=" + encodeURIComponent(mo), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
       body.textContent = ""; let tot = 0;
       let nc = 0;
-      j.bills.slice().reverse().forEach(b => { if (b.cancelled) nc++; else tot += b.total || 0; const tr = document.createElement("tr"); const td = (x, cl) => { const e = document.createElement("td"); if (cl) e.className = cl; e.textContent = x; tr.appendChild(e); return e; };
+      const showC = !!j.canCancel && $("bshowcx").checked; // owner 16/10: a cancelled bill's line leaves the screen (still kept, still in the Excel) (C-20261016-HIDECANCELLED)
+      j.bills.slice().reverse().forEach(b => { if (b.cancelled) { nc++; if (!showC) return; } else tot += b.total || 0; const tr = document.createElement("tr"); const td = (x, cl) => { const e = document.createElement("td"); if (cl) e.className = cl; e.textContent = x; tr.appendChild(e); return e; };
         td(dmy(b.date)); td(b.no); const ty = td(b.title); if (b.cancelled) { const s = document.createElement("div"); s.style.cssText = "color:#a12b2b;font-weight:600"; s.textContent = "CANCELLED"; const r = document.createElement("div"); r.className = "hint"; r.textContent = b.cancelled; ty.append(s, r); tr.style.opacity = "0.75"; }
         td(b.name + (b.city ? ", " + b.city : "")); td(fmt(b.total), "num"); td(b.fine ? g3(b.fine) : "—", "num"); td(b.by || "");
         const x = document.createElement("td"); x.style.whiteSpace = "nowrap"; const o = document.createElement("button"); o.type = "button"; o.className = "btn ghost"; o.textContent = "PDF"; o.addEventListener("click", () => reprint(b.no, o)); x.appendChild(o);
