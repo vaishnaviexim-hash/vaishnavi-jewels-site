@@ -486,7 +486,8 @@ async function vjQuote(request, env, who, ctx) {
 // Gold to Gold: fine gold due = net x (9K 0.4235, 14K 0.66, 18K 0.836, 22K 1.06, 24K 1), making 650/750 per g in rupees.
 // Gold Item: fine gold due = net x (9K 0.54, 14K 0.74, 18K 0.90, 22K 1.06, 24K 1), making already in the gold (none in rupees).
 // For Gold to Gold / Gold Item, settle 'fine' = customer gives the fine gold; 'amount' = fine x F is charged in rupees.
-// Diamonds = ct x the tag's rate, plus other charges. Rupee total before GST rounded UP to Rs 1,000; GST to the nearest rupee.
+// Diamonds = ct x the tag's rate, plus other charges. Discount (C-20261016-BILLDISC) per piece, rupees or 'n%' of that piece's
+// rupee amount, never more than it. Rupee total less discount, rounded UP to Rs 1,000; GST to the nearest rupee.
 const VJ_FINE = { g2g: { '9K': 0.4235, '14K': 0.66, '18K': 0.836, '22K': 1.06, '24K': 1 }, item: { '9K': 0.54, '14K': 0.74, '18K': 0.90, '22K': 1.06, '24K': 1 } };
 function vjBillCalc(tags, o) {
   const pur = Object.assign({ '24K': 1, '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.40 }, o.purity || {});
@@ -512,11 +513,16 @@ function vjBillCalc(tags, o) {
       gold: gl.map(g => g.k + ' ' + g.net.toFixed(3) + ' g').join(' + '), net: Math.round(net * 1000) / 1000, fine, goldAmt: Math.round(gold),
       mkRate: mk, making: Math.round(mk * net), ct: Math.round(ct * 100) / 100, diaAmt: Math.round(dia), other: Math.round(oth) };
     r.amount = r.goldAmt + r.making + r.diaAmt + r.other;
+    const dv = String(o.disc && o.disc[t.id] != null ? o.disc[t.id] : '').trim(), pm = dv.match(/^(\d+(?:\.\d+)?)\s*%$/), dn = Number(dv.replace(/[,\s]/g, ''));
+    r.discTxt = pm ? Math.min(100, Number(pm[1])) + '%' : '';
+    r.disc = Math.round(Math.min(r.amount, pm ? r.amount * Math.min(100, Number(pm[1])) / 100 : (dn > 0 ? dn : 0)));
+    r.net = r.amount - r.disc;
     return r;
   });
-  const sum = rows.reduce((a, r) => a + r.amount, 0), sub = Math.ceil(sum / 1000) * 1000, gst = Math.round(sub * gstPct / 100);
+  const sum = rows.reduce((a, r) => a + r.amount, 0), disc = rows.reduce((a, r) => a + r.disc, 0), after = sum - disc;
+  const sub = Math.ceil(after / 1000) * 1000, gst = Math.round(sub * gstPct / 100);
   const fine = Math.round(rows.reduce((a, r) => a + r.fine, 0) * 1000) / 1000;
-  return { mode, settle, rows, fine: settle === 'fine' ? fine : 0, fineIn: fine, sum, roundOff: sub - sum, sub, gstPct, gst, total: sub + gst };
+  return { mode, settle, rows, fine: settle === 'fine' ? fine : 0, fineIn: fine, sum, disc, after, roundOff: sub - after, sub, gstPct, gst, total: sub + gst };
 }
 // VJ_BILL_CALC_END
 
@@ -536,6 +542,7 @@ async function vjBill(request, env, who) {
   const settle = b && b.settle === 'amount' ? 'amount' : 'fine';
   const title = b && b.title === 'Estimate' ? 'Estimate' : 'Bill';
   const ids = Array.isArray(b && b.ids) ? [...new Set(b.ids.map(String))].slice(0, 25) : [];
+  const disc = {}; if (b && b.disc && typeof b.disc === 'object') for (const id of ids) if (b.disc[id] != null) disc[id] = String(b.disc[id]).slice(0, 12);
   if (!/^[A-Z0-9][A-Z0-9\-\/]{0,19}$/.test(no)) return vjDeny(400, 'bill number: letters, digits, - or / only');
   if (!name) return vjDeny(400, 'customer name is required');
   if (mobile && !/^[6-9]\d{9}$/.test(mobile)) return vjDeny(400, 'mobile must be 10 digits');
@@ -551,12 +558,12 @@ async function vjBill(request, env, who) {
   }
   const sRow = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first();
   const s = sRow ? JSON.parse(sRow.data) : {};
-  const calc = vjBillCalc(tags, { F, mode, settle, purity: s.purity, making: s.making, gst: s.gst });
+  const calc = vjBillCalc(tags, { F, mode, settle, disc, purity: s.purity, making: s.making, gst: s.gst });
   calc.rows.forEach((r, i) => { const ph = tags[i].photo; if (typeof ph === 'string' && /^[0-9a-f]{32}$/.test(ph)) r.photo = ph; }); // owner 16/10: photo on the bill
   const bill = Object.assign({ no, title, date, name, city, mobile, F, by: who.email, byName: who.name, at: new Date().toISOString() }, calc);
   const res = await env.DB.prepare('INSERT INTO vj_bills (no, ts, email, data) VALUES (?, ?, ?, ?) ON CONFLICT(no) DO NOTHING').bind(no, Date.now(), who.email, JSON.stringify(bill)).run();
   if (!res.meta || res.meta.changes !== 1) return vjJson({ error: 'bill number ' + no + ' is already used' }, 409);
-  await vjAudit(env, who, 'bill', 'bills/' + no, `${title} ${mode}${calc.settle ? '/' + calc.settle : ''} ${name} ${mobile} ${calc.total}${calc.fine ? ' + ' + calc.fine + ' g fine' : ''} | ${ids.join(',')}`);
+  await vjAudit(env, who, 'bill', 'bills/' + no, `${title} ${mode}${calc.settle ? '/' + calc.settle : ''} ${name} ${mobile} ${calc.total}${calc.fine ? ' + ' + calc.fine + ' g fine' : ''}${calc.disc ? ' disc ' + calc.disc : ''} | ${ids.join(',')}`);
   return vjJson({ ok: true, bill });
 }
 
