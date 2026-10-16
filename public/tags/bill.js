@@ -242,7 +242,7 @@
       date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, title: B.title, ids: B.items.slice(), disc: Object.assign({}, B.disc) };
     if (!body.name) { m.textContent = "Enter the customer's name."; return; }
     if (!body.no && B.title !== "Estimate") { m.textContent = "Enter the bill number."; return; }
-    if (body.mobile && !/^[6-9]\d{9}$/.test(body.mobile)) { m.textContent = "Mobile must be 10 digits (or leave it empty)."; return; }
+    if (body.mobile && !/^[6-9]\d{9}$/.test(body.mobile)) { const dg = body.mobile.replace(/^91(?=\d{9,10}$)/, "").length; m.textContent = `The mobile number has ${dg} digit${dg === 1 ? "" : "s"} (after +91); it needs 10. Check it, or leave it empty.`; return; }
     if (!(body.F >= 2000)) { m.textContent = "Type the gold rate (F) per gram, 24K."; return; }
     if (!body.ids.length) { m.textContent = "Add at least one piece."; return; }
     $("bsave").disabled = true; m.textContent = "Saving the bill…";
