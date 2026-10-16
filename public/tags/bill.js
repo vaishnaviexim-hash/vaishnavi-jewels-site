@@ -102,20 +102,50 @@
         <tr><td id="bgstl">GST 3%</td><td id="bgst">—</td></tr><tr class="total"><td>Bill total</td><td id="btotal">—</td></tr></table>
       <p class="hint" id="bnote"></p>
       <div class="actions"><button type="button" class="btn" id="bsave">Save bill &amp; make PDF</button><button type="button" class="btn ghost" id="bclear">Clear</button></div>
-      <p class="hint" id="bmsg"></p><div class="actions" id="bout" hidden></div>`;
+      <p class="hint" id="bmsg"></p><div class="actions" id="bout" hidden></div>
+      <h2>3 · Saved bills &amp; estimates</h2>
+      <div class="row" style="align-items:end"><label style="flex:0 1 200px">Month <input id="bmonth" type="month"></label>
+        <div class="actions" style="margin:0"><button type="button" class="btn ghost" id="bxl">Download summary (Excel)</button><button type="button" class="btn ghost" id="bxlall">All months (Excel)</button></div></div>
+      <div class="list"><table class="items" style="min-width:640px"><thead><tr><th>Date</th><th>Number</th><th>Type</th><th>Customer</th><th>Total</th><th>Fine gold</th><th>By</th><th></th></tr></thead><tbody id="bbook"></tbody></table></div>
+      <p class="hint" id="bbookmsg"></p>`;
     $("p-rates").parentNode.insertBefore(sec, $("p-rates"));
     document.querySelectorAll("nav button").forEach(x => x.addEventListener("click", () => {
-      const on = x.dataset.tab === "bill"; sec.hidden = !on; if (on) { document.querySelectorAll('[id^="p-"]').forEach(p => { if (p !== sec) p.hidden = true; }); prefill(); render(); }
+      const on = x.dataset.tab === "bill"; sec.hidden = !on; if (on) { document.querySelectorAll('[id^="p-"]').forEach(p => { if (p !== sec) p.hidden = true; }); prefill(); numField(); render(); loadBook(); }
       document.querySelectorAll("nav button").forEach(y => y.setAttribute("aria-selected", y === x ? "true" : "false"));
     }));
     $("badd").addEventListener("click", pick); $("bq").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); pick(); } });
     document.querySelectorAll("input[name=bmode]").forEach(r => r.addEventListener("change", () => { B.mode = r.value; render(); }));
     document.querySelectorAll("input[name=bset]").forEach(r => r.addEventListener("change", () => { B.settle = r.value; render(); }));
-    document.querySelectorAll("input[name=btitle]").forEach(r => r.addEventListener("change", () => { B.title = r.value; }));
-    $("bF").addEventListener("input", render); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); });
-    $("bclear").addEventListener("click", () => { B.items = []; B.disc = {}; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); render(); });
+    document.querySelectorAll("input[name=btitle]").forEach(r => r.addEventListener("change", () => { B.title = r.value; numField(); }));
+    $("bmonth").value = today().slice(0, 7); $("bmonth").addEventListener("change", loadBook);
+    $("bxl").addEventListener("click", () => xl($("bmonth").value || today().slice(0, 7))); $("bxlall").addEventListener("click", () => xl("all"));
+    $("bF").addEventListener("input", render); $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); });
+    $("bclear").addEventListener("click", () => { B.items = []; B.disc = {}; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
     $("bsave").addEventListener("click", save);
   }
+  // C-20261016-BILLBOOK: estimate numbers are given by the server (E-YYMM-NN, from 01 each month); bill numbers are typed
+  function numField() { const e = B.title === "Estimate", n = $("bno"); n.disabled = e; if (e) n.value = ""; const d = $("bdate").value || today();
+    n.placeholder = e ? "automatic (E-" + d.slice(2, 4) + d.slice(5, 7) + "-01, 02 …)" : "bill book number"; }
+  async function loadBook() {
+    const body = $("bbook"), m = $("bbookmsg"); if (!body) return; const mo = $("bmonth").value || today().slice(0, 7);
+    try { const r = await fetch("/api/vj/bills?month=" + encodeURIComponent(mo), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+      body.textContent = ""; let tot = 0;
+      j.bills.slice().reverse().forEach(b => { tot += b.total || 0; const tr = document.createElement("tr"); const td = (x, cl) => { const e = document.createElement("td"); if (cl) e.className = cl; e.textContent = x; tr.appendChild(e); };
+        td(dmy(b.date)); td(b.no); td(b.title); td(b.name + (b.city ? ", " + b.city : "")); td(fmt(b.total), "num"); td(b.fine ? g3(b.fine) : "—", "num"); td(b.by || "");
+        const x = document.createElement("td"), o = document.createElement("button"); o.type = "button"; o.className = "btn ghost"; o.textContent = "PDF"; o.addEventListener("click", () => reprint(b.no, o)); x.appendChild(o); tr.appendChild(x); body.appendChild(tr); });
+      m.textContent = j.bills.length ? `${j.bills.length} in this month, total ${fmt(tot)}.` : "Nothing saved in this month.";
+    } catch (e) { m.textContent = "Could not load the saved bills (" + (e.message || e) + ")."; }
+  }
+  async function reprint(no, btn) { btn.disabled = true;
+    try { const r = await fetch("/api/vj/bill?no=" + encodeURIComponent(no), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+      const b = j.bill, blob = await makePdf(b, B.photos), a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+      a.download = `${b.title} ${b.no.replace(/[^A-Z0-9\-]/g, "-")} ${String(b.name).replace(/[^A-Za-z0-9 .\-]/g, "").trim().slice(0, 40)}.pdf`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+    } catch (e) { $("bbookmsg").textContent = "Could not open " + no + " (" + (e.message || e) + ")."; } btn.disabled = false; }
+  async function xl(mo) {
+    try { const r = await fetch("/api/vj/bills.xlsx?month=" + encodeURIComponent(mo), { credentials: "same-origin" }); if (!r.ok) throw new Error(r.status);
+      const a = document.createElement("a"); a.href = URL.createObjectURL(await r.blob()); a.download = "VJ_Bills_" + (mo === "all" ? "all" : mo.split("-").reverse().join("-")) + ".xlsx";
+      document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+    } catch (e) { $("bbookmsg").textContent = "Could not make the Excel (" + (e.message || e) + ")."; } }
   function prefill() { if (!$("bdate").value) $("bdate").value = today(); if (!$("bF").value) { const g = settings().gold24g; if (g) $("bF").value = Math.round(g); } }
   function pick() {
     const box = $("bpick"); box.textContent = ""; const r = find($("bq").value);
@@ -203,7 +233,7 @@
     const body = { no: $("bno").value.trim(), name: $("bname").value.trim(), city: $("bcity").value.trim(), mobile: $("bmob").value.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""),
       date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, title: B.title, ids: B.items.slice(), disc: Object.assign({}, B.disc) };
     if (!body.name) { m.textContent = "Enter the customer's name."; return; }
-    if (!body.no) { m.textContent = "Enter the bill number."; return; }
+    if (!body.no && B.title !== "Estimate") { m.textContent = "Enter the bill number."; return; }
     if (body.mobile && !/^[6-9]\d{9}$/.test(body.mobile)) { m.textContent = "Mobile must be 10 digits (or leave it empty)."; return; }
     if (!(body.F >= 2000)) { m.textContent = "Type the gold rate (F) per gram, 24K."; return; }
     if (!body.ids.length) { m.textContent = "Add at least one piece."; return; }
@@ -214,7 +244,7 @@
       const b = j.bill; m.textContent = "Making the PDF…";
       const blob = await makePdf(b, B.photos), fname = `${b.title} ${b.no.replace(/[^A-Z0-9\-]/g, "-")} ${b.name.replace(/[^A-Za-z0-9 .\-]/g, "").trim().slice(0, 40)}.pdf`;
       const file = new File([blob], fname, { type: "application/pdf" }), url = URL.createObjectURL(file);
-      m.textContent = `${b.title} ${b.no} saved: ${fmt(b.total)}${b.fine ? " + " + g3(b.fine) + " fine gold" : ""}.`;
+      loadBook(); m.textContent = `${b.title} ${b.no} saved: ${fmt(b.total)}${b.fine ? " + " + g3(b.fine) + " fine gold" : ""}.`;
       out.textContent = ""; out.hidden = false;
       const op = document.createElement("a"); op.className = "btn"; op.href = url; op.target = "_blank"; op.rel = "noopener"; op.textContent = "Open PDF (print)";
       const dl = document.createElement("a"); dl.className = "btn ghost"; dl.href = url; dl.download = fname; dl.textContent = "Download";
