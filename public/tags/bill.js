@@ -139,19 +139,19 @@
         td(dmy(b.date)); td(b.no); const ty = td(b.title); if (b.cancelled) { const s = document.createElement("div"); s.style.cssText = "color:#a12b2b;font-weight:600"; s.textContent = "CANCELLED"; const r = document.createElement("div"); r.className = "hint"; r.textContent = b.cancelled; ty.append(s, r); tr.style.opacity = "0.75"; }
         td(b.name + (b.city ? ", " + b.city : "")); td(fmt(b.total), "num"); td(b.fine ? g3(b.fine) : "—", "num"); td(b.by || "");
         const x = document.createElement("td"); x.style.whiteSpace = "nowrap"; const o = document.createElement("button"); o.type = "button"; o.className = "btn ghost"; o.textContent = "PDF"; o.addEventListener("click", () => reprint(b.no, o)); x.appendChild(o);
-        if (j.canCancel) { const c = document.createElement("button"); c.type = "button"; c.className = "btn ghost"; c.style.color = "#a12b2b"; c.textContent = "Cancel / Erase"; c.addEventListener("click", () => actBox(b, x)); x.appendChild(c); }
+        if (j.canCancel || (j.canCancelOnly && !b.cancelled)) { const c = document.createElement("button"); c.type = "button"; c.className = "btn ghost"; c.style.color = "#a12b2b"; c.textContent = j.canCancel ? "Cancel / Erase" : "Cancel"; c.addEventListener("click", () => actBox(b, x, !!j.canCancel)); x.appendChild(c); }
         tr.appendChild(x); body.appendChild(tr); });
       m.textContent = j.bills.length ? `${j.bills.length} in this month${nc ? " (" + nc + " cancelled)" : ""}, total ${fmt(tot)}${nc ? " without the cancelled ones" : ""}.` : "Nothing saved in this month.";
     } catch (e) { m.textContent = "Could not load the saved bills (" + (e.message || e) + ")."; }
   }
   // owners only (C-20261016-BILL3WAY): 1 erase everything, 2 cancel the bill only (pieces stay - orders stay orders), 3 cancel and move order pieces to stock
-  function actBox(b, cell) {
+  function actBox(b, cell, owner) { // owner: all 3 choices; anyone else: only 2 (cancel the bill, pieces unchanged)
     cell.textContent = ""; const w = document.createElement("div"); w.style.cssText = "display:flex;flex-direction:column;gap:6px;max-width:360px;white-space:normal";
     const nm = "bact" + Math.random().toString(36).slice(2), opts = [];
     const add = (v, l) => { const lb = document.createElement("label"); lb.style.cssText = "flex-direction:row;align-items:flex-start;gap:8px;color:var(--fg);font-size:14px"; const r = document.createElement("input"); r.type = "radio"; r.name = nm; r.value = v; r.style.cssText = "width:auto;margin-top:3px"; lb.append(r, l); w.appendChild(lb); opts.push(r); };
-    add("1", `1 · Erase everything: the bill and its ${b.pieces} piece${b.pieces === 1 ? "" : "s"} (tags, codes, photos) are removed for good`);
+    if (owner) add("1", `1 · Erase everything: the bill and its ${b.pieces} piece${b.pieces === 1 ? "" : "s"} (tags, codes, photos) are removed for good`);
     if (!b.cancelled) add("2", "2 · Cancel the bill only: pieces stay as they are (an order stays an order, pending again)");
-    add("3", b.cancelled ? "3 · Move this bill's order pieces to stock" : "3 · Cancel the bill and move its order pieces to stock");
+    if (owner) add("3", b.cancelled ? "3 · Move this bill's order pieces to stock" : "3 · Cancel the bill and move its order pieces to stock");
     const sel = document.createElement("select"); sel.setAttribute("aria-label", "Reason for cancelling");
     [["", "Reason…"], ["Customer cancelled", "Customer cancelled"], ["Wrong entry", "Wrong entry"], ["Made again", "Made again (new bill)"], ["Other", "Other"]].forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = l; sel.appendChild(o); });
     const note = document.createElement("input"); note.placeholder = "note (needed for Other)"; note.maxLength = 120;
@@ -162,7 +162,7 @@
     let sure = false; const pick = () => (opts.find(r => r.checked) || {}).value || "";
     const ok = () => { const v = pick(), needR = (v === "2" || v === "3") && !b.cancelled; rs.hidden = !needR; rs.style.display = needR ? "flex" : "none"; sure = false;
       y.textContent = v === "1" ? "Erase for good" : "Do it"; y.disabled = !v || (needR && (!sel.value || (sel.value === "Other" && !note.value.trim()))); };
-    opts.forEach(r => r.addEventListener("change", ok)); sel.addEventListener("change", ok); note.addEventListener("input", ok); n.addEventListener("click", loadBook); ok();
+    opts.forEach(r => r.addEventListener("change", ok)); sel.addEventListener("change", ok); note.addEventListener("input", ok); n.addEventListener("click", loadBook); if (opts.length === 1) opts[0].checked = true; ok();
     y.addEventListener("click", async () => {
       const v = pick(); if (v === "1" && !sure) { sure = true; y.textContent = "Yes, erase " + b.no + " for good"; return; }
       y.disabled = true;
