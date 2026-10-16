@@ -72,7 +72,7 @@
   function build() {
     const nav = document.querySelector("nav"); if (!nav || $("t-bill")) return;
     const b = document.createElement("button"); b.setAttribute("role", "tab"); b.id = "t-bill"; b.dataset.tab = "bill"; b.textContent = "Bill"; b.setAttribute("aria-selected", "false");
-    nav.insertBefore(b, nav.querySelector('[data-tab="rates"]'));
+    const nt = nav.querySelector('[data-tab="new"]'); nav.insertBefore(b, nt ? nt.nextSibling : nav.querySelector('[data-tab="rates"]')); // owner 16/10: New tag, Bill, then the rest
     const sec = document.createElement("section"); sec.id = "p-bill"; sec.className = "card"; sec.hidden = true;
     sec.innerHTML = `
       <h2>1 · Pieces</h2>
