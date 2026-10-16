@@ -223,6 +223,7 @@ async function vjSync(request, env, who, ctx) {
   const out = docs.map(r => {
     const data = JSON.parse(r.data);
     if (who.role === 'sales' && (r.path === 'counters/main' || r.path.startsWith('quotes/'))) return null;
+    if (who.role === 'sales' && data && data.order) delete data.order; // C-20261016-ORDERS: customer details never go to the sales login
     return { path: r.path, data, version: r.version };
   }).filter(Boolean);
   // 'now - 2000' so a write landing in the same millisecond is never missed on the next poll
@@ -265,6 +266,13 @@ async function vjWrite(request, env, who) {
   }
   if (path.startsWith('tags/')) {
     for (const k of ['costPrice', 'cost', 'mrp', 'purchase']) delete next[k]; // F-025: never store cost prices
+    if (next.order !== undefined) { // C-20261016-ORDERS: order customer, cleaned
+      const o = next.order && typeof next.order === 'object' ? next.order : null;
+      if (!o || next.kind !== 'order') delete next.order;
+      else { const mob = String(o.mobile || '').replace(/\D/g, '').slice(-10), due = String(o.due || '');
+        next.order = { name: vjClean(o.name, 60), mobile: /^[6-9]\d{9}$/.test(mob) ? mob : '', city: vjClean(o.city, 40), due: /^\d{4}-\d{2}-\d{2}$/.test(due) ? due : '' };
+        if (!next.order.name) return vjDeny(400, 'order needs the customer name'); }
+    }
     if (!cur) next.createdBy = who.email;
   }
   const s = JSON.stringify(next);
@@ -561,7 +569,7 @@ async function vjBill(request, env, who) {
 const VJ_PHOTO_F = new Set(['photo', 'photoAt', 'photoBy']);
 const VJ_PRINT_F = new Set(['code', 'priceAtTag', 'gold24gAtTag', 'queue', 'queueAt', 'printedAt']);
 const VJ_FIELD_NAME = { designNo: 'Design no.', label: 'Tag', catName: 'Category', remark: 'Remark', gold: 'Gold', dias: 'Diamonds', other: 'Other charges',
-  metal: 'Sample weight', box: 'Packet / box', kind: 'Stock / sample', status: 'Status', photo: 'Photo', code: 'Price code', priceAtTag: 'Price when tagged' };
+  metal: 'Sample weight', box: 'Packet / box', kind: 'Order / stock / sample', order: 'Order customer', status: 'Status', photo: 'Photo', code: 'Price code', priceAtTag: 'Price when tagged' };
 const vjGoldTxt = t => t && t.kind === 'sample' ? ((t.metal && t.metal.net > 0) ? Number(t.metal.net).toFixed(3) + ' g (14K)' : '') : (Array.isArray(t && t.gold) ? t.gold.filter(g => g && g.net > 0).map(g => g.k + ' ' + Number(g.net).toFixed(3) + ' g').join('; ') : '');
 const vjDiaTxt = t => Array.isArray(t && t.dias) ? t.dias.filter(Boolean).map(d => `${d.shape || ''} ${d.q || ''} ${Number(d.ct || 0).toFixed(2)} ct${d.pcs ? ' (' + d.pcs + ')' : ''}`.replace(/\s+/g, ' ').trim()).join('; ') : '';
 function vjValTxt(field, raw) {
@@ -639,7 +647,7 @@ function vjBuildDayBook({ audit, changes, deleted, byPath, who, ymd }) {
   const list = [...tags.values()].sort((a, b) => (order[status(a)] - order[status(b)]) || (a.first - b.first));
   const rows = list.map(g => {
     const t = doc(g), changed = g.changes.sort((a, b) => a.ts - b.ts).map(c => `${VJ_FIELD_NAME[c.field] || c.field}: ${vjValTxt(c.field, c.old)} → ${vjValTxt(c.field, c.new)}`).join('\n');
-    return [status(g), t.label || g.path.slice(5), t.designNo || '', t.catName || '', t.kind === 'sample' ? 'Sample' : 'Stock', vjGoldTxt(t), vjDiaTxt(t),
+    return [status(g), t.label || g.path.slice(5), t.designNo || '', t.catName || '', t.kind === 'sample' ? 'Sample' : t.kind === 'order' ? 'Order' + (t.order && t.order.name ? ' - ' + t.order.name : '') : 'Stock', vjGoldTxt(t), vjDiaTxt(t),
       t.photo ? 'Yes' : 'No', t.printedAt ? 'Yes' : 'No', [...g.by].join(', '), g.first === g.last ? hm(g.first) : hm(g.first) + ' - ' + hm(g.last), changed, g.del ? g.del.reason || '' : ''];
   });
   const logRows = log.concat(deleted.filter(d => !audit.some(a => a.action === 'delete' && a.path === d.path)).map(d => ({ ts: d.ts, act: 'Deleted', path: d.path, by: who(d.email), keys: [] })))
@@ -657,6 +665,25 @@ function vjBuildDayBook({ audit, changes, deleted, byPath, who, ymd }) {
       widths: [18, 16, 12, 16, 12, 22, 34, 7, 8, 18, 13, 60, 16], rows, mark: r => String(r[0]).includes('eleted'), wrap: [6, 11] },
     { name: 'Activity log', head: ['Time', 'Action', 'Tag', 'Design no.', 'By', 'Details'], widths: [8, 16, 16, 12, 16, 50], rows: logRows, mark: r => r[1] === 'Deleted' }]);
   return { count: rows.length, xlsx, fileName: `VJ_Tags_${dd}.xlsx`, caption };
+}
+
+// Orders report (C-20261016-ORDERS): every tag made as an order, with the customer, as an Excel file. Owners and staff only.
+async function vjOrdersReport(env, who) {
+  if (who.role === 'sales') return vjDeny(403, 'not allowed');
+  const all = ((await env.DB.prepare("SELECT path, data FROM docs WHERE path LIKE 'tags/%'").all()).results) || [];
+  const users = ((await env.DB.prepare('SELECT email, name FROM users').all()).results) || [];
+  const owners = String(env.OWNER_EMAILS || '').toLowerCase().split(',').map(s => s.trim());
+  const by = e => e === 'vaishnavijewels@gmail.com' ? 'Shilpiji' : owners.includes(e) ? 'Abhinav' : ((users.find(u => u.email === e) || {}).name || String(e || '').split('@')[0]);
+  const dmy = d => d ? String(d).slice(0, 10).split('-').reverse().join('-') : '';
+  const rows = all.map(r => JSON.parse(r.data)).filter(t => t.kind === 'order')
+    .sort((a, b) => String((a.order || {}).due || '9999').localeCompare(String((b.order || {}).due || '9999')) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')))
+    .map(t => { const o = t.order || {}; return [o.name || '', o.mobile ? '+91 ' + o.mobile : '', o.city || '', dmy(o.due), t.label || '', t.designNo || '', t.catName || '',
+      vjGoldTxt(t), vjDiaTxt(t), Number(t.priceAtTag) || '', t.photo ? 'Yes' : 'No', t.printedAt ? 'Yes' : 'No', by(t.createdBy), dmy(t.createdAt), t.remark || '']; });
+  const xlsx = vjXlsx([{ name: 'Orders', head: ['Customer', 'Mobile', 'City', 'Delivery date', 'Tag', 'Design no.', 'Category', 'Gold', 'Diamonds', 'Price when tagged (Rs)', 'Photo', 'Printed', 'Made by', 'Tagged on', 'Remark'],
+    widths: [24, 16, 14, 13, 14, 12, 16, 22, 34, 14, 7, 8, 14, 12, 18], rows, wrap: [8] }]);
+  const bin = atob(xlsx), out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  await vjAudit(env, who, 'orders-report', 'tags/', rows.length + ' orders');
+  return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_Orders.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
 }
 
 async function vjDailyReport(env) {
@@ -736,6 +763,7 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/photosearch' && request.method === 'POST') return vjPhotoSearch(request, env, who);
   if (p === '/api/vj/quote' && request.method === 'POST') return vjQuote(request, env, who, ctx);
   if (p === '/api/vj/bill' && request.method === 'POST') return vjBill(request, env, who);
+  if (p === '/api/vj/orders' && request.method === 'GET') return vjOrdersReport(env, who);
   if (p.startsWith('/_blob/') && request.method === 'GET') return vjBlob(p.slice(7), env);
   if ((p === '/tags' || p === '/tags.html' || p.startsWith('/tags/')) && request.method === 'GET') {
     const r = await env.ASSETS.fetch(request);
