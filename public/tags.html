@@ -140,6 +140,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
         <label>Mobile <input id="oMob" inputmode="tel" autocomplete="off" maxlength="20" placeholder="98xxxxxxxx"></label>
         <label>City <input id="oCity" autocomplete="off" maxlength="40"></label>
         <label>Delivery date <input id="oDue" type="date"></label>
+        <label>Gold rate (F) for this order, 24K/g <input id="oRate" inputmode="decimal" autocomplete="off"></label>
       </div>
       <div class="row">
         <label>Category <select id="cat"></select></label>
@@ -410,7 +411,7 @@ $("addDia").addEventListener("click",()=>addDia());
 ["goldLines","diaLines"].forEach(id=>{$(id).addEventListener("input",update);$(id).addEventListener("change",update)});
 ["cat","remark","otherAmt"].forEach(id=>{$(id).addEventListener("input",update);$(id).addEventListener("change",update)});
 document.querySelectorAll('input[name=kind]').forEach(r=>r.addEventListener("change",update));
-["oName","oMob","oCity","oDue"].forEach(id=>$(id).addEventListener("input",update));
+["oName","oMob","oCity","oDue","oRate"].forEach(id=>$(id).addEventListener("input",update));
 CATS.forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=c.name;$("cat").appendChild(o)});
 
 /* ---------- read form ---------- */
@@ -421,13 +422,13 @@ function readForm(){
   const dias=[...$("diaLines").children].map(r=>{const i=r.dataset.id;const qq=$("dq"+i).value==="Other"?($("dqo"+i).value.trim().toUpperCase()||"OTHER?"):$("dq"+i).value;const sp=num($("dr"+i).value),sh=$("ds"+i).value,def=defRate(sh,qq);return {shape:sh,q:qq,ct:num($("dc"+i).value),pcs:Math.round(num($("dp"+i).value)),rate:sp>0?sp:(def||0),special:sp>0}}).filter(d=>d.ct>0||d.pcs>0||d.special);
   const mainK=(gold.find(g=>g.net>0)||gold[0]||{k:"14K"}).k;
   const prefix=k==="sample"?cat.s:cat.code+KNUM[mainK];
-  const order=k==="order"?{name:$("oName").value.trim().slice(0,60),mobile:$("oMob").value.trim().slice(0,20),city:$("oCity").value.trim().slice(0,40),due:$("oDue").value||""}:null;
+  const order=k==="order"?{name:$("oName").value.trim().slice(0,60),mobile:$("oMob").value.trim().slice(0,20),city:$("oCity").value.trim().slice(0,40),due:$("oDue").value||"",rate:num($("oRate").value)}:null; /* owner 16/10: the order is booked at this gold rate (C-20261016-ORDERRATE2) */
   return {kind:k,cat:cat.id,prefix,catName:cat.name.replace(/\s*\(.*\)$/,""),mainK,gold,dias,order,
     remark:$("remark").value.trim(),designNo:$("designNo").value.trim().toUpperCase(),other:{amt:num($("otherAmt").value)}};
 }
 /* ---------- price (Brain F-025 / F-044) ---------- */
 function price(t){
-  const s=st(),r24=s.gold24g;if(!r24)return null;
+  const s=st(),r24=t.kind==="order"&&t.order&&t.order.rate>=2000&&t.order.rate<=50000?t.order.rate:s.gold24g;if(!r24)return null; /* an order uses the rate typed for it */
   /* Bills workbook, Nett mode: one making rate per piece, taken from the FIRST gold line
      (R-Making: Rs 650/g if that line is over 5 g, else 750; plus 10% of its karat rate; rounded up to Rs 100),
      charged on all gold lines together. */
@@ -444,6 +445,7 @@ function price(t){
 function problems(t){
   const p=[],s=st();
   if(t.kind==="order"&&!t.order.name)p.push("Enter the customer's name for this order.");
+  if(t.kind==="order"&&t.order.rate&&!(t.order.rate>=2000&&t.order.rate<=50000))p.push("The order's gold rate (F) looks wrong - type the 24K rate per gram.");
   if(!t.designNo)p.push("Enter the design number.");
   if(!t.gold.some(g=>g.net>0))p.push("Enter the net gold weight.");
   t.dias.forEach((d,i)=>{if(d.q==="OTHER?")p.push(`Diamond line ${i+1}: type the quality.`);if(!(d.ct>0))p.push(`Diamond line ${i+1}: enter the carat weight.`);if(t.kind!=="sample"&&!(d.rate>0))p.push(`Diamond line ${i+1}: no default rate for ${d.shape} ${d.q}. Enter the special rate.`)});
@@ -536,7 +538,7 @@ function tagPDF(t){
 /* ---------- live update ---------- */
 function update(){
   if(!S.settings)return;
-  const t=readForm(),s=st(),pr=t.kind!=="sample"?price(t):null;$("orderBox").hidden=t.kind!=="order";
+  const t=readForm(),s=st(),pr=t.kind!=="sample"?price(t):null;$("orderBox").hidden=t.kind!=="order";if(t.kind==="order"&&!$("oRate").value&&s.gold24g){$("oRate").value=Math.round(s.gold24g);t.order.rate=Math.round(s.gold24g)}
   [...$("goldLines").children].forEach(r=>{const i=r.dataset.id,net=num($("gn"+i).value),k=$("gk"+i).value;
     $("gv"+i).textContent=s.gold24g&&net>0?fmt(net*s.gold24g*(s.purity[k]||0)):""});
   [...$("diaLines").children].forEach(r=>{const i=r.dataset.id,qq=$("dq"+i).value==="Other"?$("dqo"+i).value.trim().toUpperCase():$("dq"+i).value,def=defRate($("ds"+i).value,qq),sp=num($("dr"+i).value),rate=sp>0?sp:def,ct=num($("dc"+i).value);
@@ -737,7 +739,7 @@ async function offerPDF(t){
   catch(e){if(e&&e.code==="declined")msg(`${t.label}: download skipped. Reprint it any time from Tagged pieces.`,"warn");else msg(`${t.label}: the PDF could not be offered (${e&&e.code||"error"}). Reprint it from Tagged pieces.`,"warn")}
 }
 function resetForm(keepKind){
-  ["remark","otherAmt","designNo"].concat(keepKind?[]:["oName","oMob","oCity","oDue"]).forEach(id=>$(id).value=""); /* after a save the order customer stays, for the next piece of the same order */
+  ["remark","otherAmt","designNo"].concat(keepKind?[]:["oName","oMob","oCity","oDue","oRate"]).forEach(id=>$(id).value=""); /* after a save the order customer stays, for the next piece of the same order */
   $("goldLines").textContent="";$("diaLines").textContent="";addGold();addDia();
   S.photo=null;$("photo").value="";$("thumb").textContent="No photo yet";if(!keepKind)$("k-sale").checked=true;update();
 }
