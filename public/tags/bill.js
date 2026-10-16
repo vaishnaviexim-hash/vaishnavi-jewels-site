@@ -83,7 +83,7 @@
       <p class="hint" id="bcusthint"></p>
       <div class="row"><label>Name <input id="bname" autocomplete="off" maxlength="60"></label>
         <label>City <input id="bcity" autocomplete="off" maxlength="40"></label>
-        <label>Mobile No. <input id="bmob" inputmode="tel" autocomplete="off" maxlength="14" placeholder="98xxxxxxxx"></label></div>
+        <label>Mobile No. <input id="bmob" inputmode="tel" autocomplete="off" maxlength="20" placeholder="98xxxxxxxx"></label></div>
       <div class="row"><label>Number <input id="bno" autocomplete="off" maxlength="20" placeholder="bill book number"></label>
         <label>Date <input id="bdate" type="date"></label>
         <label>Gold Rate (F) per g, 24K <input id="bF" inputmode="decimal" autocomplete="off"></label></div>
@@ -208,7 +208,7 @@
     doc.setTextColor(20); doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.text(b.title, M, y);
     doc.setFontSize(12); doc.text(`No. ${b.no}`, W - M, y - 3, { align: "right" }); doc.setFont("helvetica", "normal"); doc.text(`Date ${dmy(b.date)}`, W - M, y + 3, { align: "right" });
     y += 10; doc.setFontSize(12);
-    doc.text(`Name: ${b.name}`, M, y); y += 6.5; doc.text(`City: ${b.city || "-"}`, M, y); doc.text(`Mobile: ${b.mobile ? "+91 " + b.mobile : "-"}`, M + 90, y); y += 6.5;
+    doc.text(`Name: ${b.name}`, M, y); y += 6.5; doc.text(`City: ${b.city || "-"}`, M, y); doc.text(`Mobile: ${!b.mobile ? "-" : /^\d{10}$/.test(b.mobile) ? "+91 " + b.mobile : b.mobile}`, M + 90, y); y += 6.5;
     doc.text(`Gold Rate (F): ${fmt(b.F)} per g (24K)`, M, y); doc.text(`Gold Calculation: ${MODES[b.mode] || b.mode}${b.settle === "fine" ? " (fine gold)" : b.settle === "amount" ? " (in rupees)" : ""}`, M + 90, y); y += 9;
     const pics = {}; if (photos) for (const r of b.rows) if (r.photo) pics[r.id] = await thumb(r.photo);
     const P = Object.values(pics).some(Boolean) ? 22 : 0; // photo column (mm) only when a piece has a photo
@@ -235,11 +235,12 @@
   }
   async function save() {
     const m = $("bmsg"), out = $("bout"); out.hidden = true;
-    const body = { no: $("bno").value.trim(), name: $("bname").value.trim(), city: $("bcity").value.trim(), mobile: $("bmob").value.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""),
+    const body = { no: $("bno").value.trim(), name: $("bname").value.trim(), city: $("bcity").value.trim(), mobile: $("bmob").value.trim().slice(0, 20),
       date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, title: B.title, ids: B.items.slice(), disc: Object.assign({}, B.disc) };
     if (!body.name) { m.textContent = "Enter the customer's name."; return; }
     if (!body.no && B.title !== "Estimate") { m.textContent = "Enter the bill number."; return; }
-    if (body.mobile && !/^[6-9]\d{9}$/.test(body.mobile)) { const dg = body.mobile.replace(/^91(?=\d{9,10}$)/, "").length; m.textContent = `The mobile number has ${dg} digit${dg === 1 ? "" : "s"} (after +91); it needs 10. Check it, or leave it empty.`; return; }
+    let dg = body.mobile.replace(/\D/g, ""); if (dg.length === 12 && dg.startsWith("91")) dg = dg.slice(2); // phone copy like "+91 98xxx xxxxx" is fine
+    const mobNote = body.mobile && !/^[6-9]\d{9}$/.test(dg) ? ` Note: the mobile has ${dg.replace(/^91/, "").length} digits after +91 (a mobile usually has 10) - saved as typed.` : "";
     if (!(body.F >= 2000)) { m.textContent = "Type the gold rate (F) per gram, 24K."; return; }
     if (!body.ids.length) { m.textContent = "Add at least one piece."; return; }
     $("bsave").disabled = true; m.textContent = "Saving the bill…";
@@ -249,7 +250,7 @@
       const b = j.bill; m.textContent = "Making the PDF…";
       const blob = await makePdf(b, B.photos), fname = `${b.title} ${b.no.replace(/[^A-Z0-9\-]/g, "-")} ${b.name.replace(/[^A-Za-z0-9 .\-]/g, "").trim().slice(0, 40)}.pdf`;
       const file = new File([blob], fname, { type: "application/pdf" }), url = URL.createObjectURL(file);
-      loadBook(); m.textContent = `${b.title} ${b.no} saved: ${fmt(b.total)}${b.fine ? " + " + g3(b.fine) + " fine gold" : ""}.`;
+      loadBook(); m.textContent = `${b.title} ${b.no} saved: ${fmt(b.total)}${b.fine ? " + " + g3(b.fine) + " fine gold" : ""}.` + mobNote;
       out.textContent = ""; out.hidden = false;
       const op = document.createElement("a"); op.className = "btn"; op.href = url; op.target = "_blank"; op.rel = "noopener"; op.textContent = "Open PDF (print)";
       const dl = document.createElement("a"); dl.className = "btn ghost"; dl.href = url; dl.download = fname; dl.textContent = "Download";
