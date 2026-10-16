@@ -471,32 +471,44 @@ async function vjQuote(request, env, who, ctx) {
 }
 
 // VJ_BILL_CALC_START (same function in tags/bill.js - keep both copies identical)
-// Bills (owner 16/10/2026, C-20261016-BILLS), formulas from the owner's bills_and_estimates_1.xlsm sheet 'BILLS DIAMONDS':
-// karat rate = F (fine 24K per g, typed on the bill) x purity. W/s: gold = net x karat rate x 1.10 (10% wastage, none on 24K),
-// making per g = Rs 650 if the first gold line is over 5 g, else 750. Nett: gold = net x karat rate, making per g =
-// (650 or 750) + 10% of the karat rate, rounded up to Rs 100. Making is charged on all gold lines. Diamonds = ct x the tag's
-// rate, plus other charges. Bill total before GST rounded UP to Rs 1,000; GST rounded to the nearest rupee.
+// Bills (owner 16/10/2026, C-20261016-BILLS / BILLS2), formulas from the owner's bills_and_estimates_1.xlsm sheet 'BILLS DIAMONDS'.
+// karat rate = F (fine 24K per g, typed on the bill) x purity. Making per g = Rs 650 if the first gold line is over 5 g, else 750.
+// W/s: gold = net x karat rate x 1.10 (10% wastage, none on 24K), making 650/750 per g.
+// Nett: gold = net x karat rate, making per g = (650 or 750) + 10% of the karat rate, rounded up to Rs 100.
+// Gold to Gold: fine gold due = net x (9K 0.4235, 14K 0.66, 18K 0.836, 22K 1.06, 24K 1), making 650/750 per g in rupees.
+// Gold Item: fine gold due = net x (9K 0.54, 14K 0.74, 18K 0.90, 22K 1.06, 24K 1), making already in the gold (none in rupees).
+// For Gold to Gold / Gold Item, settle 'fine' = customer gives the fine gold; 'amount' = fine x F is charged in rupees.
+// Diamonds = ct x the tag's rate, plus other charges. Rupee total before GST rounded UP to Rs 1,000; GST to the nearest rupee.
+const VJ_FINE = { g2g: { '9K': 0.4235, '14K': 0.66, '18K': 0.836, '22K': 1.06, '24K': 1 }, item: { '9K': 0.54, '14K': 0.74, '18K': 0.90, '22K': 1.06, '24K': 1 } };
 function vjBillCalc(tags, o) {
   const pur = Object.assign({ '24K': 1, '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.40 }, o.purity || {});
-  const m = Object.assign({ base: 650, small: 750, limit: 5, pct: 10 }, o.making || {}), F = Number(o.F) || 0, ws = o.mode === 'ws';
+  const m = Object.assign({ base: 650, small: 750, limit: 5, pct: 10 }, o.making || {}), F = Number(o.F) || 0;
+  const mode = ['ws', 'nett', 'g2g', 'item'].includes(o.mode) ? o.mode : 'ws', fineMode = mode === 'g2g' || mode === 'item';
+  const settle = fineMode ? (o.settle === 'amount' ? 'amount' : 'fine') : '';
   const gstPct = o.gst == null ? 3 : Number(o.gst);
   const rows = tags.map(t => {
     const gl = (t.kind === 'sample' ? [{ k: '14K', net: Number(t.metal && t.metal.net) || 0 }] : (Array.isArray(t.gold) ? t.gold : []))
       .map(g => ({ k: String(g && g.k || ''), net: Number(g && g.net) || 0 })).filter(g => g.net > 0);
     const kr = k => F * (Number(pur[k]) || 0), g0 = gl[0];
     let mk = 0;
-    if (g0) { const b = g0.net > m.limit ? m.base : m.small; mk = ws ? b : Math.ceil(Math.round((b + kr(g0.k) * m.pct / 100) * 100) / 100 / 100) * 100; }
-    let gold = 0, net = 0; gl.forEach(g => { net += g.net; gold += g.net * kr(g.k) * (ws && g.k !== '24K' ? 1.1 : 1); });
-    const dl = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map(d => ({ q: String(d.q || ''), shape: String(d.shape || ''), ct: Number(d.ct) || 0, pcs: Number(d.pcs) || 0, rate: Number(d.rate) || 0 }));
+    if (g0 && mode !== 'item') { const b = g0.net > m.limit ? m.base : m.small; mk = mode === 'nett' ? Math.ceil(Math.round((b + kr(g0.k) * m.pct / 100) * 100) / 100 / 100) * 100 : b; }
+    let gold = 0, net = 0, fine = 0;
+    gl.forEach(g => { net += g.net;
+      if (fineMode) fine += g.net * (VJ_FINE[mode][g.k] || 0);
+      else gold += g.net * kr(g.k) * (mode === 'ws' && g.k !== '24K' ? 1.1 : 1); });
+    fine = Math.round(fine * 1000) / 1000;
+    if (settle === 'amount') gold = fine * F;
+    const dl = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map(d => ({ ct: Number(d.ct) || 0, rate: Number(d.rate) || 0 }));
     const ct = dl.reduce((a, d) => a + d.ct, 0), dia = dl.reduce((a, d) => a + d.ct * d.rate, 0), oth = Number(t.other && t.other.amt) || 0;
     const r = { id: t.id, label: String(t.label || ''), design: String(t.designNo || ''), cat: String(t.catName || ''),
-      gold: gl.map(g => g.k + ' ' + g.net.toFixed(3) + ' g').join(' + '), net: Math.round(net * 1000) / 1000, goldAmt: Math.round(gold),
+      gold: gl.map(g => g.k + ' ' + g.net.toFixed(3) + ' g').join(' + '), net: Math.round(net * 1000) / 1000, fine, goldAmt: Math.round(gold),
       mkRate: mk, making: Math.round(mk * net), ct: Math.round(ct * 100) / 100, diaAmt: Math.round(dia), other: Math.round(oth) };
     r.amount = r.goldAmt + r.making + r.diaAmt + r.other;
     return r;
   });
   const sum = rows.reduce((a, r) => a + r.amount, 0), sub = Math.ceil(sum / 1000) * 1000, gst = Math.round(sub * gstPct / 100);
-  return { rows, sum, roundOff: sub - sum, sub, gstPct, gst, total: sub + gst };
+  const fine = Math.round(rows.reduce((a, r) => a + r.fine, 0) * 1000) / 1000;
+  return { mode, settle, rows, fine: settle === 'fine' ? fine : 0, fineIn: fine, sum, roundOff: sub - sum, sub, gstPct, gst, total: sub + gst };
 }
 // VJ_BILL_CALC_END
 
@@ -512,7 +524,8 @@ async function vjBill(request, env, who) {
   if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
   const no = String(b && b.no || '').trim().toUpperCase(), name = vjClean(b && b.name, 60), city = vjClean(b && b.city, 40);
   const mobile = String(b && b.mobile || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '');
-  const date = String(b && b.date || ''), F = Math.round(Number(b && b.F) * 100) / 100, mode = b && b.mode === 'ws' ? 'ws' : b && b.mode === 'nett' ? 'nett' : '';
+  const date = String(b && b.date || ''), F = Math.round(Number(b && b.F) * 100) / 100, mode = ['ws', 'nett', 'g2g', 'item'].includes(b && b.mode) ? b.mode : '';
+  const settle = b && b.settle === 'amount' ? 'amount' : 'fine';
   const title = b && b.title === 'Estimate' ? 'Estimate' : 'Bill';
   const ids = Array.isArray(b && b.ids) ? [...new Set(b.ids.map(String))].slice(0, 25) : [];
   if (!/^[A-Z0-9][A-Z0-9\-\/]{0,19}$/.test(no)) return vjDeny(400, 'bill number: letters, digits, - or / only');
@@ -520,7 +533,7 @@ async function vjBill(request, env, who) {
   if (mobile && !/^[6-9]\d{9}$/.test(mobile)) return vjDeny(400, 'mobile must be 10 digits');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(Date.parse(date))) return vjDeny(400, 'bad date');
   if (!(F >= 2000 && F <= 50000)) return vjDeny(400, 'gold rate (F) per g looks wrong');
-  if (!mode) return vjDeny(400, 'choose W/s or Nett');
+  if (!mode) return vjDeny(400, 'choose W/s, Nett, Gold to Gold or Gold Item');
   if (!ids.length || ids.some(i => !/^[A-Za-z0-9_\-.~]{1,60}$/.test(i))) return vjDeny(400, 'add at least one piece');
   const tags = [];
   for (const id of ids) {
@@ -530,11 +543,11 @@ async function vjBill(request, env, who) {
   }
   const sRow = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first();
   const s = sRow ? JSON.parse(sRow.data) : {};
-  const calc = vjBillCalc(tags, { F, mode, purity: s.purity, making: s.making, gst: s.gst });
-  const bill = Object.assign({ no, title, date, name, city, mobile, F, mode, by: who.email, byName: who.name, at: new Date().toISOString() }, calc);
+  const calc = vjBillCalc(tags, { F, mode, settle, purity: s.purity, making: s.making, gst: s.gst });
+  const bill = Object.assign({ no, title, date, name, city, mobile, F, by: who.email, byName: who.name, at: new Date().toISOString() }, calc);
   const res = await env.DB.prepare('INSERT INTO vj_bills (no, ts, email, data) VALUES (?, ?, ?, ?) ON CONFLICT(no) DO NOTHING').bind(no, Date.now(), who.email, JSON.stringify(bill)).run();
   if (!res.meta || res.meta.changes !== 1) return vjJson({ error: 'bill number ' + no + ' is already used' }, 409);
-  await vjAudit(env, who, 'bill', 'bills/' + no, `${title} ${name} ${mobile} ${calc.total} | ${ids.join(',')}`);
+  await vjAudit(env, who, 'bill', 'bills/' + no, `${title} ${mode}${calc.settle ? '/' + calc.settle : ''} ${name} ${mobile} ${calc.total}${calc.fine ? ' + ' + calc.fine + ' g fine' : ''} | ${ids.join(',')}`);
   return vjJson({ ok: true, bill });
 }
 
