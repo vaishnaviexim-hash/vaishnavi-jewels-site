@@ -808,9 +808,20 @@ async function vjOrdersReport(env, who) {
     return [...base(x), d === '' ? '' : d < 0 ? 'OVERDUE ' + (-d) + ' d' : d, ...piece(x)]; });
   const allRows = list.map(x => [x.st, ...base(x), ...piece(x)]);
   const ph = ['Tag', 'Design no.', 'Category', 'Gold', 'Diamonds', 'Price when tagged (Rs)', 'Photo', 'Printed', 'Made by', 'Tagged on', 'Remark'];
-  const pshort = list.filter(x => x.pending).map((x, i) => [x.o.name || '', vjPhoneTxt(x.o.mobile), x.o.city || '', dmy(x.o.due), pend[i][4], x.t.label || '', x.t.designNo || '']);
+  // amount today = the tag's price at today's gold rate, same rule as Price check (owner 16/10: 'a column of Amount also')
+  const sRow = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first(), S0 = sRow ? JSON.parse(sRow.data) : {};
+  const up = (n, s) => Math.ceil(Math.round(n * 100) / 100 / s) * s, pur = Object.assign({ '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.40 }, S0.purity || {});
+  const mkS = Object.assign({ base: 650, small: 750, limit: 5, pct: 10 }, S0.making || {}), gstP = S0.gst == null ? 3 : Number(S0.gst), r24 = Number(S0.gold24g) || 0;
+  const priceToday = t => { if (!r24) return 0; const gl = (Array.isArray(t.gold) ? t.gold : []).filter(g => g && g.net > 0), dias = Array.isArray(t.dias) ? t.dias.filter(Boolean) : [];
+    const dia = dias.reduce((a, d) => a + (Number(d.ct) || 0) * (Number(d.rate) || 0), 0), oth = Number(t.other && t.other.amt) || 0;
+    if (!gl.length) { const s0 = up(dia + oth, 10); return s0 > 0 ? up(s0 + s0 * gstP / 100, 10) : 0; }
+    const g0 = gl[0], mk = up((g0.net > mkS.limit ? mkS.base : mkS.small) + r24 * (pur[g0.k] || 0) * mkS.pct / 100, 100);
+    let gold = 0, making = 0; gl.forEach(g => { gold += g.net * r24 * (pur[g.k] || 0); making += g.net * mk; });
+    const sub = up(gold + making + dia + oth, 100); return up(sub + sub * gstP / 100, 1000); };
+  const pshort = list.filter(x => x.pending).map((x, i) => [x.o.name || '', vjPhoneTxt(x.o.mobile), x.o.city || '', dmy(x.o.due), pend[i][4], x.t.label || '', x.t.designNo || '', priceToday(x.t) || Number(x.t.priceAtTag) || '']);
+  if (pshort.length) pshort.push(['TOTAL (' + pshort.length + ' pending)', '', '', '', '', '', '', pshort.reduce((a, r) => a + (Number(r[7]) || 0), 0)]);
   const xlsx = vjXlsx([
-    { name: 'Pending (print)', head: ['Customer', 'Mobile', 'City', 'Delivery', 'Days left', 'Tag', 'Design no.'], rows: pshort, widths: [26, 16, 12, 11, 12, 12, 11], wrap: [0], mark: r => String(r[4]).startsWith('OVERDUE') },
+    { name: 'Pending (print)', head: ['Customer', 'Mobile', 'City', 'Delivery', 'Days left', 'Tag', 'Design no.', 'Amount today (Rs)'], rows: pshort, widths: [24, 15, 11, 11, 11, 11, 10, 15], wrap: [0], mark: r => String(r[4]).startsWith('OVERDUE') || String(r[0]).startsWith('TOTAL') },
     { name: 'Pending orders', head: ['Customer', 'Mobile', 'City', 'Delivery date', 'Days left', ...ph], rows: pend, widths: [24, 16, 14, 13, 12, 14, 12, 16, 22, 34, 14, 7, 8, 14, 12, 18], wrap: [9], mark: r => String(r[4]).startsWith('OVERDUE') },
     { name: 'All orders', head: ['Status', 'Customer', 'Mobile', 'City', 'Delivery date', ...ph], rows: allRows, widths: [30, 24, 16, 14, 13, 14, 12, 16, 22, 34, 14, 7, 8, 14, 12, 18], wrap: [0, 9], mark: r => String(r[0]).startsWith('Moved') }]);
   const bin = atob(xlsx), out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
