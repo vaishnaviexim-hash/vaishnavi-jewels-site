@@ -556,7 +556,7 @@ async function vjBill(request, env, who) { // every login may make bills (owner 
   const ids = Array.isArray(b && b.ids) ? [...new Set(b.ids.map(String))].slice(0, 25) : [];
   const disc = {}; if (b && b.disc && typeof b.disc === 'object') for (const id of ids) if (b.disc[id] != null) disc[id] = String(b.disc[id]).slice(0, 12);
   const rates = {}; if (b && b.rates && typeof b.rates === 'object') for (const id of ids) if (Array.isArray(b.rates[id])) rates[id] = b.rates[id].slice(0, 30).map(v => { const n = Number(v); return n > 0 && n <= 5000000 ? Math.round(n) : 0; });
-  if (title !== 'Estimate' && !/^[A-Z0-9][A-Z0-9\-\/]{0,19}$/.test(no)) return vjDeny(400, 'bill number: letters, digits, - or / only');
+  // owner 16/10/2026 20:03 'Bill no should be automatic. Every month starts with number 1': bills are numbered by the server too
   if (!name) return vjDeny(400, 'customer name is required');
   if (b && b.mobile && String(b.mobile).trim() && !mobile) return vjDeny(400, 'mobile number not readable');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(Date.parse(date))) return vjDeny(400, 'bad date');
@@ -574,16 +574,16 @@ async function vjBill(request, env, who) { // every login may make bills (owner 
   const calc = vjBillCalc(tags, { F, mode, settle, disc, rates, purity: s.purity, making: s.making, gst: s.gst });
   calc.rows.forEach((r, i) => { const ph = tags[i].photo; if (typeof ph === 'string' && /^[0-9a-f]{32}$/.test(ph)) r.photo = ph; }); // owner 16/10: photo on the bill
   const bill = Object.assign({ no, title, date, name, city, mobile, F, by: who.email, byName: who.name, at: new Date().toISOString() }, calc);
-  // C-20261016-BILLBOOK: estimates are numbered automatically, E-YYMM-NN, starting at 01 every month (by the estimate's date)
+  // C-20261016-BILLBOOK / BILLAUTO: bills B-YYMM-NN and estimates E-YYMM-NN are numbered automatically, from 01 every month (by the date)
   for (let i = 0; ; i++) {
-    if (title === 'Estimate') {
-      const px = 'E-' + date.slice(2, 4) + date.slice(5, 7) + '-';
+    {
+      const px = (title === 'Estimate' ? 'E-' : 'B-') + date.slice(2, 4) + date.slice(5, 7) + '-';
       const used = ((await env.DB.prepare('SELECT no FROM vj_bills WHERE no LIKE ?').bind(px + '%').all()).results) || [];
       bill.no = px + String(used.reduce((a, r) => Math.max(a, parseInt(String(r.no).slice(px.length), 10) || 0), 0) + 1).padStart(2, '0');
     }
     const res = await env.DB.prepare('INSERT INTO vj_bills (no, ts, email, data) VALUES (?, ?, ?, ?) ON CONFLICT(no) DO NOTHING').bind(bill.no, Date.now(), who.email, JSON.stringify(bill)).run();
     if (res.meta && res.meta.changes === 1) break;
-    if (title !== 'Estimate' || i >= 5) return vjJson({ error: 'bill number ' + bill.no + ' is already used' }, 409);
+    if (i >= 5) return vjJson({ error: 'could not give a number, try again' }, 409);
   }
   await vjAudit(env, who, 'bill', 'bills/' + bill.no, `${title} ${mode}${calc.settle ? '/' + calc.settle : ''} ${name} ${mobile} ${calc.total}${calc.fine ? ' + ' + calc.fine + ' g fine' : ''}${calc.disc ? ' disc ' + calc.disc : ''} | ${ids.join(',')}`);
   return vjJson({ ok: true, bill });
