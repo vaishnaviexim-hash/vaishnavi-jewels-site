@@ -132,11 +132,31 @@
     const body = $("bbook"), m = $("bbookmsg"); if (!body) return; const mo = $("bmonth").value || today().slice(0, 7);
     try { const r = await fetch("/api/vj/bills?month=" + encodeURIComponent(mo), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
       body.textContent = ""; let tot = 0;
-      j.bills.slice().reverse().forEach(b => { tot += b.total || 0; const tr = document.createElement("tr"); const td = (x, cl) => { const e = document.createElement("td"); if (cl) e.className = cl; e.textContent = x; tr.appendChild(e); };
-        td(dmy(b.date)); td(b.no); td(b.title); td(b.name + (b.city ? ", " + b.city : "")); td(fmt(b.total), "num"); td(b.fine ? g3(b.fine) : "—", "num"); td(b.by || "");
-        const x = document.createElement("td"), o = document.createElement("button"); o.type = "button"; o.className = "btn ghost"; o.textContent = "PDF"; o.addEventListener("click", () => reprint(b.no, o)); x.appendChild(o); tr.appendChild(x); body.appendChild(tr); });
-      m.textContent = j.bills.length ? `${j.bills.length} in this month, total ${fmt(tot)}.` : "Nothing saved in this month.";
+      let nc = 0;
+      j.bills.slice().reverse().forEach(b => { if (b.cancelled) nc++; else tot += b.total || 0; const tr = document.createElement("tr"); const td = (x, cl) => { const e = document.createElement("td"); if (cl) e.className = cl; e.textContent = x; tr.appendChild(e); return e; };
+        td(dmy(b.date)); td(b.no); const ty = td(b.title); if (b.cancelled) { const s = document.createElement("div"); s.style.cssText = "color:#a12b2b;font-weight:600"; s.textContent = "CANCELLED"; const r = document.createElement("div"); r.className = "hint"; r.textContent = b.cancelled; ty.append(s, r); tr.style.opacity = "0.75"; }
+        td(b.name + (b.city ? ", " + b.city : "")); td(fmt(b.total), "num"); td(b.fine ? g3(b.fine) : "—", "num"); td(b.by || "");
+        const x = document.createElement("td"); x.style.whiteSpace = "nowrap"; const o = document.createElement("button"); o.type = "button"; o.className = "btn ghost"; o.textContent = "PDF"; o.addEventListener("click", () => reprint(b.no, o)); x.appendChild(o);
+        if (j.canCancel && !b.cancelled) { const c = document.createElement("button"); c.type = "button"; c.className = "btn ghost"; c.style.color = "#a12b2b"; c.textContent = "Cancel"; c.addEventListener("click", () => cancelBox(b, x)); x.appendChild(c); }
+        tr.appendChild(x); body.appendChild(tr); });
+      m.textContent = j.bills.length ? `${j.bills.length} in this month${nc ? " (" + nc + " cancelled)" : ""}, total ${fmt(tot)}${nc ? " without the cancelled ones" : ""}.` : "Nothing saved in this month.";
     } catch (e) { m.textContent = "Could not load the saved bills (" + (e.message || e) + ")."; }
+  }
+  // owners only (the server refuses anyone else): cancel with a reason; the bill stays in the records, marked CANCELLED (C-20261016-BILLCANCEL)
+  function cancelBox(b, cell) {
+    cell.textContent = ""; const sel = document.createElement("select"); sel.setAttribute("aria-label", "Reason for cancelling");
+    [["", "Reason…"], ["Customer cancelled", "Customer cancelled"], ["Wrong entry", "Wrong entry"], ["Made again", "Made again (new bill)"], ["Other", "Other"]].forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = l; sel.appendChild(o); });
+    const note = document.createElement("input"); note.placeholder = "note (needed for Other)"; note.maxLength = 120; note.style.width = "160px";
+    const y = document.createElement("button"); y.type = "button"; y.className = "btn danger"; y.textContent = "Cancel " + b.no; y.disabled = true;
+    const n = document.createElement("button"); n.type = "button"; n.className = "btn ghost"; n.textContent = "Keep";
+    const ok = () => { y.disabled = !sel.value || (sel.value === "Other" && !note.value.trim()); }; sel.addEventListener("change", ok); note.addEventListener("input", ok);
+    n.addEventListener("click", loadBook);
+    y.addEventListener("click", async () => { y.disabled = true;
+      try { const r = await fetch("/api/vj/bill/cancel", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ no: b.no, reason: sel.value, note: note.value.trim() }) });
+        const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(r.status === 403 ? "only Abhinav or Shilpiji can cancel" : (j.error || r.status));
+        const why = sel.value; await loadBook(); $("bbookmsg").textContent = `${b.title} ${b.no} cancelled (${why}). It stays in the records. ` + $("bbookmsg").textContent;
+      } catch (e) { $("bbookmsg").textContent = "Could not cancel: " + (e.message || e) + "."; y.disabled = false; } });
+    const wrap = document.createElement("div"); wrap.style.cssText = "display:flex;gap:6px;flex-wrap:wrap;align-items:center"; wrap.append(sel, note, y, n); cell.appendChild(wrap);
   }
   async function reprint(no, btn) { btn.disabled = true;
     try { const r = await fetch("/api/vj/bill?no=" + encodeURIComponent(no), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
@@ -206,6 +226,8 @@
     const W = 210, M = 14; let y = 14;
     y += 6; // owner 16/10/2026 19:31: no company name, logo or address on bills / estimates
     doc.setTextColor(20); doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.text(b.title, M, y);
+    if (b.cancelled) { doc.setTextColor(161, 43, 43); doc.text("CANCELLED", M + 40, y); doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+      doc.text(`${b.cancelled.reason}${b.cancelled.note ? ": " + b.cancelled.note : ""} (${b.cancelled.byName}, ${dmy(String(b.cancelled.at).slice(0, 10))})`, M + 40, y + 5); doc.setTextColor(20); doc.setFont("helvetica", "bold"); doc.setFontSize(18); }
     doc.setFontSize(12); doc.text(`No. ${b.no}`, W - M, y - 3, { align: "right" }); doc.setFont("helvetica", "normal"); doc.text(`Date ${dmy(b.date)}`, W - M, y + 3, { align: "right" });
     y += 10; doc.setFontSize(12);
     doc.text(`Name: ${b.name}`, M, y); y += 6.5; doc.text(`City: ${b.city || "-"}`, M, y); doc.text(`Mobile: ${!b.mobile ? "-" : /^\d{10}$/.test(b.mobile) ? "+91 " + b.mobile : b.mobile}`, M + 90, y); y += 6.5;
