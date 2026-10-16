@@ -591,15 +591,16 @@ async function vjBill(request, env, who) { // every login may make bills (owner 
 
 // Cancel a bill / estimate (C-20261016-BILLCANCEL): owners only, with a reason. Never deleted, number never reused; marked cancelled.
 const VJ_CANCEL_REASONS = ['Customer cancelled', 'Wrong entry', 'Made again', 'Other'];
-async function vjBillCancel(request, env, who) {
-  if (who.role !== 'admin') return vjDeny(403, 'owner only');
+async function vjBillCancel(request, env, who) { // choice 2 (cancel only) for every login - owner 16/10 '2 can be done by all'; choice 3 owners only
   let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+  if (b && b.stock && who.role !== 'admin') return vjDeny(403, 'owner only');
   const no = String(b && b.no || '').slice(0, 20), reason = VJ_CANCEL_REASONS.includes(b && b.reason) ? b.reason : '', note = vjClean(b && b.note, 120);
   const stock = !!(b && b.stock); // C-20261016-BILL3WAY choice 3: also move the bill's order pieces to stock
   if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
   const row = await env.DB.prepare('SELECT data FROM vj_bills WHERE no = ?').bind(no).first();
   if (!row) return vjDeny(404, 'not found');
-  const bill = JSON.parse(row.data), byName = who.email === 'vaishnavijewels@gmail.com' ? 'Shilpiji' : 'Abhinav';
+  const bill = JSON.parse(row.data), byName = who.role === 'admin' ? (who.email === 'vaishnavijewels@gmail.com' ? 'Shilpiji' : 'Abhinav') : (who.name || String(who.email).split('@')[0]);
+  if (who.role === 'sales' && bill.by !== who.email) return vjDeny(404, 'not found'); // a sales login only handles its own bills
   if (bill.cancelled && !stock) return vjJson({ error: 'already cancelled' }, 409);
   if (!bill.cancelled) {
     if (!reason) return vjDeny(400, 'reason required');
@@ -669,7 +670,7 @@ async function vjBillBook(url, env, who) { // a sales login sees only the bills 
   const dmy = d => String(d || '').split('-').reverse().join('-');
   if (url.pathname === '/api/vj/bills') return vjJson({ ok: true, bills: bills.map(b => ({ no: b.no, title: b.title, date: b.date, name: b.name, city: b.city, mobile: b.mobile,
     mode: b.mode, settle: b.settle || '', total: b.total, fine: b.fine || 0, disc: b.disc || 0, pieces: (b.rows || []).length, by: b.byName && b.byName !== 'Owner' ? b.byName : String(b.by || '').split('@')[0],
-    cancelled: b.cancelled ? b.cancelled.reason + (b.cancelled.note ? ' - ' + b.cancelled.note : '') + ' (' + b.cancelled.byName + ')' : '' })), canCancel: who.role === 'admin' });
+    cancelled: b.cancelled ? b.cancelled.reason + (b.cancelled.note ? ' - ' + b.cancelled.note : '') + ' (' + b.cancelled.byName + ')' : '' })), canCancel: who.role === 'admin', canCancelOnly: true });
   const head = ['Date', 'Number', 'Type', 'Status', 'Customer', 'Mobile', 'City', 'Gold calculation', 'Gold rate F (Rs/g)', 'Pieces', 'Total (Rs)', 'Discount (Rs)', 'After discount (Rs)', 'Rounded (Rs)', 'GST (Rs)', 'Bill total (Rs)', 'Fine gold to receive (g)', 'Made by'];
   const cx = b => b.cancelled ? 'CANCELLED - ' + b.cancelled.reason + (b.cancelled.note ? ': ' + b.cancelled.note : '') + ' (' + b.cancelled.byName + ', ' + dmy(String(b.cancelled.at).slice(0, 10)) + ')' : 'Active';
   const rows = bills.map(b => [dmy(b.date), b.no, b.title, cx(b), b.name, vjPhoneTxt(b.mobile), b.city || '', (MODE[b.mode] || b.mode) + (b.settle === 'fine' ? ' (fine gold)' : b.settle === 'amount' ? ' (in rupees)' : ''),
