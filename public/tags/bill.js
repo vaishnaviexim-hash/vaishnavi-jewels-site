@@ -6,7 +6,7 @@
   "use strict";
   const $ = id => document.getElementById(id);
   const fmt = n => "Rs " + Math.round(n).toLocaleString("en-IN");
-  const B = { items: [], mode: "ws", settle: "fine", title: "Bill", photos: true };
+  const B = { items: [], mode: "ws", settle: "fine", title: "Bill", photos: true, disc: {} };
   const MODES = { ws: "W/s", nett: "Nett", g2g: "Gold to Gold", item: "Gold Item" };
   const fineMode = () => B.mode === "g2g" || B.mode === "item";
   const g3 = n => Number(n || 0).toFixed(3) + " g";
@@ -22,7 +22,8 @@
   // Gold to Gold: fine gold due = net x (9K 0.4235, 14K 0.66, 18K 0.836, 22K 1.06, 24K 1), making 650/750 per g in rupees.
   // Gold Item: fine gold due = net x (9K 0.54, 14K 0.74, 18K 0.90, 22K 1.06, 24K 1), making already in the gold (none in rupees).
   // For Gold to Gold / Gold Item, settle 'fine' = customer gives the fine gold; 'amount' = fine x F is charged in rupees.
-  // Diamonds = ct x the tag's rate, plus other charges. Rupee total before GST rounded UP to Rs 1,000; GST to the nearest rupee.
+  // Diamonds = ct x the tag's rate, plus other charges. Discount (C-20261016-BILLDISC) per piece, rupees or 'n%' of that piece's
+  // rupee amount, never more than it. Rupee total less discount, rounded UP to Rs 1,000; GST to the nearest rupee.
   const VJ_FINE = { g2g: { '9K': 0.4235, '14K': 0.66, '18K': 0.836, '22K': 1.06, '24K': 1 }, item: { '9K': 0.54, '14K': 0.74, '18K': 0.90, '22K': 1.06, '24K': 1 } };
   function vjBillCalc(tags, o) {
     const pur = Object.assign({ '24K': 1, '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.40 }, o.purity || {});
@@ -48,11 +49,16 @@
         gold: gl.map(g => g.k + ' ' + g.net.toFixed(3) + ' g').join(' + '), net: Math.round(net * 1000) / 1000, fine, goldAmt: Math.round(gold),
         mkRate: mk, making: Math.round(mk * net), ct: Math.round(ct * 100) / 100, diaAmt: Math.round(dia), other: Math.round(oth) };
       r.amount = r.goldAmt + r.making + r.diaAmt + r.other;
+      const dv = String(o.disc && o.disc[t.id] != null ? o.disc[t.id] : '').trim(), pm = dv.match(/^(\d+(?:\.\d+)?)\s*%$/), dn = Number(dv.replace(/[,\s]/g, ''));
+      r.discTxt = pm ? Math.min(100, Number(pm[1])) + '%' : '';
+      r.disc = Math.round(Math.min(r.amount, pm ? r.amount * Math.min(100, Number(pm[1])) / 100 : (dn > 0 ? dn : 0)));
+      r.net = r.amount - r.disc;
       return r;
     });
-    const sum = rows.reduce((a, r) => a + r.amount, 0), sub = Math.ceil(sum / 1000) * 1000, gst = Math.round(sub * gstPct / 100);
+    const sum = rows.reduce((a, r) => a + r.amount, 0), disc = rows.reduce((a, r) => a + r.disc, 0), after = sum - disc;
+    const sub = Math.ceil(after / 1000) * 1000, gst = Math.round(sub * gstPct / 100);
     const fine = Math.round(rows.reduce((a, r) => a + r.fine, 0) * 1000) / 1000;
-    return { mode, settle, rows, fine: settle === 'fine' ? fine : 0, fineIn: fine, sum, roundOff: sub - sum, sub, gstPct, gst, total: sub + gst };
+    return { mode, settle, rows, fine: settle === 'fine' ? fine : 0, fineIn: fine, sum, disc, after, roundOff: sub - after, sub, gstPct, gst, total: sub + gst };
   }
   // VJ_BILL_CALC_END
 
@@ -91,8 +97,8 @@
       <div class="row" style="align-items:end"><label style="flex:2 1 220px">Design number or tag number <input id="bq" autocomplete="off" placeholder="e.g. 1436 or VLR14/803"></label>
       <div><button type="button" class="btn" id="badd">Add piece</button></div></div>
       <div id="bpick" class="row" style="gap:8px"></div>
-      <div class="list"><table class="items" style="min-width:640px"><thead><tr><th>Piece</th><th>Gold</th><th>Gold value</th><th>Making</th><th>Diamonds</th><th>Other</th><th>Amount</th><th></th></tr></thead><tbody id="brows"></tbody></table></div>
-      <table class="sum"><tr id="bfinerow" hidden><td><b>Fine gold to receive</b></td><td id="bfine"><b>—</b></td></tr><tr><td>Total</td><td id="bsum">—</td></tr><tr><td>Rounded up to Rs 1,000</td><td id="bsub">—</td></tr>
+      <div class="list"><table class="items" style="min-width:820px"><thead><tr><th>Piece</th><th>Gold</th><th>Gold value</th><th>Making</th><th>Diamonds</th><th>Other</th><th>Amount</th><th>Discount<br><span style="font-weight:400;text-transform:none">Rs or %</span></th><th>Net</th><th></th></tr></thead><tbody id="brows"></tbody></table></div>
+      <table class="sum"><tr id="bfinerow" hidden><td><b>Fine gold to receive</b></td><td id="bfine"><b>—</b></td></tr><tr><td>Total</td><td id="bsum">—</td></tr><tr id="bdiscrow" hidden><td>Less discount</td><td id="bdisc">—</td></tr><tr><td>Rounded up to Rs 1,000</td><td id="bsub">—</td></tr>
         <tr><td id="bgstl">GST 3%</td><td id="bgst">—</td></tr><tr class="total"><td>Bill total</td><td id="btotal">—</td></tr></table>
       <p class="hint" id="bnote"></p>
       <div class="actions"><button type="button" class="btn" id="bsave">Save bill &amp; make PDF</button><button type="button" class="btn ghost" id="bclear">Clear</button></div>
@@ -107,7 +113,7 @@
     document.querySelectorAll("input[name=bset]").forEach(r => r.addEventListener("change", () => { B.settle = r.value; render(); }));
     document.querySelectorAll("input[name=btitle]").forEach(r => r.addEventListener("change", () => { B.title = r.value; }));
     $("bF").addEventListener("input", render); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); });
-    $("bclear").addEventListener("click", () => { B.items = []; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); render(); });
+    $("bclear").addEventListener("click", () => { B.items = []; B.disc = {}; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); render(); });
     $("bsave").addEventListener("click", save);
   }
   function prefill() { if (!$("bdate").value) $("bdate").value = today(); if (!$("bF").value) { const g = settings().gold24g; if (g) $("bF").value = Math.round(g); } }
@@ -120,7 +126,7 @@
   function add(t) { if (!B.items.includes(t.id)) B.items.push(t.id); $("bq").value = ""; $("bpick").textContent = ""; render(); }
   const F = () => Number(String($("bF").value).replace(/[^0-9.]/g, "")) || 0;
   function calcNow() { const s = settings(), all = tags(); const list = B.items.map(id => all.find(t => t.id === id)).filter(Boolean);
-    return vjBillCalc(list, { F: F(), mode: B.mode, settle: B.settle, purity: s.purity, making: s.making, gst: s.gst }); }
+    return vjBillCalc(list, { F: F(), mode: B.mode, settle: B.settle, disc: B.disc, purity: s.purity, making: s.making, gst: s.gst }); }
   function goldCell(r, c) { return c.settle === "fine" ? g3(r.fine) + " fine" : fmt(r.goldAmt) + (c.settle ? " (" + g3(r.fine) + " fine)" : ""); }
   function mkCell(r, c) { return c.mode === "item" ? "in gold" : fmt(r.making) + " (" + r.mkRate + "/g)"; }
   function noteText(mode) { return (mode === "ws" || mode === "g2g" ? "Gold includes 10% wastage. " : "") + (mode === "item" ? "Making is included in the gold. " : ""); }
@@ -133,10 +139,18 @@
       const t0 = tags().find(t => t.id === r.id); if (B.photos && t0 && t0.photo) { const im = document.createElement("img"); im.alt = ""; im.src = "/_blob/" + t0.photo; im.style.cssText = "width:56px;height:56px;object-fit:cover;border-radius:4px;display:block;margin-bottom:4px"; tr.firstChild.prepend(im); }
       td(ok || c.settle === "fine" ? goldCell(r, c) : "—", "num"); td(ok ? mkCell(r, c) : "—", "num");
       td(r.ct ? r.ct.toFixed(2) + " ct · " + fmt(r.diaAmt) : "—", "num"); td(r.other ? fmt(r.other) : "—", "num"); td(ok ? fmt(r.amount) : "—", "num");
+      const dc = document.createElement("td"), di = document.createElement("input"); di.className = "bdisc"; di.dataset.id = r.id; di.value = B.disc[r.id] || ""; di.placeholder = "0"; di.maxLength = 12; di.autocomplete = "off"; di.style.cssText = "width:84px;text-align:right";
+      di.addEventListener("input", () => { B.disc[r.id] = di.value.trim(); totals(); }); dc.appendChild(di); tr.appendChild(dc);
+      const nt = document.createElement("td"); nt.className = "num"; nt.dataset.net = r.id; nt.textContent = ok ? fmt(r.net) : "—"; tr.appendChild(nt);
       const x = document.createElement("td"), rm = document.createElement("button"); rm.type = "button"; rm.className = "btn ghost"; rm.textContent = "Remove";
-      rm.addEventListener("click", () => { B.items.splice(i, 1); render(); }); x.appendChild(rm); tr.appendChild(x); body.appendChild(tr);
+      rm.addEventListener("click", () => { delete B.disc[r.id]; B.items.splice(i, 1); render(); }); x.appendChild(rm); tr.appendChild(x); body.appendChild(tr);
     });
-    const has = c.rows.length && ok;
+    totals(c);
+  }
+  function totals(c) {
+    c = c || calcNow(); const ok = F() >= 2000, has = c.rows.length && ok;
+    c.rows.forEach(r => { const n = document.querySelector('[data-net="' + r.id + '"]'); if (n) n.textContent = ok ? fmt(r.net) + (r.discTxt ? " (" + r.discTxt + ")" : "") : "—"; });
+    $("bdiscrow").hidden = !c.disc; $("bdisc").textContent = "- " + fmt(c.disc);
     $("bsettle").hidden = !fineMode(); $("bfinerow").hidden = !(c.settle === "fine" && c.rows.length); $("bfine").firstChild.textContent = g3(c.fine);
     $("bmodehint").textContent = { ws: "Gold x karat rate + 10% wastage; making Rs 650/g (750/g up to 5 g).", nett: "Gold x karat rate; making Rs 650/g (750 up to 5 g) + 10% of the karat rate.",
       g2g: "Fine gold = weight x 14K 0.66 / 18K 0.836 / 9K 0.4235 / 22K 1.06; making Rs 650/g (750 up to 5 g) in rupees.", item: "Fine gold = weight x 14K 0.74 / 18K 0.90 / 9K 0.54 / 22K 1.06; making included in the gold." }[B.mode];
@@ -173,12 +187,12 @@
     doc.setFillColor(243, 230, 211); doc.rect(M, y - 5, W - 2 * M, 8, "F"); row(cols.map(c => c[0]), true); y += 1;
     b.rows.forEach(r => { if (y > 250) { doc.addPage(); y = 20; }
       row([(r.design ? r.design + " - " : "") + r.label + (r.cat ? "\n" + r.cat : ""), r.gold || "-", b.settle === "fine" ? g3(r.fine) + "\nfine" : fmt(r.goldAmt) + (b.settle ? "\n" + g3(r.fine) + " fine" : ""), b.mode === "item" ? "in gold" : fmt(r.making) + "\n@ " + r.mkRate + "/g",
-        r.ct ? r.ct.toFixed(2) + " ct\n" + fmt(r.diaAmt) : "-", r.other ? fmt(r.other) : "-", fmt(r.amount)], false, 10.5, P ? (pics[r.id] || null) : undefined);
+        r.ct ? r.ct.toFixed(2) + " ct\n" + fmt(r.diaAmt) : "-", r.other ? fmt(r.other) : "-", r.disc ? fmt(r.amount) + "\nless " + fmt(r.disc).slice(3) + (r.discTxt ? " (" + r.discTxt + ")" : "") + "\n" + fmt(r.net) : fmt(r.amount)], false, 10.5, P ? (pics[r.id] || null) : undefined);
       doc.setDrawColor(225); doc.line(M, y - 3, W - M, y - 3); });
     y += 3; if (y > 240) { doc.addPage(); y = 20; }
     const tot = (l, v, big) => { doc.setFont("helvetica", big ? "bold" : "normal"); doc.setFontSize(big ? 15 : 12); doc.text(l, W - M - 50, y, { align: "right" }); doc.text(v, W - M, y, { align: "right" }); y += big ? 9 : 7; };
     if (b.settle === "fine") { tot("Fine gold to receive", g3(b.fine), true); y += 2; }
-    tot("Total", fmt(b.sum)); tot("Rounded up to Rs 1,000", fmt(b.sub)); tot(`GST ${b.gstPct}%`, fmt(b.gst)); doc.setDrawColor(180, 150, 80); doc.line(W - M - 95, y - 4, W - M, y - 4); y += 2; tot(b.title + " total", fmt(b.total), true);
+    tot("Total", fmt(b.sum)); if (b.disc) { tot("Less discount", "- " + fmt(b.disc)); tot("Total after discount", fmt(b.after)); } tot("Rounded up to Rs 1,000", fmt(b.sub)); tot(`GST ${b.gstPct}%`, fmt(b.gst)); doc.setDrawColor(180, 150, 80); doc.line(W - M - 95, y - 4, W - M, y - 4); y += 2; tot(b.title + " total", fmt(b.total), true);
     y += 4; doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(80);
     const notes = [noteText(b.mode).trim(), "All diamonds are third-party certified (IGI / EGL / TGL) and all gold is BIS HUID hallmarked.", b.title === "Estimate" ? "This is an estimate. Final figure may vary with the gold price." : ""].filter(Boolean);
     doc.text(doc.splitTextToSize(notes.join(" "), W - 2 * M), M, y);
@@ -187,7 +201,7 @@
   async function save() {
     const m = $("bmsg"), out = $("bout"); out.hidden = true;
     const body = { no: $("bno").value.trim(), name: $("bname").value.trim(), city: $("bcity").value.trim(), mobile: $("bmob").value.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""),
-      date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, title: B.title, ids: B.items.slice() };
+      date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, title: B.title, ids: B.items.slice(), disc: Object.assign({}, B.disc) };
     if (!body.name) { m.textContent = "Enter the customer's name."; return; }
     if (!body.no) { m.textContent = "Enter the bill number."; return; }
     if (body.mobile && !/^[6-9]\d{9}$/.test(body.mobile)) { m.textContent = "Mobile must be 10 digits (or leave it empty)."; return; }
@@ -211,6 +225,6 @@
     } catch (e) { m.textContent = "Not saved: " + (e.message || e) + "."; }
     $("bsave").disabled = false;
   }
-  function boot() { if (document.querySelector("nav") && $("p-rates")) { build(); setInterval(() => { const s = $("p-bill"); if (s && !s.hidden) render(); }, 20000); } else setTimeout(boot, 300); }
+  function boot() { if (document.querySelector("nav") && $("p-rates")) { build(); setInterval(() => { const s = $("p-bill"); if (s && !s.hidden && !(document.activeElement && document.activeElement.classList.contains("bdisc"))) render(); }, 20000); } else setTimeout(boot, 300); }
   boot();
 })();
