@@ -224,6 +224,7 @@ async function vjSync(request, env, who, ctx) {
     const data = JSON.parse(r.data);
     if (who.role === 'sales' && (r.path === 'counters/main' || r.path.startsWith('quotes/'))) return null;
     if (who.role === 'sales' && data && data.order) delete data.order; // C-20261016-ORDERS: customer details never go to the sales login
+    if (who.role === 'sales' && data && data.orderCancelled) delete data.orderCancelled;
     return { path: r.path, data, version: r.version };
   }).filter(Boolean);
   // 'now - 2000' so a write landing in the same millisecond is never missed on the next poll
@@ -272,6 +273,11 @@ async function vjWrite(request, env, who) {
       else { const mob = vjPhone(o.mobile), due = String(o.due || '');
         next.order = { name: vjClean(o.name, 60), mobile: mob, city: vjClean(o.city, 40), due: /^\d{4}-\d{2}-\d{2}$/.test(due) ? due : '' };
         if (!next.order.name) return vjDeny(400, 'order needs the customer name'); }
+    }
+    if (next.orderCancelled !== undefined) { // C-20261016-ORDERSTOCK: the cancelled order's customer, kept for the record (owners only)
+      const oc = next.orderCancelled && typeof next.orderCancelled === 'object' ? next.orderCancelled : null;
+      if (!oc || who.role !== 'admin' && JSON.stringify(oc) !== JSON.stringify(cur && cur.orderCancelled)) delete next.orderCancelled;
+      else next.orderCancelled = { name: vjClean(oc.name, 60), mobile: vjPhone(oc.mobile), city: vjClean(oc.city, 40), due: /^\d{4}-\d{2}-\d{2}$/.test(String(oc.due || '')) ? oc.due : '', at: vjClean(oc.at, 30), by: vjClean(oc.by, 80) };
     }
     if (!cur) next.createdBy = who.email;
   }
@@ -742,23 +748,36 @@ function vjBuildDayBook({ audit, changes, deleted, byPath, who, ymd }) {
   return { count: rows.length, xlsx, fileName: `VJ_Tags_${dd}.xlsx`, caption };
 }
 
-// Orders report (C-20261016-ORDERS): every tag made as an order, with the customer, as an Excel file. Owners and staff only.
+// Orders report (C-20261016-ORDERS / ORDERSTOCK): sheet 1 pending orders (still an order and on no bill or estimate that is not
+// cancelled), sheet 2 every order with its status. Owners and staff only.
 async function vjOrdersReport(env, who) {
   if (who.role === 'sales') return vjDeny(403, 'not allowed');
+  if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
   const all = ((await env.DB.prepare("SELECT path, data FROM docs WHERE path LIKE 'tags/%'").all()).results) || [];
   const users = ((await env.DB.prepare('SELECT email, name FROM users').all()).results) || [];
   const owners = String(env.OWNER_EMAILS || '').toLowerCase().split(',').map(s => s.trim());
   const by = e => e === 'vaishnavijewels@gmail.com' ? 'Shilpiji' : owners.includes(e) ? 'Abhinav' : ((users.find(u => u.email === e) || {}).name || String(e || '').split('@')[0]);
   const dmy = d => d ? String(d).slice(0, 10).split('-').reverse().join('-') : '';
-  const rows = all.map(r => JSON.parse(r.data)).filter(t => t.kind === 'order')
-    .sort((a, b) => String((a.order || {}).due || '9999').localeCompare(String((b.order || {}).due || '9999')) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')))
-    .map(t => { const o = t.order || {}; return [o.name || '', vjPhoneTxt(o.mobile), o.city || '', dmy(o.due), t.label || '', t.designNo || '', t.catName || '',
-      vjGoldTxt(t), vjDiaTxt(t), Number(t.priceAtTag) || '', t.photo ? 'Yes' : 'No', t.printedAt ? 'Yes' : 'No', by(t.createdBy), dmy(t.createdAt), t.remark || '']; });
-  const xlsx = vjXlsx([{ name: 'Orders', head: ['Customer', 'Mobile', 'City', 'Delivery date', 'Tag', 'Design no.', 'Category', 'Gold', 'Diamonds', 'Price when tagged (Rs)', 'Photo', 'Printed', 'Made by', 'Tagged on', 'Remark'],
-    widths: [24, 16, 14, 13, 14, 12, 16, 22, 34, 14, 7, 8, 14, 12, 18], rows, wrap: [8] }]);
+  const billed = new Map(); // tag id -> the bill / estimate it is on (not cancelled), latest last
+  (((await env.DB.prepare('SELECT data FROM vj_bills ORDER BY ts').all()).results) || []).map(r => JSON.parse(r.data)).filter(b => !b.cancelled)
+    .forEach(b => (b.rows || []).forEach(r => billed.set(r.id, b.title + ' ' + b.no + ' (' + dmy(b.date) + ')')));
+  const today = Date.parse(new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10));
+  const list = all.map(r => Object.assign({ id: r.path.slice(5) }, JSON.parse(r.data))).filter(t => t.kind === 'order' || t.orderCancelled)
+    .map(t => { const o = t.order || t.orderCancelled || {}; const st = t.kind !== 'order' ? 'Moved to stock (' + dmy(t.orderCancelled && t.orderCancelled.at) + ')' : billed.has(t.id) ? 'Billed - ' + billed.get(t.id) : 'Pending';
+      return { t, o, st, pending: st === 'Pending' }; })
+    .sort((a, b) => String(a.o.due || '9999').localeCompare(String(b.o.due || '9999')) || String(a.t.createdAt || '').localeCompare(String(b.t.createdAt || '')));
+  const base = x => [x.o.name || '', vjPhoneTxt(x.o.mobile), x.o.city || '', dmy(x.o.due)];
+  const piece = x => [x.t.label || '', x.t.designNo || '', x.t.catName || '', vjGoldTxt(x.t), vjDiaTxt(x.t), Number(x.t.priceAtTag) || '', x.t.photo ? 'Yes' : 'No', x.t.printedAt ? 'Yes' : 'No', by(x.t.createdBy), dmy(x.t.createdAt), x.t.remark || ''];
+  const pend = list.filter(x => x.pending).map(x => { const d = x.o.due ? Math.round((Date.parse(x.o.due) - today) / 864e5) : '';
+    return [...base(x), d === '' ? '' : d < 0 ? 'OVERDUE ' + (-d) + ' d' : d, ...piece(x)]; });
+  const allRows = list.map(x => [x.st, ...base(x), ...piece(x)]);
+  const ph = ['Tag', 'Design no.', 'Category', 'Gold', 'Diamonds', 'Price when tagged (Rs)', 'Photo', 'Printed', 'Made by', 'Tagged on', 'Remark'];
+  const xlsx = vjXlsx([
+    { name: 'Pending orders', head: ['Customer', 'Mobile', 'City', 'Delivery date', 'Days left', ...ph], rows: pend, widths: [24, 16, 14, 13, 12, 14, 12, 16, 22, 34, 14, 7, 8, 14, 12, 18], wrap: [9], mark: r => String(r[4]).startsWith('OVERDUE') },
+    { name: 'All orders', head: ['Status', 'Customer', 'Mobile', 'City', 'Delivery date', ...ph], rows: allRows, widths: [30, 24, 16, 14, 13, 14, 12, 16, 22, 34, 14, 7, 8, 14, 12, 18], wrap: [0, 9], mark: r => String(r[0]).startsWith('Moved') }]);
   const bin = atob(xlsx), out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  await vjAudit(env, who, 'orders-report', 'tags/', rows.length + ' orders');
-  return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_Orders.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
+  await vjAudit(env, who, 'orders-report', 'tags/', pend.length + ' pending of ' + list.length);
+  return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_Orders.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'x-pending': String(pend.length) } });
 }
 
 async function vjDailyReport(env) {
