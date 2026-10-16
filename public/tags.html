@@ -384,7 +384,7 @@ function opt(sel,vals,cur){vals.forEach(v=>{const o=document.createElement("opti
 function addGold(k,net){
   const id=++lineSeq,d=document.createElement("div");d.className="ln g";d.dataset.id=id;
   d.innerHTML=`<label>Karat<select id="gk${id}"></select></label><label>Net gold wt (g)<input type="number" id="gn${id}" step="0.001" min="0" placeholder="0.000"></label><div class="val" id="gv${id}"></div><button type="button" class="x" aria-label="Remove gold line">✕</button>`;
-  $("goldLines").appendChild(d);opt($("gk"+id),KARATS,k||"18K");if(net)$("gn"+id).value=net;
+  $("goldLines").appendChild(d);opt($("gk"+id),KARATS,k||"14K"); /* owner 16/10/2026: default 14K */if(net)$("gn"+id).value=net;
   d.querySelector(".x").addEventListener("click",()=>{if($("goldLines").children.length>1){d.remove();update()}});
   update();
 }
@@ -410,7 +410,7 @@ function readForm(){
   const k=kind(),cat=CATS.find(c=>c.id===$("cat").value)||CATS[0];
   const gold=[...$("goldLines").children].map(r=>({k:$("gk"+r.dataset.id).value,net:num($("gn"+r.dataset.id).value)}));
   const dias=[...$("diaLines").children].map(r=>{const i=r.dataset.id;const qq=$("dq"+i).value==="Other"?($("dqo"+i).value.trim().toUpperCase()||"OTHER?"):$("dq"+i).value;const sp=num($("dr"+i).value),sh=$("ds"+i).value,def=defRate(sh,qq);return {shape:sh,q:qq,ct:num($("dc"+i).value),pcs:Math.round(num($("dp"+i).value)),rate:sp>0?sp:(def||0),special:sp>0}}).filter(d=>d.ct>0||d.pcs>0||d.special);
-  const mainK=(gold.find(g=>g.net>0)||gold[0]||{k:"18K"}).k;
+  const mainK=(gold.find(g=>g.net>0)||gold[0]||{k:"14K"}).k;
   const prefix=k==="sample"?cat.s:cat.code+KNUM[mainK];
   const order=k==="order"?{name:$("oName").value.trim().slice(0,60),mobile:$("oMob").value.replace(/\D/g,"").replace(/^91(?=\d{10}$)/,""),city:$("oCity").value.trim().slice(0,40),due:$("oDue").value||""}:null;
   return {kind:k,cat:cat.id,prefix,catName:cat.name.replace(/\s*\(.*\)$/,""),mainK,gold,dias,order,
