@@ -124,7 +124,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
         <div class="thumb" id="thumb">No photo yet</div>
         <label>Photo of the piece
           <input type="file" id="photo" accept="image/*" capture="environment">
-          <span class="hint">Take it on the tray, in good light. Or skip it here: scan the printed tag's QR with your phone and tap <b>Take photo</b>.</span>
+          <span class="hint">Take it on the tray, in good light. Or skip it here: scan the printed tag's QR with your phone and tap <b>Add photo</b>.</span>
         </label>
       </div>
 
@@ -341,8 +341,12 @@ function renderCheck(){
     many.forEach(x=>{const b=document.createElement("button");b.type="button";b.className="btn ghost";b.textContent=(x.designNo?x.designNo+" · ":"")+x.label+(x.catName?" · "+x.catName:"");b.addEventListener("click",()=>{$("cq").value=x.label;renderCheck()});w.appendChild(b)});card.appendChild(w);box.appendChild(card);return}
   if(!t){card.textContent=!S.tags.length?"Loading stock…":/^[a-z]{3}\d+[a-z]{3}$/i.test(q)?`No piece has the code ${q}. Pieces imported from Onnet get their code when their new tag is printed; until then type the tag number (e.g. 809).`:`No piece with tag ${raw.trim()} in VJ Inventory.`;box.appendChild(card);return}
   const top=document.createElement("div");top.style.cssText="display:flex;gap:12px;align-items:center;flex-wrap:wrap";
-  if(t.photo){const im=document.createElement("img");im.alt="";im.src="/_blob/"+t.photo;im.style.cssText="width:96px;height:96px;object-fit:cover;border-radius:6px";top.appendChild(im)}
-  else{const ph=document.createElement("div");ph.className="hint";ph.style.cssText="width:96px;height:96px;display:flex;align-items:center;justify-content:center;text-align:center;border:1px dashed var(--line);border-radius:6px";ph.textContent="Photo pending";top.appendChild(ph)}
+  /* owner 16/10/2026: Add photo sits right next to the photo / Photo pending box */
+  const pcol=document.createElement("div");pcol.style.cssText="display:flex;flex-direction:column;gap:6px;align-items:stretch;width:112px";
+  if(t.photo){const im=document.createElement("img");im.alt="";im.src="/_blob/"+t.photo;im.style.cssText="width:112px;height:112px;object-fit:cover;border-radius:6px";pcol.appendChild(im)}
+  else{const ph=document.createElement("div");ph.className="hint";ph.style.cssText="width:112px;height:112px;display:flex;align-items:center;justify-content:center;text-align:center;border:1px dashed var(--line);border-radius:6px";ph.textContent="Photo pending";pcol.appendChild(ph)}
+  const pb=photoButton(t,renderCheck);if(pb){pb.style.justifyContent="center";pb.style.padding="6px 8px";if(t.photo)pb.classList.add("ghost");pcol.appendChild(pb)}
+  top.appendChild(pcol);
   const h=document.createElement("div");const l=document.createElement("div");l.className="labelno";l.textContent=(t.designNo?t.designNo+" · ":"")+t.label;const c=document.createElement("div");c.className="hint";c.textContent=S.role==="sales"?(t.catName||""):(t.catName||"")+(t.remark?" · "+t.remark:"")+(t.kind==="sample"?" · sample":"");h.append(l,c);top.appendChild(h);card.appendChild(top);
   const tb=document.createElement("table");tb.className="sum";const add=(a,b,cl)=>{const tr=document.createElement("tr");if(cl)tr.className=cl;const x=document.createElement("td"),y=document.createElement("td");x.textContent=a;y.textContent=b;tr.append(x,y);tb.appendChild(tr)};
   const pin=priceInput(t);pin.gold.forEach(g=>add("Gold "+g.k,g.net.toFixed(3)+" g"));pin.dias.forEach(d=>add(`${d.shape} ${d.q}`,`${d.ct.toFixed(2)} ct (${d.pcs})`+(d.rate>0?` @ ${fmt(d.rate)}`:"")));
@@ -355,8 +359,9 @@ function renderCheck(){
   card.appendChild(tb);
   const n=document.createElement("p");n.className="hint";n.textContent=pr?`At 24K ${fmt(s.gold24g)}/g${s.goldAt?", updated "+new Date(s.goldAt).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):""}.`+(t.priceAtTag?` Price when tagged: ${fmt(t.priceAtTag)}.`:""):"";card.appendChild(n);
   const acts=document.createElement("div");acts.style.cssText="display:flex;gap:8px;flex-wrap:wrap";
-  const pb=photoButton(t,renderCheck);if(pb)acts.appendChild(pb);
   if(S.role!=="sales"){const rp=document.createElement("button");rp.type="button";rp.className="btn ghost";rp.textContent="Reprint tag";rp.addEventListener("click",async()=>{if(await ensureCode(t))printOrPDF(t)});acts.appendChild(rp);}
+  if(S.owner){const dl=document.createElement("button");dl.type="button";dl.className="btn ghost";dl.style.color="#a12b2b";dl.textContent="Delete tag";
+    dl.addEventListener("click",()=>{const hold=document.createElement("div");acts.replaceWith(hold);deleteBox(t,hold,renderCheck,renderCheck)});acts.appendChild(dl)}
   card.appendChild(acts);
   box.appendChild(card);
 }
@@ -543,12 +548,30 @@ async function shrinkPhoto(f){
   c.getContext("2d").drawImage(img,0,0,c.width,c.height);
   return await new Promise(r=>c.toBlob(r,"image/jpeg",0.85));
 }
+/* owners only (Abhinav, Shilpiji - the server refuses anyone else): delete a tag with a reason (F-069). The server keeps a full
+   copy of the deleted tag and its photo stays saved (owner 16/10/2026, C-20261016-TAGSDELETE). */
+const DEL_REASONS=["Sold","Melted or broken","Approval","Wrong entry"];
+function deleteBox(t,holder,done,cancel){
+  holder.textContent="";
+  const box=document.createElement("div");box.className="confirm";box.style.cssText="display:flex;gap:8px;align-items:center;flex-wrap:wrap";
+  const q=document.createElement("b");q.textContent="Delete "+(t.designNo?t.designNo+" · ":"")+t.label+"?";
+  const sel=document.createElement("select");sel.setAttribute("aria-label","Reason for deleting");
+  [["","Choose a reason…"]].concat(DEL_REASONS.map(r=>[r,r])).forEach(([v,l])=>{const o=document.createElement("option");o.value=v;o.textContent=l;sel.appendChild(o)});
+  const y=document.createElement("button");y.type="button";y.className="btn danger";y.textContent="Delete";y.disabled=true;
+  const n=document.createElement("button");n.type="button";n.className="btn ghost";n.textContent="Keep";
+  sel.addEventListener("change",()=>{y.disabled=!sel.value});
+  y.addEventListener("click",async()=>{if(!sel.value)return;y.disabled=true;
+    try{await S.db.doc("tags/"+t.id).delete(sel.value);msg(`Deleted ${t.label} (${sel.value}). A copy is kept in the records.`,"ok");if(done)done()}
+    catch(e){y.disabled=false;msg(e&&/owner only|403/.test(String(e.code||e.message))?"Only Abhinav or Shilpiji can delete a tag.":"Could not delete. Try again.","bad")}});
+  n.addEventListener("click",()=>{if(cancel)cancel()});
+  box.append(q,sel,y,n);holder.appendChild(box);
+}
 /* phone: add or replace the photo of a saved piece (owner 13/10/2026: details on the laptop, photo from the mobile) */
 function photoButton(t,after){
   if(!S.db||!S.assets)return null;
   const lab=document.createElement("label");lab.className="btn";lab.style.cssText="display:inline-flex;align-items:center;gap:6px;cursor:pointer";
   const inp=document.createElement("input");inp.type="file";inp.accept="image/*";inp.setAttribute("capture","environment");inp.hidden=true;
-  lab.append(t.photo?"Replace photo":"Take photo",inp);
+  lab.append(t.photo?"Replace photo":"Add photo",inp);
   inp.addEventListener("change",async()=>{const f=inp.files&&inp.files[0];if(!f)return;
     msg(`Saving the photo of ${t.label}…`,"ok");
     try{const blob=await shrinkPhoto(f);const up=await S.assets.upload(blob,{type:"image/jpeg"});
@@ -726,10 +749,7 @@ async function renderList(){
     const act=document.createElement("td");act.style.whiteSpace="nowrap";
     const rp=document.createElement("button");rp.type="button";rp.className="btn ghost";rp.textContent="Reprint";rp.addEventListener("click",async()=>{if(await ensureCode(t))printOrPDF(t)});act.appendChild(rp);
     if(S.owner){const del=document.createElement("button");del.type="button";del.className="btn ghost";del.textContent="Delete";
-      del.addEventListener("click",()=>{act.textContent="";const box=document.createElement("span");box.className="confirm";box.append("Delete "+t.label+"?");
-        const y=document.createElement("button");y.type="button";y.className="btn danger";y.textContent="Delete";const n=document.createElement("button");n.type="button";n.className="btn ghost";n.textContent="Keep";
-        y.addEventListener("click",async()=>{try{await S.db.doc("tags/"+t.id).delete();if(t.photo&&S.assets){try{await S.assets.delete(t.photo)}catch(e){}}msg("Deleted "+t.label+".","ok")}catch(e){msg("Could not delete. Try again.","bad")}});
-        n.addEventListener("click",renderList);box.append(y,n);act.appendChild(box)});act.appendChild(del)}
+      del.addEventListener("click",()=>deleteBox(t,act,renderList,renderList));act.appendChild(del)}
     tr.appendChild(act);body.appendChild(tr);
   });
 }
