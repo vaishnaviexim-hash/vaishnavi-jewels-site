@@ -22,7 +22,8 @@
     list.forEach(p => { const b = document.createElement("button"); b.type = "button";
       b.style.cssText = "display:block;width:100%;text-align:left;padding:9px 12px;border:0;background:none;cursor:pointer;color:#222";
       b.textContent = p.name + (p.city ? " · " + p.city : "") + (p.mobile ? " · " + (/^\d{10}$/.test(p.mobile) ? "+91 " + p.mobile : p.mobile) : "");
-      b.addEventListener("mousedown", e => { e.preventDefault(); fill(set, p, true); close(); }); box.appendChild(b); });
+      b._pick = () => { fill(set, p, true); close(); }; b.addEventListener("mousedown", e => { e.preventDefault(); b._pick(); }); box.appendChild(b); });
+    box._i = 0; hl();
     document.body.appendChild(box); }
   document.addEventListener("input", e => {
     const t = e.target; if (!e.isTrusted || !t || !t.id) return; const set = setOf(t.id); if (!set) return;
@@ -34,5 +35,12 @@
       timer = setTimeout(async () => { const l = await look(q); if (l && document.activeElement === t) show(t, set, l); }, 250); }
   });
   document.addEventListener("focusout", e => { if (e.target && setOf(e.target.id || "")) setTimeout(close, 150); });
-  document.addEventListener("keydown", e => { if (e.key === "Escape") close(); });
+  // owner 17/10/2026 17:35: pick from the keyboard - Down / Up to move, Enter to fill
+  function hl() { if (!box) return; [...box.children].forEach((b, i) => { b.style.background = i === box._i ? "#f3ead2" : "none"; }); }
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") { close(); return; }
+    if (!box || !box.children.length) return; const n = box.children.length;
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); box._i = (box._i + (e.key === "ArrowDown" ? 1 : n - 1)) % n; hl(); }
+    else if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); box.children[box._i]._pick(); }
+  }, true);
 })();
