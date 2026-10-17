@@ -28,11 +28,14 @@
     mk: Object.assign({ base: 650, small: 750, limit: 5, pct: 10, min: 1000 }, s.making || {}), gst: s.gst == null ? 3 : s.gst, rates: s.defaultRates || DEF_RATES }; }
   const defRate = (q, sh, st) => { const v = Number(st.rates[q + "|" + sh]); return v > 0 ? v : 0; };
   // price incl. GST (same rule as the server's vjQPrice): gold + making (std / flat) + diamonds + extra (polki + other), up to Rs 100, + GST, up to Rs 1,000
+  // chain gold lines (C-20261017-CHAINTUNCH): net x tunch x 24K rate, no making, no wastage; making on the other lines only
+  const lineT = g => { const n = Number(g && g.tunch); return n >= 0.3 && n <= 1.1 ? n : 0; };
   function calc(gold, dv, extra, st, mk) {
-    const g0 = gold.find(g => g.net > 0); if (!g0 || !st.g) return 0;
-    let gv = 0, nt = 0; gold.forEach(g => { if (g.net > 0) { gv += g.net * st.g * (Number(st.pur[g.k]) || 0); nt += g.net; } });
-    const mv = mk === "flat" ? FLAT_MK * nt : Math.max((g0.net > st.mk.limit ? st.mk.base : st.mk.small) * nt, Number(st.mk.min) || 0) + gv * st.mk.pct / 100;
-    return up(up(gv + mv + dv + extra, 100) * (1 + st.gst / 100), 1000); // owner 16/10/2026: nearest Rs 1,000 (was 10,000)
+    if (!gold.some(g => g.net > 0) || !st.g) return 0;
+    const g0 = gold.find(g => g.net > 0 && !lineT(g)); let gv = 0, cv = 0, nt = 0;
+    gold.forEach(g => { if (g.net > 0) { const tn = lineT(g); if (tn) cv += g.net * st.g * tn; else { gv += g.net * st.g * (Number(st.pur[g.k]) || 0); nt += g.net; } } });
+    const mv = !g0 ? 0 : mk === "flat" ? FLAT_MK * nt : Math.max((g0.net > st.mk.limit ? st.mk.base : st.mk.small) * nt, Number(st.mk.min) || 0) + gv * st.mk.pct / 100;
+    return up(up(gv + cv + mv + dv + extra, 100) * (1 + st.gst / 100), 1000); // owner 16/10/2026: nearest Rs 1,000 (was 10,000)
   }
   const polkiOf = t => (t.polki && Number(t.polki.pcs) > 0 ? { pcs: Number(t.polki.pcs), rate: Number(Q.prates[t.id]) || Number(t.polki.rate) || PRATE } : null);
   function optRate(d, opt, st) {
@@ -43,24 +46,26 @@
   }
   function priceFor(t, opt) {
     const st = settings(); if (!st.g) return null;
-    const gold = (t.kind === "sample" ? [{ k: "14K", net: (t.metal && t.metal.net) || 0 }] : (t.gold || [])).map(g => ({ k: String(g.k || ""), net: Number(g.net) || 0 }));
+    const gold = (t.kind === "sample" ? [{ k: "14K", net: (t.metal && t.metal.net) || 0 }] : (t.gold || [])).map(g => ({ k: String(g.k || ""), net: Number(g.net) || 0, tunch: lineT(g) }));
     // C-20261017-MAKINGMIN (owner 17/10): std = 650/g (750 up to 5 g), minimum Rs 1,000 a piece, + 10% wastage on gold; flat = Rs 1,600/g
     let dv = 0, missing = false; (t.dias || []).filter(Boolean).forEach(d => { const r = optRate(d, opt, st); if (!(r > 0) && !NON_DIAMOND.test(d.q || "")) missing = true; dv += (Number(d.ct) || 0) * r; });
     const pk = polkiOf(t), final = calc(gold, dv, (pk ? pk.pcs * pk.rate : 0) + (Number(t.other && t.other.amt) || 0), st, Q.mk);
     return final ? { final, missing } : null;
   }
   // one new-design line: {desc, k, net, dias:[{q, shape, ct, rate, edited}], ppcs, prate, other}
-  const newDesign = () => ({ desc: "", k: "14K", net: "", dias: [], ppcs: "", prate: String(PRATE), other: "" });
+  const newDesign = () => ({ desc: "", k: "14K", net: "", tunch: "", dias: [], ppcs: "", prate: String(PRATE), other: "" });
   function designIn(d, st) { // the numbers the server gets, and what is still missing
     const net = num(d.net), ppcs = num(d.ppcs), prate = String(d.prate).trim() === "" ? PRATE : num(d.prate), other = num(d.other), bad = [];
     const dias = d.dias.filter(x => num(x.ct) > 0).map(x => ({ q: x.q, pcs: Math.max(0, Math.round(num(x.pcs))), shape: x.shape, ct: num(x.ct), rate: String(x.rate).trim() === "" ? defRate(x.q, x.shape, st) : num(x.rate) }));
+    const tv = String(d.tunch == null ? "" : d.tunch).trim(), tunch = tv === "" ? 0 : Math.round(num(tv) * 1000) / 1000; // a chain: its own tunch (C-20261017-CHAINTUNCH)
+    if (tv !== "" && !(tunch >= 0.3 && tunch <= 1.1)) bad.push("chain tunch (0.300-1.100, e.g. 0.920, or empty)");
     if (!(net > 0)) bad.push("net gold weight"); if (dias.some(x => !(x.rate > 0))) bad.push("a diamond rate per ct");
     if (!(Number.isInteger(ppcs) && ppcs >= 0 && ppcs <= 10000) || ppcs > 0 && !(Number.isInteger(prate) && prate >= 1 && prate <= 100000)) bad.push("polki pcs (whole, up to 10,000) and rate per pc (Rs 1-1,00,000)");
     if (!(Number.isInteger(other) && other >= 0)) bad.push("other charges in whole rupees");
-    return { desc: String(d.desc || "").trim().slice(0, 60), k: d.k, net, dias, ppcs, prate, other, bad };
+    return { desc: String(d.desc || "").trim().slice(0, 60), k: d.k, net, tunch, dias, ppcs, prate, other, bad };
   }
   function designPrice(d) { const st = settings(), x = designIn(d, st); if (x.bad.length || !st.g) return 0;
-    return calc([{ k: x.k, net: x.net }], x.dias.reduce((a, y) => a + y.ct * y.rate, 0), (x.ppcs ? x.ppcs * x.prate : 0) + x.other, st, "std"); }
+    return calc([{ k: x.k, net: x.net, tunch: x.tunch }], x.dias.reduce((a, y) => a + y.ct * y.rate, 0), (x.ppcs ? x.ppcs * x.prate : 0) + x.other, st, "std"); }
   const tags = () => (window.VJ_TAGS ? window.VJ_TAGS() : []);
   function find(q) {
     q = String(q || "").trim().toUpperCase().replace(/\s+/g, ""); if (!q) return [];
@@ -80,7 +85,7 @@
         <label><input type="radio" name="qkind" value="design"> Estimate for a new design</label></div>
       <div id="qdesbox" hidden>
       <h2>1 · Designs</h2>
-      <p class="hint">No tag needed: type each design's karat, net gold, diamonds and polki. Priced at today's gold rate with the same making rule.</p>
+      <p class="hint">No tag needed: type each design's karat, net gold, diamonds and polki. Priced at today's gold rate with the same making rule. For a chain, type its tunch: gold = net × tunch × rate, no making.</p>
       <div id="qdlines" style="display:flex;flex-direction:column;gap:12px"></div>
       <div class="actions"><button type="button" class="btn ghost" id="qdadd">+ Add design</button></div>
       </div>
@@ -157,10 +162,11 @@
       const card = el("div"); card.style.cssText = "border:1px solid var(--line);border-radius:var(--r,10px);padding:12px;display:flex;flex-direction:column;gap:8px";
       const desc = el("input", { value: d.desc, maxLength: 60, autocomplete: "off", placeholder: "e.g. Bracelet, new design" }), k = sel(DKARATS, d.k);
       const net = el("input", { value: d.net, inputMode: "decimal", autocomplete: "off", placeholder: "0.000" }), price = el("div", { className: "labelno" }); price.dataset.qd = i;
+      const tu = el("input", { value: d.tunch || "", inputMode: "decimal", autocomplete: "off", placeholder: "chain only, e.g. 0.920" }); tu.addEventListener("input", () => { d.tunch = tu.value; prices(); });
       desc.addEventListener("input", () => { d.desc = desc.value; }); k.addEventListener("change", () => { d.k = k.value; prices(); }); net.addEventListener("input", () => { d.net = net.value; prices(); });
       const rm = el("button", { type: "button", className: "btn ghost", textContent: "Remove design" }); rm.addEventListener("click", () => { Q.designs.splice(i, 1); if (!Q.designs.length) Q.designs.push(newDesign()); drawDesigns(); });
       card.append(el("div", { style: "display:flex;justify-content:space-between;align-items:center;gap:8px" }, [el("strong", { textContent: "Design " + (i + 1) }), price]),
-        el("div", { className: "row" }, [fld("Description", desc, "2 1 220px"), fld("Karat", k), fld("Net gold (g)", net)]));
+        el("div", { className: "row" }, [fld("Description", desc, "2 1 220px"), fld("Karat", k), fld("Net gold (g)", net), fld("Chain tunch", tu)]));
       const dbox = el("div", { style: "display:flex;flex-direction:column;gap:6px" });
       d.dias.forEach((x, j) => {
         const q = sel(DQUALS, x.q, o => QC[o] + " · " + o), sh = sel(DSHAPES, x.shape), pc = el("input", { value: x.pcs || "", inputMode: "numeric", autocomplete: "off", placeholder: "0" }), ct = el("input", { value: x.ct, inputMode: "decimal", autocomplete: "off", placeholder: "0.00" });
@@ -282,7 +288,7 @@
     try {
       // the server prices every line again (from the tags or the weights typed) and returns the figures the PDF prints
       const r = await fetch("/api/vj/quote", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-        body: JSON.stringify(design ? { kind: "design", name, mobile: mob, city, items: dIn.map(x => ({ desc: x.desc, k: x.k, net: x.net, dias: x.dias, ppcs: x.ppcs, prate: x.prate, other: x.other })) }
+        body: JSON.stringify(design ? { kind: "design", name, mobile: mob, city, items: dIn.map(x => ({ desc: x.desc, k: x.k, net: x.net, ...(x.tunch ? { tunch: x.tunch } : {}), dias: x.dias, ppcs: x.ppcs, prate: x.prate, other: x.other })) }
           : { kind: "tags", name, mobile: mob, city, option: OPTS[Q.option], mk: Q.mk, items: items.map(i => ({ id: i.id, ...(Q.prates[i.id] ? { prate: Q.prates[i.id] } : {}) })) }) });
       const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("server " + r.status));
       if (!Array.isArray(j.items) || j.items.length !== (design ? dIn.length : items.length)) throw new Error("unexpected reply from the server");
