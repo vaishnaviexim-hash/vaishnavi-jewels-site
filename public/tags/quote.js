@@ -107,7 +107,7 @@
       <h2 id="qcusth">3 · Customer</h2>
       <div class="actions" id="qcbox" hidden><button type="button" class="btn ghost" id="qcontact">Pick from phone contacts</button></div>
       <div class="row"><label>Name <input id="qname" autocomplete="off" maxlength="60"></label>
-        <label>Mobile (10 digits) <input id="qmob" inputmode="tel" autocomplete="off" maxlength="14" placeholder="98xxxxxxxx"></label>
+        <label>Mobile (10 digits) <input id="qmob" inputmode="tel" autocomplete="off" maxlength="20" placeholder="98xxxxxxxx"></label>
         <label>City <input id="qcity" autocomplete="off" maxlength="40"></label></div>
       <label id="qphotol" style="flex-direction:row;align-items:center;gap:8px;color:var(--fg)"><input type="checkbox" id="qphoto" checked style="width:auto"> Show piece photos in the PDF</label>
       <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg)"><input type="checkbox" id="qwt" checked style="width:auto"> Show gold weight &amp; diamond carats in the PDF</label>
@@ -279,7 +279,7 @@
     const design = Q.kind === "design", dIn = design ? Q.designs.map(d => designIn(d, st)).filter(x => x.net > 0 || x.dias.length || x.ppcs > 0) : [];
     if (design ? !dIn.length : !Q.items.length) { m.textContent = design ? "Fill in at least one design (karat and net gold)." : "Add at least one piece."; return; }
     if (!st.g) { m.textContent = "Set today's gold rate first (Gold rate & settings)."; return; }
-    if (!name || !city || !/^[6-9]\d{9}$/.test(mob)) { m.textContent = "Enter the customer's name, 10-digit mobile and city."; return; }
+    if (!name || !city || !/^[6-9]\d{9}$/.test(mob)) { m.textContent = !name || !city ? "Enter the customer's name, 10-digit mobile and city." : "The mobile number has " + mob.length + " digits (after +91) - it needs 10. Please check it."; return; }
     const bad = dIn.findIndex(x => x.bad.length); if (bad >= 0) { m.textContent = "Design " + (bad + 1) + ": check " + dIn[bad].bad.join(", ") + "."; return; }
     const items = design ? [] : Q.items.map(t => Object.assign({}, t, { price: (priceFor(t, Q.option) || {}).final || 0 }));
     if (items.some(i => !i.price)) { m.textContent = "A piece has no price - check the gold rate and the default diamond rates."; return; }
