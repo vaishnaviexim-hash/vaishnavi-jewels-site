@@ -349,6 +349,11 @@ async function vjPhotoUpload(request, env, who) {
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(type)) return vjDeny(415, 'jpg, png or webp only');
   const buf = await request.arrayBuffer();
   if (!buf.byteLength || buf.byteLength > 6e6) return vjDeny(413, 'photo too large');
+  { // C-20261017-PHOTOIMPORT: the bytes must match the declared type (magic bytes), so no other file can be stored as a photo
+    const h = new Uint8Array(buf, 0, Math.min(12, buf.byteLength)), a = (i, s) => String.fromCharCode(...h.slice(i, i + s.length)) === s;
+    const real = h[0] === 0xff && h[1] === 0xd8 && h[2] === 0xff ? 'image/jpeg' : h[0] === 0x89 && a(1, 'PNG') ? 'image/png' : a(0, 'RIFF') && a(8, 'WEBP') ? 'image/webp' : '';
+    if (real !== type) return vjDeny(415, 'not a real jpg, png or webp photo');
+  }
   const id = [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
   await vjPhotoPut(env, id, buf, type, { by: who.email, at: new Date().toISOString() });
   await vjAudit(env, who, 'photo', id, String(buf.byteLength));
