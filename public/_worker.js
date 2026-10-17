@@ -534,7 +534,7 @@ function vjBillCalc(tags, o) {
     return r;
   });
   const sum = rows.reduce((a, r) => a + r.amount, 0), disc = rows.reduce((a, r) => a + r.disc, 0), after = sum - disc;
-  const sub = Math.ceil(after / 1000) * 1000, gst = Math.round(sub * gstPct / 100);
+  const sub = Math.ceil(after / 500) * 500, gst = Math.round(sub * gstPct / 100);
   const fine = Math.round(rows.reduce((a, r) => a + r.fine, 0) * 1000) / 1000;
   return { mode, settle, rows, fine: settle === 'fine' ? fine : 0, fineIn: fine, sum, disc, after, roundOff: sub - after, sub, gstPct, gst, total: sub + gst };
 }
