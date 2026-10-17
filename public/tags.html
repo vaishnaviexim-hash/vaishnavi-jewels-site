@@ -608,7 +608,9 @@ function deleteBox(t,holder,done,cancel){
   const n=document.createElement("button");n.type="button";n.className="btn ghost";n.textContent="Keep";
   sel.addEventListener("change",()=>{y.disabled=!sel.value});
   y.addEventListener("click",async()=>{if(!sel.value)return;y.disabled=true;
-    try{await S.db.doc("tags/"+t.id).delete(sel.value);msg(`Deleted ${t.label} (${sel.value}). A copy is kept in the records.`,"ok");if(done)done()}
+    try{await S.db.doc("tags/"+t.id).delete(sel.value);msg(`Deleted ${t.label} (${sel.value}). A copy is kept in the records.`,"ok");
+      /* owner 17/10/2026 17:47: drop it from this page's list straight away, so the other tag of a double pair stops being flagged */
+      S.tags=S.tags.filter(x=>x.id!==t.id);Object.values(S.parts).forEach(a=>{const i=a.findIndex(x=>x.id===t.id);if(i>=0)a.splice(i,1)});S.sel.delete(t.id);if(done)done()}
     catch(e){y.disabled=false;msg(e&&/owner only|403/.test(String(e.code||e.message))?"Only Abhinav or Shilpiji can delete a tag.":"Could not delete. Try again.","bad")}});
   n.addEventListener("click",()=>{if(cancel)cancel()});
   box.append(q,sel,y,n);holder.appendChild(box);
