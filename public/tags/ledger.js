@@ -63,7 +63,7 @@
     document.querySelectorAll("input[name=rgas]").forEach(r => r.addEventListener("change", modeUi));
     ["rgross", "rpur", "rrate"].forEach(i => $(i).addEventListener("input", fineNow)); $("rkarat").addEventListener("change", fineNow);
     $("lfind").addEventListener("click", search); $("lq").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); search(); } });
-    $("lopen").addEventListener("click", () => search(true));
+    $("lopen").addEventListener("click", () => search(true)); $("ldebt").addEventListener("click", debtors);
     $("rsave").addEventListener("click", saveReceipt); $("rclear").addEventListener("click", clearForm);
     $("lmonth").value = today().slice(0, 7); $("lxl").addEventListener("click", excel);
     $("rdate").value = today(); modeUi(); fillBills();
@@ -116,6 +116,11 @@
       td(fmt(d.balance), "num"); td(d.fineDue ? g3(d.fineDue) : dash, "num"); const x = el("td"); x.appendChild(btn("Open", "ghost", () => openCust(d.key))); tr.appendChild(x); tb.appendChild(tr); });
     const tr = el("tr"); tr.style.fontWeight = "700"; [["TOTAL SUNDRY DEBTORS (" + j.list.length + ")"], [""], [""], [""], [""], [fmt(j.total), "num"], [j.fine ? g3(j.fine) : dash, "num"], [""]].forEach(([x, cl]) => tr.appendChild(el("td", { className: cl || "", textContent: x }))); tb.appendChild(tr);
     return el("div", { className: "list" }, [t]); }
+  async function debtors() { const w = $("ldebtwrap"), m = $("lmsg"); m.textContent = "Working out sundry debtors…";
+    try { const j = await api("/api/vj/debtors"); w.textContent = ""; w.hidden = false; $("lreswrap").hidden = true;
+      w.append(el("h3", { textContent: "Sundry debtors" }), debtTable(j), el("div", { className: "actions" }, [debtXl()]));
+      m.textContent = j.list.length ? j.list.length + " customer" + (j.list.length === 1 ? "" : "s") + " owe " + fmt(j.total) + (j.fine ? " + " + g3(j.fine) + " fine gold" : "") + "." + (j.advances ? " Advances received (credit, not included): " + fmt(j.advances) + "." : "") : "Nobody owes anything.";
+    } catch (e) { m.textContent = "Could not load sundry debtors (" + (e.message || e) + ")."; } }
   async function openCust(key) {
     const box = $("lcard"); box.hidden = false; box.textContent = "Loading…";
     try { const j = await api("/api/vj/ledger?key=" + encodeURIComponent(key)); L.card = j; L.cust = j.customer; L.canSettle = !!j.canSettle; drawCard(); fillBills(); modeUi();
