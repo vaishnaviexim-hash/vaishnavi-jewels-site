@@ -1152,6 +1152,34 @@ async function vjLedgerXlsx(url, env, who) {
   return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_Ledger.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
 }
 
+// Sundry debtors (owner 17/10/2026 16:43, C-20261017-DEBTORS): every customer who still owes money or fine gold, customer-wise,
+// with the open bills, the oldest one and how many days it has been due, and the grand total. Advances (credit) shown apart.
+function vjDebtorList(L) {
+  const today = Date.parse(new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10));
+  const C = [...vjCustomers(L).values()], list = [];
+  for (const c of C) {
+    if (!(c.balance > 0 || c.fineDue > 0)) continue;
+    const open = c.pos.filter(p => !p.settled && (p.bal > 0 || p.fineDue > 0)).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    const old = open.length ? open[0].date : '';
+    list.push({ key: c.key, name: c.name, mobile: c.mobile, city: c.city, open: open.map(p => p.no), oldest: old, days: old ? Math.max(0, Math.round((today - Date.parse(old)) / 864e5)) : 0, balance: Math.max(0, c.balance), fineDue: c.fineDue });
+  }
+  list.sort((a, b) => b.balance - a.balance || a.name.localeCompare(b.name));
+  const adv = C.filter(c => c.balance < 0).reduce((a, c) => a - c.balance, 0);
+  return { list, total: list.reduce((a, d) => a + d.balance, 0), fine: vjR3(list.reduce((a, d) => a + d.fineDue, 0)), advances: adv };
+}
+async function vjDebtors(url, env, who) {
+  const D = vjDebtorList(await vjLedgerLoad(env));
+  if (url.pathname === '/api/vj/debtors') return vjJson(Object.assign({ ok: true }, D));
+  const rows = D.list.map(d => [d.name, vjPhoneTxt(d.mobile), d.city || '', d.open.join(', '), d.oldest ? vjDmy(d.oldest) : '', d.days || '', d.balance, d.fineDue || '']);
+  if (rows.length) rows.push(['TOTAL SUNDRY DEBTORS (' + D.list.length + ' customers)', '', '', '', '', '', D.total, D.fine || '']);
+  if (D.advances) rows.push(['Advances received (customers in credit, not included above)', '', '', '', '', '', D.advances, '']);
+  const xlsx = vjXlsx([{ name: 'Sundry debtors', land: true, head: ['Customer', 'Mobile', 'City', 'Open bills', 'Oldest bill', 'Days due', 'Balance due (Rs)', 'Fine gold due (g)'], rows,
+    widths: [28, 16, 13, 26, 12, 9, 16, 14], wrap: [0, 3], mark: r => String(r[0]).startsWith('TOTAL') || String(r[0]).startsWith('Advances') }]);
+  const bin = atob(xlsx), out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  await vjAudit(env, who, 'debtors-report', 'ledger/', D.list.length + ' debtors, ' + D.total);
+  return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_Sundry_Debtors.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
+}
+
 // GET /api/vj/wa-ready: which WhatsApp templates are approved (set by the owner in vj_meta 'wa-ready:bill' / 'wa-ready:receipt' = '1')
 async function vjWaReady(env) {
   await vjMetaT(env);
@@ -1406,6 +1434,7 @@ async function vjHandle(request, env, ctx, url) {
   // C-20261017-LEDGER: receipts, ledgers, Settled (Abhinav only, checked inside), WhatsApp template readiness
   if ((p === '/api/vj/ledger' || p === '/api/vj/ledger/bill' || p === '/api/vj/receipt') && request.method === 'GET') return vjLedgerGet(url, env, who);
   if (p === '/api/vj/ledger.xlsx' && request.method === 'GET') return vjLedgerXlsx(url, env, who);
+  if ((p === '/api/vj/debtors' || p === '/api/vj/debtors.xlsx') && request.method === 'GET') return vjDebtors(url, env, who); // C-20261017-DEBTORS
   if (p === '/api/vj/wa-ready' && request.method === 'GET') return vjWaReady(env);
   if (['/api/vj/receipt', '/api/vj/receipt/reverse', '/api/vj/ledger/settle', '/api/vj/ledger/unsettle'].includes(p) && request.method === 'POST') {
     if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed');
