@@ -678,6 +678,81 @@ async function vjBillErase(request, env, who) {
   return vjJson({ ok: true, pieces: ids.length });
 }
 
+// Send a bill / estimate PDF to the customer on WhatsApp from Aashvi (owner 17/10/2026, C-20261017-BILLWA).
+// The page sends the PDF it made; the server checks the saved bill, keeps the PDF under a random one-time token (30 min) and rings
+// the existing Make hook (VJ_QUOTE_HOOK) with ONLY {kind, token}. Make then fetches /hooks/vj-billpdf?t=token, which hands out the
+// customer's number (from the saved bill, never from the hook) and the PDF once; Make sends template vj_bill_pdf_v1 and reports to
+// /hooks/vj-billpdf-done. Someone holding the hook URL cannot choose a number or a file: tokens are 128-bit, single-use, 30 min.
+const VJ_BWA_TTL = 30 * 60e3;
+const vjMetaT = env => env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_meta (k TEXT PRIMARY KEY, v TEXT)').run();
+async function vjBillSend(request, env, who) {
+  const len = Number(request.headers.get('content-length') || 0);
+  if (!len || len > 7e6) return vjDeny(413, 'the PDF is too large to send');
+  if (!env.VJ_QUOTE_HOOK || !/^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_QUOTE_HOOK)) return vjJson({ error: 'WhatsApp sending is not set up' }, 503);
+  let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+  const no = String(b && b.no || '').trim().toUpperCase().slice(0, 20);
+  if (!/^[BE]-\d{4}-\d{2,4}$/.test(no)) return vjDeny(400, 'bad bill number');
+  if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
+  const row = await env.DB.prepare('SELECT data FROM vj_bills WHERE no = ?').bind(no).first();
+  if (!row) return vjDeny(404, 'not found');
+  const bill = JSON.parse(row.data);
+  if (who.role === 'sales' && bill.by !== who.email) return vjDeny(404, 'not found'); // a sales login only handles its own bills
+  if (bill.cancelled) return vjJson({ error: 'this bill is cancelled' }, 409);
+  if (!/^[6-9]\d{9}$/.test(String(bill.mobile || ''))) return vjJson({ error: 'the bill has no 10-digit Indian mobile number' }, 400);
+  let bytes; try { const s = String(b.pdf || ''); if (s.length > 7e6) throw new Error('big'); bytes = Uint8Array.from(atob(s), c => c.charCodeAt(0)); } catch (e) { return vjDeny(400, 'bad PDF'); }
+  if (bytes.length < 500 || bytes.length > 5e6 || String.fromCharCode(...bytes.subarray(0, 5)) !== '%PDF-') return vjDeny(400, 'bad PDF');
+  await vjMetaT(env);
+  // tidy: PDFs never collected by Make are removed after 30 minutes (customer data is not kept)
+  try { const old = ((await env.DB.prepare("SELECT k, v FROM vj_meta WHERE k LIKE 'billsend:%' AND v LIKE '%\"status\":\"queued\"%' LIMIT 30").all()).results) || [];
+    for (const o of old) { const s = JSON.parse(o.v); if (Date.now() - s.at > VJ_BWA_TTL) { try { await env.PHOTOS.delete('billpdf-' + o.k.slice(9)); } catch (e) {} await env.DB.prepare('UPDATE vj_meta SET v = ? WHERE k = ?').bind(JSON.stringify(Object.assign(s, { status: 'expired' })), o.k).run(); } } } catch (e) {}
+  const day = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10), ck = 'billsend-count:' + no + ':' + day;
+  const cnt = Number(((await env.DB.prepare('SELECT v FROM vj_meta WHERE k = ?').bind(ck).first()) || {}).v || 0);
+  if (cnt >= 3) return vjJson({ error: 'this bill was already sent 3 times today' }, 429);
+  const token = [...crypto.getRandomValues(new Uint8Array(16))].map(x => x.toString(16).padStart(2, '0')).join('');
+  await vjPhotoPut(env, 'billpdf-' + token, bytes, 'application/pdf', { no });
+  await env.DB.batch([
+    env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('billsend:' + token, JSON.stringify({ no, status: 'queued', at: Date.now(), by: who.email })),
+    env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = CAST(CAST(v AS INTEGER) + 1 AS TEXT)').bind(ck, '1')]);
+  let ok = false;
+  try { const r = await fetch(env.VJ_QUOTE_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000), body: JSON.stringify({ kind: 'bill-pdf', token }) }); ok = r.ok; } catch (e) {}
+  await vjAudit(env, who, 'bill-whatsapp', 'bills/' + no, (ok ? 'queued' : 'hook failed') + ' to +91 ' + bill.mobile);
+  if (!ok) { try { await env.PHOTOS.delete('billpdf-' + token); } catch (e) {} return vjJson({ error: 'could not reach Aashvi, try again' }, 502); }
+  return vjJson({ ok: true, token, to: '+91 ' + bill.mobile });
+}
+async function vjBillSendStatus(url, env) {
+  const t = String(url.searchParams.get('t') || ''); if (!/^[a-f0-9]{32}$/.test(t)) return vjDeny(400, 'bad');
+  await vjMetaT(env); const r = await env.DB.prepare('SELECT v FROM vj_meta WHERE k = ?').bind('billsend:' + t).first(); if (!r) return vjDeny(404, 'not found');
+  const s = JSON.parse(r.v); return vjJson({ ok: true, status: s.status, error: s.err || '' });
+}
+// Make side (outside Cloudflare Access): one-time hand-out of the number + PDF, then the result
+async function vjBillPdfHook(url, env, done) {
+  const t = String(url.searchParams.get('t') || ''); if (!/^[a-f0-9]{32}$/.test(t)) return reply('not found', 404);
+  await vjMetaT(env);
+  const r = await env.DB.prepare('SELECT v FROM vj_meta WHERE k = ?').bind('billsend:' + t).first(); if (!r) return reply('not found', 404);
+  const s = JSON.parse(r.v);
+  if (!done) {
+    if (s.status !== 'queued' || Date.now() - s.at > VJ_BWA_TTL) return reply('gone', 410);
+    const u = await env.DB.prepare('UPDATE vj_meta SET v = ? WHERE k = ? AND v = ?').bind(JSON.stringify(Object.assign({}, s, { status: 'fetched', fetchedAt: Date.now() })), 'billsend:' + t, r.v).run();
+    if (!u.meta || u.meta.changes !== 1) return reply('gone', 410);
+    const row = await env.DB.prepare('SELECT data FROM vj_bills WHERE no = ?').bind(s.no).first(), bill = row ? JSON.parse(row.data) : null;
+    const f = await vjPhotoGet(env, 'billpdf-' + t);
+    if (!bill || bill.cancelled || !f || !/^[6-9]\d{9}$/.test(String(bill.mobile || ''))) return reply('gone', 410);
+    const buf = await new Response(f.body).arrayBuffer();
+    const clean = v => String(v || '').replace(/[\u0000-\u001f"\\<>{}]/g, ' ').replace(/\s+/g, ' ').trim();
+    const name = clean(bill.name).slice(0, 60) || 'Customer', title = bill.title === 'Estimate' ? 'Estimate' : 'Bill';
+    return new Response(JSON.stringify({ to: '91' + bill.mobile, name, title, no: bill.no, date: String(bill.date || '').split('-').reverse().join('-'),
+      total: 'Rs ' + Number(bill.total || 0).toLocaleString('en-IN'), fileName: (title + ' ' + bill.no + ' ' + name.replace(/[^A-Za-z0-9 .\-]/g, '')).trim().slice(0, 80) + '.pdf', pdf: vjB64(buf) }),
+      { status: 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
+  }
+  if (s.status !== 'fetched') return reply('gone', 410);
+  const ok = url.searchParams.get('s') === 'sent';
+  const n = Object.assign({}, s, { status: ok ? 'sent' : 'failed', err: ok ? '' : String(url.searchParams.get('e') || 'not sent').replace(/[\u0000-\u001f<>]/g, ' ').slice(0, 150), mid: ok ? String(url.searchParams.get('m') || '').slice(0, 80) : '', doneAt: Date.now() });
+  await env.DB.prepare('UPDATE vj_meta SET v = ? WHERE k = ? AND v = ?').bind(JSON.stringify(n), 'billsend:' + t, r.v).run();
+  try { await env.PHOTOS.delete('billpdf-' + t); } catch (e) {}
+  await vjAudit(env, { email: 'aashvi (WhatsApp)' }, 'bill-whatsapp', 'bills/' + s.no, n.status + (n.err ? ': ' + n.err : ''));
+  return reply('ok', 200);
+}
+
 // Saved bills & estimates (C-20261016-BILLBOOK): month list, one bill for re-printing, or a summary Excel. Owners + staff only.
 async function vjBillBook(url, env, who) { // a sales login sees only the bills it made
   const mine = b => who.role !== 'sales' || b.by === who.email;
@@ -948,6 +1023,8 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/bill' && request.method === 'POST') return vjBill(request, env, who);
   if ((p === '/api/vj/bills' || p === '/api/vj/bills.xlsx' || p === '/api/vj/bill') && request.method === 'GET') return vjBillBook(url, env, who);
   if (p === '/api/vj/bill/cancel' && request.method === 'POST') return vjBillCancel(request, env, who);
+  if (p === '/api/vj/bill/send' && request.method === 'POST') return vjBillSend(request, env, who); // C-20261017-BILLWA
+  if (p === '/api/vj/bill/sendstatus' && request.method === 'GET') return vjBillSendStatus(url, env);
   if (p === '/api/vj/bill/erase' && request.method === 'POST') return vjBillErase(request, env, who);
   if (p === '/api/vj/orders' && request.method === 'GET') return vjOrdersReport(env, who);
   if (p.startsWith('/_blob/') && request.method === 'GET') return vjBlob(p.slice(7), env);
@@ -964,6 +1041,7 @@ export default {
     const url = new URL(request.url);
     const p = url.pathname;
     if (p === '/tags' || p === '/tags.html' || p.startsWith('/tags/') || p.startsWith('/api/vj/') || p.startsWith('/_blob/')) return vjHandle(request, env, ctx, url);
+    if (p === '/hooks/vj-billpdf' || p === '/hooks/vj-billpdf-done') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjBillPdfHook(url, env, p.endsWith('-done')) : reply('Method not allowed', 405); // C-20261017-BILLWA
     if (p === '/hooks/vj-daily') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjDailyReport(env) : reply('Method not allowed', 405);
     // gold rate pushed by Make (secret header); outside Cloudflare Access like the WhatsApp hook
     if (p === '/hooks/vj-gold') return (request.method === 'POST' && (url.hostname === VJ_HOST || env.VJ_DEV === '1')) ? vjGoldPush(request, env) : reply('Method not allowed', 405);
