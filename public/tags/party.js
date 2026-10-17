@@ -1,10 +1,10 @@
 /* VJ Tags - customer recall (owner Abhinav 17/10/2026, C-20261017-PARTY).
-   On New tag (order), Bill and Ledger receipt: type a mobile number and the name and city fill in; type part of a name and pick
+   On New tag (order), Bill, Ledger receipt and Quote: type a mobile number and the name and city fill in; type part of a name and pick
    the party from a short list. Data comes from /api/vj/parties (logged-in users only); fields already typed are not overwritten
    by the mobile lookup, a picked name fills all three. */
 (function () {
   "use strict";
-  const SETS = [["oName", "oMob", "oCity"], ["bname", "bmob", "bcity"], ["rname", "rmob", "rcity"]];
+  const SETS = [["oName", "oMob", "oCity"], ["bname", "bmob", "bcity"], ["rname", "rmob", "rcity"], ["qname", "qmob", "qcity"]]; // + Quote tab, both choices (C-20261017-QUOTEMODES)
   const $ = id => document.getElementById(id);
   let box = null, timer = 0, seq = 0;
   const digits = v => String(v || "").replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "");
