@@ -62,6 +62,7 @@ input[readonly]{background:var(--sunk);color:var(--muted)}
 .ln.g{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr) auto}
 .ln.d{grid-template-columns:minmax(0,1fr) minmax(0,1.1fr) minmax(0,.7fr) minmax(0,.8fr) minmax(0,1fr) minmax(0,1fr) auto} /* owner 17/10 17:27: Shape, Quality, Pcs, D Wt, Rate */
 .ln.o{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
+.ln.p{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr)}
 .ln .val{font-family:var(--f-mono);font-size:13px;color:var(--muted);padding-bottom:9px;font-variant-numeric:tabular-nums;text-align:right}
 .ln .x{font:inherit;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:var(--r);padding:7px 10px;cursor:pointer;margin-bottom:1px}
 button.add{align-self:flex-start;font:inherit;font-size:14px;border:1px dashed var(--line);background:transparent;color:var(--gold);border-radius:var(--r);padding:7px 12px;cursor:pointer}
@@ -156,7 +157,10 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
       <div class="lines" id="diaLines"></div>
       <button type="button" class="add" id="addDia">+ Add diamond line</button>
 
-      <h2>5 · Other charges</h2>
+      <h2>5 · Polki</h2>
+      <div class="ln p" id="polkiLine"><label>Pcs<input type="number" id="polkiPcs" min="0" max="10000" step="1" placeholder="0" inputmode="numeric"></label><label>Rate per pc (₹)<input type="number" id="polkiRate" min="1" max="100000" step="1" value="300" inputmode="numeric"></label><div class="val" id="polkiVal"></div></div>
+
+      <h2>6 · Other charges</h2>
       <div class="row"><label>Colour stones and other charges (₹) <input type="number" id="otherAmt" min="0" step="1" placeholder="0"></label></div>
     </section>
 
@@ -360,12 +364,13 @@ function renderCheck(){
   const h=document.createElement("div");const l=document.createElement("div");l.className="labelno";l.textContent=(t.designNo?t.designNo+" · ":"")+t.label;const c=document.createElement("div");c.className="hint";c.textContent=S.role==="sales"?(t.catName||""):(t.catName||"")+(t.remark?" · "+t.remark:"")+(t.kind==="sample"?" · sample":"")+(t.kind==="order"?" · order"+(t.order&&t.order.name?" for "+t.order.name:"")+(t.order&&t.order.due?", delivery "+t.order.due.split("-").reverse().join("-"):""):"");h.append(l,c);top.appendChild(h);card.appendChild(top);
   const tb=document.createElement("table");tb.className="sum";const add=(a,b,cl)=>{const tr=document.createElement("tr");if(cl)tr.className=cl;const x=document.createElement("td"),y=document.createElement("td");x.textContent=a;y.textContent=b;tr.append(x,y);tb.appendChild(tr)};
   const pin=priceInput(t);pin.gold.forEach(g=>add("Gold "+g.k,g.net.toFixed(3)+" g"));pin.dias.forEach(d=>add(`${d.shape} ${d.q}`,`${d.ct.toFixed(2)} ct (${d.pcs})`+(d.rate>0?` @ ${fmt(d.rate)}`:"")));
+  if(t.polki&&t.polki.pcs>0)add("Polki",`${t.polki.pcs} pc @ ${fmt(t.polki.rate)}`);
   if(t.other&&t.other.amt)add("Other charges",fmt(t.other.amt));
   const pr=price(priceInput(t)),s=st();
   if(t.kind==="sample"&&S.role!=="sales")add("Sample","not for sale - order estimate at 14K below");
   if(!pr)add("Price","gold rate not set","total");
   else if(S.role==="sales"){add("Price today",fmt(pr.final),"total")}
-  else{add("Gold value",fmt(pr.gold));add("Making",fmt(pr.making));if(pr.dia)add("Diamonds",fmt(pr.dia));if(pr.oth)add("Other",fmt(pr.oth));add(`GST ${s.gst}%`,fmt(pr.gst));add("Price today",fmt(pr.final),"total")}
+  else{add("Gold value",fmt(pr.gold));add("Making",fmt(pr.making));if(pr.dia)add("Diamonds",fmt(pr.dia));if(pr.pol)add("Polki",fmt(pr.pol));if(pr.oth)add("Other",fmt(pr.oth));add(`GST ${s.gst}%`,fmt(pr.gst));add("Price today",fmt(pr.final),"total")}
   card.appendChild(tb);
   const n=document.createElement("p");n.className="hint";n.textContent=pr?`At 24K ${fmt(s.gold24g)}/g${s.goldAt?", updated "+new Date(s.goldAt).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):""}.`+(t.priceAtTag?` Price when tagged: ${fmt(t.priceAtTag)}.`:""):"";card.appendChild(n);
   const acts=document.createElement("div");acts.style.cssText="display:flex;gap:8px;flex-wrap:wrap";
@@ -412,7 +417,7 @@ function addDia(){
 $("addGold").addEventListener("click",()=>addGold());
 $("addDia").addEventListener("click",()=>addDia());
 ["goldLines","diaLines"].forEach(id=>{$(id).addEventListener("input",update);$(id).addEventListener("change",update)});
-["cat","remark","otherAmt"].forEach(id=>{$(id).addEventListener("input",update);$(id).addEventListener("change",update)});
+["cat","remark","otherAmt","polkiPcs","polkiRate"].forEach(id=>{$(id).addEventListener("input",update);$(id).addEventListener("change",update)});
 document.querySelectorAll('input[name=kind]').forEach(r=>r.addEventListener("change",update));
 ["oName","oMob","oCity","oDue","oRate"].forEach(id=>$(id).addEventListener("input",update));
 CATS.forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=c.name;$("cat").appendChild(o)});
@@ -426,7 +431,8 @@ function readForm(){
   const mainK=(gold.find(g=>g.net>0)||gold[0]||{k:"14K"}).k;
   const prefix=k==="sample"?cat.s:cat.code+KNUM[mainK];
   const order=k==="order"?{name:$("oName").value.trim().slice(0,60),mobile:$("oMob").value.trim().slice(0,20),city:$("oCity").value.trim().slice(0,40),due:$("oDue").value||"",rate:num($("oRate").value)}:null; /* owner 16/10: the order is booked at this gold rate (C-20261016-ORDERRATE2) */
-  return {kind:k,cat:cat.id,prefix,catName:cat.name.replace(/\s*\(.*\)$/,""),mainK,gold,dias,order,
+  const ppcs=num($("polkiPcs").value),prt=$("polkiRate").value.trim()===""?300:num($("polkiRate").value); /* C-20261017-POLKI: pcs x rate per pc (default Rs 300) */
+  return {kind:k,cat:cat.id,prefix,catName:cat.name.replace(/\s*\(.*\)$/,""),mainK,gold,dias,order,polki:ppcs>0?{pcs:ppcs,rate:prt}:null,
     remark:$("remark").value.trim(),designNo:$("designNo").value.trim().toUpperCase(),other:{amt:num($("otherAmt").value)}};
 }
 /* ---------- price (Brain F-025 / F-044) ---------- */
@@ -436,15 +442,16 @@ function price(t){
      (R-Making: Rs 650/g if that line is over 5 g, else 750; plus 10% of its karat rate; rounded up to Rs 100),
      charged on all gold lines together. */
   const m=s.making,g0=t.gold.find(g=>g.net>0);let gold=0,making=0;const lines=[];
+  const pol=t.polki&&t.polki.pcs>0?t.polki.pcs*(t.polki.rate||0):0; /* polki pcs x rate per pc (C-20261017-POLKI) */
   if(!g0){ /* no gold (e.g. Moti mala): fixed amount + diamonds, +GST, rounded up to Rs 10 (owner 13/10/2026) */
-    const dia0=t.dias.reduce((a,d)=>a+d.ct*d.rate,0),oth0=(t.other&&t.other.amt)||0,sub0=up(dia0+oth0,10),gst0=sub0*s.gst/100;
-    return {gold:0,making:0,dia:dia0,oth:oth0,sub:sub0,gst:gst0,final:sub0>0?up(sub0+gst0,10):0,lines,r24,mk:0};}
+    const dia0=t.dias.reduce((a,d)=>a+d.ct*d.rate,0),oth0=(t.other&&t.other.amt)||0,sub0=up(dia0+pol+oth0,10),gst0=sub0*s.gst/100;
+    return {gold:0,making:0,dia:dia0,pol,oth:oth0,sub:sub0,gst:gst0,final:sub0>0?up(sub0+gst0,10):0,lines,r24,mk:0};}
   /* owner 17/10/2026 17:00 (C-20261017-MAKINGMIN): making Rs 650/g (750/g when the first gold line is up to 5 g), minimum Rs 1,000 a piece, + 10% wastage on the gold */
   let nt=0;t.gold.forEach(g=>{if(!(g.net>0))return;const kr=r24*(s.purity[g.k]||0);gold+=g.net*kr;nt+=g.net;lines.push({k:g.k,net:g.net,kr,mk:0});});
   making=Math.max((g0.net>m.limit?m.base:m.small)*nt,Number(m.min)||1000)+gold*m.pct/100;const mk=Math.round(making/nt);lines.forEach(l=>{l.mk=mk});
   const dia=t.dias.reduce((a,d)=>a+d.ct*d.rate,0),oth=t.other.amt||0;
-  const sub=up(gold+making+dia+oth,100),gst=sub*s.gst/100,final=up(sub+gst,1000); /* owner 16/10/2026 (C-20261016-ROUND1000): final price rounded UP to the nearest Rs 1,000 (was Rs 10,000) */
-  return {gold,making,dia,oth,sub,gst,final,lines,r24,mk};
+  const sub=up(gold+making+dia+pol+oth,100),gst=sub*s.gst/100,final=up(sub+gst,1000); /* owner 16/10/2026 (C-20261016-ROUND1000): final price rounded UP to the nearest Rs 1,000 (was Rs 10,000) */
+  return {gold,making,dia,pol,oth,sub,gst,final,lines,r24,mk};
 }
 function problems(t){
   const p=[],s=st();
@@ -453,6 +460,8 @@ function problems(t){
   if(!t.designNo)p.push("Enter the design number.");
   if(!t.gold.some(g=>g.net>0))p.push("Enter the net gold weight.");
   t.dias.forEach((d,i)=>{if(d.q==="OTHER?")p.push(`Diamond line ${i+1}: type the quality.`);if(!(d.ct>0))p.push(`Diamond line ${i+1}: enter the carat weight.`);if(t.kind!=="sample"&&!(d.rate>0))p.push(`Diamond line ${i+1}: no default rate for ${d.shape} ${d.q}. Enter the special rate.`)});
+  if(t.polki&&!(Number.isInteger(t.polki.pcs)&&t.polki.pcs<=10000))p.push("Polki: pieces must be a whole number up to 10,000.");
+  if(t.polki&&!(Number.isInteger(t.polki.rate)&&t.polki.rate>=1&&t.polki.rate<=100000))p.push("Polki: rate per piece must be a whole number from ₹1 to ₹1,00,000.");
   if(t.kind!=="sample"&&!s.gold24g)p.push("Today's gold rate is not set (Gold rate & settings).");
   return p;
 }
@@ -474,8 +483,8 @@ function sampleRate(d){
 }
 /* owner 13/10/2026: a sample's recorded weight is already converted to gold weight; its estimate is priced as 14K */
 function priceInput(t){
-  if(t.kind==="sample")return {gold:[{k:"14K",net:(t.metal&&t.metal.net)||0}],dias:(t.dias||[]).map(d=>d.rate>0?d:Object.assign({},d,{rate:sampleRate(d)})),other:t.other||{amt:0}};
-  return {gold:t.gold||[],dias:t.dias||[],other:t.other||{amt:0}};
+  if(t.kind==="sample")return {gold:[{k:"14K",net:(t.metal&&t.metal.net)||0}],dias:(t.dias||[]).map(d=>d.rate>0?d:Object.assign({},d,{rate:sampleRate(d)})),polki:t.polki||null,other:t.other||{amt:0}};
+  return {gold:t.gold||[],dias:t.dias||[],polki:t.polki||null,other:t.other||{amt:0}};
 }
 function tagPrims(t){
   const s=st(),{h,printW:p}=s.tag,pad=1,half=p/2,pr=[];
@@ -486,6 +495,7 @@ function tagPrims(t){
   const smp=t.kind==="sample";
   const gl=(t.gold||[]).filter(g=>g.net>0),karats=gl.length?[...new Set(gl.map(g=>KNUM[g.k]+"kt"))].join("+"):(smp?"14kt":"");
   const L=[{t:t.designNo?t.designNo:t.label,b:1,sz:7},{t:t.designNo?"("+t.label+")":"",sz:5.4},{t:karats,sz:5.4},{t:smp?"":t.remark,sz:5.2}];
+  if(t.polki&&t.polki.pcs>0)L.push({t:"Polki "+t.polki.pcs+"pc",sz:5.2}); /* C-20261017-POLKI: the 5th row on the left is always free */
   L.forEach((l,i)=>{if(l.t)pr.push({k:"t",x:lx,y:y(i),t:l.t,b:l.b,sz:l.sz,maxW:lw})});
   const net=gl.reduce((a,g)=>a+g.net,0),mw=!gl.length&&t.metal&&t.metal.net?t.metal.net:0;
   const R=[{t:"G.Wt. "+(mw||net).toFixed(3),sz:5.6,b:1}];
@@ -548,6 +558,7 @@ function update(){
   [...$("diaLines").children].forEach(r=>{const i=r.dataset.id,qq=$("dq"+i).value==="Other"?$("dqo"+i).value.trim().toUpperCase():$("dq"+i).value,def=defRate($("ds"+i).value,qq),sp=num($("dr"+i).value),rate=sp>0?sp:def,ct=num($("dc"+i).value);
     $("dr"+i).placeholder=def?"default "+def.toLocaleString("en-IN"):"enter rate";
     $("dv"+i).textContent=(rate&&ct>0?fmt(ct*rate):"")+(sp>0?" · special":(def&&ct>0?" · default":""));});
+  $("polkiVal").textContent=t.polki?`${t.polki.pcs} × ${fmt(t.polki.rate)} = ${fmt(t.polki.pcs*t.polki.rate)}`:"";
   t.no=nextNo(t.prefix);t.label=t.prefix+"/"+t.no;t.code="";
   $("lblPreview").textContent=t.label;
   const sum=$("sum");sum.textContent="";
@@ -557,7 +568,7 @@ function update(){
   else{
     pr.lines.forEach(l=>add(`Gold ${l.k} ${l.net.toFixed(3)} g × ${fmt(l.kr)}/g`,fmt(l.net*l.kr)));
     add(`Making ${fmt(pr.mk)}/g × ${pr.lines.reduce((a,l)=>a+l.net,0).toFixed(3)} g`,fmt(pr.making));
-    if(pr.dia)add("Diamonds",fmt(pr.dia));if(pr.oth)add("Other charges",fmt(pr.oth));
+    if(pr.dia)add("Diamonds",fmt(pr.dia));if(pr.pol)add(`Polki ${t.polki.pcs} pc × ${fmt(t.polki.rate)}`,fmt(pr.pol));if(pr.oth)add("Other charges",fmt(pr.oth));
     add("Total (rounded up to ₹100)",fmt(pr.sub));add(`GST ${s.gst}%`,fmt(pr.gst));add("Price (rounded up to ₹1,000)",fmt(pr.final),"total");
     $("rateNote").textContent=`24K gold at ${fmt(s.gold24g)}/g${s.goldAt?", set "+new Date(s.goldAt).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):""}. Diamond rates on the tag are final; only gold and making move with the rate.`;
   }
@@ -685,6 +696,7 @@ async function allocateAndSave(t,photoId){
     dias:t.dias,other:t.other,remark:t.remark,designNo:t.designNo||"",photo:photoId,status:t.kind==="sample"?"sample":t.kind==="order"?"order":"in_stock",createdBy:S.me||null,createdAt:new Date().toISOString(),
     gold24gAtTag:pr?pr.r24:null,priceAtTag:pr?pr.final:null,code:pr?codeFor(pr.final):null};
   if(t.kind==="order")body.order=t.order;
+  if(t.polki)body.polki={pcs:t.polki.pcs,rate:t.polki.rate}; /* C-20261017-POLKI */
   await S.db.doc("tags/"+t.id).set(body);
   const last=Object.assign({},seeds);last[t.prefix]=Math.max(last[t.prefix]||0,t.no);await cref.set({last});S.counters=last;
   return Object.assign({id:t.id},body);
@@ -743,7 +755,8 @@ async function offerPDF(t){
   catch(e){if(e&&e.code==="declined")msg(`${t.label}: download skipped. Reprint it any time from Tagged pieces.`,"warn");else msg(`${t.label}: the PDF could not be offered (${e&&e.code||"error"}). Reprint it from Tagged pieces.`,"warn")}
 }
 function resetForm(keepKind){
-  ["otherAmt","designNo"].concat(keepKind?[]:["oName","oMob","oCity","oDue","oRate"]).forEach(id=>$(id).value="");$("remark").value="TGL"; /* owner 17/10/2026: certificate list, TGL by default (C-20261017-CERTLIST) */ /* after a save the order customer stays, for the next piece of the same order */
+  $("polkiRate").value="300"; /* C-20261017-POLKI: rate back to Rs 300, pcs empty */
+  ["otherAmt","designNo","polkiPcs"].concat(keepKind?[]:["oName","oMob","oCity","oDue","oRate"]).forEach(id=>$(id).value="");$("remark").value="TGL"; /* owner 17/10/2026: certificate list, TGL by default (C-20261017-CERTLIST) */ /* after a save the order customer stays, for the next piece of the same order */
   $("goldLines").textContent="";$("diaLines").textContent="";addGold();addDia();
   S.photo=null;$("photo").value="";$("thumb").textContent="No photo yet";if(!keepKind)$("k-order").checked=true;update(); /* owner 17/10/2026: Order is the default */
 }
