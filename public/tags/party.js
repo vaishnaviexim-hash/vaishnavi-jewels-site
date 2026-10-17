@@ -27,8 +27,9 @@
   document.addEventListener("input", e => {
     const t = e.target; if (!e.isTrusted || !t || !t.id) return; const set = setOf(t.id); if (!set) return;
     clearTimeout(timer);
-    if (t.id === set[1]) { close(); const d = digits(t.value); if (d.length !== 10) return;
-      timer = setTimeout(async () => { const l = await look(d); const p = l && l.find(x => digits(x.mobile) === d); if (p) fill(set, p, false); }, 250); return; }
+    if (t.id === set[1]) { const d = digits(t.value); if (d.length < 4) { close(); return; } // owner 17/10 17:32: suggestions from 4 digits, auto-fill at 10
+      timer = setTimeout(async () => { const l = await look(d); if (!l) return; const p = d.length === 10 && l.find(x => digits(x.mobile) === d);
+        if (p) { close(); fill(set, p, false); } else if (document.activeElement === t) show(t, set, l); }, 250); return; }
     if (t.id === set[0]) { const q = t.value.trim(); if (q.length < 2) { close(); return; }
       timer = setTimeout(async () => { const l = await look(q); if (l && document.activeElement === t) show(t, set, l); }, 250); }
   });
