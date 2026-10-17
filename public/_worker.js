@@ -1548,7 +1548,7 @@ async function vjDailyReport(env) {
 // JSON (manifest with row counts + schema; photos stay in R2/KV), gzips it, keeps it under a random 128-bit one-time token (60 min)
 // and rings VJ_QUOTE_HOOK with ONLY {kind:'vj-backup', token}. Make fetches /hooks/vj-backupfile?t=token once (then it is deleted)
 // and saves it in the owner's private Drive folder "VJ Tags backups" (kept 15 days). Live bill-send / backup tokens are left out.
-const VJ_BK_WIN = [18 * 60 + 30, 21 * 60]; // TEMP end-to-end test 17/10 (real window 23:55-00:45 IST)
+const VJ_BK_WIN = [23 * 60 + 55, 45]; // IST minutes, from 23:55 to 00:45
 const VJ_BK_TTL = 60 * 60e3;
 async function vjBackupBuild(env, ymd, now) {
   const tabs = ((await env.DB.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' AND name NOT LIKE '\\_cf\\_%' ESCAPE '\\' AND name NOT LIKE 'd1\\_%' ESCAPE '\\' ORDER BY name").all()).results) || [];
