@@ -16,7 +16,7 @@
 
   function settings() { const s = (window.VJ_SETTINGS && window.VJ_SETTINGS()) || {}; return {
     g: s.gold24g || null, at: s.goldAt || null, pur: Object.assign({}, PUR, s.purity || {}),
-    mk: Object.assign({ base: 650, small: 750, limit: 5, pct: 10 }, s.making || {}), gst: s.gst == null ? 3 : s.gst, rates: s.defaultRates || {} }; }
+    mk: Object.assign({ base: 650, small: 750, limit: 5, pct: 10, min: 1000 }, s.making || {}), gst: s.gst == null ? 3 : s.gst, rates: s.defaultRates || {} }; }
   function optRate(d, opt, st) {
     if (NON_DIAMOND.test(String(d.q || "") + " " + String(d.code || ""))) return Number(d.rate) || 0;
     if (opt === "lgd") return LGD_RATE;
@@ -27,8 +27,9 @@
     const st = settings(); if (!st.g) return null;
     const gold = t.kind === "sample" ? [{ k: "14K", net: (t.metal && t.metal.net) || 0 }] : (t.gold || []);
     const g0 = gold.find(g => g.net > 0); if (!g0) return null;
-    const mk = Q.mk === "flat" ? FLAT_MK : up((g0.net > st.mk.limit ? st.mk.base : st.mk.small) + st.g * (st.pur[g0.k] || 0) * st.mk.pct / 100, 100);
-    let gv = 0, mv = 0; gold.forEach(g => { if (g.net > 0) { gv += g.net * st.g * (st.pur[g.k] || 0); mv += g.net * mk; } });
+    // C-20261017-MAKINGMIN (owner 17/10): std = 650/g (750 up to 5 g), minimum Rs 1,000 a piece, + 10% wastage on gold; flat = Rs 1,600/g
+    let gv = 0, nt = 0; gold.forEach(g => { if (g.net > 0) { gv += g.net * st.g * (st.pur[g.k] || 0); nt += g.net; } });
+    const mv = Q.mk === "flat" ? FLAT_MK * nt : Math.max((g0.net > st.mk.limit ? st.mk.base : st.mk.small) * nt, Number(st.mk.min) || 0) + gv * st.mk.pct / 100;
     let dv = 0, missing = false; (t.dias || []).forEach(d => { const r = optRate(d, opt, st); if (!(r > 0) && !NON_DIAMOND.test(d.q || "")) missing = true; dv += (d.ct || 0) * r; });
     const sub = up(gv + mv + dv + ((t.other && t.other.amt) || 0), 100);
     return { final: up(sub * (1 + st.gst / 100), 1000), missing }; // owner 16/10/2026: nearest Rs 1,000 (was 10,000)
@@ -121,7 +122,7 @@
   function mkText(st, items, kind) {
     if ((kind || Q.mk) === "flat") return "Making Rs " + FLAT_MK.toLocaleString("en-IN") + "/g";
     const small = (items || Q.items).some(t => { const g = t.kind === "sample" ? [{ net: (t.metal && t.metal.net) || 0 }] : (t.gold || []); const g0 = g.find(x => x.net > 0); return g0 && !(g0.net > st.mk.limit); });
-    return `Making Rs ${st.mk.base}/g${small ? ` (Rs ${st.mk.small}/g for pieces up to ${st.mk.limit} g)` : ""} + ${st.mk.pct}% wastage on gold`;
+    return `Making Rs ${st.mk.base}/g${small ? ` (Rs ${st.mk.small}/g for pieces up to ${st.mk.limit} g)` : ""}, minimum Rs ${Number(st.mk.min || 1000).toLocaleString("en-IN")} a piece, + ${st.mk.pct}% wastage on gold`;
   }
   async function dataUrl(src) { const r = await fetch(src, { credentials: "same-origin" }); if (!r.ok) throw new Error("img"); const b = await r.blob(); return await new Promise((res, rej) => { const f = new FileReader(); f.onload = () => res(f.result); f.onerror = rej; f.readAsDataURL(b); }); }
   async function makePdf(q) {
