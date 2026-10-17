@@ -439,8 +439,9 @@ function price(t){
   if(!g0){ /* no gold (e.g. Moti mala): fixed amount + diamonds, +GST, rounded up to Rs 10 (owner 13/10/2026) */
     const dia0=t.dias.reduce((a,d)=>a+d.ct*d.rate,0),oth0=(t.other&&t.other.amt)||0,sub0=up(dia0+oth0,10),gst0=sub0*s.gst/100;
     return {gold:0,making:0,dia:dia0,oth:oth0,sub:sub0,gst:gst0,final:sub0>0?up(sub0+gst0,10):0,lines,r24,mk:0};}
-  const mk=up((g0.net>m.limit?m.base:m.small)+r24*(s.purity[g0.k]||0)*m.pct/100,100);
-  t.gold.forEach(g=>{if(!(g.net>0))return;const kr=r24*(s.purity[g.k]||0);gold+=g.net*kr;making+=g.net*mk;lines.push({k:g.k,net:g.net,kr,mk});});
+  /* owner 17/10/2026 17:00 (C-20261017-MAKINGMIN): making Rs 650/g (750/g when the first gold line is up to 5 g), minimum Rs 1,000 a piece, + 10% wastage on the gold */
+  let nt=0;t.gold.forEach(g=>{if(!(g.net>0))return;const kr=r24*(s.purity[g.k]||0);gold+=g.net*kr;nt+=g.net;lines.push({k:g.k,net:g.net,kr,mk:0});});
+  making=Math.max((g0.net>m.limit?m.base:m.small)*nt,Number(m.min)||1000)+gold*m.pct/100;const mk=Math.round(making/nt);lines.forEach(l=>{l.mk=mk});
   const dia=t.dias.reduce((a,d)=>a+d.ct*d.rate,0),oth=t.other.amt||0;
   const sub=up(gold+making+dia+oth,100),gst=sub*s.gst/100,final=up(sub+gst,1000); /* owner 16/10/2026 (C-20261016-ROUND1000): final price rounded UP to the nearest Rs 1,000 (was Rs 10,000) */
   return {gold,making,dia,oth,sub,gst,final,lines,r24,mk};
