@@ -55,13 +55,19 @@
       const dv = String(o.disc && o.disc[t.id] != null ? o.disc[t.id] : '').trim(), pm = dv.match(/^(\d+(?:\.\d+)?)\s*%$/), dn = Number(dv.replace(/[,\s]/g, ''));
       r.discTxt = pm ? Math.min(100, Number(pm[1])) + '%' : '';
       r.disc = Math.round(Math.min(r.amount, pm ? r.amount * Math.min(100, Number(pm[1])) / 100 : (dn > 0 ? dn : 0)));
-      r.net = r.amount - r.disc;
+      r.wt = r.net; r.net = r.amount - r.disc;
       return r;
     });
-    const sum = rows.reduce((a, r) => a + r.amount, 0), disc = rows.reduce((a, r) => a + r.disc, 0), after = sum - disc;
+    let sum = rows.reduce((a, r) => a + r.amount, 0); const disc = rows.reduce((a, r) => a + r.disc, 0), after = sum - disc;
     const sub = Math.ceil(after / 500) * 500, gst = Math.round(sub * gstPct / 100);
+    // owner 17/10 15:29 ('i dont want 26093, straight 26500'): the round-up sits inside the biggest piece's making charge (its
+    // rate per g is shown for the new making), or in Other for Gold Item / no gold, so every printed figure adds up to the total.
+    const roundIn = sub - after;
+    if (roundIn > 0 && rows.length) { const r = rows.reduce((a, x) => x.net > a.net ? x : a, rows[0]);
+      if (mode !== 'item' && r.wt > 0) { r.making += roundIn; r.mkRate = Math.round(r.making / r.wt); } else r.other += roundIn;
+      r.amount += roundIn; r.net += roundIn; sum += roundIn; }
     const fine = Math.round(rows.reduce((a, r) => a + r.fine, 0) * 1000) / 1000;
-    return { mode, settle, rows, fine: settle === 'fine' ? fine : 0, fineIn: fine, sum, disc, after, roundOff: sub - after, sub, gstPct, gst, total: sub + gst };
+    return { mode, settle, rows, fine: settle === 'fine' ? fine : 0, fineIn: fine, sum, disc, after, roundOff: 0, roundIn, sub, gstPct, gst, total: sub + gst };
   }
   // VJ_BILL_CALC_END
 
