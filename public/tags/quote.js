@@ -113,7 +113,7 @@
       <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg)"><input type="checkbox" id="qwt" checked style="width:auto"> Show gold weight &amp; diamond carats in the PDF</label>
       <table class="sum"><tr class="total"><td>Total (incl. GST)</td><td id="qtotal">—</td></tr></table>
       <p class="hint" id="qnote"></p>
-      <div class="actions"><button type="button" class="btn" id="qsend">Make PDF &amp; send on WhatsApp</button><button type="button" class="btn ghost" id="qclear">Clear</button></div>
+      <div class="actions"><button type="button" class="btn" id="qsend">Make PDF &amp; send on WhatsApp</button><button type="button" class="btn" id="qaashvi" style="background:#1f8f4e;border-color:#1f8f4e;color:#fff">Send via Aashvi</button><button type="button" class="btn ghost" id="qclear">Clear</button></div>
       <p class="hint" id="qmsg"></p>`;
     $("p-rates").parentNode.insertBefore(sec, $("p-rates"));
     document.querySelectorAll("nav button").forEach(x => x.addEventListener("click", () => {
@@ -128,6 +128,10 @@
     $("qclear").addEventListener("click", () => { Q.items = []; Q.prates = {}; Q.designs = [newDesign()]; Q.mk = "std"; document.querySelector('input[name=qmk][value=std]').checked = true; ["qname", "qmob", "qcity", "qq"].forEach(i => $(i).value = ""); $("qmsg").textContent = ""; if ($("qsharebox")) $("qsharebox").hidden = true; drawDesigns(); render(); });
     Q.designs = [newDesign()]; drawDesigns(); kindView();
     $("qsend").addEventListener("click", send);
+    // C-20261017-QUOTEWA (owner 17/10): Aashvi sends the quote PDF from the business WhatsApp; second tap confirms the number
+    $("qaashvi").addEventListener("click", () => { const b = $("qaashvi"), mob = $("qmob").value.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "");
+      if (b.dataset.sure !== "1" && /^[6-9]\d{9}$/.test(mob)) { b.dataset.sure = "1"; b.textContent = "Tap again to send to +91 " + mob; setTimeout(() => { if (b.dataset.sure === "1") { b.dataset.sure = ""; b.textContent = "Send via Aashvi"; } }, 8000); return; }
+      b.dataset.sure = ""; b.textContent = "Send via Aashvi"; send("aashvi"); });
     // 14/10/2026 owner: pick the customer from the phone's contact book (Chrome on Android only; iPhone/computers type it).
     // The browser shows its own picker; only the ONE contact tapped is read, on the phone, nothing is uploaded.
     if (navigator.contacts && navigator.contacts.select) { $("qcbox").hidden = false; $("qcontact").addEventListener("click", async () => {
@@ -273,7 +277,18 @@
     doc.text(doc.splitTextToSize((q.design ? "Final price depends on actual weights and the gold rate on the day of billing. Estimate at today's gold rate. " : "Approximate prices at today's gold rate, valid today. ") + "All diamonds are third-party certified (IGI / EGL / TGL) and all gold is BIS HUID hallmarked. Made in our own manufacturing unit in Surat. Our representative will confirm the exact price.", W - 2 * M), M, y);
     return doc.output("blob");
   }
-  async function send() {
+  async function aashvi(no, blob, name, m, label) {
+    const pdf = await new Promise((res, rej) => { const f = new FileReader(); f.onload = () => res(String(f.result).split(",")[1] || ""); f.onerror = rej; f.readAsDataURL(blob); });
+    const r = await fetch("/api/vj/bill/send", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ no, pdf }) });
+    const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("server " + r.status));
+    m.textContent = `${label} ${no} saved and handed to Aashvi for ${j.to}…`;
+    for (let i = 0; i < 30; i++) { await new Promise(z => setTimeout(z, 3000));
+      const s = await (await fetch("/api/vj/bill/sendstatus?t=" + j.token, { credentials: "same-origin" })).json().catch(() => ({}));
+      if (s.status === "sent") { m.textContent = `${label} ${no} sent on WhatsApp to ${name} (${j.to}) by Aashvi ✓. Core has been told to call.`; return; }
+      if (s.status === "failed" || s.status === "expired") throw new Error("Aashvi could not send it (" + (s.error || s.status) + "). The quote " + no + " is saved"); }
+    m.textContent = `${label} ${no}: Aashvi has not confirmed yet. Check WhatsApp before sending again.`;
+  }
+  async function send(via) {
     const m = $("qmsg"), st = settings();
     const name = $("qname").value.trim(), city = $("qcity").value.trim(), mob = $("qmob").value.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "");
     const design = Q.kind === "design", dIn = design ? Q.designs.map(d => designIn(d, st)).filter(x => x.net > 0 || x.dias.length || x.ppcs > 0) : [];
@@ -284,7 +299,7 @@
     const items = design ? [] : Q.items.map(t => Object.assign({}, t, { price: (priceFor(t, Q.option) || {}).final || 0 }));
     if (items.some(i => !i.price)) { m.textContent = "A piece has no price - check the gold rate and the default diamond rates."; return; }
     if ($("qsharebox")) $("qsharebox").hidden = true;
-    $("qsend").disabled = true; m.textContent = "Saving the quote…";
+    $("qsend").disabled = true; $("qaashvi").disabled = true; m.textContent = "Saving the quote…";
     try {
       // the server prices every line again (from the tags or the weights typed) and returns the figures the PDF prints
       const r = await fetch("/api/vj/quote", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
@@ -304,7 +319,8 @@
       // 14/10/2026: the share sheet only on phones; on a computer (Windows share box has no WhatsApp) download + open WhatsApp
       const phone = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
       const canFile = (() => { try { return !!(navigator.canShare && navigator.canShare({ files: [file] })); } catch (e) { return false; } })();
-      if (phone) {
+      if (via === "aashvi") await aashvi(j.qno, blob, name, m, design ? "Estimate" : "Quotation");
+      else if (phone) {
         // Phones (14/10/2026, iPhone fix): the PDF is made first, then a green button. Its tap is a fresh tap, which iPhone needs
         // to open the share box. If this browser cannot share files (e.g. Chrome or an in-app browser on iPhone) the tap opens
         // the PDF itself, which has the iPhone share icon; a second link opens the customer's WhatsApp chat.
@@ -331,7 +347,7 @@
         m.textContent = `Quote ${j.qno} saved (${fmt(j.total)}${changed ? ", worked out again on the server" : ""}) and the PDF downloaded. Attach ${fname} in the WhatsApp chat that opened. Core has been told to call ${name}.`;
       }
     } catch (e) { m.textContent = "Could not send: " + (e.message || e) + "."; }
-    $("qsend").disabled = false;
+    $("qsend").disabled = false; $("qaashvi").disabled = false;
   }
   function boot() { if (document.querySelector("nav") && $("p-rates")) { build(); setInterval(() => { const s = $("p-quote"); if (s && !s.hidden && !(document.activeElement && document.activeElement.classList.contains("qprate"))) render(); }, 20000); } else setTimeout(boot, 300); }
   boot();
