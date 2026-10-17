@@ -418,7 +418,7 @@ function addDia(){
 const firstBox=id=>{const l=$(id).lastElementChild,f=l&&l.querySelector("select,input");if(f)f.focus()};
 /* owner 17/10/2026 17:43 (C-20261017-DESIGNWARN): warn while typing a design number that is already tagged; saving is still allowed */
 (()=>{const dn=$("designNo"),w=document.createElement("div");w.id="dnWarn";w.style.cssText="font-size:14px;margin-top:4px;line-height:1.35";dn.parentNode.appendChild(w);
-  const chk=()=>{const v=dn.value.trim().toUpperCase();w.textContent="";if(!v)return;const same=(S.tags||[]).filter(t=>String(t.designNo||"").trim().toUpperCase()===v);if(!same.length)return;
+  const chk=()=>{const v=dn.value.trim().toUpperCase();w.textContent="";if(!v||($("cat").value==="CH"&&!/\d/.test(v)))return;const same=(S.tags||[]).filter(t=>String(t.designNo||"").trim().toUpperCase()===v);if(!same.length)return;
     const wt=[...$("goldLines").querySelectorAll('input[id^=gn]')].reduce((a,i)=>a+(Number(i.value)||0),0),gw=t=>(t.gold||[]).reduce((a,g)=>a+(Number(g&&g.net)||0),0);
     const twin=wt>0&&same.find(t=>Math.abs(gw(t)-wt)<0.0005);
     w.style.color=twin?"#b3261e":"#8a5a00";w.textContent=(twin?"Looks like a double tag: "+twin.label+" has the same design number and the same gold weight ("+gw(twin).toFixed(3)+" g).":"Design "+v+" is already tagged: "+same.slice(0,4).map(t=>t.label+" ("+gw(t).toFixed(3)+" g)").join(", ")+(same.length>4?" and "+(same.length-4)+" more":"")+".")+" You can still save if this is another piece."};
@@ -430,6 +430,7 @@ $("addDia").addEventListener("click",()=>{addDia();firstBox("diaLines")});
 document.querySelectorAll('input[name=kind]').forEach(r=>r.addEventListener("change",update));
 ["oName","oMob","oCity","oDue","oRate"].forEach(id=>$(id).addEventListener("input",update));
 CATS.forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=c.name;$("cat").appendChild(o)});
+$("cat").addEventListener("change",()=>{const c=$("cat").value==="CH";$("designNo").placeholder=c?"optional - e.g. Sid / Arun / Self":"e.g. 1436";$("designNo").required=!c}); /* C-20261017-CHAINDN */
 
 /* ---------- read form ---------- */
 function kind(){return document.querySelector('input[name=kind]:checked').value}
@@ -469,7 +470,10 @@ function problems(t){
   const p=[],s=st();
   if(t.kind==="order"&&!t.order.name)p.push("Enter the customer's name for this order.");
   if(t.kind==="order"&&t.order.rate&&!(t.order.rate>=2000&&t.order.rate<=50000))p.push("The order's gold rate (F) looks wrong - type the 24K rate per gram.");
-  if(!t.designNo)p.push("Enter the design number.");
+  /* owner 17/10/2026 (C-20261017-CHAINDN): Chain tags - design number optional, free text (e.g. Sid / Arun / Self); all other tags - required, letters and numbers only */
+  if(t.cat==="CH"){if(t.designNo&&(t.designNo.length>30||/[<>"`]/.test(t.designNo)))p.push("Chain design number / name: up to 30 letters, numbers or spaces (e.g. Sid, Arun, Self), or leave it empty.")}
+  else if(!t.designNo)p.push("Enter the design number.");
+  else if(!/^[A-Z0-9][A-Z0-9\/.-]{0,29}$/.test(t.designNo))p.push("Design number: letters and numbers only (e.g. 1436 or VJ1436). Names like Sid / Self are allowed only for Chain tags.");
   if(!t.gold.some(g=>g.net>0))p.push("Enter the net gold weight.");
   t.gold.forEach((g,i)=>{if(g.tunch!==undefined&&!(g.tunch>=0.3&&g.tunch<=1.1))p.push(`Gold line ${i+1}: chain tunch must be from 0.300 to 1.100 (e.g. 0.920), or leave it empty if this line is not a chain.`)});
   if(t.cat==="CH"&&t.kind!=="sample"&&t.gold.some(g=>g.net>0&&g.tunch===undefined))p.push("Chain: type the tunch on each gold line (e.g. 0.920). Rate of fine gold and tunch are kept separate; no making on a chain.");
@@ -785,7 +789,7 @@ async function renderList(){
   const q=$("q").value.trim().toLowerCase(),fk=$("fkind").value;
   const qq=q.replace(/\s+/g,"");
   /* owner 17/10/2026 17:34 (C-20261017-DOUBLETAG): same design number + same total gold weight = possible double tag, highlighted in red */
-  const dkey=t=>{const dn=String(t.designNo||"").trim().toUpperCase();const w=(t.gold||[]).reduce((a,g)=>a+(Number(g&&g.net)||0),0)||(t.metal&&Number(t.metal.net))||0;return dn&&w>0?dn+"|"+w.toFixed(3):""};
+  const dkey=t=>{const dn=String(t.designNo||"").trim().toUpperCase();const w=(t.gold||[]).reduce((a,g)=>a+(Number(g&&g.net)||0),0)||(t.metal&&Number(t.metal.net))||0;return dn&&w>0&&!(t.cat==="CH"&&!/\d/.test(dn))?dn+"|"+w.toFixed(3):""};
   /* owner 17/10 17:48: Abhinav can mark a pair 'Not a double' (notDouble on each tag); a later new tag with the same design + weight is flagged again */
   const DUPT=new Map();S.tags.forEach(t=>{const k=dkey(t);if(k)DUPT.set(k,(DUPT.get(k)||[]).concat(t))});
   const dupOf=t=>{const g=DUPT.get(dkey(t))||[];return g.length>1&&(!t.notDouble||g.some(x=>x!==t&&!x.notDouble))?g.map(x=>x.label):[]};
