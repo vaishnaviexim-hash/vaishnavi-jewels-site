@@ -60,7 +60,7 @@ input[readonly]{background:var(--sunk);color:var(--muted)}
 .lines{display:flex;flex-direction:column;gap:8px}
 .ln{display:grid;gap:8px;align-items:end}
 .ln.g{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr) auto}
-.ln.d{grid-template-columns:minmax(0,1.1fr) minmax(0,.7fr) minmax(0,.8fr) minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) auto} /* owner 17/10: Quality, Pcs, Ct, Rate, Shape */
+.ln.d{grid-template-columns:minmax(0,1fr) minmax(0,1.1fr) minmax(0,.7fr) minmax(0,.8fr) minmax(0,1fr) minmax(0,1fr) auto} /* owner 17/10 17:27: Shape, Quality, Pcs, D Wt, Rate */
 .ln.o{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
 .ln .val{font-family:var(--f-mono);font-size:13px;color:var(--muted);padding-bottom:9px;font-variant-numeric:tabular-nums;text-align:right}
 .ln .x{font:inherit;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:var(--r);padding:7px 10px;cursor:pointer;margin-bottom:1px}
@@ -400,7 +400,7 @@ function addGold(k,net){
 }
 function addDia(){
   const id=++lineSeq,d=document.createElement("div");d.className="ln d";d.dataset.id=id;
-  d.innerHTML=`<label>Quality<select id="dq${id}"></select><input id="dqo${id}" autocomplete="off" maxlength="24" placeholder="Type quality" hidden></label><label>Pcs<input type="number" id="dp${id}" step="1" min="0" placeholder="0"></label><label>Ct<input type="number" id="dc${id}" step="0.01" min="0" placeholder="0.00"></label><label>Special rate ₹/ct<input type="number" id="dr${id}" step="100" min="0" placeholder="default"></label><label>Shape<select id="ds${id}"></select></label><div class="val" id="dv${id}"></div><button type="button" class="x" aria-label="Remove diamond line">✕</button>`;
+  d.innerHTML=`<label>Shape<select id="ds${id}"></select></label><label>Quality<select id="dq${id}"></select><input id="dqo${id}" autocomplete="off" maxlength="24" placeholder="Type quality" hidden></label><label>Pcs<input type="number" id="dp${id}" step="1" min="0" placeholder="0"></label><label>D Wt (ct)<input type="number" id="dc${id}" step="0.01" min="0" placeholder="0.00"></label><label>Rate ₹/ct<input type="number" id="dr${id}" step="100" min="0" placeholder="default"></label><div class="val" id="dv${id}"></div><button type="button" class="x" aria-label="Remove diamond line">✕</button>`;
   $("diaLines").appendChild(d);opt($("ds"+id),SHAPES,"Round");opt($("dq"+id),QUALS,"CVD");
   /* owner 17/10/2026: shop codes for diamond quality - type 42 CVD, 2 VS IJ, 3 VS HI, 4 VS GH, 5 VVS EF in the Quality box (C-20261017-QCODES) */
   {const q=$("dq"+id),QC={"CVD":"42","VS IJ":"2","VS HI":"3","VS GH":"4","VVS EF":"5"},BY={};[...q.options].forEach(o=>{if(QC[o.value]){o.textContent=QC[o.value]+" · "+o.value;BY[QC[o.value]]=o.value}});
