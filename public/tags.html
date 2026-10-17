@@ -416,6 +416,13 @@ function addDia(){
 }
 /* owner 17/10/2026 17:42: after adding a line the cursor goes to its first box (Karat / Shape) */
 const firstBox=id=>{const l=$(id).lastElementChild,f=l&&l.querySelector("select,input");if(f)f.focus()};
+/* owner 17/10/2026 17:43 (C-20261017-DESIGNWARN): warn while typing a design number that is already tagged; saving is still allowed */
+(()=>{const dn=$("designNo"),w=document.createElement("div");w.id="dnWarn";w.style.cssText="font-size:14px;margin-top:4px;line-height:1.35";dn.parentNode.appendChild(w);
+  const chk=()=>{const v=dn.value.trim().toUpperCase();w.textContent="";if(!v)return;const same=(S.tags||[]).filter(t=>String(t.designNo||"").trim().toUpperCase()===v);if(!same.length)return;
+    const wt=[...$("goldLines").querySelectorAll('input[type=number],input[inputmode=decimal]')].reduce((a,i)=>a+(Number(i.value)||0),0),gw=t=>(t.gold||[]).reduce((a,g)=>a+(Number(g&&g.net)||0),0);
+    const twin=wt>0&&same.find(t=>Math.abs(gw(t)-wt)<0.0005);
+    w.style.color=twin?"#b3261e":"#8a5a00";w.textContent=(twin?"Looks like a double tag: "+twin.label+" has the same design number and the same gold weight ("+gw(twin).toFixed(3)+" g).":"Design "+v+" is already tagged: "+same.slice(0,4).map(t=>t.label+" ("+gw(t).toFixed(3)+" g)").join(", ")+(same.length>4?" and "+(same.length-4)+" more":"")+".")+" You can still save if this is another piece."};
+  dn.addEventListener("input",chk);$("goldLines").addEventListener("input",chk);dn.addEventListener("blur",chk);})();
 $("addGold").addEventListener("click",()=>{addGold();firstBox("goldLines")});
 $("addDia").addEventListener("click",()=>{addDia();firstBox("diaLines")});
 ["goldLines","diaLines"].forEach(id=>{$(id).addEventListener("input",update);$(id).addEventListener("change",update)});
