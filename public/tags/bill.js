@@ -344,7 +344,8 @@
     y += 10; doc.setFontSize(12);
     doc.text(`Name: ${b.name}`, M, y); y += 6.5; doc.text(`City: ${b.city || "-"}`, M, y); doc.text(`Mobile: ${!b.mobile ? "-" : /^\d{10}$/.test(b.mobile) ? "+91 " + b.mobile : b.mobile}`, M + 90, y); y += 6.5;
     const rts = [...new Set((b.rows || []).map(r => Math.round(r.F || b.F)))], hF = rts.length === 1 ? rts[0] : b.F; // owner 17/10: the rate shown is the one the pieces were billed at (tag rate)
-    doc.text(`Gold Rate (F): ${fmt(hF)} per g (24K)${rts.length > 1 ? ", other rates shown per piece" : ""}`, M, y); doc.text(`Gold Calculation: ${MODES[b.mode] || b.mode}${b.settle === "fine" ? " (fine gold)" : b.settle === "amount" ? " (in rupees)" : ""}`, M + 90, y); y += 9;
+    doc.text(`Gold Rate (F): ${fmt(hF)} per g (24K)`, M, y); doc.text(`Gold Calculation: ${MODES[b.mode] || b.mode}${b.settle === "fine" ? " (fine gold)" : b.settle === "amount" ? " (in rupees)" : ""}`, M + 90, y);
+    if (rts.length > 1) { y += 5.5; doc.setFontSize(10); doc.text("Other gold rates are shown under each piece.", M, y); doc.setFontSize(12); } y += 9;
     const pics = {}; if (photos) for (const r of b.rows) if (r.photo) pics[r.id] = await thumb(r.photo);
     const P = Object.values(pics).some(Boolean) ? 22 : 0; // photo column (mm) only when a piece has a photo
     const D = (b.disc || 0) > 0; // owner 16/10: own Discount and Net columns when a piece has a discount (amounts then without 'Rs', said once above)
