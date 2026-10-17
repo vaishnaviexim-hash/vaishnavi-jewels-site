@@ -794,6 +794,369 @@ async function vjBillBook(url, env, who) { // a sales login sees only the bills 
   return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_Bills.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
 }
 
+// ---------------------------------------------------------------------------------------------
+// Customer receipts, ledgers and Settled (owner Abhinav 17/10/2026, C-20261017-LEDGER).
+// - Every login (admin, staff, sales) may enter receipts and see every customer's ledger (owner: 'everyone can do both').
+//   Settled / un-settle: ONLY Abhinav (owner 17/10 16:15) = an owner email that is not Shilpiji's. canSettle comes from here.
+// - Receipts R-YYMM-NN (from 01 every month, by the receipt date) live in vj_receipts; never deleted, only reversed with a reason.
+// - The page sends only what was typed; the server finds the bill, works out every balance itself and refuses overpayments.
+// - Ledger key: the customer's 10-digit mobile, else name + city. Cancelled bills and estimates are not in any ledger.
+// - Settled: the rupee balance is written off as a discount ON THE BILL (spread over the pieces' Discount column), GST worked
+//   again on the lower taxable value, bill total = what was received; the original figures stay in bill.original.
+// ---------------------------------------------------------------------------------------------
+const VJ_RC_MODES = { cash: 'Cash', upi: 'UPI', card: 'Card', cheque: 'Cheque', bank: 'Bank transfer', gold: 'Old gold', adjust: 'Adjustment' };
+const VJ_KARAT = { '24K': 1, '22K': 22 / 24, '18K': 18 / 24, '14K': 14 / 24, '9K': 9 / 24 }; // old gold purity by karat; a purity % typed on the receipt wins
+const VJ_SHILPI = 'vaishnavijewels@gmail.com';
+let vjRcOk = false;
+async function vjRcT(env) {
+  if (vjRcOk) return;
+  await env.DB.batch([env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)'),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_receipts (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)')]);
+  vjBillsOk = true; vjRcOk = true;
+}
+const vjByName = who => who.role === 'admin' ? (who.email === VJ_SHILPI ? 'Shilpiji' : 'Abhinav') : (who.name || String(who.email).split('@')[0]);
+const vjCanSettle = who => !!who && who.role === 'admin' && who.email !== VJ_SHILPI; // owner 17/10 16:15: only Abhinav
+const vjNk = s => String(s || '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+const vjLKey = (name, city, mobile) => /^\d{10}$/.test(String(mobile || '')) ? 'm:' + mobile : 'n:' + vjNk(name).slice(0, 60) + '|' + vjNk(city).slice(0, 40);
+const vjR3 = n => Math.round((Number(n) || 0) * 1000) / 1000;
+const vjDmy = d => String(d || '').slice(0, 10).split('-').reverse().join('-');
+const vjInr = n => 'Rs ' + Math.round(Number(n) || 0).toLocaleString('en-IN');
+const vjIstDay = (plus = 0) => new Date(Date.now() + 5.5 * 3600e3 + plus * 864e5).toISOString().slice(0, 10);
+const vjParse = r => { try { return JSON.parse(r.data); } catch (e) { return null; } };
+
+async function vjLedgerLoad(env) {
+  await vjRcT(env);
+  const bills = ((((await env.DB.prepare("SELECT data FROM vj_bills WHERE no LIKE 'B-%' ORDER BY ts").all()).results) || []).map(vjParse))
+    .filter(b => b && !b.cancelled && b.title !== 'Estimate'); // owner 17/10: cancelled bills appear nowhere
+  const all = ((((await env.DB.prepare('SELECT data FROM vj_receipts ORDER BY ts').all()).results) || []).map(vjParse)).filter(Boolean);
+  return { bills, rcs: all.filter(r => !r.reversed), all };
+}
+// one bill's position: rupees received (incl. old gold taken in rupees and adjustments in, less adjustments out), fine gold received
+function vjBillPos(b, rcs) {
+  const mine = rcs.filter(r => r.bill === b.no);
+  const recv = mine.reduce((a, r) => a + (r.dir === 'out' ? -1 : 1) * (Number(r.amount) || 0), 0);
+  const fineRecv = vjR3(mine.reduce((a, r) => a + (r.mode === 'gold' && r.details && r.details.goldAs === 'fine' ? Number(r.fine) || 0 : 0), 0));
+  const orig = b.original ? Number(b.original.total) || 0 : Number(b.total) || 0;
+  const sd = b.settled ? orig - (Number(b.total) || 0) : 0;
+  const fine = b.settle === 'fine' ? Number(b.fine) || 0 : 0;
+  const fineDue = fine ? vjR3(fine - fineRecv - (b.settled ? Number(b.settled.fineWaived) || 0 : 0)) : 0;
+  return { recv, fineRecv, orig, sd, bal: (Number(b.total) || 0) - recv, fine, fineDue, n: mine.length };
+}
+// every customer: bills, receipts, on-account credit, totals
+function vjCustomers(L) {
+  const C = new Map();
+  const get = (key, src) => { if (!C.has(key)) C.set(key, { key, name: '', city: '', mobile: '', last: '', bills: [], rcs: [] });
+    const c = C.get(key), at = String(src.at || src.date || ''); if (at >= c.last) { c.last = at; c.name = src.name || c.name; c.city = src.city || ''; c.mobile = src.mobile || ''; } return c; };
+  L.bills.forEach(b => get(vjLKey(b.name, b.city, b.mobile), b).bills.push(b));
+  L.rcs.forEach(r => get(r.key, r).rcs.push(r));
+  for (const c of C.values()) {
+    c.pos = c.bills.map(b => Object.assign({ no: b.no, date: b.date, total: b.total, settled: b.settled || null }, vjBillPos(b, L.rcs)));
+    c.account = c.rcs.filter(r => !r.bill).reduce((a, r) => a + (r.dir === 'out' ? -1 : 1) * (Number(r.amount) || 0), 0);
+    c.billed = c.pos.reduce((a, p) => a + p.orig, 0);
+    c.received = c.rcs.filter(r => r.mode !== 'adjust').reduce((a, r) => a + (Number(r.amount) || 0), 0);
+    c.sd = c.pos.reduce((a, p) => a + p.sd, 0);
+    c.balance = c.billed - c.received - c.sd;
+    c.fineDue = vjR3(c.pos.reduce((a, p) => a + Math.max(0, p.fineDue), 0));
+  }
+  return C;
+}
+const vjCustBrief = c => ({ key: c.key, name: c.name, city: c.city, mobile: c.mobile, bills: c.bills.length, billed: c.billed, received: c.received, settlement: c.sd, balance: c.balance, account: c.account, fineDue: c.fineDue });
+const vjRcText = r => {
+  const d = r.details || {};
+  if (r.mode === 'cheque') return 'Cheque no. ' + (d.chequeNo || '') + (d.bank ? ', ' + d.bank : '');
+  if (r.mode === 'bank') return 'Bank transfer, ref. ' + (d.ref || '');
+  if ((r.mode === 'upi' || r.mode === 'card') && d.ref) return VJ_RC_MODES[r.mode] + ', ref. ' + d.ref;
+  if (r.mode === 'gold') return 'Old gold ' + Number(d.gross || 0).toFixed(3) + ' g ' + (d.karat ? d.karat : (d.purity || 0) + '%') + ' = ' + Number(r.fine || 0).toFixed(3) + ' g fine' + (d.goldAs === 'rupees' ? ' @ ' + vjInr(d.rate) + ' per g fine' : ' (taken as fine gold)');
+  if (r.mode === 'adjust') return 'Adjustment ' + (r.dir === 'out' ? 'to ' : 'from ') + (d.other || 'account');
+  return VJ_RC_MODES[r.mode] || r.mode;
+};
+const vjAgainst = r => r.bill || 'on account';
+
+// GET /api/vj/ledger?q=... | ?open=1 | ?key=... ; GET /api/vj/ledger/bill?no= ; GET /api/vj/receipt?no=
+async function vjLedgerGet(url, env, who) {
+  const L = await vjLedgerLoad(env), C = vjCustomers(L), p = url.pathname;
+  if (p === '/api/vj/ledger/bill') {
+    const no = String(url.searchParams.get('no') || '').trim().toUpperCase();
+    const b = /^B-\d{4}-\d{2,4}$/.test(no) ? L.bills.find(x => x.no === no) : null;
+    return b ? vjJson({ ok: true, bill: b }) : vjDeny(404, 'not found');
+  }
+  if (p === '/api/vj/receipt') {
+    const no = String(url.searchParams.get('no') || '').trim().toUpperCase();
+    const r = /^R-\d{4}-\d{2,4}$/.test(no) ? L.all.find(x => x.no === no) : null;
+    return r ? vjJson({ ok: true, receipt: Object.assign({ modeName: VJ_RC_MODES[r.mode], text: vjRcText(r) }, r) }) : vjDeny(404, 'not found');
+  }
+  const key = String(url.searchParams.get('key') || '');
+  if (key) {
+    if (key.length > 120 || !/^(m:\d{10}|n:[^|]{0,60}\|[^|]{0,40})$/.test(key)) return vjDeny(400, 'bad customer');
+    const c = C.get(key); if (!c) return vjDeny(404, 'not found');
+    // running ledger: bill = debit (its original total), settlement = credit, receipts = credit; an adjustment pair is one line, no amount
+    const ev = [];
+    c.bills.forEach(b => { const ps = c.pos.find(x => x.no === b.no);
+      ev.push({ date: b.date, at: b.at || '', part: 'Bill ' + b.no + (b.settle === 'fine' && b.fine ? ' (+ ' + Number(b.fine).toFixed(3) + ' g fine gold)' : ''), dr: ps.orig, cr: 0 });
+      if (b.settled) ev.push({ date: String(b.settled.at).slice(0, 10), at: b.settled.at, part: 'Settlement discount on ' + b.no + (b.settled.fineWaived ? ', fine gold waived ' + Number(b.settled.fineWaived).toFixed(3) + ' g' : ''), dr: 0, cr: ps.sd }); });
+    c.rcs.forEach(r => { if (r.mode === 'adjust') { if (r.dir === 'in') ev.push({ date: r.date, at: r.at, part: `Adjustment ${r.no}: ${vjInr(r.amount)} moved from ${(r.details && r.details.other) || 'account'} to ${vjAgainst(r)}`, dr: 0, cr: 0 }); return; }
+      ev.push({ date: r.date, at: r.at, part: `Receipt ${r.no} - ${vjRcText(r)} - against ${vjAgainst(r)}`, dr: 0, cr: Number(r.amount) || 0 }); });
+    ev.sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.at).localeCompare(String(b.at)));
+    let run = 0; ev.forEach(e => { run += e.dr - e.cr; e.bal = run; });
+    await vjAudit(env, who, 'ledger-view', 'ledger/' + key.slice(0, 60), c.name);
+    return vjJson({ ok: true, canSettle: vjCanSettle(who), customer: vjCustBrief(c),
+      bills: c.bills.map(b => { const ps = c.pos.find(x => x.no === b.no); return { no: b.no, date: b.date, total: ps.orig, nowTotal: b.total, sub: b.sub, received: ps.recv, settlement: ps.sd, balance: ps.bal, fine: ps.fine, fineRecv: ps.fineRecv, fineDue: ps.fineDue, gstPct: b.gstPct,
+        settled: b.settled ? { at: b.settled.at, byName: b.settled.byName, discount: b.settled.discount, gstReduction: b.settled.gstReduction, paid: b.settled.paid, fineWaived: b.settled.fineWaived || 0 } : null }; }),
+      receipts: c.rcs.map(r => ({ no: r.no, date: r.date, mode: r.mode, modeName: VJ_RC_MODES[r.mode], text: vjRcText(r), amount: r.amount, fine: r.fine || 0, bill: r.bill || '', dir: r.dir || '', note: r.note || '', byName: r.byName || '' })),
+      ledger: ev });
+  }
+  const open = url.searchParams.get('open') === '1', q = String(url.searchParams.get('q') || '').trim().slice(0, 40);
+  if (!open && q.length < 2) return vjDeny(400, 'type at least 2 letters or digits');
+  const qd = q.replace(/\D/g, ''), qn = vjNk(q);
+  const hit = [...C.values()].filter(c => open ? (c.balance !== 0 || c.fineDue > 0 || c.account !== 0)
+    : (qd.length >= 3 && String(c.mobile).replace(/\D/g, '').includes(qd)) || (qn && vjNk(c.name).includes(qn)) || c.bills.some(b => b.no === q.toUpperCase()));
+  hit.sort((a, b) => String(b.last).localeCompare(String(a.last)));
+  return vjJson({ ok: true, canSettle: vjCanSettle(who), customers: hit.slice(0, 40).map(vjCustBrief), more: Math.max(0, hit.length - 40) });
+}
+
+// R-YYMM-NN numbering (by the receipt date), same way as bills
+async function vjRcInsert(env, who, r) {
+  const px = 'R-' + r.date.slice(2, 4) + r.date.slice(5, 7) + '-';
+  for (let i = 0; i < 6; i++) {
+    const used = ((await env.DB.prepare('SELECT no FROM vj_receipts WHERE no LIKE ?').bind(px + '%').all()).results) || [];
+    r.no = px + String(used.reduce((a, x) => Math.max(a, parseInt(String(x.no).slice(px.length), 10) || 0), 0) + 1).padStart(2, '0');
+    const res = await env.DB.prepare('INSERT INTO vj_receipts (no, ts, email, data) VALUES (?, ?, ?, ?) ON CONFLICT(no) DO NOTHING').bind(r.no, Date.now(), who.email, JSON.stringify(r)).run();
+    if (res.meta && res.meta.changes === 1) return r.no;
+  }
+  return null;
+}
+const vjMoney = v => { const s = String(v == null ? '' : v).replace(/[,\s]/g, ''); if (!/^\d{1,9}(\.\d{1,2})?$/.test(s)) return NaN; return Math.round(Number(s)); };
+
+// POST /api/vj/receipt
+async function vjReceipt(request, env, who) {
+  const len = Number(request.headers.get('content-length') || 0);
+  if (len > 5000) return vjDeny(413, 'too large');
+  let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+  if (!b || typeof b !== 'object' || Array.isArray(b)) return vjDeny(400, 'bad request');
+  const mode = Object.prototype.hasOwnProperty.call(VJ_RC_MODES, b.mode) ? b.mode : '';
+  if (!mode) return vjDeny(400, 'choose how the customer paid');
+  const date = String(b.date || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(Date.parse(date)) || date < '2024-01-01' || date > vjIstDay(1)) return vjDeny(400, 'bad date');
+  const note = vjClean(b.note, 120);
+  const L = await vjLedgerLoad(env), C = vjCustomers(L);
+  const billOf = no => L.bills.find(x => x.no === no);
+  const now = new Date().toISOString(), base = { date, at: now, by: who.email, byName: vjByName(who), mode, note };
+  const done = async (list, msg) => { // insert (adjustments: both entries), then check no bill got settled meanwhile
+    const nos = [];
+    for (const r of list) { const n = await vjRcInsert(env, who, r); if (!n) { for (const x of nos) await env.DB.prepare('DELETE FROM vj_receipts WHERE no = ?').bind(x).run(); return vjJson({ error: 'could not give a number, try again' }, 409); } nos.push(n); }
+    if (list.length === 2) { list[0].link = nos[1]; list[1].link = nos[0];
+      for (const r of list) await env.DB.prepare('UPDATE vj_receipts SET data = ? WHERE no = ?').bind(JSON.stringify(r), r.no).run(); }
+    for (const r of list) if (r.bill) { const row = await env.DB.prepare('SELECT data FROM vj_bills WHERE no = ?').bind(r.bill).first(), bb = row ? vjParse(row) : null;
+      if (!bb || bb.cancelled || bb.settled) { for (const x of nos) await env.DB.prepare('DELETE FROM vj_receipts WHERE no = ?').bind(x).run(); return vjJson({ error: 'bill ' + r.bill + ' was settled or cancelled just now' }, 409); } }
+    for (const r of list) await vjAudit(env, who, 'receipt', 'receipts/' + r.no, `${VJ_RC_MODES[mode]} ${r.dir || ''} ${r.amount}${r.fine ? ' fine ' + r.fine : ''} against ${vjAgainst(r)} | ${r.name} ${r.mobile} | ${msg}`);
+    const out = list.map(r => Object.assign({ modeName: VJ_RC_MODES[r.mode], text: vjRcText(r) }, r));
+    return vjJson({ ok: true, receipt: out[out.length - 1], linked: out.length === 2 ? out[0] : null });
+  };
+
+  if (mode === 'adjust') { // move credit: from a bill (what was received on it) or the customer's account, to another bill or the account
+    const pick = v => { const s = String(v == null ? '' : v).trim().toUpperCase(); return s === 'ACCOUNT' ? 'account' : /^B-\d{4}-\d{2,4}$/.test(s) ? s : ''; };
+    const from = pick(b.from), to = pick(b.to), amount = vjMoney(b.amount);
+    if (!from || !to || from === to) return vjDeny(400, 'choose where the money moves from and to');
+    if (!(amount >= 1 && amount <= 1e8)) return vjDeny(400, 'amount looks wrong');
+    const bf = from === 'account' ? null : billOf(from), bt = to === 'account' ? null : billOf(to);
+    if ((from !== 'account' && !bf) || (to !== 'account' && !bt)) return vjDeny(404, 'bill not found');
+    if ((bf && bf.settled) || (bt && bt.settled)) return vjJson({ error: 'a settled bill cannot take or give money' }, 409);
+    const any = bf || bt, key = vjLKey(any.name, any.city, any.mobile);
+    if (bf && bt && vjLKey(bt.name, bt.city, bt.mobile) !== key) return vjDeny(400, 'both bills must be the same customer');
+    const c = C.get(key);
+    const avail = bf ? vjBillPos(bf, L.rcs).recv : (c ? c.account : 0);
+    if (amount > avail) return vjDeny(400, `only ${vjInr(Math.max(0, avail))} can be moved from ${from === 'account' ? 'the account' : from}`);
+    if (bt) { const pb = vjBillPos(bt, L.rcs); if (amount > pb.bal) return vjDeny(400, `more than the balance of ${to} (${vjInr(Math.max(0, pb.bal))})`); }
+    const cust = { key, name: c ? c.name : any.name, city: c ? c.city : any.city, mobile: c ? c.mobile : any.mobile };
+    const bal = c ? c.balance : 0;
+    const out = Object.assign({}, base, cust, { amount, fine: 0, bill: bf ? from : '', dir: 'out', details: { other: to === 'account' ? 'account' : to }, balAfter: { customer: bal } });
+    const inn = Object.assign({}, base, cust, { amount, fine: 0, bill: bt ? to : '', dir: 'in', details: { other: from === 'account' ? 'account' : from }, balAfter: { customer: bal } });
+    if (bt) inn.balAfter.bill = vjBillPos(bt, L.rcs).bal - amount;
+    return done([out, inn], from + ' -> ' + to);
+  }
+
+  // which customer: the bill's customer (never the page's), or for an on-account receipt an existing customer / the typed details
+  const billNo = String(b.bill || '').trim().toUpperCase();
+  let bill = null, cust;
+  if (billNo) {
+    if (!/^B-\d{4}-\d{2,4}$/.test(billNo)) return vjDeny(400, 'bad bill number');
+    bill = billOf(billNo); if (!bill) return vjDeny(404, 'bill not found');
+    if (bill.settled) return vjJson({ error: billNo + ' is settled; no more receipts can be added' }, 409);
+    const k = vjLKey(bill.name, bill.city, bill.mobile), c = C.get(k);
+    cust = { key: k, name: c ? c.name : bill.name, city: c ? c.city : bill.city || '', mobile: c ? c.mobile : bill.mobile || '' };
+  } else if (b.key) {
+    const c = C.get(String(b.key).slice(0, 120)); if (!c) return vjDeny(404, 'customer not found');
+    cust = { key: c.key, name: c.name, city: c.city, mobile: c.mobile };
+  } else {
+    const name = vjClean(b.name, 60), city = vjClean(b.city, 40), mobile = vjPhone(b.mobile);
+    if (!name) return vjDeny(400, 'customer name is required');
+    if (b.mobile && String(b.mobile).trim() && !mobile) return vjDeny(400, 'mobile number not readable');
+    cust = { key: vjLKey(name, city, mobile), name, city, mobile };
+  }
+  const details = {}; let amount = 0, fine = 0;
+  if (mode === 'gold') {
+    const gross = Math.round(Number(b.gross) * 1000) / 1000, karat = Object.prototype.hasOwnProperty.call(VJ_KARAT, b.karat) ? b.karat : '';
+    const pct = Math.round(Number(b.purity) * 100) / 100;
+    if (!(gross >= 0.001 && gross <= 5000)) return vjDeny(400, 'old gold weight (g) looks wrong');
+    if (b.purity != null && String(b.purity).trim() !== '' && !(pct > 0 && pct <= 100)) return vjDeny(400, 'purity % looks wrong');
+    const pur = pct > 0 && pct <= 100 ? pct / 100 : karat ? VJ_KARAT[karat] : 0;
+    if (!pur) return vjDeny(400, 'choose the karat or type the purity %');
+    fine = vjR3(gross * pur);
+    if (!(fine > 0)) return vjDeny(400, 'fine gold works out to 0');
+    const goldAs = b.goldAs === 'fine' ? 'fine' : b.goldAs === 'rupees' ? 'rupees' : '';
+    if (!goldAs) return vjDeny(400, 'take the old gold as fine gold or in rupees?');
+    Object.assign(details, { gross, karat: pct > 0 ? '' : karat, purity: pct > 0 ? pct : Math.round(pur * 10000) / 100, goldAs });
+    if (goldAs === 'fine') {
+      if (!bill) return vjDeny(400, 'fine gold can only be taken against a bill with fine gold due');
+      const ps = vjBillPos(bill, L.rcs);
+      if (!(ps.fineDue > 0)) return vjDeny(400, billNo + ' has no fine gold due');
+      if (fine > ps.fineDue + 0.0005) return vjDeny(400, `more than the fine gold due on ${billNo} (${ps.fineDue.toFixed(3)} g)`);
+    } else {
+      const rate = Math.round(Number(b.rate) * 100) / 100;
+      if (!(rate >= 2000 && rate <= 50000)) return vjDeny(400, 'rate per g of fine gold looks wrong');
+      details.rate = rate; amount = Math.round(fine * rate);
+    }
+  } else {
+    amount = vjMoney(b.amount);
+    if (!(amount >= 1 && amount <= 1e8)) return vjDeny(400, 'amount looks wrong');
+    if (mode === 'cheque') { const cn = String(b.chequeNo || '').trim(), bank = vjClean(b.bank, 40);
+      if (!/^[0-9A-Za-z\-\/]{3,20}$/.test(cn) || bank.length < 2) return vjDeny(400, 'cheque number and bank are required'); Object.assign(details, { chequeNo: cn, bank }); }
+    if (mode === 'bank') { const ref = vjClean(b.ref, 40); if (ref.length < 3) return vjDeny(400, 'bank reference is required'); details.ref = ref; }
+    if (mode === 'upi' || mode === 'card') { const ref = vjClean(b.ref, 40); if (ref) details.ref = ref; }
+  }
+  const c = C.get(cust.key), balAfter = { customer: (c ? c.balance : 0) - amount, account: (c ? c.account : 0) + (bill ? 0 : amount) };
+  if (bill) { const ps = vjBillPos(bill, L.rcs);
+    if (amount > ps.bal) return vjDeny(400, `more than the balance of ${billNo} (${vjInr(Math.max(0, ps.bal))}). Put the extra on the customer's account (no bill).`);
+    balAfter.bill = ps.bal - amount; balAfter.fineDue = vjR3(ps.fineDue - (details.goldAs === 'fine' ? fine : 0)); }
+  const r = Object.assign({}, base, cust, { amount, fine, bill: bill ? billNo : '', details, balAfter });
+  return done([r], '');
+}
+
+// POST /api/vj/receipt/reverse {no, reason}: anyone, with a reason; kept in the database, left out of balances and lists
+async function vjReceiptReverse(request, env, who) {
+  let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+  const no = String(b && b.no || '').trim().toUpperCase(), reason = vjClean(b && b.reason, 120);
+  if (!/^R-\d{4}-\d{2,4}$/.test(no)) return vjDeny(400, 'bad receipt number');
+  if (reason.length < 3) return vjDeny(400, 'write the reason');
+  const L = await vjLedgerLoad(env), r = L.all.find(x => x.no === no);
+  if (!r) return vjDeny(404, 'not found');
+  if (r.reversed) return vjJson({ error: 'already reversed' }, 409);
+  const pair = [r].concat(r.link ? L.all.filter(x => x.no === r.link && !x.reversed) : []);
+  for (const x of pair) if (x.bill) { const bb = L.bills.find(y => y.no === x.bill); if (bb && bb.settled) return vjJson({ error: x.bill + ' is settled; Abhinav must un-settle it first' }, 409); }
+  // without these entries no bill may have taken back more than it received, and the account may not go below zero
+  const rest = { bills: L.bills, rcs: L.rcs.filter(x => !pair.some(p => p.no === x.no)) }, C2 = vjCustomers(rest);
+  const c2 = C2.get(r.key);
+  if (c2 && c2.account < 0) return vjJson({ error: 'the account credit from this receipt was already moved to a bill; reverse that adjustment first' }, 409);
+  for (const bb of L.bills) if (vjBillPos(bb, rest.rcs).recv < 0) return vjJson({ error: 'money from this receipt was already moved on (' + bb.no + '); reverse that adjustment first' }, 409);
+  const at = new Date().toISOString();
+  for (const x of pair) {
+    const row = await env.DB.prepare('SELECT data FROM vj_receipts WHERE no = ?').bind(x.no).first(); if (!row) continue;
+    const d = vjParse(row); if (!d || d.reversed) continue;
+    d.reversed = { at, by: who.email, byName: vjByName(who), reason };
+    const u = await env.DB.prepare('UPDATE vj_receipts SET data = ? WHERE no = ? AND data = ?').bind(JSON.stringify(d), x.no, row.data).run();
+    if (!u.meta || u.meta.changes !== 1) return vjJson({ error: 'changed meanwhile, try again' }, 409);
+    await vjAudit(env, who, 'receipt-reverse', 'receipts/' + x.no, reason + ' | ' + x.amount + ' against ' + vjAgainst(x));
+  }
+  return vjJson({ ok: true, reversed: pair.map(x => x.no) });
+}
+
+// Settlement figures (pure, tested): total = what was received; taxable = round(paid / (1 + GST%)); GST = paid - taxable;
+// the drop in taxable value is spread over the pieces' Discount column pro rata to their net, whole rupees, last piece takes the rest.
+function vjSettleCalc(bill, paid) {
+  const b = JSON.parse(JSON.stringify(bill)), g = Number(bill.gstPct) || 0, same = paid === Number(bill.total);
+  const taxable = same ? Number(bill.sub) : Math.round(paid / (1 + g / 100)), gst = same ? Number(bill.gst) : paid - taxable;
+  const D = Math.max(0, (Number(bill.sub) || 0) - taxable), rows = b.rows || [];
+  const base = rows.reduce((a, r) => a + Math.max(0, Number(r.net) || 0), 0);
+  let left = D;
+  rows.forEach((r, i) => { const n = Math.max(0, Number(r.net) || 0); let s = i === rows.length - 1 ? left : (base ? Math.round(D * n / base) : 0); s = Math.max(0, Math.min(s, n, left)); r.settleDisc = s; left -= s; });
+  for (const r of rows) { if (!left) break; const s = Math.min(Math.max(0, r.net - r.settleDisc), left); r.settleDisc += s; left -= s; }
+  rows.forEach(r => { if (r.settleDisc) { r.disc = (Number(r.disc) || 0) + r.settleDisc; r.net = r.net - r.settleDisc; r.discTxt = ''; } else delete r.settleDisc; });
+  b.original = { sub: bill.sub, gst: bill.gst, total: bill.total, disc: bill.disc || 0, after: bill.after, rows: bill.rows };
+  b.sub = taxable; b.after = taxable; b.gst = gst; b.total = paid; b.disc = (Number(bill.disc) || 0) + D;
+  return { bill: b, discount: D, gstReduction: (Number(bill.gst) || 0) - gst };
+}
+
+// POST /api/vj/ledger/settle {no, expect} - Abhinav only. expect = the received figure he saw (if it changed, he must look again)
+async function vjSettle(request, env, who) {
+  if (!vjCanSettle(who)) return vjDeny(403, 'only Abhinav can settle a bill');
+  let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+  const no = String(b && b.no || '').trim().toUpperCase();
+  if (!/^B-\d{4}-\d{2,4}$/.test(no)) return vjDeny(400, 'bad bill number');
+  const L = await vjLedgerLoad(env), bill = L.bills.find(x => x.no === no);
+  if (!bill) return vjDeny(404, 'bill not found');
+  if (bill.settled) return vjJson({ error: 'already settled' }, 409);
+  const ps = vjBillPos(bill, L.rcs);
+  if (ps.bal < 0) return vjJson({ error: `more was received than the bill total; move ${vjInr(-ps.bal)} to the account first` }, 409);
+  if (ps.bal === 0 && !(ps.fineDue > 0)) return vjJson({ error: 'nothing to settle: the bill is fully paid' }, 409);
+  if (Number(b && b.expect) !== ps.recv) return vjJson({ error: 'the figures changed meanwhile; look again', received: ps.recv }, 409);
+  const row = await env.DB.prepare('SELECT data FROM vj_bills WHERE no = ?').bind(no).first();
+  const s = vjSettleCalc(bill, ps.recv), nb = s.bill;
+  nb.settled = { at: new Date().toISOString(), by: who.email, byName: vjByName(who), discount: s.discount, gstReduction: s.gstReduction, paid: ps.recv, fineWaived: ps.fineDue > 0 ? ps.fineDue : 0 };
+  const u = await env.DB.prepare('UPDATE vj_bills SET data = ? WHERE no = ? AND data = ?').bind(JSON.stringify(nb), no, row.data).run();
+  if (!u.meta || u.meta.changes !== 1) return vjJson({ error: 'changed meanwhile, try again' }, 409);
+  const L2 = await vjLedgerLoad(env); // a receipt saved at the same moment: put the bill back
+  if (vjBillPos(bill, L2.rcs).recv !== ps.recv) { await env.DB.prepare('UPDATE vj_bills SET data = ? WHERE no = ? AND data = ?').bind(row.data, no, JSON.stringify(nb)).run(); return vjJson({ error: 'a receipt was just added; look again' }, 409); }
+  await vjAudit(env, who, 'bill-settle', 'bills/' + no, `total ${bill.total} -> ${nb.total}, discount ${s.discount}, GST less ${s.gstReduction}${nb.settled.fineWaived ? ', fine waived ' + nb.settled.fineWaived + ' g' : ''}`);
+  return vjJson({ ok: true, bill: nb });
+}
+
+// POST /api/vj/ledger/unsettle {no, reason} - Abhinav only; the original figures come back, the settlement is kept in history
+async function vjUnsettle(request, env, who) {
+  if (!vjCanSettle(who)) return vjDeny(403, 'only Abhinav can settle a bill');
+  let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+  const no = String(b && b.no || '').trim().toUpperCase(), reason = vjClean(b && b.reason, 120);
+  if (!/^B-\d{4}-\d{2,4}$/.test(no)) return vjDeny(400, 'bad bill number');
+  if (reason.length < 3) return vjDeny(400, 'write the reason');
+  await vjRcT(env);
+  const row = await env.DB.prepare('SELECT data FROM vj_bills WHERE no = ?').bind(no).first(), bill = row ? vjParse(row) : null;
+  if (!bill || bill.cancelled || bill.title === 'Estimate') return vjDeny(404, 'bill not found');
+  if (!bill.settled || !bill.original) return vjJson({ error: 'this bill is not settled' }, 409);
+  const o = bill.original;
+  bill.unsettled = (Array.isArray(bill.unsettled) ? bill.unsettled : []).concat([Object.assign({}, bill.settled, { undoneAt: new Date().toISOString(), undoneBy: who.email, undoneByName: vjByName(who), reason })]);
+  Object.assign(bill, { sub: o.sub, gst: o.gst, total: o.total, disc: o.disc, after: o.after, rows: o.rows });
+  delete bill.settled; delete bill.original;
+  const u = await env.DB.prepare('UPDATE vj_bills SET data = ? WHERE no = ? AND data = ?').bind(JSON.stringify(bill), no, row.data).run();
+  if (!u.meta || u.meta.changes !== 1) return vjJson({ error: 'changed meanwhile, try again' }, 409);
+  await vjAudit(env, who, 'bill-unsettle', 'bills/' + no, reason + ' | total back to ' + o.total);
+  return vjJson({ ok: true, bill });
+}
+
+// GET /api/vj/ledger.xlsx?month=YYYY-MM: sheet 1 every customer's balance today, sheet 2 the month's receipts (A4 landscape)
+async function vjLedgerXlsx(url, env, who) {
+  const month = String(url.searchParams.get('month') || '');
+  if (!/^\d{4}-\d{2}$/.test(month)) return vjDeny(400, 'month as YYYY-MM');
+  const L = await vjLedgerLoad(env), C = [...vjCustomers(L).values()].sort((a, b) => b.balance - a.balance || a.name.localeCompare(b.name));
+  const r1 = C.map(c => [c.name, vjPhoneTxt(c.mobile), c.city, c.billed, c.received, c.sd, c.balance, c.fineDue || '']);
+  const t = C.reduce((a, c) => [a[0] + c.billed, a[1] + c.received, a[2] + c.sd, a[3] + c.balance, a[4] + c.fineDue], [0, 0, 0, 0, 0]);
+  if (r1.length) r1.push(['TOTAL (' + C.length + ' customers)', '', '', t[0], t[1], t[2], t[3], vjR3(t[4]) || '']);
+  const rm = L.rcs.filter(r => String(r.date).startsWith(month) && !(r.mode === 'adjust' && r.dir === 'out')).sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.no).localeCompare(String(b.no)));
+  const r2 = rm.map(r => [vjDmy(r.date), r.no, r.name, vjPhoneTxt(r.mobile), r.city || '', VJ_RC_MODES[r.mode], r.mode === 'adjust' ? 'Moved from ' + ((r.details && r.details.other) || 'account') + ' (' + (r.link || '') + ')' : vjRcText(r), vjAgainst(r), r.mode === 'adjust' ? 0 : r.amount, r.fine || '', r.note || '', r.byName || '']);
+  if (r2.length) r2.push(['', 'TOTAL (' + rm.filter(r => r.mode !== 'adjust').length + ')', '', '', '', '', '', '', rm.reduce((a, r) => a + (r.mode === 'adjust' ? 0 : Number(r.amount) || 0), 0), vjR3(rm.reduce((a, r) => a + (Number(r.fine) || 0), 0)) || '', '', '']);
+  const xlsx = vjXlsx([
+    { name: 'Customer balances', land: true, head: ['Name', 'Mobile', 'City', 'Billed (Rs)', 'Received (Rs)', 'Settlement discount (Rs)', 'Balance (Rs)', 'Fine gold due (g)'], rows: r1, widths: [28, 16, 14, 14, 14, 16, 14, 14], wrap: [0], mark: r => String(r[0]).startsWith('TOTAL') },
+    { name: 'Receipts ' + month.split('-').reverse().join('-'), land: true, head: ['Date', 'Receipt no.', 'Customer', 'Mobile', 'City', 'Mode', 'Details', 'Against', 'Amount (Rs)', 'Fine gold (g)', 'Note', 'By'], rows: r2, widths: [11, 12, 22, 15, 12, 12, 34, 12, 13, 11, 20, 12], wrap: [2, 6, 10], mark: r => String(r[1]).startsWith('TOTAL') }]);
+  const bin = atob(xlsx), out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  await vjAudit(env, who, 'ledger-report', 'ledger/', month + ' ' + C.length + ' customers, ' + rm.length + ' receipts');
+  return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_Ledger.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
+}
+
+// GET /api/vj/wa-ready: which WhatsApp templates are approved (set by the owner in vj_meta 'wa-ready:bill' / 'wa-ready:receipt' = '1')
+async function vjWaReady(env) {
+  await vjMetaT(env);
+  const rows = ((await env.DB.prepare("SELECT k, v FROM vj_meta WHERE k IN ('wa-ready:bill', 'wa-ready:receipt')").all()).results) || [];
+  const on = k => rows.some(r => r.k === k && r.v === '1');
+  return vjJson({ bill: on('wa-ready:bill'), receipt: on('wa-ready:receipt') });
+}
+
+// receipts (not reversed) against one bill - a bill with receipts is not cancelled or erased (owner 17/10)
+async function vjBillRc(env, no) {
+  await vjRcT(env);
+  return ((((await env.DB.prepare('SELECT data FROM vj_receipts ORDER BY ts').all()).results) || []).map(vjParse)).filter(r => r && !r.reversed && r.bill === no);
+}
+// POSTs of the ledger must be JSON from our own page (a form on another site cannot send application/json without being refused)
+const vjSameSite = (request, env) => /^application\/json\b/i.test(request.headers.get('content-type') || '') &&
+  (env.VJ_DEV === '1' || !request.headers.get('origin') || request.headers.get('origin') === 'https://' + VJ_HOST);
+
 // Daily tag report (owner 14/10/2026; evening Excel added 16/10/2026, C-20261016-TAGSDELETE). A Make schedule just "rings the
 // bell" (GET /hooks/vj-daily, no data returned, no secret needed) at 20:15 IST, after the showroom closes; this worker builds
 // everything itself and sends it ONLY to the existing quote hook (VJ_QUOTE_HOOK, encrypted), whose scenario forwards it to
