@@ -201,7 +201,12 @@
       const ph = document.createElement("td"); if (t.photo) { const im = document.createElement("img"); im.alt = ""; im.src = "/_blob/" + t.photo; ph.appendChild(im); } tr.appendChild(ph);
       c((t.designNo ? t.designNo + " · " : "") + t.label); c(t.catName || "");
       c(t.kind === "sample" ? "14K " + ((t.metal && t.metal.net) || 0).toFixed(3) : (t.gold || []).map(g => g.k + " " + g.net.toFixed(3)).join(" + "), "num");
-      c((t.dias || []).reduce((a, d) => a + (d.ct || 0), 0).toFixed(2) + " ct", "num"); c(p ? fmt(p.final) : "—", "num");
+      c((t.dias || []).reduce((a, d) => a + (d.ct || 0), 0).toFixed(2) + " ct", "num");
+      { const pk = polkiOf(t), td = document.createElement("td"); td.className = "num"; if (!pk) td.textContent = "—"; else { // polki: rate per pc editable for this quote (C-20261017-POLKI)
+        const ri = document.createElement("input"); ri.className = "qprate"; ri.inputMode = "numeric"; ri.autocomplete = "off"; ri.style.cssText = "width:64px;text-align:right;padding:4px 6px"; ri.value = pk.rate;
+        ri.addEventListener("change", () => { const v = num(ri.value); if (Number.isInteger(v) && v >= 1 && v <= 100000 && v !== Number(t.polki.rate)) Q.prates[t.id] = v; else delete Q.prates[t.id]; render(); });
+        td.append(pk.pcs + " pc @ ", ri); } tr.appendChild(td); }
+      c(p ? fmt(p.final) : "—", "num");
       const x = document.createElement("td"); const rm = document.createElement("button"); rm.type = "button"; rm.className = "btn ghost"; rm.textContent = "Remove"; rm.addEventListener("click", () => { Q.items.splice(i, 1); render(); }); x.appendChild(rm); tr.appendChild(x);
       body.appendChild(tr);
     });
@@ -213,9 +218,10 @@
     Q.total = total;
   }
   // the making line shown on screen and printed in the PDF (std uses the rates in Gold rate & settings)
-  function mkText(st, items, kind) {
+  function mkText(st, items, kind, des) {
     if ((kind || Q.mk) === "flat") return "Making Rs " + FLAT_MK.toLocaleString("en-IN") + "/g";
-    const small = (items || Q.items).some(t => { const g = t.kind === "sample" ? [{ net: (t.metal && t.metal.net) || 0 }] : (t.gold || []); const g0 = g.find(x => x.net > 0); return g0 && !(g0.net > st.mk.limit); });
+    const small = des ? (items || Q.designs).some(d => num(d.net) > 0 && !(num(d.net) > st.mk.limit))
+      : (items || Q.items).some(t => { const g = t.kind === "sample" ? [{ net: (t.metal && t.metal.net) || 0 }] : (t.gold || []); const g0 = g.find(x => x.net > 0); return g0 && !(g0.net > st.mk.limit); });
     return `Making Rs ${st.mk.base}/g${small ? ` (Rs ${st.mk.small}/g for pieces up to ${st.mk.limit} g)` : ""}, minimum Rs ${Number(st.mk.min || 1000).toLocaleString("en-IN")} a piece, + ${st.mk.pct}% wastage on gold`;
   }
   async function dataUrl(src) { const r = await fetch(src, { credentials: "same-origin" }); if (!r.ok) throw new Error("img"); const b = await r.blob(); return await new Promise((res, rej) => { const f = new FileReader(); f.onload = () => res(f.result); f.onerror = rej; f.readAsDataURL(b); }); }
@@ -226,10 +232,21 @@
     doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(90);
     doc.text(["120, Rajhans Ornate - High Street Retail Mall", "Parle Point, Surat, Gujarat 395007", "vaishnavijewels.com"], W - M, y + 3, { align: "right" });
     y += 26; doc.setDrawColor(180, 150, 80); doc.line(M, y, W - M, y); y += 9;
-    doc.setTextColor(20); doc.setFont("helvetica", "bold"); doc.setFontSize(15); doc.text("Quotation", M, y);
+    doc.setTextColor(20); doc.setFont("helvetica", "bold"); doc.setFontSize(15); doc.text(q.design ? "Estimate – new design" : "Quotation", M, y);
     doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.text(`${q.qno}   ·   ${new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}`, W - M, y, { align: "right" });
-    y += 8; doc.text(`For: ${q.name}, ${q.city}`, M, y); y += 6; doc.text(`Option: ${q.option} diamonds, gold as per piece`, M, y); y += 6; doc.text(q.making, M, y); y += 8;
-    for (const t of q.items) {
+    y += 8; doc.text(`For: ${q.name}, ${q.city}`, M, y); y += 6; if (!q.design) { doc.text(`Option: ${q.option} diamonds, gold as per piece`, M, y); y += 6; } doc.text(q.making, M, y); y += 8;
+    if (q.design) for (const d of q.items) { // C-20261017-QUOTEMODES: a new design has no tag and no photo
+      if (y > 250) { doc.addPage(); y = 20; }
+      doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.text(doc.splitTextToSize(d.desc || "New design", W - 2 * M - 45)[0], M, y + 6);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9.5); doc.setTextColor(80);
+      const dq = [...new Set(d.dias.map(x => x.q))];
+      const parts = [q.weights ? `${d.k} gold ${d.net.toFixed(3)} g` : `${d.k} gold`].concat(d.dias.length ? [q.weights ? "diamonds " + dq.map(z => d.dias.filter(x => x.q === z).reduce((a, x) => a + x.ct, 0).toFixed(2) + " ct " + z).join(" + ") : "diamonds " + dq.join(" + ")] : [])
+        .concat(d.ppcs ? [q.weights ? "polki " + d.ppcs + " pcs" : "polki"] : []);
+      doc.text(doc.splitTextToSize(parts.join(", "), W - 2 * M - 45), M, y + 12); doc.setTextColor(20);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.text(fmt(d.price), W - M, y + 8, { align: "right" });
+      y += 18; doc.setDrawColor(225); doc.line(M, y - 2, W - M, y - 2);
+    }
+    else for (const t of q.items) {
       if (y > 250) { doc.addPage(); y = 20; }
       const h = q.photos && t.photo ? 34 : 14;
       if (q.photos && t.photo) { try { doc.addImage(await dataUrl("/_blob/" + t.photo), "JPEG", M, y, 32, 32); } catch (e) {} }
@@ -240,33 +257,43 @@
       const ct = (t.dias || []).filter(d => !NON_DIAMOND.test(d.q || "")).reduce((a, d) => a + (d.ct || 0), 0);
       const goldTxt = t.kind === "sample" ? (q.weights ? "14K gold " + ((t.metal && t.metal.net) || 0).toFixed(3) + " g" : "14K gold") // owner 14/10: no "made to order" line
         : [...new Set((t.gold || []).map(g => g.k))].length && !q.weights ? [...new Set((t.gold || []).map(g => g.k))].join(" + ") + " gold" : (t.gold || []).map(g => g.k + " gold " + g.net.toFixed(3) + " g").join(" + ");
-      doc.text(`${goldTxt}${ct ? (q.weights ? ", diamonds " + ct.toFixed(2) + " ct" : ", diamonds") : ""}`, x, y + 12); doc.setTextColor(20);
+      const pk = t.polkiQ; // polki as the server priced it (C-20261017-POLKI)
+      doc.text(`${goldTxt}${ct ? (q.weights ? ", diamonds " + ct.toFixed(2) + " ct" : ", diamonds") : ""}${pk ? (q.weights ? ", polki " + pk.pcs + " pcs" : ", polki") : ""}`, x, y + 12); doc.setTextColor(20);
       doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.text(fmt(t.price), W - M, y + 8, { align: "right" });
       y += h + 4; doc.setDrawColor(225); doc.line(M, y - 2, W - M, y - 2);
     }
     y += 4; doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.text("Total (incl. 3% GST)", M, y); doc.text(fmt(q.total), W - M, y, { align: "right" });
     y += 10; doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(90);
-    doc.text(doc.splitTextToSize("Approximate prices at today's gold rate, valid today. All diamonds are third-party certified (IGI / EGL / TGL) and all gold is BIS HUID hallmarked. Made in our own manufacturing unit in Surat. Our representative will confirm the exact price.", W - 2 * M), M, y);
+    doc.text(doc.splitTextToSize((q.design ? "Final price depends on actual weights and the gold rate on the day of billing. Estimate at today's gold rate. " : "Approximate prices at today's gold rate, valid today. ") + "All diamonds are third-party certified (IGI / EGL / TGL) and all gold is BIS HUID hallmarked. Made in our own manufacturing unit in Surat. Our representative will confirm the exact price.", W - 2 * M), M, y);
     return doc.output("blob");
   }
   async function send() {
     const m = $("qmsg"), st = settings();
     const name = $("qname").value.trim(), city = $("qcity").value.trim(), mob = $("qmob").value.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "");
-    if (!Q.items.length) { m.textContent = "Add at least one piece."; return; }
+    const design = Q.kind === "design", dIn = design ? Q.designs.map(d => designIn(d, st)).filter(x => x.net > 0 || x.dias.length || x.ppcs > 0) : [];
+    if (design ? !dIn.length : !Q.items.length) { m.textContent = design ? "Fill in at least one design (karat and net gold)." : "Add at least one piece."; return; }
     if (!st.g) { m.textContent = "Set today's gold rate first (Gold rate & settings)."; return; }
     if (!name || !city || !/^[6-9]\d{9}$/.test(mob)) { m.textContent = "Enter the customer's name, 10-digit mobile and city."; return; }
-    const items = Q.items.map(t => Object.assign({}, t, { price: (priceFor(t, Q.option) || {}).final || 0 }));
+    const bad = dIn.findIndex(x => x.bad.length); if (bad >= 0) { m.textContent = "Design " + (bad + 1) + ": check " + dIn[bad].bad.join(", ") + "."; return; }
+    const items = design ? [] : Q.items.map(t => Object.assign({}, t, { price: (priceFor(t, Q.option) || {}).final || 0 }));
     if (items.some(i => !i.price)) { m.textContent = "A piece has no price - check the gold rate and the default diamond rates."; return; }
     if ($("qsharebox")) $("qsharebox").hidden = true;
     $("qsend").disabled = true; m.textContent = "Saving the quote…";
     try {
+      // the server prices every line again (from the tags or the weights typed) and returns the figures the PDF prints
       const r = await fetch("/api/vj/quote", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name, mobile: mob, city, option: OPTS[Q.option], total: Q.total, gold24g: st.g, items: items.map(i => ({ id: i.id, label: i.label, design: i.designNo || "", price: i.price })) }) });
+        body: JSON.stringify(design ? { kind: "design", name, mobile: mob, city, items: dIn.map(x => ({ desc: x.desc, k: x.k, net: x.net, dias: x.dias, ppcs: x.ppcs, prate: x.prate, other: x.other })) }
+          : { kind: "tags", name, mobile: mob, city, option: OPTS[Q.option], mk: Q.mk, items: items.map(i => ({ id: i.id, ...(Q.prates[i.id] ? { prate: Q.prates[i.id] } : {}) })) }) });
       const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("server " + r.status));
+      if (!Array.isArray(j.items) || j.items.length !== (design ? dIn.length : items.length)) throw new Error("unexpected reply from the server");
+      const pagePrice = design ? Q.total : items.reduce((a, t) => a + t.price, 0);
+      const pItems = design ? dIn.map((x, i) => Object.assign({}, x, { price: j.items[i].price })) : items.map((t, i) => Object.assign(t, { price: j.items[i].price, polkiQ: j.items[i].polki }));
+      const changed = pagePrice !== j.total;
       m.textContent = "Making the PDF…";
-      const blob = await makePdf({ qno: j.qno, name, city, option: OPTS[Q.option], items, total: Q.total, photos: $("qphoto").checked, weights: $("qwt").checked, making: mkText(st, items) });
-      const fname = `${name.replace(/[^A-Za-z0-9 .\-]/g, "").trim().slice(0, 40) || "Quote"} ${{ gh: "VSGH", ij: "VSIJ", lgd: "LGD" }[Q.option]}.pdf`, // owner 14/10: file named e.g. "Krishna VSGH.pdf"
-        text = `Dear ${name}, thank you for your interest in Vaishnavi Jewels. Please find your quotation ${j.qno} attached. Our team will call you shortly.`;
+      const blob = await makePdf({ qno: j.qno, design, name, city, option: OPTS[Q.option], items: pItems, total: j.total, photos: !design && $("qphoto").checked, weights: $("qwt").checked, making: design ? mkText(st, Q.designs, "std", true) : mkText(st, items) });
+      const fname = `${name.replace(/[^A-Za-z0-9 .\-]/g, "").trim().slice(0, 40) || "Quote"} ${design ? "Estimate" : { gh: "VSGH", ij: "VSIJ", lgd: "LGD" }[Q.option]}.pdf`, // owner 14/10: file named e.g. "Krishna VSGH.pdf"
+        text = `Dear ${name}, thank you for your interest in Vaishnavi Jewels. Please find your ${design ? "estimate" : "quotation"} ${j.qno} attached. Our team will call you shortly.`;
+      if (changed) $("qtotal").textContent = fmt(j.total);
       const file = new File([blob], fname, { type: "application/pdf" });
       // 14/10/2026: the share sheet only on phones; on a computer (Windows share box has no WhatsApp) download + open WhatsApp
       const phone = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
@@ -275,7 +302,7 @@
         // Phones (14/10/2026, iPhone fix): the PDF is made first, then a green button. Its tap is a fresh tap, which iPhone needs
         // to open the share box. If this browser cannot share files (e.g. Chrome or an in-app browser on iPhone) the tap opens
         // the PDF itself, which has the iPhone share icon; a second link opens the customer's WhatsApp chat.
-        m.textContent = `Quote ${j.qno} saved. Core has been told to call ${name}. Now tap the green button to send the PDF.`;
+        m.textContent = `Quote ${j.qno} saved (${fmt(j.total)}${changed ? ", worked out again on the server" : ""}). Core has been told to call ${name}. Now tap the green button to send the PDF.`;
         let box = $("qsharebox");
         if (!box) { box = document.createElement("div"); box.id = "qsharebox"; box.className = "actions"; m.after(box); }
         box.textContent = ""; box.hidden = false;
@@ -295,11 +322,11 @@
       } else {
         const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = fname; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
         window.open("https://web.whatsapp.com/send?phone=91" + mob + "&text=" + encodeURIComponent(text), "_blank", "noopener");
-        m.textContent = `Quote ${j.qno} saved and the PDF downloaded. Attach ${fname} in the WhatsApp chat that opened. Core has been told to call ${name}.`;
+        m.textContent = `Quote ${j.qno} saved (${fmt(j.total)}${changed ? ", worked out again on the server" : ""}) and the PDF downloaded. Attach ${fname} in the WhatsApp chat that opened. Core has been told to call ${name}.`;
       }
     } catch (e) { m.textContent = "Could not send: " + (e.message || e) + "."; }
     $("qsend").disabled = false;
   }
-  function boot() { if (document.querySelector("nav") && $("p-rates")) { build(); setInterval(() => { const s = $("p-quote"); if (s && !s.hidden) render(); }, 20000); } else setTimeout(boot, 300); }
+  function boot() { if (document.querySelector("nav") && $("p-rates")) { build(); setInterval(() => { const s = $("p-quote"); if (s && !s.hidden && !(document.activeElement && document.activeElement.classList.contains("qprate"))) render(); }, 20000); } else setTimeout(boot, 300); }
   boot();
 })();
