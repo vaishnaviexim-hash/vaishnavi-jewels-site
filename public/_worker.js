@@ -765,7 +765,7 @@ async function vjBillBook(url, env, who) { // a sales login sees only the bills 
   const month = String(url.searchParams.get('month') || ''), all = month === 'all';
   if (!all && !/^\d{4}-\d{2}$/.test(month)) return vjDeny(400, 'month as YYYY-MM or all');
   const bills = (((await env.DB.prepare('SELECT data FROM vj_bills ORDER BY ts').all()).results) || []).map(r => JSON.parse(r.data))
-    .filter(b => !b.cancelled && (all || String(b.date || '').startsWith(month)) && mine(b)).sort( // owner 17/10 16:03: cancelled bills appear nowhere (list, summary, bills, pieces); the record stays only in the database (C-20261017-NOCANCELLED)(a, b) => String(a.date).localeCompare(String(b.date)) || String(a.at).localeCompare(String(b.at)));
+    .filter(b => !b.cancelled && (all || String(b.date || '').startsWith(month)) && mine(b)).sort(/* owner 17/10 16:03: cancelled bills appear nowhere (list, summary, bills, pieces); the record stays only in the database (C-20261017-NOCANCELLED) */ (a, b) => String(a.date).localeCompare(String(b.date)) || String(a.at).localeCompare(String(b.at)));
   const MODE = { ws: 'W/s', nett: 'Nett', g2g: 'Gold to Gold', item: 'Gold Item' };
   const dmy = d => String(d || '').split('-').reverse().join('-');
   if (url.pathname === '/api/vj/bills') return vjJson({ ok: true, bills: bills.map(b => ({ no: b.no, title: b.title, date: b.date, name: b.name, city: b.city, mobile: b.mobile,
