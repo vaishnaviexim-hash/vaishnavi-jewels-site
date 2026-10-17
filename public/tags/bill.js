@@ -27,7 +27,7 @@
   const VJ_FINE = { g2g: { '9K': 0.4235, '14K': 0.66, '18K': 0.836, '22K': 1.06, '24K': 1 }, item: { '9K': 0.54, '14K': 0.74, '18K': 0.90, '22K': 1.06, '24K': 1 } };
   function vjBillCalc(tags, o) {
     const pur = Object.assign({ '24K': 1, '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.40 }, o.purity || {});
-    const m = Object.assign({ base: 650, small: 750, limit: 5, pct: 10 }, o.making || {}), F = Number(o.F) || 0;
+    const m = Object.assign({ base: 650, small: 750, limit: 5, pct: 10, min: 1000 }, o.making || {}), F = Number(o.F) || 0;
     const mode = ['ws', 'nett', 'g2g', 'item'].includes(o.mode) ? o.mode : 'ws', fineMode = mode === 'g2g' || mode === 'item';
     const settle = fineMode ? (o.settle === 'amount' ? 'amount' : 'fine') : '';
     const gstPct = o.gst == null ? 3 : Number(o.gst);
@@ -38,7 +38,9 @@
       const Fx = Number(o.frates && o.frates[t.id]), Fr = Fx >= 2000 && Fx <= 50000 ? Fx : Fo; // rate typed for this piece on the bill (C-20261016-PIECERATE)
       const kr = k => Fr * (Number(pur[k]) || 0), g0 = gl[0];
       let mk = 0;
-      if (g0 && mode !== 'item') { const b = g0.net > m.limit ? m.base : m.small; mk = mode === 'nett' ? Math.ceil(Math.round((b + kr(g0.k) * m.pct / 100) * 100) / 100 / 100) * 100 : b; }
+      // owner 17/10/2026 17:00 (C-20261017-MAKINGMIN): making Rs 650/g (750/g when the first gold line is up to 5 g), never below Rs 1,000 a piece,
+      // plus 10% wastage on the gold - in every mode (W/s: wastage in the gold value; Nett: wastage added to the making; Gold to Gold: in the fine factor)
+      const b = g0 ? (g0.net > m.limit ? m.base : m.small) : 0; if (g0 && mode !== 'item') mk = b;
       let gold = 0, net = 0, fine = 0;
       gl.forEach(g => { net += g.net;
         if (fineMode) fine += g.net * (VJ_FINE[mode][g.k] || 0);
@@ -50,7 +52,8 @@
       const ct = dl.reduce((a, d) => a + d.ct, 0), dia = dl.reduce((a, d) => a + d.ct * d.rate, 0), oth = Number(t.other && t.other.amt) || 0;
       const r = { id: t.id, label: String(t.label || ''), design: String(t.designNo || ''), cat: String(t.catName || ''),
         gold: gl.map(g => g.k + ' ' + g.net.toFixed(3) + ' g').join(' + '), F: Fr, Fdef: Fo, orderRate: Fo !== F, rateEdited: Fr !== Fo, net: Math.round(net * 1000) / 1000, fine, goldAmt: Math.round(gold),
-        mkRate: mk, making: Math.round(mk * net), ct: Math.round(ct * 100) / 100, diaAmt: Math.round(dia), other: Math.round(oth), dias: dl };
+        mkRate: 0, making: 0, ct: Math.round(ct * 100) / 100, diaAmt: Math.round(dia), other: Math.round(oth), dias: dl };
+      if (g0 && mode !== 'item' && net > 0) { let mkAmt = Math.max(mk * net, Number(m.min) || 0); if (mode === 'nett') mkAmt += gold * m.pct / 100; r.making = Math.round(mkAmt); r.mkRate = Math.round(r.making / net); }
       r.amount = r.goldAmt + r.making + r.diaAmt + r.other;
       const dv = String(o.disc && o.disc[t.id] != null ? o.disc[t.id] : '').trim(), pm = dv.match(/^(\d+(?:\.\d+)?)\s*%$/), dn = Number(dv.replace(/[,\s]/g, ''));
       r.discTxt = pm ? Math.min(100, Number(pm[1])) + '%' : '';
@@ -302,8 +305,8 @@
       const dv = document.querySelector('[data-dia="' + r.id + '"]'); if (dv) dv.textContent = "= " + fmt(r.diaAmt); const am = document.querySelector('[data-amt="' + r.id + '"]'); if (am) am.textContent = ok ? fmt(r.amount) : "—"; });
     $("bdiscrow").hidden = !c.disc; $("bdisc").textContent = "- " + fmt(c.sum - c.sub);
     $("bsettle").hidden = !fineMode(); $("bsettle").style.display = fineMode() ? "" : "none"; /* .seg sets display:flex, which beats [hidden] */ $("bfinerow").hidden = !(c.settle === "fine" && c.rows.length); $("bfine").firstChild.textContent = g3(c.fine);
-    $("bmodehint").textContent = { ws: "Gold x karat rate + 10% wastage; making Rs 650/g (750/g up to 5 g).", nett: "Gold x karat rate; making Rs 650/g (750 up to 5 g) + 10% of the karat rate.",
-      g2g: "Fine gold = weight x 14K 0.66 / 18K 0.836 / 9K 0.4235 / 22K 1.06; making Rs 650/g (750 up to 5 g) in rupees.", item: "Fine gold = weight x 14K 0.74 / 18K 0.90 / 9K 0.54 / 22K 1.06; making included in the gold." }[B.mode];
+    $("bmodehint").textContent = { ws: "Gold x karat rate + 10% wastage; making Rs 650/g (750/g up to 5 g), minimum Rs 1,000 a piece.", nett: "Gold x karat rate; making Rs 650/g (750 up to 5 g), minimum Rs 1,000, + 10% wastage on the gold.",
+      g2g: "Fine gold = weight x 14K 0.66 / 18K 0.836 / 9K 0.4235 / 22K 1.06; making Rs 650/g (750 up to 5 g), minimum Rs 1,000, in rupees.", item: "Fine gold = weight x 14K 0.74 / 18K 0.90 / 9K 0.54 / 22K 1.06; making included in the gold." }[B.mode];
     $("bsum").textContent = has ? fmt(c.disc ? c.sum : c.sub) : "—"; $("bsub").textContent = has ? fmt(c.sub) : "—";
     // owner 17/10 15:33: when every piece carries its own gold rate (typed on the tag), that rate is what this box shows;
     // today's rate (F) is asked for only when a piece has no rate on its tag (C-20261017-TAGRATE)
