@@ -797,6 +797,11 @@ async function vjBillErase(request, env, who) {
 // customer's number (from the saved bill, never from the hook) and the PDF once; Make sends template vj_bill_pdf_v1 and reports to
 // /hooks/vj-billpdf-done. Someone holding the hook URL cannot choose a number or a file: tokens are 128-bit, single-use, 30 min.
 const VJ_BWA_TTL = 30 * 60e3;
+// C-20261017-QUOTEWA (owner 17/10): quotes Q-yymmdd-XXXX are read from docs 'quotes/<no>'; same template vj_bill_pdf_v1 ("Your Quotation no. ...")
+const vjSendRow = (env, no, isR) => /^Q-/.test(no) ? env.DB.prepare('SELECT data FROM docs WHERE path = ?').bind('quotes/' + no).first()
+  : env.DB.prepare(isR ? 'SELECT data FROM vj_receipts WHERE no = ?' : 'SELECT data FROM vj_bills WHERE no = ?').bind(no).first();
+function vjSendDoc(no, row) { const d = JSON.parse(row.data); if (!/^Q-/.test(no)) return d;
+  return Object.assign({}, d, { no, title: d.kind === 'design' ? 'Estimate' : 'Quotation', date: '20' + no.slice(2, 4) + '-' + no.slice(4, 6) + '-' + no.slice(6, 8), mobile: String(d.mobile || '').replace(/\D/g, '').slice(-10) }); }
 const vjMetaT = env => env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_meta (k TEXT PRIMARY KEY, v TEXT)').run();
 async function vjBillSend(request, env, who) {
   const len = Number(request.headers.get('content-length') || 0);
@@ -804,12 +809,13 @@ async function vjBillSend(request, env, who) {
   if (!env.VJ_QUOTE_HOOK || !/^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_QUOTE_HOOK)) return vjJson({ error: 'WhatsApp sending is not set up' }, 503);
   let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
   const no = String(b && b.no || '').trim().toUpperCase().slice(0, 20);
-  if (!/^[BER]-\d{4}-\d{2,4}$/.test(no)) return vjDeny(400, 'bad bill number'); // R = receipt (C-20261017-LEDGER)
+  const isQ = /^Q-\d{6}-[2-9A-Z]{4}$/.test(no); // C-20261017-QUOTEWA: a saved quote / estimate goes the same way (from docs quotes/)
+  if (!isQ && !/^[BER]-\d{4}-\d{2,4}$/.test(no)) return vjDeny(400, 'bad bill number'); // R = receipt (C-20261017-LEDGER)
   if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
   const isR = no[0] === 'R'; if (isR) await vjRcT(env); // C-20261017-LEDGER: a receipt slip goes the same way (from vj_receipts)
-  const row = await env.DB.prepare(isR ? 'SELECT data FROM vj_receipts WHERE no = ?' : 'SELECT data FROM vj_bills WHERE no = ?').bind(no).first();
+  const row = await vjSendRow(env, no, isR);
   if (!row) return vjDeny(404, 'not found');
-  const bill = JSON.parse(row.data);
+  const bill = vjSendDoc(no, row);
   if (!isR && who.role === 'sales' && bill.by !== who.email) return vjDeny(404, 'not found'); // a sales login only handles its own bills (receipts: every login)
   if (bill.cancelled) return vjJson({ error: 'this bill is cancelled' }, 409);
   if (isR && (bill.reversed || bill.mode === 'adjust')) return vjJson({ error: bill.reversed ? 'this receipt is reversed' : 'an adjustment has no slip to send' }, 409);
@@ -830,7 +836,7 @@ async function vjBillSend(request, env, who) {
     env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = CAST(CAST(v AS INTEGER) + 1 AS TEXT)').bind(ck, '1')]);
   let ok = false;
   try { const r = await fetch(env.VJ_QUOTE_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000), body: JSON.stringify({ kind: 'bill-pdf', token }) }); ok = r.ok; } catch (e) {}
-  await vjAudit(env, who, 'bill-whatsapp', (isR ? 'receipts/' : 'bills/') + no, (ok ? 'queued' : 'hook failed') + ' to +91 ' + bill.mobile);
+  await vjAudit(env, who, 'bill-whatsapp', (isR ? 'receipts/' : isQ ? 'quotes/' : 'bills/') + no, (ok ? 'queued' : 'hook failed') + ' to +91 ' + bill.mobile);
   if (!ok) { try { await env.PHOTOS.delete('billpdf-' + token); } catch (e) {} return vjJson({ error: 'could not reach Aashvi, try again' }, 502); }
   return vjJson({ ok: true, token, to: '+91 ' + bill.mobile });
 }
@@ -850,12 +856,12 @@ async function vjBillPdfHook(url, env, done) {
     const u = await env.DB.prepare('UPDATE vj_meta SET v = ? WHERE k = ? AND v = ?').bind(JSON.stringify(Object.assign({}, s, { status: 'fetched', fetchedAt: Date.now() })), 'billsend:' + t, r.v).run();
     if (!u.meta || u.meta.changes !== 1) return reply('gone', 410);
     const isR = /^R-/.test(s.no); if (isR) await vjRcT(env); // C-20261017-LEDGER: receipts
-    const row = await env.DB.prepare(isR ? 'SELECT data FROM vj_receipts WHERE no = ?' : 'SELECT data FROM vj_bills WHERE no = ?').bind(s.no).first(), bill = row ? JSON.parse(row.data) : null;
+    const row = await vjSendRow(env, s.no, isR), bill = row ? vjSendDoc(s.no, row) : null;
     const f = await vjPhotoGet(env, 'billpdf-' + t);
     if (!bill || bill.cancelled || bill.reversed || !f || !/^[6-9]\d{9}$/.test(String(bill.mobile || ''))) return reply('gone', 410);
     const buf = await new Response(f.body).arrayBuffer();
     const clean = v => String(v || '').replace(/[\u0000-\u001f"\\<>{}]/g, ' ').replace(/\s+/g, ' ').trim();
-    const name = clean(bill.name).slice(0, 60) || 'Customer', title = isR ? 'Receipt' : bill.title === 'Estimate' ? 'Estimate' : 'Bill';
+    const name = clean(bill.name).slice(0, 60) || 'Customer', title = isR ? 'Receipt' : bill.title === 'Estimate' || bill.title === 'Quotation' ? bill.title : 'Bill';
     const date = String(bill.date || '').split('-').reverse().join('-'), total = isR && !(Number(bill.amount) > 0) ? Number(bill.fine || 0).toFixed(3) + ' g fine gold' : 'Rs ' + Number((isR ? bill.amount : bill.total) || 0).toLocaleString('en-IN');
     // template + params in body order (C-20261017-LEDGER): bills [name, title, no, date, total]; receipts [name, receipt no, amount, date, against]
     const params = (isR ? [name, bill.no, total, date, bill.bill || 'your account'] : [name, title, bill.no, date, total]).map(v => clean(v).slice(0, 200));
