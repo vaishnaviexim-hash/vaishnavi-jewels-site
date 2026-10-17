@@ -1155,6 +1155,26 @@ async function vjLedgerXlsx(url, env, who) {
   return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_Ledger.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
 }
 
+// Customer recall (owner 17/10/2026 17:04, C-20261017-PARTY): type a mobile number or part of a name on New tag (order), Bill or
+// Ledger receipt and get the party's name, mobile and city from earlier bills, estimates, receipts, quotes and order tags.
+// Read-only, logged-in users only, at most 8 matches, nothing else about the customer is returned.
+async function vjParties(url, env) {
+  const q = String(url.searchParams.get('q') || '').trim().slice(0, 40), qd = q.replace(/\D/g, ''), qn = vjNk(q);
+  if (qd.length < 3 && qn.replace(/\s/g, '').length < 2) return vjJson({ ok: true, parties: [] });
+  await vjRcT(env); if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
+  const seen = new Map(), add = (name, mobile, city, at) => {
+    name = vjClean(name, 60); if (!name) return; const m = vjPhone(mobile), d = String(m).replace(/\D/g, '').slice(-10);
+    const key = /^[6-9]\d{9}$/.test(d) ? 'm:' + d : 'n:' + vjNk(name) + '|' + vjNk(city);
+    const old = seen.get(key); if (!old || String(at || '') >= old.at) seen.set(key, { name, mobile: m, city: vjClean(city, 40), at: String(at || '') }); };
+  ((((await env.DB.prepare('SELECT data FROM vj_bills').all()).results) || []).map(vjParse)).forEach(b => { if (b && !b.cancelled) add(b.name, b.mobile, b.city, b.at || b.date); });
+  ((((await env.DB.prepare('SELECT data FROM vj_receipts').all()).results) || []).map(vjParse)).forEach(r => { if (r && !r.reversed) add(r.name, r.mobile, r.city, r.at || r.date); });
+  ((((await env.DB.prepare("SELECT data FROM docs WHERE path LIKE 'quotes/%' OR path LIKE 'tags/%'").all()).results) || []).map(vjParse)).forEach(x => {
+    if (!x) return; if (x.qno) add(x.name, x.mobile, x.city, x.at); const o = x.order || x.orderCancelled; if (o && o.name) add(o.name, o.mobile, o.city, o.at || x.createdAt || ''); });
+  const hit = [...seen.values()].filter(p => (qd.length >= 3 && String(p.mobile).replace(/\D/g, '').includes(qd)) || (qn && vjNk(p.name).includes(qn)));
+  hit.sort((a, b) => (qd.length >= 3 ? (String(b.mobile).replace(/\D/g, '').endsWith(qd) ? 1 : 0) - (String(a.mobile).replace(/\D/g, '').endsWith(qd) ? 1 : 0) : 0) || b.at.localeCompare(a.at));
+  return vjJson({ ok: true, parties: hit.slice(0, 8).map(p => ({ name: p.name, mobile: p.mobile, city: p.city })) });
+}
+
 // Sundry debtors (owner 17/10/2026 16:43, C-20261017-DEBTORS): every customer who still owes money or fine gold, customer-wise,
 // with the open bills, the oldest one and how many days it has been due, and the grand total. Advances (credit) shown apart.
 function vjDebtorList(L) {
@@ -1439,6 +1459,7 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/ledger.xlsx' && request.method === 'GET') return vjLedgerXlsx(url, env, who);
   if ((p === '/api/vj/debtors' || p === '/api/vj/debtors.xlsx') && request.method === 'GET') return vjDebtors(url, env, who); // C-20261017-DEBTORS
   if (p === '/api/vj/wa-ready' && request.method === 'GET') return vjWaReady(env);
+  if (p === '/api/vj/parties' && request.method === 'GET') return vjParties(url, env); // C-20261017-PARTY
   if (['/api/vj/receipt', '/api/vj/receipt/reverse', '/api/vj/ledger/settle', '/api/vj/ledger/unsettle'].includes(p) && request.method === 'POST') {
     if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed');
     return p === '/api/vj/receipt' ? vjReceipt(request, env, who) : p === '/api/vj/receipt/reverse' ? vjReceiptReverse(request, env, who) : p === '/api/vj/ledger/settle' ? vjSettle(request, env, who) : vjUnsettle(request, env, who);
