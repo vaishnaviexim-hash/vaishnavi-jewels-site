@@ -104,6 +104,10 @@
       if (j.customers.length === 1) openCust(j.customers[0].key);
     } catch (e) { m.textContent = "Could not search (" + (e.message || e) + ")."; }
   }
+  // Sundry debtors (owner 17/10/2026, C-20261017-DEBTORS): customer-wise list of everyone who owes money or fine gold, grand total, Excel
+  function debtXl() { const xl = btn("Sundry debtors (Excel)", "ghost", async () => { xl.disabled = true;
+      try { const r = await fetch("/api/vj/debtors.xlsx", { credentials: "same-origin" }); if (!r.ok) throw new Error(r.status); const a = el("a", { href: URL.createObjectURL(await r.blob()), download: "VJ_Sundry_Debtors_" + dmy(new Date().toISOString()) + ".xlsx" }); document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000); }
+      catch (e) { $("lmsg").textContent = "Could not make the Excel (" + (e.message || e) + ")."; } xl.disabled = false; }); return xl; }
   async function openCust(key) {
     const box = $("lcard"); box.hidden = false; box.textContent = "Loading…";
     try { const j = await api("/api/vj/ledger?key=" + encodeURIComponent(key)); L.card = j; L.cust = j.customer; L.canSettle = !!j.canSettle; drawCard(); fillBills(); modeUi();
