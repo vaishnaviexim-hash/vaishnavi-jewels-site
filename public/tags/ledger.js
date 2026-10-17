@@ -108,6 +108,14 @@
   function debtXl() { const xl = btn("Sundry debtors (Excel)", "ghost", async () => { xl.disabled = true;
       try { const r = await fetch("/api/vj/debtors.xlsx", { credentials: "same-origin" }); if (!r.ok) throw new Error(r.status); const a = el("a", { href: URL.createObjectURL(await r.blob()), download: "VJ_Sundry_Debtors_" + dmy(new Date().toISOString()) + ".xlsx" }); document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000); }
       catch (e) { $("lmsg").textContent = "Could not make the Excel (" + (e.message || e) + ")."; } xl.disabled = false; }); return xl; }
+  function debtTable(j) { const t = el("table", { className: "items" }), hd = el("tr"); t.style.minWidth = "700px";
+    ["Customer", "Mobile", "Open bills", "Oldest bill", "Days due", "Balance due", "Fine gold due", ""].forEach(h => hd.append(el("th", { textContent: h })));
+    const tb = el("tbody"); t.append(el("thead", null, [hd]), tb); const dash = "—";
+    j.list.forEach(d => { const tr = el("tr"); const td = (x, cl) => tr.appendChild(el("td", { className: cl || "", textContent: x }));
+      td(d.name + (d.city ? ", " + d.city : "")); td(String(d.mobile || "").length === 10 ? "+91 " + d.mobile : (d.mobile || dash)); td(d.open.join(", ") || dash); td(d.oldest ? dmy(d.oldest) : dash); td(d.oldest ? String(d.days) : dash, "num");
+      td(fmt(d.balance), "num"); td(d.fineDue ? g3(d.fineDue) : dash, "num"); const x = el("td"); x.appendChild(btn("Open", "ghost", () => openCust(d.key))); tr.appendChild(x); tb.appendChild(tr); });
+    const tr = el("tr"); tr.style.fontWeight = "700"; [["TOTAL SUNDRY DEBTORS (" + j.list.length + ")"], [""], [""], [""], [""], [fmt(j.total), "num"], [j.fine ? g3(j.fine) : dash, "num"], [""]].forEach(([x, cl]) => tr.appendChild(el("td", { className: cl || "", textContent: x }))); tb.appendChild(tr);
+    return el("div", { className: "list" }, [t]); }
   async function openCust(key) {
     const box = $("lcard"); box.hidden = false; box.textContent = "Loading…";
     try { const j = await api("/api/vj/ledger?key=" + encodeURIComponent(key)); L.card = j; L.cust = j.customer; L.canSettle = !!j.canSettle; drawCard(); fillBills(); modeUi();
