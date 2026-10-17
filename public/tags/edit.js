@@ -1,6 +1,6 @@
 /* VJ Tags - "Edit tag" on Price check (owner 14/10/2026). Loaded by shim.js for owners only; the server also refuses
    detail changes from staff (VJ_STAFF_FIELDS), so this button is a convenience, not the security.
-   Edits: design no., remark, gold lines (karat + net g), diamond lines (quality, shape, pcs, ct, own rate), other charges,
+   Edits: design no., remark, gold lines (karat + net g), diamond lines (quality, shape, pcs, ct, own rate), polki pcs x rate, other charges,
    sample metal weight. If anything that changes the price is edited, the old price code is cleared so the next
    Reprint tag prints a fresh code and price. Every save is logged on the server (audit) with the owner's email. */
 (function () {
@@ -18,6 +18,9 @@
     const fDesign = inp(t.designNo, 140), fRemark = inp(t.remark, 220), fOther = inp((t.other && t.other.amt) || 0, 110, "number"), fBox = inp(t.box, 200);
     const row = (label, f) => el("label", { style: "display:flex;flex-direction:column;gap:4px" }, [label, f]);
     wrap.append(el("div", { className: "row", style: "display:flex;gap:10px;flex-wrap:wrap" }, [row("Design no.", fDesign), row("Remark", fRemark), row("Other charges (Rs)", fOther), row("Packet / box", fBox)]));
+    // polki pieces x rate per piece (C-20261017-POLKI); 0 pcs = no polki
+    const pk0 = t.polki && t.polki.pcs > 0 ? t.polki : null, fPPcs = inp(pk0 ? pk0.pcs : "", 90, "number"), fPRate = inp(pk0 ? pk0.rate : 300, 110, "number");
+    wrap.append(el("div", { className: "row", style: "display:flex;gap:10px;flex-wrap:wrap" }, [row("Polki pcs", fPPcs), row("Polki rate per pc (Rs)", fPRate)]));
     let fMetal = null;
     if (t.kind === "sample") { fMetal = inp((t.metal && t.metal.net) || 0, 110, "number"); wrap.append(row("Sample weight (g, priced as 14K)", fMetal)); }
     // gold lines
@@ -43,10 +46,12 @@
       const gold = [...gBox.children].map(r => r._get()).filter(g => g.net > 0);
       const dias = [...dBox.children].map(r => r._get()).filter(d => d.q && (d.ct > 0 || d.pcs > 0));
       if (gold.some(g => g.net > 500) || dias.some(d => d.ct > 200 || d.rate > 5e6)) { note.textContent = "A weight or rate looks wrong - check the numbers."; return; }
-      const data = { designNo: fDesign.value.trim().slice(0, 30), remark: fRemark.value.trim().slice(0, 120), box: fBox.value.trim().slice(0, 60), other: Object.assign({}, t.other || {}, { amt: Math.max(0, num(fOther.value)) }), dias };
+      const ppcs = num(fPPcs.value), prate = String(fPRate.value).trim() === "" ? 300 : num(fPRate.value);
+      if (!(Number.isInteger(ppcs) && ppcs >= 0 && ppcs <= 10000) || ppcs > 0 && !(Number.isInteger(prate) && prate >= 1 && prate <= 100000)) { note.textContent = "Polki: pieces 0-10,000 and rate per piece Rs 1-1,00,000, whole numbers."; return; }
+      const data = { designNo: fDesign.value.trim().slice(0, 30), remark: fRemark.value.trim().slice(0, 120), box: fBox.value.trim().slice(0, 60), other: Object.assign({}, t.other || {}, { amt: Math.max(0, num(fOther.value)) }), dias, polki: ppcs > 0 ? { pcs: ppcs, rate: prate } : null };
       if (t.kind === "sample") data.metal = Object.assign({}, t.metal || {}, { net: Math.max(0, num(fMetal.value)) }); else data.gold = gold;
-      const priceChanged = JSON.stringify([t.gold || [], t.dias || [], (t.other && t.other.amt) || 0, (t.metal && t.metal.net) || 0])
-        !== JSON.stringify([data.gold || t.gold || [], dias, data.other.amt, (data.metal && data.metal.net) || (t.metal && t.metal.net) || 0]);
+      const priceChanged = JSON.stringify([t.gold || [], t.dias || [], (t.other && t.other.amt) || 0, (t.metal && t.metal.net) || 0, pk0 ? [pk0.pcs, pk0.rate] : null])
+        !== JSON.stringify([data.gold || t.gold || [], dias, data.other.amt, (data.metal && data.metal.net) || (t.metal && t.metal.net) || 0, data.polki ? [data.polki.pcs, data.polki.rate] : null]);
       if (priceChanged && t.code) Object.assign(data, { code: null, priceAtTag: null, gold24gAtTag: null });
       data.editedAt = new Date().toISOString();
       save.disabled = true; note.textContent = "Saving…";
