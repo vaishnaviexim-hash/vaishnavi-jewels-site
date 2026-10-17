@@ -34,7 +34,7 @@
     const rows = tags.map(t => {
       const gl = (t.kind === 'sample' ? [{ k: '14K', net: Number(t.metal && t.metal.net) || 0 }] : (Array.isArray(t.gold) ? t.gold : []))
         .map(g => ({ k: String(g && g.k || ''), net: Number(g && g.net) || 0 })).filter(g => g.net > 0);
-      const Fo = t.kind === 'order' && Number(t.gold24gAtTag) > 0 ? Number(t.gold24gAtTag) : F; // an order keeps the gold rate of the day it was tagged (C-20261016-ORDERRATE)
+      const tr0 = Number(t.order && t.order.rate), trT = tr0 >= 2000 && tr0 <= 50000 ? tr0 : (t.kind === 'order' && Number(t.gold24gAtTag) >= 2000 && Number(t.gold24gAtTag) <= 50000 ? Number(t.gold24gAtTag) : 0), Fo = trT || F; // the gold rate typed on the tag is used; only tags without one use today's rate F (owner 17/10, C-20261017-TAGRATE; was C-20261016-ORDERRATE)
       const Fx = Number(o.frates && o.frates[t.id]), Fr = Fx >= 2000 && Fx <= 50000 ? Fx : Fo; // rate typed for this piece on the bill (C-20261016-PIECERATE)
       const kr = k => Fr * (Number(pur[k]) || 0), g0 = gl[0];
       let mk = 0;
@@ -255,7 +255,7 @@
         const gt = document.createElement("td"); gt.append(r.gold || "—"); const ln = document.createElement("div"); ln.style.cssText = "white-space:nowrap;margin-top:4px;font-size:12px";
         const fi = document.createElement("input"); fi.className = "brate"; fi.inputMode = "decimal"; fi.autocomplete = "off"; fi.style.cssText = "width:78px;text-align:right;padding:4px 6px"; fi.value = B.frates[r.id] || Math.round(r.Fdef) || "";
         fi.addEventListener("input", () => { const v = Number(fi.value.replace(/[^0-9.]/g, "")) || 0; if (v && v !== Math.round(r.Fdef)) B.frates[r.id] = v; else delete B.frates[r.id]; totals(); });
-        ln.append(r.orderRate ? "order rate " : "rate ", fi); gt.appendChild(ln); tr.appendChild(gt); }
+        ln.append(r.orderRate ? "tag rate " : "rate ", fi); gt.appendChild(ln); tr.appendChild(gt); }
       const t0 = tags().find(t => t.id === r.id); if (B.photos && t0 && t0.photo) { const im = document.createElement("img"); im.alt = ""; im.src = "/_blob/" + t0.photo; im.style.cssText = "width:56px;height:56px;object-fit:cover;border-radius:4px;display:block;margin-bottom:4px"; tr.firstChild.prepend(im); }
       td(ok || c.settle === "fine" ? goldCell(r, c) : "—", "num"); td(ok ? mkCell(r, c) : "—", "num");
       // diamonds: the rate saved on the tag, editable here for this bill only (C-20261016-BILLALL)
@@ -284,7 +284,7 @@
       g2g: "Fine gold = weight x 14K 0.66 / 18K 0.836 / 9K 0.4235 / 22K 1.06; making Rs 650/g (750 up to 5 g) in rupees.", item: "Fine gold = weight x 14K 0.74 / 18K 0.90 / 9K 0.54 / 22K 1.06; making included in the gold." }[B.mode];
     $("bsum").textContent = has ? fmt(c.disc ? c.sum : c.sub) : "—"; $("bsub").textContent = has ? fmt(c.sub) : "—";
     $("bgstl").textContent = "GST " + c.gstPct + "%"; $("bgst").textContent = has ? fmt(c.gst) : "—"; $("btotal").textContent = has ? fmt(c.total) : "—";
-    $("bnote").textContent = !ok ? "Type the gold rate (F): fine 24K per gram." : noteText(B.mode) + "Diamond rates come from the tag; change them here for this bill if needed." + (c.rows.some(r => r.orderRate) ? " Order pieces start at the gold rate of the day they were tagged." : "") + " Each piece's gold rate can be changed in its Gold cell.";
+    $("bnote").textContent = !ok ? "Type the gold rate (F): fine 24K per gram." : noteText(B.mode) + "Diamond rates come from the tag; change them here for this bill if needed." + (c.rows.some(r => r.orderRate) ? " Pieces with a gold rate on their tag are billed at that rate; F is used only for pieces without one." : "") + " Each piece's gold rate can be changed in its Gold cell.";
   }
   async function dataUrl(src) { const r = await fetch(src, { credentials: "same-origin" }); if (!r.ok) throw new Error("img"); const b = await r.blob(); return await new Promise((res, rej) => { const f = new FileReader(); f.onload = () => res(f.result); f.onerror = rej; f.readAsDataURL(b); }); }
   // photo for the PDF: drawn onto a small canvas and saved as JPEG, so PNG / WebP photos work too
@@ -301,7 +301,8 @@
     doc.setFontSize(12); doc.text(`No. ${b.no}`, W - M, y - 3, { align: "right" }); doc.setFont("helvetica", "normal"); doc.text(`Date ${dmy(b.date)}`, W - M, y + 3, { align: "right" });
     y += 10; doc.setFontSize(12);
     doc.text(`Name: ${b.name}`, M, y); y += 6.5; doc.text(`City: ${b.city || "-"}`, M, y); doc.text(`Mobile: ${!b.mobile ? "-" : /^\d{10}$/.test(b.mobile) ? "+91 " + b.mobile : b.mobile}`, M + 90, y); y += 6.5;
-    doc.text(`Gold Rate (F): ${fmt(b.F)} per g (24K)`, M, y); doc.text(`Gold Calculation: ${MODES[b.mode] || b.mode}${b.settle === "fine" ? " (fine gold)" : b.settle === "amount" ? " (in rupees)" : ""}`, M + 90, y); y += 9;
+    const rts = [...new Set((b.rows || []).map(r => Math.round(r.F || b.F)))], hF = rts.length === 1 ? rts[0] : b.F; // owner 17/10: the rate shown is the one the pieces were billed at (tag rate)
+    doc.text(`Gold Rate (F): ${fmt(hF)} per g (24K)${rts.length > 1 ? ", other rates shown per piece" : ""}`, M, y); doc.text(`Gold Calculation: ${MODES[b.mode] || b.mode}${b.settle === "fine" ? " (fine gold)" : b.settle === "amount" ? " (in rupees)" : ""}`, M + 90, y); y += 9;
     const pics = {}; if (photos) for (const r of b.rows) if (r.photo) pics[r.id] = await thumb(r.photo);
     const P = Object.values(pics).some(Boolean) ? 22 : 0; // photo column (mm) only when a piece has a photo
     const D = (b.disc || 0) > 0; // owner 16/10: own Discount and Net columns when a piece has a discount (amounts then without 'Rs', said once above)
@@ -319,7 +320,7 @@
     doc.setFillColor(243, 230, 211); doc.rect(M, y - 5, W - 2 * M, 8, "F"); row(cols.map(c => c[0]), true); y += 1;
     b.rows.forEach(r => { if (y > 250) { doc.addPage(); y = 20; }
       const dd = r.ct ? r.ct.toFixed(2) + " ct" + ((r.dias || []).length === 1 ? "\n@ " + Math.round(r.dias[0].rate).toLocaleString("en-IN") : "") + "\n" + fm(r.diaAmt) : "-";
-      const base = [(r.design ? r.design + " - " : "") + r.label + (r.cat ? "\n" + r.cat : ""), (r.gold || "-") + (r.F !== b.F ? "\n@ " + Math.round(r.F).toLocaleString("en-IN") + (r.orderRate && !r.rateEdited ? " (order)" : "") : ""), b.settle === "fine" ? g3(r.fine) + "\nfine" : fm(r.goldAmt) + (b.settle ? "\n" + g3(r.fine) + " fine" : ""), b.mode === "item" ? "in gold" : fm(r.making) + "\n@ " + r.mkRate + "/g", dd, r.other ? fm(r.other) : "-"];
+      const base = [(r.design ? r.design + " - " : "") + r.label + (r.cat ? "\n" + r.cat : ""), (r.gold || "-") + (Math.round(r.F) !== hF ? "\n@ " + Math.round(r.F).toLocaleString("en-IN") : ""), b.settle === "fine" ? g3(r.fine) + "\nfine" : fm(r.goldAmt) + (b.settle ? "\n" + g3(r.fine) + " fine" : ""), b.mode === "item" ? "in gold" : fm(r.making) + "\n@ " + r.mkRate + "/g", dd, r.other ? fm(r.other) : "-"];
       row(D ? base.concat([fm(r.amount), r.disc ? fm(r.disc) + (r.discTxt ? "\n(" + r.discTxt + ")" : "") : "-", fm(r.net)]) : base.concat([fm(r.amount)]), false, D ? 10 : 10.5, P ? (pics[r.id] || null) : undefined);
       doc.setDrawColor(225); doc.line(M, y - 3, W - M, y - 3); });
     y += 3; if (y > 240) { doc.addPage(); y = 20; }
