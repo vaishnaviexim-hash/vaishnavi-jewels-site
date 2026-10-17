@@ -27,9 +27,10 @@
     sec.innerHTML = `
       <h2>1 · Customer</h2>
       <div class="row" style="align-items:end"><label style="flex:2 1 220px">Name, mobile or bill number <input id="lq" autocomplete="off" maxlength="40" placeholder="e.g. Ramesh, 98250 or B-2610-06"></label>
-        <div class="actions" style="margin:0"><button type="button" class="btn" id="lfind">Find</button><button type="button" class="btn ghost" id="lopen">Customers with a balance</button></div></div>
+        <div class="actions" style="margin:0"><button type="button" class="btn" id="lfind">Find</button><button type="button" class="btn ghost" id="lopen">Customers with a balance</button><button type="button" class="btn ghost" id="ldebt">Sundry debtors</button></div></div>
       <p class="hint" id="lmsg"></p>
       <div class="list" id="lreswrap" hidden><table class="items" style="min-width:600px"><thead><tr><th>Customer</th><th>Mobile</th><th>Bills</th><th>Balance</th><th>Fine gold due</th><th></th></tr></thead><tbody id="lres"></tbody></table></div>
+      <div id="ldebtwrap" hidden style="display:flex;flex-direction:column;gap:8px"></div>
       <div id="lcard" hidden style="display:flex;flex-direction:column;gap:14px"></div>
       <h2>2 · New receipt</h2>
       <p class="hint" id="rwho">Find the customer above first, or type a new customer here for money taken on account.</p>
