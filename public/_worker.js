@@ -266,6 +266,9 @@ async function vjWrite(request, env, who) {
     }
   }
   if (path.startsWith('tags/')) {
+    // owner 17/10/2026 17:48 (C-20261017-NOTDOUBLE): only Abhinav may mark / unmark a tag as 'not a double tag'
+    if (next.notDouble !== undefined && next.notDouble !== true) delete next.notDouble;
+    if (!vjCanSettle(who)) { if (next.notDouble && !(cur && cur.notDouble)) return vjDeny(403, 'only Abhinav can mark a tag as not a double'); if (cur && cur.notDouble) next.notDouble = true; else delete next.notDouble; }
     for (const k of ['costPrice', 'cost', 'mrp', 'purchase']) delete next[k]; // F-025: never store cost prices
     if (next.order !== undefined) { // C-20261016-ORDERS: order customer, cleaned
       const o = next.order && typeof next.order === 'object' ? next.order : null;
