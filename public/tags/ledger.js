@@ -119,7 +119,7 @@
   async function debtors() { const w = $("ldebtwrap"), m = $("lmsg"); m.textContent = "Working out sundry debtors…";
     try { const j = await api("/api/vj/debtors"); w.textContent = ""; w.hidden = false; $("lreswrap").hidden = true;
       w.append(el("h3", { textContent: "Sundry debtors" }), debtTable(j), el("div", { className: "actions" }, [debtXl()]));
-      m.textContent = j.list.length ? j.list.length + " customer" + (j.list.length === 1 ? "" : "s") + " owe " + fmt(j.total) + (j.fine ? " + " + g3(j.fine) + " fine gold" : "") + "." + (j.advances ? " Advances received (credit, not included): " + fmt(j.advances) + "." : "") : "Nobody owes anything.";
+      m.textContent = j.list.length ? j.list.length + " customer" + (j.list.length === 1 ? " owes " : "s owe ") + "" + fmt(j.total) + (j.fine ? " + " + g3(j.fine) + " fine gold" : "") + "." + (j.advances ? " Advances received (credit, not included): " + fmt(j.advances) + "." : "") : "Nobody owes anything.";
     } catch (e) { m.textContent = "Could not load sundry debtors (" + (e.message || e) + ")."; } }
   async function openCust(key) {
     const box = $("lcard"); box.hidden = false; box.textContent = "Loading…";
