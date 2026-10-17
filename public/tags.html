@@ -130,8 +130,8 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
 
       <h2>2 · Piece</h2>
       <div class="seg" role="radiogroup" aria-label="Type">
-        <label><input type="radio" name="kind" id="k-order" value="order"> Order</label>
-        <label><input type="radio" name="kind" id="k-sale" value="sale" checked> Stock</label>
+        <label><input type="radio" name="kind" id="k-order" value="order" checked> Order</label>
+        <label><input type="radio" name="kind" id="k-sale" value="sale"> Stock</label>
         <label><input type="radio" name="kind" id="k-sample" value="sample"> Sample</label>
       </div>
       <!-- owner 16/10/2026 (C-20261016-ORDERS): a piece made for a customer's order -->
@@ -745,7 +745,7 @@ async function offerPDF(t){
 function resetForm(keepKind){
   ["remark","otherAmt","designNo"].concat(keepKind?[]:["oName","oMob","oCity","oDue","oRate"]).forEach(id=>$(id).value=""); /* after a save the order customer stays, for the next piece of the same order */
   $("goldLines").textContent="";$("diaLines").textContent="";addGold();addDia();
-  S.photo=null;$("photo").value="";$("thumb").textContent="No photo yet";if(!keepKind)$("k-sale").checked=true;update();
+  S.photo=null;$("photo").value="";$("thumb").textContent="No photo yet";if(!keepKind)$("k-order").checked=true;update(); /* owner 17/10/2026: Order is the default */
 }
 $("reset").addEventListener("click",()=>resetForm(false));
 
