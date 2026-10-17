@@ -781,7 +781,9 @@ async function renderList(){
   const DUP=new Map();S.tags.forEach(t=>{const k=dkey(t);if(k)DUP.set(k,(DUP.get(k)||[]).concat(t.label))});const dupOf=t=>DUP.get(dkey(t))||[];
   const all=S.tags.filter(t=>(!fk||(fk==='nophoto'?!t.photo:fk==='dup'?dupOf(t).length>1:t.kind===fk))&&(!q||[t.label,t.catName,t.remark,t.designNo,t.order&&t.order.name,t.order&&t.order.mobile].join(" ").toLowerCase().includes(q)||(qq&&String(t.designNo||"")===qq)||(qq&&String(t.label).toLowerCase().replace("/","")===qq.replace("/",""))));
   /* exact design number or label first */
-  all.sort((a,b)=>((String(b.designNo)===qq||String(b.label).toLowerCase()===q)?1:0)-((String(a.designNo)===qq||String(a.label).toLowerCase()===q)?1:0));
+  /* exact match first; then (owner 17/10 17:45) possible double tags first, each group together */
+  const ex=t=>(String(t.designNo)===qq||String(t.label).toLowerCase()===q)?1:0,dp=t=>dupOf(t).length>1?1:0;
+  all.sort((a,b)=>(ex(b)-ex(a))||(dp(b)-dp(a))||(dp(a)&&dp(b)?(dkey(a).localeCompare(dkey(b))||String(a.label).localeCompare(String(b.label))):0));
   const items=all.slice(0,300);
   $("listEmpty").hidden=items.length>0;
   $("listMore").textContent=all.length>items.length?`Showing ${items.length} of ${all.length}. Type a label, design number or category to narrow.`:`${all.length} piece${all.length===1?"":"s"}`;
