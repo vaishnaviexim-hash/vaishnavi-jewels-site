@@ -502,7 +502,7 @@ async function vjQuote(request, env, who, ctx) {
 const VJ_FINE = { g2g: { '9K': 0.4235, '14K': 0.66, '18K': 0.836, '22K': 1.06, '24K': 1 }, item: { '9K': 0.54, '14K': 0.74, '18K': 0.90, '22K': 1.06, '24K': 1 } };
 function vjBillCalc(tags, o) {
   const pur = Object.assign({ '24K': 1, '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.40 }, o.purity || {});
-  const m = Object.assign({ base: 650, small: 750, limit: 5, pct: 10 }, o.making || {}), F = Number(o.F) || 0;
+  const m = Object.assign({ base: 650, small: 750, limit: 5, pct: 10, min: 1000 }, o.making || {}), F = Number(o.F) || 0;
   const mode = ['ws', 'nett', 'g2g', 'item'].includes(o.mode) ? o.mode : 'ws', fineMode = mode === 'g2g' || mode === 'item';
   const settle = fineMode ? (o.settle === 'amount' ? 'amount' : 'fine') : '';
   const gstPct = o.gst == null ? 3 : Number(o.gst);
@@ -513,7 +513,9 @@ function vjBillCalc(tags, o) {
     const Fx = Number(o.frates && o.frates[t.id]), Fr = Fx >= 2000 && Fx <= 50000 ? Fx : Fo; // rate typed for this piece on the bill (C-20261016-PIECERATE)
     const kr = k => Fr * (Number(pur[k]) || 0), g0 = gl[0];
     let mk = 0;
-    if (g0 && mode !== 'item') { const b = g0.net > m.limit ? m.base : m.small; mk = mode === 'nett' ? Math.ceil(Math.round((b + kr(g0.k) * m.pct / 100) * 100) / 100 / 100) * 100 : b; }
+    // owner 17/10/2026 17:00 (C-20261017-MAKINGMIN): making Rs 650/g (750/g when the first gold line is up to 5 g), never below Rs 1,000 a piece,
+    // plus 10% wastage on the gold - in every mode (W/s: wastage in the gold value; Nett: wastage added to the making; Gold to Gold: in the fine factor)
+    const b = g0 ? (g0.net > m.limit ? m.base : m.small) : 0; if (g0 && mode !== 'item') mk = b;
     let gold = 0, net = 0, fine = 0;
     gl.forEach(g => { net += g.net;
       if (fineMode) fine += g.net * (VJ_FINE[mode][g.k] || 0);
@@ -525,7 +527,8 @@ function vjBillCalc(tags, o) {
     const ct = dl.reduce((a, d) => a + d.ct, 0), dia = dl.reduce((a, d) => a + d.ct * d.rate, 0), oth = Number(t.other && t.other.amt) || 0;
     const r = { id: t.id, label: String(t.label || ''), design: String(t.designNo || ''), cat: String(t.catName || ''),
       gold: gl.map(g => g.k + ' ' + g.net.toFixed(3) + ' g').join(' + '), F: Fr, Fdef: Fo, orderRate: Fo !== F, rateEdited: Fr !== Fo, net: Math.round(net * 1000) / 1000, fine, goldAmt: Math.round(gold),
-      mkRate: mk, making: Math.round(mk * net), ct: Math.round(ct * 100) / 100, diaAmt: Math.round(dia), other: Math.round(oth), dias: dl };
+      mkRate: 0, making: 0, ct: Math.round(ct * 100) / 100, diaAmt: Math.round(dia), other: Math.round(oth), dias: dl };
+    if (g0 && mode !== 'item' && net > 0) { let mkAmt = Math.max(mk * net, Number(m.min) || 0); if (mode === 'nett') mkAmt += gold * m.pct / 100; r.making = Math.round(mkAmt); r.mkRate = Math.round(r.making / net); }
     r.amount = r.goldAmt + r.making + r.diaAmt + r.other;
     const dv = String(o.disc && o.disc[t.id] != null ? o.disc[t.id] : '').trim(), pm = dv.match(/^(\d+(?:\.\d+)?)\s*%$/), dn = Number(dv.replace(/[,\s]/g, ''));
     r.discTxt = pm ? Math.min(100, Number(pm[1])) + '%' : '';
@@ -1331,12 +1334,12 @@ async function vjOrdersReport(env, who) {
   // amount = the tag's price at the order's own gold rate (rate on the day it was tagged), same rule as Price check (owner 16/10: 'a column of Amount also')
   const sRow = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first(), S0 = sRow ? JSON.parse(sRow.data) : {};
   const up = (n, s) => Math.ceil(Math.round(n * 100) / 100 / s) * s, pur = Object.assign({ '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.40 }, S0.purity || {});
-  const mkS = Object.assign({ base: 650, small: 750, limit: 5, pct: 10 }, S0.making || {}), gstP = S0.gst == null ? 3 : Number(S0.gst), r24 = Number(S0.gold24g) || 0;
+  const mkS = Object.assign({ base: 650, small: 750, limit: 5, pct: 10, min: 1000 }, S0.making || {}), gstP = S0.gst == null ? 3 : Number(S0.gst), r24 = Number(S0.gold24g) || 0;
   const priceToday = t => { const r24o = Number(t.gold24gAtTag) || r24; if (!r24o) return 0; /* the order's own rate (C-20261016-ORDERRATE) */ const gl = (Array.isArray(t.gold) ? t.gold : []).filter(g => g && g.net > 0), dias = Array.isArray(t.dias) ? t.dias.filter(Boolean) : [];
     const dia = dias.reduce((a, d) => a + (Number(d.ct) || 0) * (Number(d.rate) || 0), 0), oth = Number(t.other && t.other.amt) || 0;
     if (!gl.length) { const s0 = up(dia + oth, 10); return s0 > 0 ? up(s0 + s0 * gstP / 100, 10) : 0; }
-    const g0 = gl[0], mk = up((g0.net > mkS.limit ? mkS.base : mkS.small) + r24o * (pur[g0.k] || 0) * mkS.pct / 100, 100);
-    let gold = 0, making = 0; gl.forEach(g => { gold += g.net * r24o * (pur[g.k] || 0); making += g.net * mk; });
+    const g0 = gl[0], b0 = g0.net > mkS.limit ? mkS.base : mkS.small; // C-20261017-MAKINGMIN: 650/g (750 up to 5 g), min Rs 1,000, + 10% wastage on gold
+    let gold = 0, nt = 0; gl.forEach(g => { gold += g.net * r24o * (pur[g.k] || 0); nt += g.net; }); const making = Math.max(b0 * nt, Number(mkS.min) || 0) + gold * mkS.pct / 100;
     const sub = up(gold + making + dia + oth, 100); return up(sub + sub * gstP / 100, 1000); };
   const pshort = list.filter(x => x.pending).map((x, i) => [x.o.name || '', vjPhoneTxt(x.o.mobile), x.o.city || '', dmy(x.o.due), pend[i][4], x.t.label || '', x.t.designNo || '', priceToday(x.t) || Number(x.t.priceAtTag) || '']);
   if (pshort.length) pshort.push(['TOTAL (' + pshort.length + ' pending)', '', '', '', '', '', '', pshort.reduce((a, r) => a + (Number(r[7]) || 0), 0)]);
