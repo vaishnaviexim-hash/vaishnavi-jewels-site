@@ -637,9 +637,10 @@ function vjBillCalc(tags, o) {
   const sub = Math.ceil(after / 500) * 500, gst = Math.round(sub * gstPct / 100);
   // owner 17/10 15:29 ('i dont want 26093, straight 26500'): the round-up sits inside the biggest piece's making charge (its
   // rate per g is shown for the new making), or in Other for Gold Item / no gold, so every printed figure adds up to the total.
+  // A piece that is only chain has no making (C-20261017-CHAINTUNCH): the biggest other piece takes it; a bill of chains only puts it in Other.
   const roundIn = sub - after;
-  if (roundIn > 0 && rows.length) { const r = rows.reduce((a, x) => x.net > a.net ? x : a, rows[0]);
-    if (mode !== 'item' && r.wt > 0) { r.making += roundIn; r.mkRate = Math.round(r.making / r.wt); } else r.other += roundIn;
+  if (roundIn > 0 && rows.length) { const rc = rows.some(x => !x.chain) ? rows.filter(x => !x.chain) : rows, r = rc.reduce((a, x) => x.net > a.net ? x : a, rc[0]);
+    if (mode !== 'item' && r.mkWt > 0) { r.making += roundIn; r.mkRate = Math.round(r.making / r.mkWt); } else r.other += roundIn;
     r.amount += roundIn; r.net += roundIn; sum += roundIn; }
   const fine = Math.round(rows.reduce((a, r) => a + r.fine, 0) * 1000) / 1000;
   return { mode, settle, rows, fine: settle === 'fine' ? fine : 0, fineIn: fine, sum, disc, after, roundOff: 0, roundIn, sub, gstPct, gst, total: sub + gst };
@@ -1329,7 +1330,7 @@ const VJ_PHOTO_F = new Set(['photo', 'photoAt', 'photoBy']);
 const VJ_PRINT_F = new Set(['code', 'priceAtTag', 'gold24gAtTag', 'queue', 'queueAt', 'printedAt']);
 const VJ_FIELD_NAME = { designNo: 'Design no.', label: 'Tag', catName: 'Category', remark: 'Remark', gold: 'Gold', dias: 'Diamonds', polki: 'Polki', other: 'Other charges',
   metal: 'Sample weight', box: 'Packet / box', kind: 'Order / stock / sample', order: 'Order customer', status: 'Status', photo: 'Photo', code: 'Price code', priceAtTag: 'Price when tagged' };
-const vjGoldTxt = t => t && t.kind === 'sample' ? ((t.metal && t.metal.net > 0) ? Number(t.metal.net).toFixed(3) + ' g (14K)' : '') : (Array.isArray(t && t.gold) ? t.gold.filter(g => g && g.net > 0).map(g => g.k + ' ' + Number(g.net).toFixed(3) + ' g').join('; ') : '');
+const vjGoldTxt = t => t && t.kind === 'sample' ? ((t.metal && t.metal.net > 0) ? Number(t.metal.net).toFixed(3) + ' g (14K)' : '') : (Array.isArray(t && t.gold) ? t.gold.filter(g => g && g.net > 0).map(g => g.k + ' ' + Number(g.net).toFixed(3) + ' g' + (vjLineT(g) ? ' chain tunch ' + vjLineT(g).toFixed(3) : '')).join('; ') : '');
 const vjDiaTxt = t => (Array.isArray(t && t.dias) ? t.dias.filter(Boolean).map(d => `${d.shape || ''} ${d.q || ''} ${Number(d.ct || 0).toFixed(2)} ct${d.pcs ? ' (' + d.pcs + ')' : ''}`.replace(/\s+/g, ' ').trim()) : [])
   .concat(t && t.polki && t.polki.pcs > 0 ? ['Polki ' + t.polki.pcs + ' pc'] : []).join('; '); // + polki (C-20261017-POLKI)
 function vjValTxt(field, raw) {
@@ -1459,9 +1460,10 @@ async function vjOrdersReport(env, who) {
   const priceToday = t => { const r24o = Number(t.gold24gAtTag) || r24; if (!r24o) return 0; /* the order's own rate (C-20261016-ORDERRATE) */ const gl = (Array.isArray(t.gold) ? t.gold : []).filter(g => g && g.net > 0), dias = Array.isArray(t.dias) ? t.dias.filter(Boolean) : [];
     const dia = dias.reduce((a, d) => a + (Number(d.ct) || 0) * (Number(d.rate) || 0), 0) + (t.polki && Number(t.polki.pcs) > 0 ? Number(t.polki.pcs) * (Number(t.polki.rate) || 0) : 0) /* polki, C-20261017-POLKI */, oth = Number(t.other && t.other.amt) || 0;
     if (!gl.length) { const s0 = up(dia + oth, 10); return s0 > 0 ? up(s0 + s0 * gstP / 100, 10) : 0; }
-    const g0 = gl[0], b0 = g0.net > mkS.limit ? mkS.base : mkS.small; // C-20261017-MAKINGMIN: 650/g (750 up to 5 g), min Rs 1,000, + 10% wastage on gold
-    let gold = 0, nt = 0; gl.forEach(g => { gold += g.net * r24o * (pur[g.k] || 0); nt += g.net; }); const making = Math.max(b0 * nt, Number(mkS.min) || 0) + gold * mkS.pct / 100;
-    const sub = up(gold + making + dia + oth, 100); return up(sub + sub * gstP / 100, 1000); };
+    const g0 = gl.find(g => !vjLineT(g)), b0 = g0 && g0.net > mkS.limit ? mkS.base : mkS.small; // C-20261017-MAKINGMIN: 650/g (750 up to 5 g), min Rs 1,000, + 10% wastage on gold
+    // chain lines (C-20261017-CHAINTUNCH): net x tunch x rate, no making / wastage; making on the non-chain weight only
+    let gold = 0, ch = 0, nt = 0; gl.forEach(g => { const tn = vjLineT(g); if (tn) ch += g.net * r24o * tn; else { gold += g.net * r24o * (pur[g.k] || 0); nt += g.net; } }); const making = g0 ? Math.max(b0 * nt, Number(mkS.min) || 0) + gold * mkS.pct / 100 : 0;
+    const sub = up(gold + ch + making + dia + oth, 100); return up(sub + sub * gstP / 100, 1000); };
   const pshort = list.filter(x => x.pending).map((x, i) => [x.o.name || '', vjPhoneTxt(x.o.mobile), x.o.city || '', dmy(x.o.due), pend[i][4], x.t.label || '', x.t.designNo || '', priceToday(x.t) || Number(x.t.priceAtTag) || '']);
   if (pshort.length) pshort.push(['TOTAL (' + pshort.length + ' pending)', '', '', '', '', '', '', pshort.reduce((a, r) => a + (Number(r[7]) || 0), 0)]);
   const xlsx = vjXlsx([
