@@ -214,7 +214,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
   <section id="p-list" class="card" hidden>
     <div class="row" style="align-items:end">
       <label style="flex:2 1 220px">Search <input id="q" placeholder="Label, design no. (e.g. 1122), category, remark"></label>
-      <label style="flex:1 1 140px">Show <select id="fkind"><option value="">All</option><option value="order">Orders</option><option value="sale">Stock</option><option value="sample">Samples</option><option value="nophoto">Photo pending</option></select></label>
+      <label style="flex:1 1 140px">Show <select id="fkind"><option value="">All</option><option value="order">Orders</option><option value="sale">Stock</option><option value="sample">Samples</option><option value="nophoto">Photo pending</option><option value="dup">Possible double tags</option></select></label>
       <div><button type="button" class="btn ghost" id="ordRep">Orders report (Excel)</button></div>
     </div>
     <div class="row" style="align-items:center;gap:8px;margin:10px 0">
@@ -767,7 +767,10 @@ async function renderList(){
   const body=$("rows");body.textContent="";$("ordRep").hidden=S.role==="sales";
   const q=$("q").value.trim().toLowerCase(),fk=$("fkind").value;
   const qq=q.replace(/\s+/g,"");
-  const all=S.tags.filter(t=>(!fk||(fk==='nophoto'?!t.photo:t.kind===fk))&&(!q||[t.label,t.catName,t.remark,t.designNo,t.order&&t.order.name,t.order&&t.order.mobile].join(" ").toLowerCase().includes(q)||(qq&&String(t.designNo||"")===qq)||(qq&&String(t.label).toLowerCase().replace("/","")===qq.replace("/",""))));
+  /* owner 17/10/2026 17:34 (C-20261017-DOUBLETAG): same design number + same total gold weight = possible double tag, highlighted in red */
+  const dkey=t=>{const dn=String(t.designNo||"").trim().toUpperCase();const w=(t.gold||[]).reduce((a,g)=>a+(Number(g&&g.net)||0),0)||(t.metal&&Number(t.metal.net))||0;return dn&&w>0?dn+"|"+w.toFixed(3):""};
+  const DUP=new Map();S.tags.forEach(t=>{const k=dkey(t);if(k)DUP.set(k,(DUP.get(k)||[]).concat(t.label))});const dupOf=t=>DUP.get(dkey(t))||[];
+  const all=S.tags.filter(t=>(!fk||(fk==='nophoto'?!t.photo:fk==='dup'?dupOf(t).length>1:t.kind===fk))&&(!q||[t.label,t.catName,t.remark,t.designNo,t.order&&t.order.name,t.order&&t.order.mobile].join(" ").toLowerCase().includes(q)||(qq&&String(t.designNo||"")===qq)||(qq&&String(t.label).toLowerCase().replace("/","")===qq.replace("/",""))));
   /* exact design number or label first */
   all.sort((a,b)=>((String(b.designNo)===qq||String(b.label).toLowerCase()===q)?1:0)-((String(a.designNo)===qq||String(a.label).toLowerCase()===q)?1:0));
   const items=all.slice(0,300);
@@ -781,6 +784,7 @@ async function renderList(){
     ck.addEventListener("change",()=>{if(ck.checked)S.sel.add(t.id);else S.sel.delete(t.id);updSel()});cb.appendChild(ck);tr.appendChild(cb);
     const ph=document.createElement("td");if(t.photo){const im=document.createElement("img");im.alt="";im.loading="lazy";im.src="/_blob/"+t.photo;ph.appendChild(im)}tr.appendChild(ph);
     const lc=c((t.designNo?t.designNo+" · ":"")+t.label);lc.style.fontFamily="var(--f-mono)";
+    {const dl=dupOf(t);if(dl.length>1){tr.style.background="#fde8e4";const s=document.createElement("span");s.className="pill";s.style.cssText="background:#b3261e;color:#fff";s.textContent="double tag? same as "+dl.filter(x=>x!==t.label).join(", ");lc.append(" ",s)}}
     const it=c(t.catName||"");if(t.kind==="sample"){const s=document.createElement("span");s.className="pill s";s.textContent="sample";it.append(" ",s)}
     if(t.kind==="order"){const s=document.createElement("span");s.className="pill";s.textContent="order"+(t.order&&t.order.name?" · "+t.order.name:"");it.append(" ",s)}
     c((t.gold||[]).length?(t.gold||[]).map(g=>g.k+" "+g.net.toFixed(3)).join(" + "):(t.metal&&t.metal.net?t.metal.k+" "+t.metal.net.toFixed(3):"—"),"num");
