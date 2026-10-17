@@ -414,8 +414,10 @@ function addDia(){
   $("dq"+id).addEventListener("change",()=>{const o=$("dq"+id).value==="Other";$("dqo"+id).hidden=!o;if(o)$("dqo"+id).focus()});
   update();
 }
-$("addGold").addEventListener("click",()=>addGold());
-$("addDia").addEventListener("click",()=>addDia());
+/* owner 17/10/2026 17:42: after adding a line the cursor goes to its first box (Karat / Shape) */
+const firstBox=id=>{const l=$(id).lastElementChild,f=l&&l.querySelector("select,input");if(f)f.focus()};
+$("addGold").addEventListener("click",()=>{addGold();firstBox("goldLines")});
+$("addDia").addEventListener("click",()=>{addDia();firstBox("diaLines")});
 ["goldLines","diaLines"].forEach(id=>{$(id).addEventListener("input",update);$(id).addEventListener("change",update)});
 ["cat","remark","otherAmt","polkiPcs","polkiRate"].forEach(id=>{$(id).addEventListener("input",update);$(id).addEventListener("change",update)});
 document.querySelectorAll('input[name=kind]').forEach(r=>r.addEventListener("change",update));
