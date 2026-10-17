@@ -95,7 +95,7 @@
         <label>Mobile No. <input id="bmob" inputmode="tel" autocomplete="off" maxlength="20" placeholder="98xxxxxxxx"></label></div>
       <div class="row"><label>Number <input id="bno" autocomplete="off" maxlength="20" placeholder="bill book number"></label>
         <label>Date <input id="bdate" type="date"></label>
-        <label>Gold Rate (F) per g, 24K <input id="bF" inputmode="decimal" autocomplete="off"></label></div>
+        <label><span id="bFl">Gold Rate (F) per g, 24K</span> <input id="bF" inputmode="decimal" autocomplete="off"><input id="bFtag" readonly tabindex="-1" style="display:none"></label></div>
       <div class="seg" role="radiogroup" aria-label="Gold calculation">
         <label><input type="radio" name="bmode" value="ws" checked> W/s</label>
         <label><input type="radio" name="bmode" value="nett"> Nett</label>
@@ -283,6 +283,12 @@
     $("bmodehint").textContent = { ws: "Gold x karat rate + 10% wastage; making Rs 650/g (750/g up to 5 g).", nett: "Gold x karat rate; making Rs 650/g (750 up to 5 g) + 10% of the karat rate.",
       g2g: "Fine gold = weight x 14K 0.66 / 18K 0.836 / 9K 0.4235 / 22K 1.06; making Rs 650/g (750 up to 5 g) in rupees.", item: "Fine gold = weight x 14K 0.74 / 18K 0.90 / 9K 0.54 / 22K 1.06; making included in the gold." }[B.mode];
     $("bsum").textContent = has ? fmt(c.disc ? c.sum : c.sub) : "—"; $("bsub").textContent = has ? fmt(c.sub) : "—";
+    // owner 17/10 15:33: when every piece carries its own gold rate (typed on the tag), that rate is what this box shows;
+    // today's rate (F) is asked for only when a piece has no rate on its tag (C-20261017-TAGRATE)
+    const allOwn = c.rows.length > 0 && c.rows.every(r => r.orderRate || r.rateEdited), rts = [...new Set(c.rows.map(r => Math.round(r.F)))];
+    $("bF").style.display = allOwn ? "none" : ""; $("bFtag").style.display = allOwn ? "" : "none";
+    $("bFtag").value = allOwn ? (rts.length === 1 ? String(rts[0]) : "as on each piece") : "";
+    $("bFl").textContent = allOwn ? "Gold Rate per g, 24K (from the tag)" : c.rows.some(r => r.orderRate || r.rateEdited) ? "Today's gold rate (F) per g, 24K - for pieces without a rate on the tag" : "Gold Rate (F) per g, 24K";
     $("bgstl").textContent = "GST " + c.gstPct + "%"; $("bgst").textContent = has ? fmt(c.gst) : "—"; $("btotal").textContent = has ? fmt(c.total) : "—";
     $("bnote").textContent = !ok ? "Type the gold rate (F): fine 24K per gram." : noteText(B.mode) + "Diamond rates come from the tag; change them here for this bill if needed." + (c.rows.some(r => r.orderRate) ? " Pieces with a gold rate on their tag are billed at that rate; F is used only for pieces without one." : "") + " Each piece's gold rate can be changed in its Gold cell.";
   }
