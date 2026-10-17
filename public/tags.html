@@ -145,7 +145,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
       <div class="row">
         <label>Category <select id="cat"></select></label>
         <label>Design number <input id="designNo" autocomplete="off" placeholder="e.g. 1436" required></label>
-        <label>Certificate / remark <input id="remark" autocomplete="off" placeholder="e.g. tgl, IGI, HUID"></label>
+        <label>Certificate <select id="remark"><option value="TGL" selected>TGL</option><option value="IGI">IGI</option><option value="GIA">GIA</option><option value="EGL">EGL</option></select></label>
       </div>
 
       <h2>3 · Gold</h2>
@@ -743,7 +743,7 @@ async function offerPDF(t){
   catch(e){if(e&&e.code==="declined")msg(`${t.label}: download skipped. Reprint it any time from Tagged pieces.`,"warn");else msg(`${t.label}: the PDF could not be offered (${e&&e.code||"error"}). Reprint it from Tagged pieces.`,"warn")}
 }
 function resetForm(keepKind){
-  ["remark","otherAmt","designNo"].concat(keepKind?[]:["oName","oMob","oCity","oDue","oRate"]).forEach(id=>$(id).value=""); /* after a save the order customer stays, for the next piece of the same order */
+  ["otherAmt","designNo"].concat(keepKind?[]:["oName","oMob","oCity","oDue","oRate"]).forEach(id=>$(id).value="");$("remark").value="TGL"; /* owner 17/10/2026: certificate list, TGL by default (C-20261017-CERTLIST) */ /* after a save the order customer stays, for the next piece of the same order */
   $("goldLines").textContent="";$("diaLines").textContent="";addGold();addDia();
   S.photo=null;$("photo").value="";$("thumb").textContent="No photo yet";if(!keepKind)$("k-order").checked=true;update(); /* owner 17/10/2026: Order is the default */
 }
