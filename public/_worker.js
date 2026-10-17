@@ -279,6 +279,14 @@ async function vjWrite(request, env, who) {
       if (!oc || who.role !== 'admin' && JSON.stringify(oc) !== JSON.stringify(cur && cur.orderCancelled)) delete next.orderCancelled;
       else next.orderCancelled = { name: vjClean(oc.name, 60), mobile: vjPhone(oc.mobile), city: vjClean(oc.city, 40), due: /^\d{4}-\d{2}-\d{2}$/.test(String(oc.due || '')) ? oc.due : '', at: vjClean(oc.at, 30), by: vjClean(oc.by, 80) };
     }
+    if (next.polki !== undefined) { // C-20261017-POLKI (owner 17/10): polki pieces x rate per piece, whole numbers; none when 0 pcs
+      const pk = next.polki && typeof next.polki === 'object' && !Array.isArray(next.polki) ? next.polki : null;
+      const pcs = pk ? Number(pk.pcs) : 0, rate = pk ? Number(pk.rate) : 0;
+      if (next.polki === null || pk && pcs === 0) delete next.polki;
+      else if (!pk) return vjDeny(400, 'bad polki');
+      else if (!Number.isInteger(pcs) || pcs < 1 || pcs > 10000 || !Number.isInteger(rate) || rate < 1 || rate > 100000) return vjDeny(400, 'polki: pieces 0-10000 and rate per piece Rs 1-1,00,000, whole numbers');
+      else next.polki = { pcs, rate };
+    }
     if (!cur) next.createdBy = who.email;
   }
   const s = JSON.stringify(next);
@@ -497,7 +505,7 @@ async function vjQuote(request, env, who, ctx) {
 // Gold to Gold: fine gold due = net x (9K 0.4235, 14K 0.66, 18K 0.836, 22K 1.06, 24K 1), making 650/750 per g in rupees.
 // Gold Item: fine gold due = net x (9K 0.54, 14K 0.74, 18K 0.90, 22K 1.06, 24K 1), making already in the gold (none in rupees).
 // For Gold to Gold / Gold Item, settle 'fine' = customer gives the fine gold; 'amount' = fine x F is charged in rupees.
-// Diamonds = ct x the tag's rate, plus other charges. Discount (C-20261016-BILLDISC) per piece, rupees or 'n%' of that piece's
+// Diamonds = ct x the tag's rate, polki = pcs x rate per pc, plus other charges. Discount (C-20261016-BILLDISC) per piece, rupees or 'n%' of that piece's
 // rupee amount, never more than it. Rupee total less discount, rounded UP to Rs 1,000; GST to the nearest rupee.
 const VJ_FINE = { g2g: { '9K': 0.4235, '14K': 0.66, '18K': 0.836, '22K': 1.06, '24K': 1 }, item: { '9K': 0.54, '14K': 0.74, '18K': 0.90, '22K': 1.06, '24K': 1 } };
 function vjBillCalc(tags, o) {
@@ -525,11 +533,14 @@ function vjBillCalc(tags, o) {
     const ov = o.rates && Array.isArray(o.rates[t.id]) ? o.rates[t.id] : []; // rates edited on the bill (C-20261016-BILLALL); the tag is not changed
     const dl = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map((d, i) => ({ q: String(d.q || ''), ct: Number(d.ct) || 0, tagRate: Number(d.rate) || 0, rate: Number(ov[i]) > 0 ? Number(ov[i]) : (Number(d.rate) || 0) }));
     const ct = dl.reduce((a, d) => a + d.ct, 0), dia = dl.reduce((a, d) => a + d.ct * d.rate, 0), oth = Number(t.other && t.other.amt) || 0;
+    // polki (C-20261017-POLKI): pcs x the tag's rate per pc; the rate can be changed on the bill (prates), the tag is not changed
+    const pk = t.polki && typeof t.polki === 'object' ? t.polki : null, ppcs = pk ? Math.max(0, Math.round(Number(pk.pcs) || 0)) : 0, ptag = pk ? Math.round(Number(pk.rate) || 0) : 0;
+    const px = Number(o.prates && o.prates[t.id]), prate = ppcs ? (px >= 1 && px <= 100000 ? Math.round(px) : ptag) : 0;
     const r = { id: t.id, label: String(t.label || ''), design: String(t.designNo || ''), cat: String(t.catName || ''),
       gold: gl.map(g => g.k + ' ' + g.net.toFixed(3) + ' g').join(' + '), F: Fr, Fdef: Fo, orderRate: Fo !== F, rateEdited: Fr !== Fo, net: Math.round(net * 1000) / 1000, fine, goldAmt: Math.round(gold),
-      mkRate: 0, making: 0, ct: Math.round(ct * 100) / 100, diaAmt: Math.round(dia), other: Math.round(oth), dias: dl };
+      mkRate: 0, making: 0, ct: Math.round(ct * 100) / 100, diaAmt: Math.round(dia), polkiPcs: ppcs, polkiRate: prate, polkiTagRate: ppcs ? ptag : 0, polki: ppcs * prate, other: Math.round(oth), dias: dl };
     if (g0 && mode !== 'item' && net > 0) { let mkAmt = Math.max(mk * net, Number(m.min) || 0); if (mode === 'nett') mkAmt += gold * m.pct / 100; r.making = Math.round(mkAmt); r.mkRate = Math.round(r.making / net); }
-    r.amount = r.goldAmt + r.making + r.diaAmt + r.other;
+    r.amount = r.goldAmt + r.making + r.diaAmt + r.polki + r.other;
     const dv = String(o.disc && o.disc[t.id] != null ? o.disc[t.id] : '').trim(), pm = dv.match(/^(\d+(?:\.\d+)?)\s*%$/), dn = Number(dv.replace(/[,\s]/g, ''));
     r.discTxt = pm ? Math.min(100, Number(pm[1])) + '%' : '';
     r.disc = Math.round(Math.min(r.amount, pm ? r.amount * Math.min(100, Number(pm[1])) / 100 : (dn > 0 ? dn : 0)));
@@ -567,6 +578,8 @@ async function vjBill(request, env, who) { // every login may make bills (owner 
   const disc = {}; if (b && b.disc && typeof b.disc === 'object') for (const id of ids) if (b.disc[id] != null) disc[id] = String(b.disc[id]).slice(0, 12);
   const frates = {}; if (b && b.frates && typeof b.frates === 'object') for (const id of ids) { const n = Math.round(Number(b.frates[id]) * 100) / 100; if (n >= 2000 && n <= 50000) frates[id] = n; }
   const rates = {}; if (b && b.rates && typeof b.rates === 'object') for (const id of ids) if (Array.isArray(b.rates[id])) rates[id] = b.rates[id].slice(0, 30).map(v => { const n = Number(v); return n > 0 && n <= 5000000 ? Math.round(n) : 0; });
+  const prates = {}; if (b && b.prates && typeof b.prates === 'object') for (const id of ids) if (b.prates[id] != null && b.prates[id] !== '') { // polki rate per pc for this bill only (C-20261017-POLKI)
+    const n = Number(b.prates[id]); if (!Number.isInteger(n) || n < 1 || n > 100000) return vjDeny(400, 'polki rate per pc must be a whole number Rs 1-1,00,000'); prates[id] = n; }
   // owner 16/10/2026 20:03 'Bill no should be automatic. Every month starts with number 1': bills are numbered by the server too
   if (!name) return vjDeny(400, 'customer name is required');
   if (b && b.mobile && String(b.mobile).trim() && !mobile) return vjDeny(400, 'mobile number not readable');
@@ -593,7 +606,7 @@ async function vjBill(request, env, who) { // every login may make bills (owner 
   if (title === 'Bill') { const hit = await onBill(); if (hit.size) return vjJson({ error: dupMsg(hit), duplicate: true }, 409); }
   const sRow = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first();
   const s = sRow ? JSON.parse(sRow.data) : {};
-  const calc = vjBillCalc(tags, { F, mode, settle, disc, rates, frates, purity: s.purity, making: s.making, gst: s.gst });
+  const calc = vjBillCalc(tags, { F, mode, settle, disc, rates, frates, prates, purity: s.purity, making: s.making, gst: s.gst });
   calc.rows.forEach((r, i) => { const ph = tags[i].photo; if (typeof ph === 'string' && /^[0-9a-f]{32}$/.test(ph)) r.photo = ph; }); // owner 16/10: photo on the bill
   const bill = Object.assign({ no, title, date, name, city, mobile, F, nbb: !!(b && b.nbb === true), by: who.email, byName: who.name, at: new Date().toISOString() }, calc); // nbb: 'No Buy Back No Exchange' stamp (owner 17/10, C-20261017-NBB)
   // C-20261016-BILLBOOK / BILLAUTO: bills B-YYMM-NN and estimates E-YYMM-NN are numbered automatically, from 01 every month (by the date)
@@ -793,7 +806,7 @@ async function vjBillBook(url, env, who) { // a sales login sees only the bills 
   const live = rows.filter(r => r[3] === 'Active'); // cancelled bills are left out of the totals
   const tot = live.reduce((a, r) => [a[0] + (r[10] || 0), a[1] + (r[11] || 0), a[2] + (r[14] || 0), a[3] + (r[15] || 0), a[4] + (Number(r[16]) || 0)], [0, 0, 0, 0, 0]);
   if (rows.length) rows.push(['', '', '', '', 'TOTAL (' + live.length + (live.length < rows.length ? ', ' + (rows.length - live.length) + ' cancelled left out' : '') + ')', '', '', '', '', '', tot[0], tot[1], '', '', tot[2], tot[3], Math.round(tot[4] * 1000) / 1000 || '', '']);
-  const pieces = []; bills.forEach(b => (b.rows || []).forEach(r => pieces.push([dmy(b.date), b.no, b.title, b.cancelled ? 'CANCELLED' : 'Active', b.name, r.label, r.design || '', r.cat || '', r.gold || '', r.fine || '', r.goldAmt, r.making, r.ct || '', r.diaAmt, r.other || 0, r.amount, r.disc || 0, r.net == null ? r.amount : r.net])));
+  const pieces = []; bills.forEach(b => (b.rows || []).forEach(r => pieces.push([dmy(b.date), b.no, b.title, b.cancelled ? 'CANCELLED' : 'Active', b.name, r.label, r.design || '', r.cat || '', r.gold || '', r.fine || '', r.goldAmt, r.making, r.ct || '', r.diaAmt, r.polkiPcs || '', r.polki || 0, r.other || 0, r.amount, r.disc || 0, r.net == null ? r.amount : r.net])));
   // A4 portrait summary for printing (owner 16/10): 7 columns that fit the page at normal size; full detail on the next sheets
   // owner 17/10 16:04: Amount before GST + GST = Total amount, and the customer's mobile number
   const short = bills.map(b => [dmy(b.date), b.no, b.title, b.name, vjPhoneTxt(b.mobile), b.city || '', b.sub, b.gst, b.total, b.fine || '']);
@@ -802,8 +815,8 @@ async function vjBillBook(url, env, who) { // a sales login sees only the bills 
   const xlsx = vjXlsx([
     { name: 'Summary (print)', land: true, head: ['Date', 'Number', 'Type', 'Customer', 'Mobile', 'City', 'Amount before GST (Rs)', 'GST (Rs)', 'Total amount (Rs)', 'Fine gold (g)'], rows: short, widths: [11, 12, 8, 24, 16, 12, 21, 10, 17, 12], wrap: [3], mark: r => String(r[3]).startsWith('TOTAL') },
     { name: 'Bills and estimates', head, rows, widths: [11, 12, 9, 26, 22, 15, 12, 20, 10, 34, 12, 11, 12, 12, 10, 13, 12, 12], wrap: [3, 9], mark: r => String(r[3]).startsWith('CANCELLED') || String(r[4]).startsWith('TOTAL') },
-    { name: 'Pieces', mark: r => r[3] === 'CANCELLED', head: ['Date', 'Number', 'Type', 'Status', 'Customer', 'Tag', 'Design no.', 'Category', 'Gold', 'Fine gold (g)', 'Gold value', 'Making', 'Diamonds (ct)', 'Diamond value', 'Other', 'Amount', 'Discount', 'Net'], rows: pieces,
-      widths: [11, 12, 9, 11, 22, 14, 12, 14, 20, 10, 12, 10, 10, 12, 9, 12, 10, 12] }]);
+    { name: 'Pieces', mark: r => r[3] === 'CANCELLED', head: ['Date', 'Number', 'Type', 'Status', 'Customer', 'Tag', 'Design no.', 'Category', 'Gold', 'Fine gold (g)', 'Gold value', 'Making', 'Diamonds (ct)', 'Diamond value', 'Polki (pcs)', 'Polki amount', 'Other', 'Amount', 'Discount', 'Net'], rows: pieces,
+      widths: [11, 12, 9, 11, 22, 14, 12, 14, 20, 10, 12, 10, 10, 12, 9, 12, 9, 12, 10, 12] }]);
   const bin = atob(xlsx), out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   await vjAudit(env, who, 'bills-report', 'bills/', (all ? 'all' : month) + ' ' + bills.length);
   return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_Bills.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
@@ -1228,16 +1241,18 @@ const vjSameSite = (request, env) => /^application\/json\b/i.test(request.header
 // minutes early. Nothing is sent on a day with no tag activity.
 const VJ_PHOTO_F = new Set(['photo', 'photoAt', 'photoBy']);
 const VJ_PRINT_F = new Set(['code', 'priceAtTag', 'gold24gAtTag', 'queue', 'queueAt', 'printedAt']);
-const VJ_FIELD_NAME = { designNo: 'Design no.', label: 'Tag', catName: 'Category', remark: 'Remark', gold: 'Gold', dias: 'Diamonds', other: 'Other charges',
+const VJ_FIELD_NAME = { designNo: 'Design no.', label: 'Tag', catName: 'Category', remark: 'Remark', gold: 'Gold', dias: 'Diamonds', polki: 'Polki', other: 'Other charges',
   metal: 'Sample weight', box: 'Packet / box', kind: 'Order / stock / sample', order: 'Order customer', status: 'Status', photo: 'Photo', code: 'Price code', priceAtTag: 'Price when tagged' };
 const vjGoldTxt = t => t && t.kind === 'sample' ? ((t.metal && t.metal.net > 0) ? Number(t.metal.net).toFixed(3) + ' g (14K)' : '') : (Array.isArray(t && t.gold) ? t.gold.filter(g => g && g.net > 0).map(g => g.k + ' ' + Number(g.net).toFixed(3) + ' g').join('; ') : '');
-const vjDiaTxt = t => Array.isArray(t && t.dias) ? t.dias.filter(Boolean).map(d => `${d.shape || ''} ${d.q || ''} ${Number(d.ct || 0).toFixed(2)} ct${d.pcs ? ' (' + d.pcs + ')' : ''}`.replace(/\s+/g, ' ').trim()).join('; ') : '';
+const vjDiaTxt = t => (Array.isArray(t && t.dias) ? t.dias.filter(Boolean).map(d => `${d.shape || ''} ${d.q || ''} ${Number(d.ct || 0).toFixed(2)} ct${d.pcs ? ' (' + d.pcs + ')' : ''}`.replace(/\s+/g, ' ').trim()) : [])
+  .concat(t && t.polki && t.polki.pcs > 0 ? ['Polki ' + t.polki.pcs + ' pc'] : []).join('; '); // + polki (C-20261017-POLKI)
 function vjValTxt(field, raw) {
   if (raw === '' || raw == null) return '(blank)';
   let v; try { v = JSON.parse(raw); } catch (e) { return String(raw).slice(0, 120); }
   if (field === 'gold') return vjGoldTxt({ gold: v }) || '(none)';
   if (field === 'dias') return vjDiaTxt({ dias: v }) || '(none)';
   if (field === 'metal') return v && v.net > 0 ? Number(v.net).toFixed(3) + ' g' : '(none)';
+  if (field === 'polki') return v && v.pcs > 0 ? v.pcs + ' pc x Rs ' + Number(v.rate || 0).toLocaleString('en-IN') : '(none)';
   if (field === 'other') return v && v.amt ? 'Rs ' + Number(v.amt).toLocaleString('en-IN') : '0';
   if (v && typeof v === 'object') return JSON.stringify(v).slice(0, 120);
   return String(v).slice(0, 120);
@@ -1356,7 +1371,7 @@ async function vjOrdersReport(env, who) {
   const up = (n, s) => Math.ceil(Math.round(n * 100) / 100 / s) * s, pur = Object.assign({ '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.40 }, S0.purity || {});
   const mkS = Object.assign({ base: 650, small: 750, limit: 5, pct: 10, min: 1000 }, S0.making || {}), gstP = S0.gst == null ? 3 : Number(S0.gst), r24 = Number(S0.gold24g) || 0;
   const priceToday = t => { const r24o = Number(t.gold24gAtTag) || r24; if (!r24o) return 0; /* the order's own rate (C-20261016-ORDERRATE) */ const gl = (Array.isArray(t.gold) ? t.gold : []).filter(g => g && g.net > 0), dias = Array.isArray(t.dias) ? t.dias.filter(Boolean) : [];
-    const dia = dias.reduce((a, d) => a + (Number(d.ct) || 0) * (Number(d.rate) || 0), 0), oth = Number(t.other && t.other.amt) || 0;
+    const dia = dias.reduce((a, d) => a + (Number(d.ct) || 0) * (Number(d.rate) || 0), 0) + (t.polki && Number(t.polki.pcs) > 0 ? Number(t.polki.pcs) * (Number(t.polki.rate) || 0) : 0) /* polki, C-20261017-POLKI */, oth = Number(t.other && t.other.amt) || 0;
     if (!gl.length) { const s0 = up(dia + oth, 10); return s0 > 0 ? up(s0 + s0 * gstP / 100, 10) : 0; }
     const g0 = gl[0], b0 = g0.net > mkS.limit ? mkS.base : mkS.small; // C-20261017-MAKINGMIN: 650/g (750 up to 5 g), min Rs 1,000, + 10% wastage on gold
     let gold = 0, nt = 0; gl.forEach(g => { gold += g.net * r24o * (pur[g.k] || 0); nt += g.net; }); const making = Math.max(b0 * nt, Number(mkS.min) || 0) + gold * mkS.pct / 100;
@@ -1409,7 +1424,7 @@ async function vjDailyReport(env) {
         if (!t.designNo) miss.push('no design no.');
         const wt = sample ? (t.metal && t.metal.net > 0) : (t.gold || []).some(g => g.net > 0);
         if (!wt && !(t.other && t.other.amt > 0)) miss.push('no weight');
-        if (!(t.dias || []).length) miss.push('no diamonds');
+        if (!(t.dias || []).length && !(t.polki && t.polki.pcs > 0)) miss.push('no diamonds');
         if (!t.printedAt) miss.push('not printed');
         const d = `${label}${t.catName ? ' ' + t.catName : ''}${t.designNo ? ' · D.No ' + t.designNo : ''}`;
         (miss.length ? bad : good).push(miss.length ? `• ${d} - ${miss.join(', ')} (${name})` : label);
