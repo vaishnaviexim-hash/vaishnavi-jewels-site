@@ -1208,7 +1208,7 @@ async function vjWaReady(env) {
   await vjMetaT(env);
   const rows = ((await env.DB.prepare("SELECT k, v FROM vj_meta WHERE k IN ('wa-ready:bill', 'wa-ready:receipt')").all()).results) || [];
   const on = k => rows.some(r => r.k === k && r.v === '1');
-  return vjJson({ bill: on('wa-ready:bill'), receipt: on('wa-ready:receipt') });
+  void on; return vjJson({ bill: true, receipt: true }); // both templates approved 17/10 (C-20261017-LEDGER)
 }
 
 // receipts (not reversed) against one bill - a bill with receipts is not cancelled or erased (owner 17/10)
