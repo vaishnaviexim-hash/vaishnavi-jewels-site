@@ -780,7 +780,10 @@ async function renderList(){
   const qq=q.replace(/\s+/g,"");
   /* owner 17/10/2026 17:34 (C-20261017-DOUBLETAG): same design number + same total gold weight = possible double tag, highlighted in red */
   const dkey=t=>{const dn=String(t.designNo||"").trim().toUpperCase();const w=(t.gold||[]).reduce((a,g)=>a+(Number(g&&g.net)||0),0)||(t.metal&&Number(t.metal.net))||0;return dn&&w>0?dn+"|"+w.toFixed(3):""};
-  const DUP=new Map();S.tags.forEach(t=>{const k=dkey(t);if(k)DUP.set(k,(DUP.get(k)||[]).concat(t.label))});const dupOf=t=>DUP.get(dkey(t))||[];
+  /* owner 17/10 17:48: Abhinav can mark a pair 'Not a double' (notDouble on each tag); a later new tag with the same design + weight is flagged again */
+  const DUPT=new Map();S.tags.forEach(t=>{const k=dkey(t);if(k)DUPT.set(k,(DUPT.get(k)||[]).concat(t))});
+  const dupOf=t=>{const g=DUPT.get(dkey(t))||[];return g.length>1&&(!t.notDouble||g.some(x=>x!==t&&!x.notDouble))?g.map(x=>x.label):[]};
+  const isAbhinav=S.owner&&S.me&&S.me!=="vaishnavijewels@gmail.com";
   const all=S.tags.filter(t=>(!fk||(fk==='nophoto'?!t.photo:fk==='dup'?dupOf(t).length>1:t.kind===fk))&&(!q||[t.label,t.catName,t.remark,t.designNo,t.order&&t.order.name,t.order&&t.order.mobile].join(" ").toLowerCase().includes(q)||(qq&&String(t.designNo||"")===qq)||(qq&&String(t.label).toLowerCase().replace("/","")===qq.replace("/",""))));
   /* exact design number or label first */
   /* exact match first; then (owner 17/10 17:45) possible double tags first, each group together */
@@ -797,7 +800,10 @@ async function renderList(){
     ck.addEventListener("change",()=>{if(ck.checked)S.sel.add(t.id);else S.sel.delete(t.id);updSel()});cb.appendChild(ck);tr.appendChild(cb);
     const ph=document.createElement("td");if(t.photo){const im=document.createElement("img");im.alt="";im.loading="lazy";im.src="/_blob/"+t.photo;ph.appendChild(im)}tr.appendChild(ph);
     const lc=c((t.designNo?t.designNo+" · ":"")+t.label);lc.style.fontFamily="var(--f-mono)";
-    {const dl=dupOf(t);if(dl.length>1){tr.style.background="#fde8e4";const s=document.createElement("span");s.className="pill";s.style.cssText="background:#b3261e;color:#fff";s.textContent="double tag? same as "+dl.filter(x=>x!==t.label).join(", ");lc.append(" ",s)}}
+    {const dl=dupOf(t);if(dl.length>1){tr.style.background="#fde8e4";const s=document.createElement("span");s.className="pill";s.style.cssText="background:#b3261e;color:#fff";s.textContent="double tag? same as "+dl.filter(x=>x!==t.label).join(", ");lc.append(" ",s);
+      if(isAbhinav){const nb=document.createElement("button");nb.type="button";nb.className="btn ghost";nb.style.cssText="margin-left:6px;padding:2px 10px;font-size:13px";nb.textContent="Not a double";
+        nb.addEventListener("click",async()=>{nb.disabled=true;const g=DUPT.get(dkey(t))||[];try{for(const x of g){if(!x.notDouble){await S.db.doc("tags/"+x.id).update({notDouble:true});x.notDouble=true}}msg(`Marked as separate pieces: ${g.map(x=>x.label).join(", ")}.`,"ok");renderList()}
+          catch(e){nb.disabled=false;msg("Could not mark it ("+((e&&(e.code||e.message))||"error")+"). Only Abhinav can do this.","bad")}});lc.append(nb)}}}
     const it=c(t.catName||"");if(t.kind==="sample"){const s=document.createElement("span");s.className="pill s";s.textContent="sample";it.append(" ",s)}
     if(t.kind==="order"){const s=document.createElement("span");s.className="pill";s.textContent="order"+(t.order&&t.order.name?" · "+t.order.name:"");it.append(" ",s)}
     c((t.gold||[]).length?(t.gold||[]).map(g=>g.k+" "+g.net.toFixed(3)).join(" + "):(t.metal&&t.metal.net?t.metal.k+" "+t.metal.net.toFixed(3):"—"),"num");
