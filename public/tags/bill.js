@@ -6,7 +6,7 @@
   "use strict";
   const $ = id => document.getElementById(id);
   const fmt = n => "Rs " + Math.round(n).toLocaleString("en-IN");
-  const B = { items: [], mode: "ws", settle: "fine", title: "Bill", photos: true, disc: {}, rates: {}, frates: {} };
+  const B = { items: [], mode: "ws", settle: "fine", title: "Bill", photos: true, nbb: false, disc: {}, rates: {}, frates: {} };
   const MODES = { ws: "W/s", nett: "Nett", g2g: "Gold to Gold", item: "Gold Item" };
   const fineMode = () => B.mode === "g2g" || B.mode === "item";
   const g3 = n => Number(n || 0).toFixed(3) + " g";
@@ -109,6 +109,7 @@
         <label><input type="radio" name="btitle" value="Bill" checked> Bill</label>
         <label><input type="radio" name="btitle" value="Estimate"> Estimate</label></div>
       <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg);margin-top:8px"><input type="checkbox" id="bphoto" checked style="width:auto"> Show piece photos on the bill</label>
+      <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg);margin-top:4px"><input type="checkbox" id="bnbb" style="width:auto"> Stamp <b>No Buy Back · No Exchange</b> on this bill</label>
       <table class="sum"><tr id="bfinerow" hidden><td><b>Fine gold to receive</b></td><td id="bfine"><b>—</b></td></tr><tr><td>Total</td><td id="bsum">—</td></tr><tr id="bdiscrow" hidden><td>Less discount</td><td id="bdisc">—</td></tr><tr hidden><td>Total after discount</td><td id="bsub">—</td></tr>
         <tr><td id="bgstl">GST 3%</td><td id="bgst">—</td></tr><tr class="total"><td>Bill total</td><td id="btotal">—</td></tr></table>
       <p class="hint" id="bnote"></p>
@@ -130,8 +131,8 @@
     document.querySelectorAll("input[name=btitle]").forEach(r => r.addEventListener("change", () => { B.title = r.value; numField(); }));
     $("bmonth").value = today().slice(0, 7); $("bmonth").addEventListener("change", loadBook);
     $("bxl").addEventListener("click", () => xl($("bmonth").value || today().slice(0, 7))); $("bxlall").addEventListener("click", () => xl("all"));
-    $("bF").addEventListener("input", render); $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); });
-    $("bclear").addEventListener("click", () => { B.items = []; B.disc = {}; B.rates = {}; B.frates = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
+    $("bF").addEventListener("input", render); $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); }); $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
+    $("bclear").addEventListener("click", () => { B.items = []; B.nbb = false; $("bnbb").checked = false; B.disc = {}; B.rates = {}; B.frates = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
     $("bsave").addEventListener("click", save);
   }
   // C-20261016-BILLBOOK: estimate numbers are given by the server (E-YYMM-NN, from 01 each month); bill numbers are typed
@@ -331,17 +332,21 @@
       doc.setDrawColor(225); doc.line(M, y - 3, W - M, y - 3); });
     y += 3; if (y > 240) { doc.addPage(); y = 20; }
     const tot = (l, v, big) => { doc.setFont("helvetica", big ? "bold" : "normal"); doc.setFontSize(big ? 15 : 12); doc.text(l, W - M - 50, y, { align: "right" }); doc.text(v, W - M, y, { align: "right" }); y += big ? 9 : 7; };
+    if (b.nbb) { // owner 17/10: 'No Buy Back No Exchange' stamp, red double border, left of the totals (C-20261017-NBB)
+      const sx = M, sy = y - 4, sw = 72, sh = 24; doc.setDrawColor(176, 32, 32); doc.setLineWidth(0.9); doc.roundedRect(sx, sy, sw, sh, 2, 2); doc.setLineWidth(0.3); doc.roundedRect(sx + 1.6, sy + 1.6, sw - 3.2, sh - 3.2, 1.5, 1.5);
+      doc.setTextColor(176, 32, 32); doc.setFont("helvetica", "bold"); doc.setFontSize(15); doc.text("NO BUY BACK", sx + sw / 2, sy + 10.2, { align: "center" }); doc.text("NO EXCHANGE", sx + sw / 2, sy + 18.4, { align: "center" });
+      doc.setTextColor(20); doc.setLineWidth(0.2); doc.setDrawColor(0); }
     if (b.settle === "fine") { tot("Fine gold to receive", g3(b.fine), true); y += 2; }
     tot("Total", fmt(b.disc ? b.sum : b.sub)); if (b.disc) { tot("Less discount", "- " + fmt(b.sum - b.sub)); tot("Total after discount", fmt(b.sub)); } tot(`GST ${b.gstPct}%`, fmt(b.gst)); doc.setDrawColor(180, 150, 80); doc.line(W - M - 95, y - 4, W - M, y - 4); y += 2; tot(b.title + " total", fmt(b.total), true);
     y += 4; doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(80);
-    const notes = [noteText(b.mode).trim(), "All diamonds are third-party certified (IGI / EGL / TGL) and all gold is BIS HUID hallmarked.", b.title === "Estimate" ? "This is an estimate. Final figure may vary with the gold price." : ""].filter(Boolean);
+    const notes = [noteText(b.mode).trim(), "All diamonds are third-party certified (IGI / EGL / TGL) and all gold is BIS HUID hallmarked.", b.title === "Estimate" ? "This is an estimate. Final figure may vary with the gold price." : "", b.nbb ? "Sold on a no buy back, no exchange basis." : ""].filter(Boolean);
     doc.text(doc.splitTextToSize(notes.join(" "), W - 2 * M), M, y);
     return doc.output("blob");
   }
   async function save() {
     const m = $("bmsg"), out = $("bout"); out.hidden = true;
     const body = { no: $("bno").value.trim(), name: $("bname").value.trim(), city: $("bcity").value.trim(), mobile: $("bmob").value.trim().slice(0, 20),
-      date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, title: B.title, ids: B.items.slice(), disc: Object.assign({}, B.disc), rates: JSON.parse(JSON.stringify(B.rates)), frates: Object.assign({}, B.frates) };
+      date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, title: B.title, nbb: !!B.nbb, ids: B.items.slice(), disc: Object.assign({}, B.disc), rates: JSON.parse(JSON.stringify(B.rates)), frates: Object.assign({}, B.frates) };
     if (!body.name) { m.textContent = "Enter the customer's name."; return; }
     let dg = body.mobile.replace(/\D/g, ""); if (dg.length === 12 && dg.startsWith("91")) dg = dg.slice(2); // phone copy like "+91 98xxx xxxxx" is fine
     const mobNote = body.mobile && !/^[6-9]\d{9}$/.test(dg) ? ` Note: the mobile has ${dg.replace(/^91/, "").length} digits after +91 (a mobile usually has 10) - saved as typed.` : "";
