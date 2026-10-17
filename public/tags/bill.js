@@ -148,6 +148,9 @@
         td(dmy(b.date)); td(b.no); const ty = td(b.title); if (b.cancelled) { const s = document.createElement("div"); s.style.cssText = "color:#a12b2b;font-weight:600"; s.textContent = "CANCELLED"; const r = document.createElement("div"); r.className = "hint"; r.textContent = b.cancelled; ty.append(s, r); tr.style.opacity = "0.75"; }
         td(b.name + (b.city ? ", " + b.city : "")); td(fmt(b.total), "num"); td(b.fine ? g3(b.fine) : "—", "num"); td(b.by || "");
         const x = document.createElement("td"); x.style.whiteSpace = "nowrap"; const o = document.createElement("button"); o.type = "button"; o.className = "btn ghost"; o.textContent = "PDF"; o.addEventListener("click", () => reprint(b.no, o)); x.appendChild(o);
+        if (/^[6-9]\d{9}$/.test(String(b.mobile || ""))) { const w = document.createElement("button"); w.type = "button"; w.className = "btn ghost"; w.textContent = "WhatsApp"; w.title = "Send this bill to the customer on WhatsApp (Aashvi)";
+          w.addEventListener("click", async () => { try { if (!w._b) { const r = await fetch("/api/vj/bill?no=" + encodeURIComponent(b.no), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); w._b = j.bill; w._blob = await makePdf(j.bill, B.photos); }
+            await sendWA(w._b, w._blob, w, $("bbookmsg")); if (w.textContent.indexOf("Tap again") === 0) return; if (w.textContent !== "Sent ✓") w.textContent = "WhatsApp"; } catch (e) { $("bbookmsg").textContent = "Could not send " + b.no + " (" + (e.message || e) + ")."; } }); x.appendChild(w); }
         if (j.canCancel || (j.canCancelOnly && !b.cancelled)) { const c = document.createElement("button"); c.type = "button"; c.className = "btn ghost"; c.style.color = "#a12b2b"; c.textContent = j.canCancel ? "Cancel / Erase" : "Cancel"; c.addEventListener("click", () => actBox(b, x, !!j.canCancel)); x.appendChild(c); }
         tr.appendChild(x); body.appendChild(tr); });
       m.textContent = j.bills.length ? `${j.bills.length} in this month${nc ? " (" + nc + " cancelled)" : ""}, total ${fmt(tot)}${nc ? " without the cancelled ones" : ""}.` : "Nothing saved in this month.";
@@ -216,6 +219,24 @@
         await loadBook(); $("bbookmsg").textContent = `${b.title} ${b.no} and its ${j.pieces} piece${j.pieces === 1 ? "" : "s"} were erased. ` + $("bbookmsg").textContent;
       } catch (e) { $("bbookmsg").textContent = "Could not erase: " + (e.message || e) + "."; y.disabled = false; } });
     row.append(y, n); w.append(t, inp, row); cell.appendChild(w); inp.focus();
+  }
+  // Send the bill PDF to the customer on WhatsApp from Aashvi (owner 17/10/2026, C-20261017-BILLWA). First tap asks to confirm the
+  // number; the server sends to the mobile saved on the bill only, and the status is shown here when Aashvi reports back.
+  async function sendWA(b, blob, btn, msg) {
+    const mob = String(b.mobile || ""); if (!/^[6-9]\d{9}$/.test(mob)) { msg.textContent = "This bill has no 10-digit mobile number, so it cannot go on WhatsApp."; return; }
+    if (btn.dataset.sure !== "1") { btn.dataset.sure = "1"; btn.textContent = "Tap again to send to +91 " + mob; setTimeout(() => { if (btn.dataset.sure === "1") { btn.dataset.sure = ""; btn.textContent = "Send on WhatsApp (Aashvi)"; } }, 8000); return; }
+    btn.dataset.sure = ""; btn.disabled = true; btn.textContent = "Sending…";
+    try { const pdf = await new Promise((res, rej) => { const f = new FileReader(); f.onload = () => res(String(f.result).split(",")[1] || ""); f.onerror = rej; f.readAsDataURL(blob); });
+      const r = await fetch("/api/vj/bill/send", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ no: b.no, pdf }) });
+      const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("server " + r.status));
+      msg.textContent = `${b.title} ${b.no}: handed to Aashvi for ${j.to}…`;
+      for (let i = 0; i < 30; i++) { await new Promise(z => setTimeout(z, 3000));
+        const s = await (await fetch("/api/vj/bill/sendstatus?t=" + j.token, { credentials: "same-origin" })).json().catch(() => ({}));
+        if (s.status === "sent") { msg.textContent = `${b.title} ${b.no} sent on WhatsApp to ${j.to} ✓`; btn.textContent = "Sent ✓"; return; }
+        if (s.status === "failed" || s.status === "expired") throw new Error(s.error || "Aashvi could not send it"); }
+      msg.textContent = `${b.title} ${b.no}: Aashvi has not confirmed yet. Check WhatsApp before sending again.`; btn.textContent = "Send on WhatsApp (Aashvi)";
+    } catch (e) { msg.textContent = "Not sent on WhatsApp: " + (e.message || e) + "."; btn.textContent = "Send on WhatsApp (Aashvi)"; }
+    btn.disabled = false;
   }
   async function reprint(no, btn) { btn.disabled = true;
     try { const r = await fetch("/api/vj/bill?no=" + encodeURIComponent(no), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
@@ -364,6 +385,7 @@
       const op = document.createElement("a"); op.className = "btn"; op.href = url; op.target = "_blank"; op.rel = "noopener"; op.textContent = "Open PDF (print)";
       const dl = document.createElement("a"); dl.className = "btn ghost"; dl.href = url; dl.download = fname; dl.textContent = "Download";
       out.append(op, dl);
+      if (/^[6-9]\d{9}$/.test(String(b.mobile || ""))) { const wa = document.createElement("button"); wa.type = "button"; wa.className = "btn ghost"; wa.textContent = "Send on WhatsApp (Aashvi)"; wa.addEventListener("click", () => sendWA(b, blob, wa, m)); out.append(wa); }
       const canFile = (() => { try { return !!(navigator.canShare && navigator.canShare({ files: [file] })); } catch (e) { return false; } })();
       if (canFile) { const sh = document.createElement("button"); sh.type = "button"; sh.className = "btn ghost"; sh.textContent = "Share (WhatsApp)";
         sh.onclick = async () => { try { await navigator.share({ files: [file] }); } catch (e) {} }; out.append(sh); }
