@@ -473,28 +473,86 @@ const vjPhone = v => { const s = String(v == null ? '' : v).trim(); let d = s.re
   if (/^[6-9]\d{9}$/.test(d)) return d; return d.length >= 6 && d.length <= 13 ? s.replace(/[^0-9+ \-]/g, '').replace(/\s+/g, ' ').slice(0, 18) : ''; };
 const vjPhoneTxt = m => /^\d{10}$/.test(String(m || '')) ? '+91 ' + m : String(m || '');
 const vjClean = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f<>]/g, ' ').trim().slice(0, n);
+// C-20261017-QUOTEMODES / POLKI (owner 17/10/2026): the server works out every quote price again from the tags it holds (or, for an
+// estimate of a new design, from the weights typed) and today's saved settings; prices sent by the page are never used.
+// Same rule as the Quote tab: gold x karat rate, making Rs 650/g (750 when the first gold line is up to 5 g), minimum Rs 1,000,
+// + 10% wastage on gold (or flat Rs 1,600/g), diamonds, polki pcs x rate, other; rounded up to Rs 100, + GST, up to Rs 1,000.
+const VJ_Q_OPT = { 'Natural VS GH': 'gh', 'Natural VS IJ': 'ij', 'Lab-grown': 'lgd' };
+const VJ_Q_NONDIA = /POL|EMR|MOZ|RUBY|PEARL|MOTI|STONE|KUNDAN/i;
+const VJ_Q_KARATS = ['14K', '18K', '22K', '9K', '24K'], VJ_Q_QUALS = ['CVD', 'VS IJ', 'VS HI', 'VS GH', 'VVS EF'], VJ_Q_SHAPES = ['Round', 'Choki', 'Fancy', 'Solitaire'];
+const VJ_DEF_RATES = { 'CVD|Round': 23000, 'CVD|Choki': 23000, 'CVD|Fancy': 23000, 'CVD|Solitaire': 23000, 'VS GH|Round': 46000, 'VS GH|Choki': 46000, 'VS GH|Fancy': 85000, 'VS HI|Round': 40000, 'VS HI|Choki': 40000, 'VS IJ|Round': 35000, 'VS IJ|Choki': 35000 };
+const vjQSt = s => ({ g: Number(s.gold24g) || 0, pur: Object.assign({ '24K': 1, '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.40 }, s.purity || {}),
+  mk: Object.assign({ base: 650, small: 750, limit: 5, pct: 10, min: 1000 }, s.making || {}), gst: s.gst == null ? 3 : Number(s.gst), rates: s.defaultRates && typeof s.defaultRates === 'object' ? s.defaultRates : VJ_DEF_RATES });
+const vjQUp = (n, s) => Math.ceil(Math.round(n * 100) / 100 / s) * s;
+function vjQPrice(gold, dv, extra, st, mk) { // final price incl. GST, or 0 when it cannot be worked out
+  const g0 = gold.find(g => g.net > 0); if (!g0 || !st.g) return 0;
+  let gv = 0, nt = 0; gold.forEach(g => { if (g.net > 0) { gv += g.net * st.g * (Number(st.pur[g.k]) || 0); nt += g.net; } });
+  const mv = mk === 'flat' ? 1600 * nt : Math.max((g0.net > st.mk.limit ? st.mk.base : st.mk.small) * nt, Number(st.mk.min) || 0) + gv * st.mk.pct / 100;
+  return vjQUp(vjQUp(gv + mv + dv + extra, 100) * (1 + st.gst / 100), 1000);
+}
+const vjQOptRate = (d, opt, st) => { if (VJ_Q_NONDIA.test(String(d.q || '') + ' ' + String(d.code || ''))) return Number(d.rate) || 0; if (opt === 'lgd') return 23000;
+  const q = opt === 'gh' ? 'VS GH' : 'VS IJ', sh = ['Round', 'Choki', 'Fancy'].includes(d.shape) ? d.shape : 'Round'; return Number(st.rates[q + '|' + sh]) || Number(st.rates[q + '|Round']) || 0; };
+const vjQNum = (v, lo, hi, int) => { if (v === '' || v == null) return null; const n = Number(v); return isFinite(n) && n >= lo && n <= hi && (!int || Number.isInteger(n)) ? n : NaN; };
+const vjGTxt = n => { const s = String(Math.round(n * 1000) / 1000); return s.includes('.') ? s : s + '.0'; };
 async function vjQuote(request, env, who, ctx) {
   if (who.role === 'sales') return vjDeny(403, 'read only');
   const len = Number(request.headers.get('content-length') || 0);
-  if (len > 20000) return vjDeny(413, 'too large');
+  if (len > 40000) return vjDeny(413, 'too large');
   let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
   const name = vjClean(b && b.name, 60), city = vjClean(b && b.city, 40), mobile = String(b && b.mobile || '').replace(/\D/g, '');
-  const option = ['Natural VS GH', 'Natural VS IJ', 'Lab-grown'].includes(b && b.option) ? b.option : '';
-  const items = Array.isArray(b && b.items) ? b.items.slice(0, 20).map(i => ({ id: vjClean(i && i.id, 60), label: vjClean(i && i.label, 40), design: vjClean(i && i.design, 30), price: Math.max(0, Math.round(Number(i && i.price) || 0)) })).filter(i => /^[A-Za-z0-9_\-.~]{1,60}$/.test(i.id)) : [];
-  const total = Math.max(0, Math.round(Number(b && b.total) || 0));
-  if (!name || !city || !/^(91)?[6-9]\d{9}$/.test(mobile) || !option || !items.length || !total) return vjDeny(400, 'name, 10-digit mobile, city, option and at least one piece are required');
+  const design = b && b.kind === 'design', mk = !design && b && b.mk === 'flat' ? 'flat' : 'std';
+  const option = design ? 'Estimate - new design' : (VJ_Q_OPT[b && b.option] ? b.option : '');
+  const raw = Array.isArray(b && b.items) ? b.items : [];
+  if (!name || !city || !/^(91)?[6-9]\d{9}$/.test(mobile) || !option || !raw.length) return vjDeny(400, 'name, 10-digit mobile, city, option and at least one piece are required');
+  if (raw.length > (design ? 10 : 20)) return vjDeny(400, design ? 'at most 10 designs in one estimate' : 'at most 20 pieces in one quote');
+  const sRow = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first(), st = vjQSt(sRow ? JSON.parse(sRow.data) : {});
+  if (!(st.g > 0)) return vjDeny(400, "today's gold rate is not set (Gold rate & settings)");
+  const items = [];
+  for (let n = 0; n < raw.length; n++) {
+    const i = raw[n] && typeof raw[n] === 'object' ? raw[n] : {}, no = (design ? 'design ' : 'piece ') + (n + 1);
+    if (design) {
+      const k = VJ_Q_KARATS.includes(i.k) ? i.k : '', net = vjQNum(i.net, 0.001, 1000), other = vjQNum(i.other, 0, 10000000, true) ?? 0;
+      const ppcs = vjQNum(i.ppcs, 0, 10000, true) ?? 0, prate = vjQNum(i.prate, 1, 100000, true) ?? 300;
+      if (!k || !(net > 0)) return vjDeny(400, no + ': karat and net gold weight (g) are needed');
+      if (isNaN(other) || isNaN(ppcs) || isNaN(prate)) return vjDeny(400, no + ': polki pcs 0-10000, rate per pc Rs 1-1,00,000 and other charges must be whole rupees');
+      const dl = Array.isArray(i.dias) ? i.dias : []; if (dl.length > 20) return vjDeny(400, no + ': at most 20 diamond lines');
+      const dias = [];
+      for (const d0 of dl) { const d = d0 && typeof d0 === 'object' ? d0 : {}, q = VJ_Q_QUALS.includes(d.q) ? d.q : '', shape = VJ_Q_SHAPES.includes(d.shape) ? d.shape : '';
+        const ct = vjQNum(d.ct, 0.001, 200), pcs = vjQNum(d.pcs, 0, 100000, true) ?? 0, r0 = vjQNum(d.rate, 1, 5000000), rate = r0 === null ? Number(st.rates[q + '|' + shape]) || 0 : r0;
+        if (!q || !shape || !(ct > 0) || !(rate > 0) || isNaN(pcs)) return vjDeny(400, no + ': each diamond line needs quality, shape, ct (up to 200), a rate per ct, and whole pcs');
+        dias.push({ q, pcs, shape, ct: Math.round(ct * 1000) / 1000, rate: Math.round(rate) }); }
+      const dv = dias.reduce((a, d) => a + d.ct * d.rate, 0);
+      const price = vjQPrice([{ k, net }], dv, (ppcs ? ppcs * prate : 0) + other, st, 'std');
+      if (!price) return vjDeny(400, no + ': no price');
+      items.push({ newDesign: true, desc: vjClean(i.desc, 60) || 'New design', k, net: Math.round(net * 1000) / 1000, dias, ...(ppcs ? { polki: { pcs: ppcs, rate: prate } } : {}), other, price });
+    } else {
+      const id = String(i.id || ''); if (!/^[A-Za-z0-9_\-.~]{1,60}$/.test(id) || items.some(x => x.id === id)) return vjDeny(400, no + ': bad piece');
+      const row = await env.DB.prepare('SELECT data FROM docs WHERE path = ?').bind('tags/' + id).first(); if (!row) return vjDeny(404, 'a piece is no longer in stock: ' + id);
+      const t = JSON.parse(row.data), pk = t.polki && Number(t.polki.pcs) > 0 ? t.polki : null;
+      const px = vjQNum(i.prate, 1, 100000, true); if (isNaN(px)) return vjDeny(400, no + ': polki rate per pc Rs 1-1,00,000');
+      const prate = px ?? (pk ? Number(pk.rate) || 300 : 0), ppcs = pk ? Number(pk.pcs) || 0 : 0;
+      const gold = (t.kind === 'sample' ? [{ k: '14K', net: Number(t.metal && t.metal.net) || 0 }] : (Array.isArray(t.gold) ? t.gold : [])).map(g => ({ k: String(g && g.k || ''), net: Number(g && g.net) || 0 }));
+      const dv = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).reduce((a, d) => a + (Number(d.ct) || 0) * vjQOptRate(d, VJ_Q_OPT[option], st), 0);
+      const price = vjQPrice(gold, dv, ppcs * prate + (Number(t.other && t.other.amt) || 0), st, mk);
+      if (!price) return vjDeny(400, 'a piece has no price - check its gold weight and the default diamond rates: ' + (t.label || id));
+      items.push({ id, label: vjClean(t.label, 40), design: vjClean(t.designNo, 30), ...(ppcs ? { polki: { pcs: ppcs, rate: prate } } : {}), price });
+    }
+  }
+  const total = items.reduce((a, x) => a + x.price, 0);
   const ist = new Date(Date.now() + 5.5 * 3600e3), d = ist.toISOString().slice(2, 10).replace(/-/g, '');
   const qno = 'Q-' + d + '-' + [...crypto.getRandomValues(new Uint8Array(4))].map(x => '23456789ABCDEFGHJKMNPQRSTUVWXYZ'[x % 31]).join('');
-  const doc = { qno, name, mobile: mobile.slice(-10), city, option, items, total, gold24g: Number(b && b.gold24g) || null, by: who.email, at: new Date().toISOString() };
+  const doc = { qno, kind: design ? 'design' : 'tags', name, mobile: mobile.slice(-10), city, option, mk, items, total, gold24g: st.g, by: who.email, at: new Date().toISOString() };
   await env.DB.prepare('INSERT INTO docs (path, data, version, updated_at, updated_by) VALUES (?, ?, 1, ?, ?)').bind('quotes/' + qno, JSON.stringify(doc), Date.now(), who.email).run();
-  await vjAudit(env, who, 'quote', 'quotes/' + qno, name + ' ' + doc.mobile + ' ' + total);
+  await vjAudit(env, who, 'quote', 'quotes/' + qno, (design ? 'estimate ' : '') + name + ' ' + doc.mobile + ' ' + total);
   if (env.VJ_QUOTE_HOOK && /^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_QUOTE_HOOK)) {
     const inr = n => 'Rs ' + Number(n).toLocaleString('en-IN');
+    const txt = i => i.newDesign ? 'New design: ' + [i.desc + ' ' + i.k + ' ' + vjGTxt(i.net) + ' g', ...i.dias.map(x => x.ct.toFixed(2) + ' ct ' + x.q), ...(i.polki ? ['Polki ' + i.polki.pcs + ' pc'] : [])].join(', ')
+      : (i.design ? i.design + ' (' + i.label + ')' : i.label) + (i.polki ? ', Polki ' + i.polki.pcs + ' pc' : '');
     ctx.waitUntil(fetch(env.VJ_QUOTE_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000),
       body: JSON.stringify({ qno, name, mobile: '+91 ' + doc.mobile, city, option, total: inr(total) + ' incl. GST', by: who.name && who.name !== 'Owner' ? who.name : who.email,
-        items: items.map(i => (i.design ? i.design + ' (' + i.label + ')' : i.label) + ' ' + inr(i.price)).join('; ') }) }).catch(() => {}));
+        items: items.map(i => txt(i) + ' ' + inr(i.price)).join('; ') }) }).catch(() => {}));
   }
-  return vjJson({ ok: true, qno });
+  return vjJson({ ok: true, qno, items: items.map(i => ({ id: i.id || null, price: i.price, polki: i.polki || null })), total, gold24g: st.g });
 }
 
 // VJ_BILL_CALC_START (same function in tags/bill.js - keep both copies identical)
@@ -1462,7 +1520,7 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/photo' && request.method === 'POST') return vjPhotoUpload(request, env, who);
   if (p === '/api/vj/import' && request.method === 'POST') return vjImport(request, env, who);
   if (p === '/api/vj/photosearch' && request.method === 'POST') return vjPhotoSearch(request, env, who);
-  if (p === '/api/vj/quote' && request.method === 'POST') return vjQuote(request, env, who, ctx);
+  if (p === '/api/vj/quote' && request.method === 'POST') return vjSameSite(request, env) ? vjQuote(request, env, who, ctx) : vjDeny(403, 'not allowed'); // JSON from our own page only (C-20261017-QUOTEMODES)
   if (p === '/api/vj/bill' && request.method === 'POST') return vjBill(request, env, who);
   if ((p === '/api/vj/bills' || p === '/api/vj/bills.xlsx' || p === '/api/vj/bill') && request.method === 'GET') return vjBillBook(url, env, who);
   if (p === '/api/vj/bill/cancel' && request.method === 'POST') return vjBillCancel(request, env, who);
