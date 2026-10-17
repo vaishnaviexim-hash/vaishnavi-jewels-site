@@ -571,6 +571,17 @@ async function vjBill(request, env, who) { // every login may make bills (owner 
     if (!row) return vjDeny(404, 'a piece is no longer in stock: ' + id);
     tags.push(Object.assign({ id }, JSON.parse(row.data)));
   }
+  // C-20261017-NODUPBILL (owner 17/10/2026 'no duplicate bills for same tag'): a piece already on a Bill that is not cancelled
+  // cannot go on another Bill until that bill is cancelled. Estimates are not limited and do not block a Bill.
+  const onBill = async () => { const hit = new Map();
+    (((await env.DB.prepare("SELECT no, data FROM vj_bills WHERE no LIKE 'B-%' ORDER BY ts").all()).results) || []).forEach(x => {
+      let d; try { d = JSON.parse(x.data); } catch (e) { return; } if (!d || d.cancelled) return;
+      (d.rows || []).forEach(r => { const id = String(r.id || ''); if (ids.includes(id) && !hit.has(id)) hit.set(id, d); }); });
+    return hit; };
+  const dupMsg = hit => { const [id, d] = [...hit.entries()][0], t = tags.find(x => x.id === id) || {};
+    const dd = String(d.date || '').split('-').reverse().join('-');
+    return `this piece is already billed: ${String(t.label || t.designNo || id)} is on ${d.no} (${dd}, ${d.name || ''}). Cancel that bill first if it must be billed again.` + (hit.size > 1 ? ` ${hit.size - 1} more piece${hit.size > 2 ? 's are' : ' is'} also already billed.` : ''); };
+  if (title === 'Bill') { const hit = await onBill(); if (hit.size) return vjJson({ error: dupMsg(hit), duplicate: true }, 409); }
   const sRow = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first();
   const s = sRow ? JSON.parse(sRow.data) : {};
   const calc = vjBillCalc(tags, { F, mode, settle, disc, rates, frates, purity: s.purity, making: s.making, gst: s.gst });
@@ -586,6 +597,12 @@ async function vjBill(request, env, who) { // every login may make bills (owner 
     const res = await env.DB.prepare('INSERT INTO vj_bills (no, ts, email, data) VALUES (?, ?, ?, ?) ON CONFLICT(no) DO NOTHING').bind(bill.no, Date.now(), who.email, JSON.stringify(bill)).run();
     if (res.meta && res.meta.changes === 1) break;
     if (i >= 5) return vjJson({ error: 'could not give a number, try again' }, 409);
+  }
+  if (title === 'Bill') { // two saves at the same moment: the earlier bill keeps the piece, this one is taken back (C-20261017-NODUPBILL)
+    const hit = await onBill(); for (const d of hit.values()) if (d.no !== bill.no) {
+      await env.DB.prepare('DELETE FROM vj_bills WHERE no = ? AND ts IS NOT NULL').bind(bill.no).run();
+      return vjJson({ error: dupMsg(new Map([...hit].filter(([, x]) => x.no !== bill.no))), duplicate: true }, 409);
+    }
   }
   await vjAudit(env, who, 'bill', 'bills/' + bill.no, `${title} ${mode}${calc.settle ? '/' + calc.settle : ''} ${name} ${mobile} ${calc.total}${calc.fine ? ' + ' + calc.fine + ' g fine' : ''}${calc.disc ? ' disc ' + calc.disc : ''} | ${ids.join(',')}`);
   return vjJson({ ok: true, bill });
