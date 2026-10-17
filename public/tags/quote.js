@@ -1,22 +1,40 @@
 /* VJ Tags - Quote tab (owner 14/10/2026, Brain F-069). Loaded by shim.js on vaishnavijewels.com/tags only.
    Staff pick pieces by design / tag number, ONE option (Natural VS GH, Natural VS IJ or Lab-grown at Rs 23,000/ct),
    enter the customer, and send a branded PDF from their own WhatsApp. The server numbers and saves the quote and
-   tells Core (Aashvi WhatsApp). No rates, codes or costs are printed - only each piece's final price and the total. */
+   tells Core (Aashvi WhatsApp). No rates, codes or costs are printed - only each piece's final price and the total.
+   Owner 17/10/2026 (C-20261017-QUOTEMODES / POLKI): two choices at the top - "From our code" (pieces by tag / design number, as
+   before, + polki pcs x rate per pc, rate editable per line) or "Estimate for a new design" (no tag: karat, net gold, diamond
+   lines, polki, other charges per design line). The server works every price out again from the tags / weights and today's
+   settings; the PDF is printed from the server's figures. */
 (function () {
   "use strict";
   const $ = id => document.getElementById(id);
   const OPTS = { gh: "Natural VS GH", ij: "Natural VS IJ", lgd: "Lab-grown" };
   const LGD_RATE = 23000;
   const NON_DIAMOND = /POL|EMR|MOZ|RUBY|PEARL|MOTI|STONE|KUNDAN/i;
-  const PUR = { "22K": 0.92, "18K": 0.76, "14K": 0.60, "9K": 0.40 };
+  const PUR = { "24K": 1, "22K": 0.92, "18K": 0.76, "14K": 0.60, "9K": 0.40 };
   const fmt = n => "Rs " + Math.round(n).toLocaleString("en-IN");
   const up = (n, s) => Math.ceil(Math.round(n * 100) / 100 / s) * s;
-  const Q = { items: [], option: "gh", mk: "std" }; // mk: "std" = settings making + 10% wastage, "flat" = Rs 1,600/g (owner 14/10)
-  const FLAT_MK = 1600;
+  const Q = { kind: "code", items: [], option: "gh", mk: "std", prates: {}, designs: [] }; // mk: "std" = settings making + 10% wastage, "flat" = Rs 1,600/g (owner 14/10)
+  const FLAT_MK = 1600, PRATE = 300;
+  // new-design estimate (C-20261017-QUOTEMODES): same karats, qualities (with the shop codes) and shapes as the New tag form
+  const DKARATS = ["14K", "18K", "22K", "9K", "24K"], DQUALS = ["CVD", "VS IJ", "VS HI", "VS GH", "VVS EF"], DSHAPES = ["Round", "Choki", "Fancy", "Solitaire"];
+  const QC = { "CVD": "42", "VS IJ": "2", "VS HI": "3", "VS GH": "4", "VVS EF": "5" };
+  const DEF_RATES = { "CVD|Round": 23000, "CVD|Choki": 23000, "CVD|Fancy": 23000, "CVD|Solitaire": 23000, "VS GH|Round": 46000, "VS GH|Choki": 46000, "VS GH|Fancy": 85000, "VS HI|Round": 40000, "VS HI|Choki": 40000, "VS IJ|Round": 35000, "VS IJ|Choki": 35000 };
+  const num = v => { const n = parseFloat(String(v == null ? "" : v).replace(/,/g, "")); return isFinite(n) ? n : 0; };
 
   function settings() { const s = (window.VJ_SETTINGS && window.VJ_SETTINGS()) || {}; return {
     g: s.gold24g || null, at: s.goldAt || null, pur: Object.assign({}, PUR, s.purity || {}),
-    mk: Object.assign({ base: 650, small: 750, limit: 5, pct: 10, min: 1000 }, s.making || {}), gst: s.gst == null ? 3 : s.gst, rates: s.defaultRates || {} }; }
+    mk: Object.assign({ base: 650, small: 750, limit: 5, pct: 10, min: 1000 }, s.making || {}), gst: s.gst == null ? 3 : s.gst, rates: s.defaultRates || DEF_RATES }; }
+  const defRate = (q, sh, st) => { const v = Number(st.rates[q + "|" + sh]); return v > 0 ? v : 0; };
+  // price incl. GST (same rule as the server's vjQPrice): gold + making (std / flat) + diamonds + extra (polki + other), up to Rs 100, + GST, up to Rs 1,000
+  function calc(gold, dv, extra, st, mk) {
+    const g0 = gold.find(g => g.net > 0); if (!g0 || !st.g) return 0;
+    let gv = 0, nt = 0; gold.forEach(g => { if (g.net > 0) { gv += g.net * st.g * (Number(st.pur[g.k]) || 0); nt += g.net; } });
+    const mv = mk === "flat" ? FLAT_MK * nt : Math.max((g0.net > st.mk.limit ? st.mk.base : st.mk.small) * nt, Number(st.mk.min) || 0) + gv * st.mk.pct / 100;
+    return up(up(gv + mv + dv + extra, 100) * (1 + st.gst / 100), 1000); // owner 16/10/2026: nearest Rs 1,000 (was 10,000)
+  }
+  const polkiOf = t => (t.polki && Number(t.polki.pcs) > 0 ? { pcs: Number(t.polki.pcs), rate: Number(Q.prates[t.id]) || Number(t.polki.rate) || PRATE } : null);
   function optRate(d, opt, st) {
     if (NON_DIAMOND.test(String(d.q || "") + " " + String(d.code || ""))) return Number(d.rate) || 0;
     if (opt === "lgd") return LGD_RATE;
@@ -25,15 +43,24 @@
   }
   function priceFor(t, opt) {
     const st = settings(); if (!st.g) return null;
-    const gold = t.kind === "sample" ? [{ k: "14K", net: (t.metal && t.metal.net) || 0 }] : (t.gold || []);
-    const g0 = gold.find(g => g.net > 0); if (!g0) return null;
+    const gold = (t.kind === "sample" ? [{ k: "14K", net: (t.metal && t.metal.net) || 0 }] : (t.gold || [])).map(g => ({ k: String(g.k || ""), net: Number(g.net) || 0 }));
     // C-20261017-MAKINGMIN (owner 17/10): std = 650/g (750 up to 5 g), minimum Rs 1,000 a piece, + 10% wastage on gold; flat = Rs 1,600/g
-    let gv = 0, nt = 0; gold.forEach(g => { if (g.net > 0) { gv += g.net * st.g * (st.pur[g.k] || 0); nt += g.net; } });
-    const mv = Q.mk === "flat" ? FLAT_MK * nt : Math.max((g0.net > st.mk.limit ? st.mk.base : st.mk.small) * nt, Number(st.mk.min) || 0) + gv * st.mk.pct / 100;
-    let dv = 0, missing = false; (t.dias || []).forEach(d => { const r = optRate(d, opt, st); if (!(r > 0) && !NON_DIAMOND.test(d.q || "")) missing = true; dv += (d.ct || 0) * r; });
-    const sub = up(gv + mv + dv + ((t.other && t.other.amt) || 0), 100);
-    return { final: up(sub * (1 + st.gst / 100), 1000), missing }; // owner 16/10/2026: nearest Rs 1,000 (was 10,000)
+    let dv = 0, missing = false; (t.dias || []).filter(Boolean).forEach(d => { const r = optRate(d, opt, st); if (!(r > 0) && !NON_DIAMOND.test(d.q || "")) missing = true; dv += (Number(d.ct) || 0) * r; });
+    const pk = polkiOf(t), final = calc(gold, dv, (pk ? pk.pcs * pk.rate : 0) + (Number(t.other && t.other.amt) || 0), st, Q.mk);
+    return final ? { final, missing } : null;
   }
+  // one new-design line: {desc, k, net, dias:[{q, shape, ct, rate, edited}], ppcs, prate, other}
+  const newDesign = () => ({ desc: "", k: "14K", net: "", dias: [], ppcs: "", prate: String(PRATE), other: "" });
+  function designIn(d, st) { // the numbers the server gets, and what is still missing
+    const net = num(d.net), ppcs = num(d.ppcs), prate = String(d.prate).trim() === "" ? PRATE : num(d.prate), other = num(d.other), bad = [];
+    const dias = d.dias.filter(x => num(x.ct) > 0).map(x => ({ q: x.q, pcs: Math.max(0, Math.round(num(x.pcs))), shape: x.shape, ct: num(x.ct), rate: String(x.rate).trim() === "" ? defRate(x.q, x.shape, st) : num(x.rate) }));
+    if (!(net > 0)) bad.push("net gold weight"); if (dias.some(x => !(x.rate > 0))) bad.push("a diamond rate per ct");
+    if (!(Number.isInteger(ppcs) && ppcs >= 0 && ppcs <= 10000) || ppcs > 0 && !(Number.isInteger(prate) && prate >= 1 && prate <= 100000)) bad.push("polki pcs (whole, up to 10,000) and rate per pc (Rs 1-1,00,000)");
+    if (!(Number.isInteger(other) && other >= 0)) bad.push("other charges in whole rupees");
+    return { desc: String(d.desc || "").trim().slice(0, 60), k: d.k, net, dias, ppcs, prate, other, bad };
+  }
+  function designPrice(d) { const st = settings(), x = designIn(d, st); if (x.bad.length || !st.g) return 0;
+    return calc([{ k: x.k, net: x.net }], x.dias.reduce((a, y) => a + y.ct * y.rate, 0), (x.ppcs ? x.ppcs * x.prate : 0) + x.other, st, "std"); }
   const tags = () => (window.VJ_TAGS ? window.VJ_TAGS() : []);
   function find(q) {
     q = String(q || "").trim().toUpperCase().replace(/\s+/g, ""); if (!q) return [];
@@ -48,11 +75,21 @@
     nav.insertBefore(b, nav.querySelector('[data-tab="rates"]'));
     const sec = document.createElement("section"); sec.id = "p-quote"; sec.className = "card"; sec.hidden = true;
     sec.innerHTML = `
+      <div class="seg" role="radiogroup" aria-label="Quote type" style="margin-bottom:6px">
+        <label><input type="radio" name="qkind" value="code" checked> From our code</label>
+        <label><input type="radio" name="qkind" value="design"> Estimate for a new design</label></div>
+      <div id="qdesbox" hidden>
+      <h2>1 · Designs</h2>
+      <p class="hint">No tag needed: type each design's karat, net gold, diamonds and polki. Priced at today's gold rate with the same making rule.</p>
+      <div id="qdlines" style="display:flex;flex-direction:column;gap:12px"></div>
+      <div class="actions"><button type="button" class="btn ghost" id="qdadd">+ Add design</button></div>
+      </div>
+      <div id="qcodebox">
       <h2>1 · Pieces</h2>
       <div class="row" style="align-items:end"><label style="flex:2 1 220px">Design number or tag number <input id="qq" autocomplete="off" placeholder="e.g. 1436 or VLR14/803"></label>
       <div><button type="button" class="btn" id="qadd">Add piece</button></div></div>
       <div id="qpick" class="row" style="gap:8px"></div>
-      <div class="list"><table class="items" style="min-width:560px"><thead><tr><th></th><th>Design · label</th><th>Category</th><th>Gold</th><th>Diamonds</th><th>Price</th><th></th></tr></thead><tbody id="qrows"></tbody></table></div>
+      <div class="list"><table class="items" style="min-width:560px"><thead><tr><th></th><th>Design · label</th><th>Category</th><th>Gold</th><th>Diamonds</th><th>Polki</th><th>Price</th><th></th></tr></thead><tbody id="qrows"></tbody></table></div>
       <h2>2 · Option (one per quote)</h2>
       <div class="seg" role="radiogroup" aria-label="Option">
         <label><input type="radio" name="qopt" value="gh" checked> Natural VS GH</label>
@@ -61,12 +98,13 @@
       <div class="seg" role="radiogroup" aria-label="Making" style="margin-top:8px">
         <label><input type="radio" name="qmk" value="std" checked> <span id="qmkstd">Making Rs 650/g + 10% wastage on gold</span></label>
         <label><input type="radio" name="qmk" value="flat"> Making Rs 1,600/g</label></div>
-      <h2>3 · Customer</h2>
+      </div>
+      <h2 id="qcusth">3 · Customer</h2>
       <div class="actions" id="qcbox" hidden><button type="button" class="btn ghost" id="qcontact">Pick from phone contacts</button></div>
       <div class="row"><label>Name <input id="qname" autocomplete="off" maxlength="60"></label>
         <label>Mobile (10 digits) <input id="qmob" inputmode="tel" autocomplete="off" maxlength="14" placeholder="98xxxxxxxx"></label>
         <label>City <input id="qcity" autocomplete="off" maxlength="40"></label></div>
-      <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg)"><input type="checkbox" id="qphoto" checked style="width:auto"> Show piece photos in the PDF</label>
+      <label id="qphotol" style="flex-direction:row;align-items:center;gap:8px;color:var(--fg)"><input type="checkbox" id="qphoto" checked style="width:auto"> Show piece photos in the PDF</label>
       <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg)"><input type="checkbox" id="qwt" checked style="width:auto"> Show gold weight &amp; diamond carats in the PDF</label>
       <table class="sum"><tr class="total"><td>Total (incl. GST)</td><td id="qtotal">—</td></tr></table>
       <p class="hint" id="qnote"></p>
@@ -80,7 +118,10 @@
     $("qadd").addEventListener("click", pick); $("qq").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); pick(); } });
     document.querySelectorAll('input[name=qopt]').forEach(r => r.addEventListener("change", () => { Q.option = r.value; render(); }));
     document.querySelectorAll('input[name=qmk]').forEach(r => r.addEventListener("change", () => { Q.mk = r.value; render(); }));
-    $("qclear").addEventListener("click", () => { Q.items = []; Q.mk = "std"; document.querySelector('input[name=qmk][value=std]').checked = true; ["qname", "qmob", "qcity", "qq"].forEach(i => $(i).value = ""); $("qmsg").textContent = ""; render(); });
+    document.querySelectorAll('input[name=qkind]').forEach(r => r.addEventListener("change", () => { Q.kind = r.value; kindView(); }));
+    $("qdadd").addEventListener("click", () => { Q.designs.push(newDesign()); drawDesigns(); });
+    $("qclear").addEventListener("click", () => { Q.items = []; Q.prates = {}; Q.designs = [newDesign()]; Q.mk = "std"; document.querySelector('input[name=qmk][value=std]').checked = true; ["qname", "qmob", "qcity", "qq"].forEach(i => $(i).value = ""); $("qmsg").textContent = ""; if ($("qsharebox")) $("qsharebox").hidden = true; drawDesigns(); render(); });
+    Q.designs = [newDesign()]; drawDesigns(); kindView();
     $("qsend").addEventListener("click", send);
     // 14/10/2026 owner: pick the customer from the phone's contact book (Chrome on Android only; iPhone/computers type it).
     // The browser shows its own picker; only the ONE contact tapped is read, on the phone, nothing is uploaded.
@@ -99,7 +140,60 @@
     r.forEach(t => { const b = document.createElement("button"); b.type = "button"; b.className = "btn ghost"; b.textContent = (t.designNo ? t.designNo + " · " : "") + t.label; b.addEventListener("click", () => { addItem(t); box.textContent = ""; }); box.appendChild(b); });
   }
   function addItem(t) { if (!Q.items.some(x => x.id === t.id)) Q.items.push(t); $("qq").value = ""; $("qpick").textContent = ""; render(); }
+  function kindView() {
+    const d = Q.kind === "design"; $("qdesbox").hidden = !d; $("qcodebox").hidden = d; $("qphotol").style.display = d ? "none" : "";
+    $("qcusth").textContent = (d ? "2" : "3") + " · Customer"; $("qmsg").textContent = ""; if ($("qsharebox")) $("qsharebox").hidden = true; render();
+  }
+  const el = (tag, props, kids) => { const e = document.createElement(tag); Object.assign(e, props || {}); (kids || []).forEach(k => e.append(k)); return e; };
+  const fld = (label, input, flex) => { const l = el("label", {}, [label, input]); if (flex) l.style.flex = flex; return l; };
+  const sel = (opts, val, txt) => { const s = el("select"); opts.forEach(o => s.append(el("option", { value: o, textContent: txt ? txt(o) : o, selected: o === val }))); return s; };
+  // the quality box takes the shop codes typed on the keyboard, like the New tag form: 42 CVD, 2 VS IJ, 3 VS HI, 4 VS GH, 5 VVS EF (C-20261017-QCODES)
+  function codeKeys(q) { const BY = {}; Object.keys(QC).forEach(k => { BY[QC[k]] = k; }); let buf = "", tm = 0;
+    q.addEventListener("keydown", e => { if (!/^[0-9]$/.test(e.key)) return; e.preventDefault(); const t = Date.now(); buf = (t - tm < 900 ? buf : "") + e.key; tm = t;
+      const v = BY[buf] || (buf.length > 1 ? BY[e.key] : null); if (v && q.value !== v) { q.value = v; q.dispatchEvent(new Event("change", { bubbles: true })); } if (!BY[buf] && BY[e.key]) buf = e.key; }); }
+  function drawDesigns() {
+    const box = $("qdlines"); if (!box) return; box.textContent = ""; const st = settings();
+    Q.designs.forEach((d, i) => {
+      const card = el("div"); card.style.cssText = "border:1px solid var(--line);border-radius:var(--r,10px);padding:12px;display:flex;flex-direction:column;gap:8px";
+      const desc = el("input", { value: d.desc, maxLength: 60, autocomplete: "off", placeholder: "e.g. Bracelet, new design" }), k = sel(DKARATS, d.k);
+      const net = el("input", { value: d.net, inputMode: "decimal", autocomplete: "off", placeholder: "0.000" }), price = el("div", { className: "labelno" }); price.dataset.qd = i;
+      desc.addEventListener("input", () => { d.desc = desc.value; }); k.addEventListener("change", () => { d.k = k.value; prices(); }); net.addEventListener("input", () => { d.net = net.value; prices(); });
+      const rm = el("button", { type: "button", className: "btn ghost", textContent: "Remove design" }); rm.addEventListener("click", () => { Q.designs.splice(i, 1); if (!Q.designs.length) Q.designs.push(newDesign()); drawDesigns(); });
+      card.append(el("div", { style: "display:flex;justify-content:space-between;align-items:center;gap:8px" }, [el("strong", { textContent: "Design " + (i + 1) }), price]),
+        el("div", { className: "row" }, [fld("Description", desc, "2 1 220px"), fld("Karat", k), fld("Net gold (g)", net)]));
+      const dbox = el("div", { style: "display:flex;flex-direction:column;gap:6px" });
+      d.dias.forEach((x, j) => {
+        const q = sel(DQUALS, x.q, o => QC[o] + " · " + o), sh = sel(DSHAPES, x.shape), pc = el("input", { value: x.pcs || "", inputMode: "numeric", autocomplete: "off", placeholder: "0" }), ct = el("input", { value: x.ct, inputMode: "decimal", autocomplete: "off", placeholder: "0.00" });
+        const rt = el("input", { value: x.rate, inputMode: "numeric", autocomplete: "off" }), xx = el("button", { type: "button", className: "btn ghost", textContent: "✕", ariaLabel: "Remove diamond line" });
+        codeKeys(q);
+        const fill = () => { const def = defRate(x.q, x.shape, st); rt.placeholder = def ? "default " + def.toLocaleString("en-IN") : "enter rate"; if (!x.edited) { x.rate = def ? String(def) : ""; rt.value = x.rate; } };
+        q.addEventListener("change", () => { x.q = q.value; fill(); prices(); }); sh.addEventListener("change", () => { x.shape = sh.value; fill(); prices(); });
+        ct.addEventListener("input", () => { x.ct = ct.value; prices(); }); pc.addEventListener("input", () => { x.pcs = pc.value; }); rt.addEventListener("input", () => { x.rate = rt.value; x.edited = rt.value.trim() !== ""; prices(); });
+        xx.addEventListener("click", () => { d.dias.splice(j, 1); drawDesigns(); }); fill();
+        dbox.append(el("div", { className: "row", style: "align-items:end" }, [fld("Shape", sh), fld("Quality", q), fld("Pcs", pc), fld("D Wt (ct)", ct), fld("Rate ₹/ct", rt), el("div", {}, [xx])] /* same order and labels as the New tag form (owner 17/10): Shape, Quality, Pcs, D Wt, Rate */));
+      });
+      const addD = el("button", { type: "button", className: "btn ghost", textContent: "+ Diamond line" }); addD.addEventListener("click", () => { d.dias.push({ q: "CVD", pcs: "", shape: "Round", ct: "", rate: "", edited: false }); drawDesigns(); });
+      const pp = el("input", { value: d.ppcs, inputMode: "numeric", autocomplete: "off", placeholder: "0" }), pr = el("input", { value: d.prate, inputMode: "numeric", autocomplete: "off" }), ot = el("input", { value: d.other, inputMode: "numeric", autocomplete: "off", placeholder: "0" });
+      const pv = el("span", { className: "hint" }); pv.dataset.qp = i;
+      pp.addEventListener("input", () => { d.ppcs = pp.value; prices(); }); pr.addEventListener("input", () => { d.prate = pr.value; prices(); }); ot.addEventListener("input", () => { d.other = ot.value; prices(); });
+      card.append(el("strong", { textContent: "Diamonds" }), dbox, el("div", {}, [addD]),
+        el("div", { className: "row", style: "align-items:end" }, [fld("Polki pcs", pp), fld("Rate per pc (Rs)", pr), fld("Other charges (Rs)", ot)]), pv, el("div", { className: "actions", style: "margin:0" }, [rm]));
+      box.append(card);
+    });
+    prices();
+  }
+  function prices() { // live prices of the design lines and the estimate total (no redraw, so typing is not interrupted)
+    if (Q.kind !== "design") return; const st = settings(); let total = 0, miss = [];
+    Q.designs.forEach((d, i) => { const p = designPrice(d), x = designIn(d, st); total += p;
+      const c = document.querySelector('[data-qd="' + i + '"]'); if (c) c.textContent = p ? fmt(p) : "—";
+      const pv = document.querySelector('[data-qp="' + i + '"]'); if (pv) pv.textContent = x.ppcs > 0 && Number.isInteger(x.prate) ? `Polki ${x.ppcs} pc × ${fmt(x.prate)} = ${fmt(x.ppcs * x.prate)}` : "";
+      if (x.bad.length && (num(d.net) > 0 || d.dias.length || num(d.ppcs) > 0)) miss.push("Design " + (i + 1) + ": check " + x.bad.join(", ")); });
+    $("qtotal").textContent = total && st.g ? fmt(total) : "—"; Q.total = total;
+    $("qnote").textContent = !st.g ? "Today's gold rate is not set (Gold rate & settings) - prices cannot be worked out." :
+      (miss.length ? miss.join(". ") + ". " : "") + `At 24K ${fmt(st.g)}/g. ${mkText(st, null, "std", true)}. Estimate only: final price depends on actual weights and the gold rate on the day of billing.`;
+  }
   function render() {
+    if (Q.kind === "design") { prices(); return; }
     const body = $("qrows"); if (!body) return; body.textContent = ""; let total = 0, miss = false;
     Q.items.forEach((t, i) => {
       const p = priceFor(t, Q.option); if (p) { total += p.final; if (p.missing) miss = true; }
