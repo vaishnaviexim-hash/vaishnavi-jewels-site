@@ -592,7 +592,7 @@ async function vjBill(request, env, who) { // every login may make bills (owner 
   const s = sRow ? JSON.parse(sRow.data) : {};
   const calc = vjBillCalc(tags, { F, mode, settle, disc, rates, frates, purity: s.purity, making: s.making, gst: s.gst });
   calc.rows.forEach((r, i) => { const ph = tags[i].photo; if (typeof ph === 'string' && /^[0-9a-f]{32}$/.test(ph)) r.photo = ph; }); // owner 16/10: photo on the bill
-  const bill = Object.assign({ no, title, date, name, city, mobile, F, by: who.email, byName: who.name, at: new Date().toISOString() }, calc);
+  const bill = Object.assign({ no, title, date, name, city, mobile, F, nbb: !!(b && b.nbb === true), by: who.email, byName: who.name, at: new Date().toISOString() }, calc); // nbb: 'No Buy Back No Exchange' stamp (owner 17/10, C-20261017-NBB)
   // C-20261016-BILLBOOK / BILLAUTO: bills B-YYMM-NN and estimates E-YYMM-NN are numbered automatically, from 01 every month (by the date)
   for (let i = 0; ; i++) {
     {
