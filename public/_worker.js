@@ -627,6 +627,10 @@ async function vjBillCancel(request, env, who) { // choice 2 (cancel only) for e
   const bill = JSON.parse(row.data), byName = who.role === 'admin' ? (who.email === 'vaishnavijewels@gmail.com' ? 'Shilpiji' : 'Abhinav') : (who.name || String(who.email).split('@')[0]);
   if (who.role === 'sales' && bill.by !== who.email) return vjDeny(404, 'not found'); // a sales login only handles its own bills
   if (bill.cancelled && !stock) return vjJson({ error: 'already cancelled' }, 409);
+  if (!bill.cancelled) { // C-20261017-LEDGER (owner 17/10): a bill with receipts or a settlement is not cancelled
+    if (bill.settled) return vjJson({ error: 'this bill is settled; Abhinav must un-settle it first' }, 409);
+    const rc = await vjBillRc(env, no); if (rc.length) return vjJson({ error: `this bill has ${rc.length} receipt${rc.length === 1 ? '' : 's'} (${rc.map(r => r.no).join(', ')}): move or reverse the receipts first` }, 409);
+  }
   if (!bill.cancelled) {
     if (!reason) return vjDeny(400, 'reason required');
     if (reason === 'Other' && !note) return vjDeny(400, 'write the reason');
@@ -661,6 +665,7 @@ async function vjBillErase(request, env, who) {
   const row = await env.DB.prepare('SELECT data FROM vj_bills WHERE no = ?').bind(no).first();
   if (!row) return vjDeny(404, 'not found');
   const bill = JSON.parse(row.data), ids = [...new Set((bill.rows || []).map(r => String(r.id || '')).filter(i => /^[A-Za-z0-9_\-.~]{1,60}$/.test(i)))];
+  { const rc = await vjBillRc(env, no); if (rc.length || bill.settled) return vjJson({ error: bill.settled ? 'this bill is settled; un-settle it first' : 'this bill has receipts (' + rc.map(r => r.no).join(', ') + '): move or reverse the receipts first' }, 409); } // C-20261017-LEDGER
   const photos = [], now = Date.now(), st = [env.DB.prepare('DELETE FROM vj_bills WHERE no = ?').bind(no), env.DB.prepare('DELETE FROM audit WHERE path = ?').bind('bills/' + no)];
   for (const id of ids) {
     const path = 'tags/' + id, t = await env.DB.prepare('SELECT data FROM docs WHERE path = ?').bind(path).first();
@@ -691,13 +696,15 @@ async function vjBillSend(request, env, who) {
   if (!env.VJ_QUOTE_HOOK || !/^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_QUOTE_HOOK)) return vjJson({ error: 'WhatsApp sending is not set up' }, 503);
   let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
   const no = String(b && b.no || '').trim().toUpperCase().slice(0, 20);
-  if (!/^[BE]-\d{4}-\d{2,4}$/.test(no)) return vjDeny(400, 'bad bill number');
+  if (!/^[BER]-\d{4}-\d{2,4}$/.test(no)) return vjDeny(400, 'bad bill number'); // R = receipt (C-20261017-LEDGER)
   if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
-  const row = await env.DB.prepare('SELECT data FROM vj_bills WHERE no = ?').bind(no).first();
+  const isR = no[0] === 'R'; if (isR) await vjRcT(env); // C-20261017-LEDGER: a receipt slip goes the same way (from vj_receipts)
+  const row = await env.DB.prepare(isR ? 'SELECT data FROM vj_receipts WHERE no = ?' : 'SELECT data FROM vj_bills WHERE no = ?').bind(no).first();
   if (!row) return vjDeny(404, 'not found');
   const bill = JSON.parse(row.data);
-  if (who.role === 'sales' && bill.by !== who.email) return vjDeny(404, 'not found'); // a sales login only handles its own bills
+  if (!isR && who.role === 'sales' && bill.by !== who.email) return vjDeny(404, 'not found'); // a sales login only handles its own bills (receipts: every login)
   if (bill.cancelled) return vjJson({ error: 'this bill is cancelled' }, 409);
+  if (isR && (bill.reversed || bill.mode === 'adjust')) return vjJson({ error: bill.reversed ? 'this receipt is reversed' : 'an adjustment has no slip to send' }, 409);
   if (!/^[6-9]\d{9}$/.test(String(bill.mobile || ''))) return vjJson({ error: 'the bill has no 10-digit Indian mobile number' }, 400);
   let bytes; try { const s = String(b.pdf || ''); if (s.length > 7e6) throw new Error('big'); bytes = Uint8Array.from(atob(s), c => c.charCodeAt(0)); } catch (e) { return vjDeny(400, 'bad PDF'); }
   if (bytes.length < 500 || bytes.length > 5e6 || String.fromCharCode(...bytes.subarray(0, 5)) !== '%PDF-') return vjDeny(400, 'bad PDF');
@@ -715,7 +722,7 @@ async function vjBillSend(request, env, who) {
     env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = CAST(CAST(v AS INTEGER) + 1 AS TEXT)').bind(ck, '1')]);
   let ok = false;
   try { const r = await fetch(env.VJ_QUOTE_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000), body: JSON.stringify({ kind: 'bill-pdf', token }) }); ok = r.ok; } catch (e) {}
-  await vjAudit(env, who, 'bill-whatsapp', 'bills/' + no, (ok ? 'queued' : 'hook failed') + ' to +91 ' + bill.mobile);
+  await vjAudit(env, who, 'bill-whatsapp', (isR ? 'receipts/' : 'bills/') + no, (ok ? 'queued' : 'hook failed') + ' to +91 ' + bill.mobile);
   if (!ok) { try { await env.PHOTOS.delete('billpdf-' + token); } catch (e) {} return vjJson({ error: 'could not reach Aashvi, try again' }, 502); }
   return vjJson({ ok: true, token, to: '+91 ' + bill.mobile });
 }
@@ -734,14 +741,18 @@ async function vjBillPdfHook(url, env, done) {
     if (s.status !== 'queued' || Date.now() - s.at > VJ_BWA_TTL) return reply('gone', 410);
     const u = await env.DB.prepare('UPDATE vj_meta SET v = ? WHERE k = ? AND v = ?').bind(JSON.stringify(Object.assign({}, s, { status: 'fetched', fetchedAt: Date.now() })), 'billsend:' + t, r.v).run();
     if (!u.meta || u.meta.changes !== 1) return reply('gone', 410);
-    const row = await env.DB.prepare('SELECT data FROM vj_bills WHERE no = ?').bind(s.no).first(), bill = row ? JSON.parse(row.data) : null;
+    const isR = /^R-/.test(s.no); if (isR) await vjRcT(env); // C-20261017-LEDGER: receipts
+    const row = await env.DB.prepare(isR ? 'SELECT data FROM vj_receipts WHERE no = ?' : 'SELECT data FROM vj_bills WHERE no = ?').bind(s.no).first(), bill = row ? JSON.parse(row.data) : null;
     const f = await vjPhotoGet(env, 'billpdf-' + t);
-    if (!bill || bill.cancelled || !f || !/^[6-9]\d{9}$/.test(String(bill.mobile || ''))) return reply('gone', 410);
+    if (!bill || bill.cancelled || bill.reversed || !f || !/^[6-9]\d{9}$/.test(String(bill.mobile || ''))) return reply('gone', 410);
     const buf = await new Response(f.body).arrayBuffer();
     const clean = v => String(v || '').replace(/[\u0000-\u001f"\\<>{}]/g, ' ').replace(/\s+/g, ' ').trim();
-    const name = clean(bill.name).slice(0, 60) || 'Customer', title = bill.title === 'Estimate' ? 'Estimate' : 'Bill';
-    return new Response(JSON.stringify({ to: '91' + bill.mobile, name, title, no: bill.no, date: String(bill.date || '').split('-').reverse().join('-'),
-      total: 'Rs ' + Number(bill.total || 0).toLocaleString('en-IN'), fileName: (title + ' ' + bill.no + ' ' + name.replace(/[^A-Za-z0-9 .\-]/g, '')).trim().slice(0, 80) + '.pdf', pdf: vjB64(buf) }),
+    const name = clean(bill.name).slice(0, 60) || 'Customer', title = isR ? 'Receipt' : bill.title === 'Estimate' ? 'Estimate' : 'Bill';
+    const date = String(bill.date || '').split('-').reverse().join('-'), total = isR && !(Number(bill.amount) > 0) ? Number(bill.fine || 0).toFixed(3) + ' g fine gold' : 'Rs ' + Number((isR ? bill.amount : bill.total) || 0).toLocaleString('en-IN');
+    // template + params in body order (C-20261017-LEDGER): bills [name, title, no, date, total]; receipts [name, receipt no, amount, date, against]
+    const params = (isR ? [name, bill.no, total, date, bill.bill || 'your account'] : [name, title, bill.no, date, total]).map(v => clean(v).slice(0, 200));
+    return new Response(JSON.stringify({ to: '91' + bill.mobile, name, title, no: bill.no, date,
+      total, fileName: (title + ' ' + bill.no + ' ' + name.replace(/[^A-Za-z0-9 .\-]/g, '')).trim().slice(0, 80) + '.pdf', template: isR ? 'vj_receipt_pdf_v1' : 'vj_bill_pdf_v1', params, pdf: vjB64(buf) }),
       { status: 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
   }
   if (s.status !== 'fetched') return reply('gone', 410);
@@ -768,8 +779,9 @@ async function vjBillBook(url, env, who) { // a sales login sees only the bills 
     .filter(b => !b.cancelled && (all || String(b.date || '').startsWith(month)) && mine(b)).sort(/* owner 17/10 16:03: cancelled bills appear nowhere (list, summary, bills, pieces); the record stays only in the database (C-20261017-NOCANCELLED) */ (a, b) => String(a.date).localeCompare(String(b.date)) || String(a.at).localeCompare(String(b.at)));
   const MODE = { ws: 'W/s', nett: 'Nett', g2g: 'Gold to Gold', item: 'Gold Item' };
   const dmy = d => String(d || '').split('-').reverse().join('-');
+  const rcs = url.pathname === '/api/vj/bills' ? (await vjLedgerLoad(env)).rcs : []; // C-20261017-LEDGER: paid / balance per bill
   if (url.pathname === '/api/vj/bills') return vjJson({ ok: true, bills: bills.map(b => ({ no: b.no, title: b.title, date: b.date, name: b.name, city: b.city, mobile: b.mobile,
-    mode: b.mode, settle: b.settle || '', total: b.total, fine: b.fine || 0, disc: b.disc || 0, pieces: (b.rows || []).length, by: b.byName && b.byName !== 'Owner' ? b.byName : String(b.by || '').split('@')[0],
+    mode: b.mode, settle: b.settle || '', total: b.total, ...(b.title === 'Bill' ? (q => ({ received: q.recv, balance: q.bal, fineDue: q.fineDue, settled: !!b.settled }))(vjBillPos(b, rcs)) : {}), fine: b.fine || 0, disc: b.disc || 0, pieces: (b.rows || []).length, by: b.byName && b.byName !== 'Owner' ? b.byName : String(b.by || '').split('@')[0],
     cancelled: b.cancelled ? b.cancelled.reason + (b.cancelled.note ? ' - ' + b.cancelled.note : '') + ' (' + b.cancelled.byName + ')' : '' })), canCancel: who.role === 'admin', canCancelOnly: true });
   const head = ['Date', 'Number', 'Type', 'Status', 'Customer', 'Mobile', 'City', 'Gold calculation', 'Gold rate F (Rs/g)', 'Pieces', 'Total (Rs)', 'Discount (Rs)', 'After discount (Rs)', 'Rounded (Rs)', 'GST (Rs)', 'Bill total (Rs)', 'Fine gold to receive (g)', 'Made by'];
   const cx = b => b.cancelled ? 'CANCELLED - ' + b.cancelled.reason + (b.cancelled.note ? ': ' + b.cancelled.note : '') + ' (' + b.cancelled.byName + ', ' + dmy(String(b.cancelled.at).slice(0, 10)) + ')' : 'Active';
@@ -1391,6 +1403,14 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/bill/send' && request.method === 'POST') return vjBillSend(request, env, who); // C-20261017-BILLWA
   if (p === '/api/vj/bill/sendstatus' && request.method === 'GET') return vjBillSendStatus(url, env);
   if (p === '/api/vj/bill/erase' && request.method === 'POST') return vjBillErase(request, env, who);
+  // C-20261017-LEDGER: receipts, ledgers, Settled (Abhinav only, checked inside), WhatsApp template readiness
+  if ((p === '/api/vj/ledger' || p === '/api/vj/ledger/bill' || p === '/api/vj/receipt') && request.method === 'GET') return vjLedgerGet(url, env, who);
+  if (p === '/api/vj/ledger.xlsx' && request.method === 'GET') return vjLedgerXlsx(url, env, who);
+  if (p === '/api/vj/wa-ready' && request.method === 'GET') return vjWaReady(env);
+  if (['/api/vj/receipt', '/api/vj/receipt/reverse', '/api/vj/ledger/settle', '/api/vj/ledger/unsettle'].includes(p) && request.method === 'POST') {
+    if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed');
+    return p === '/api/vj/receipt' ? vjReceipt(request, env, who) : p === '/api/vj/receipt/reverse' ? vjReceiptReverse(request, env, who) : p === '/api/vj/ledger/settle' ? vjSettle(request, env, who) : vjUnsettle(request, env, who);
+  }
   if (p === '/api/vj/orders' && request.method === 'GET') return vjOrdersReport(env, who);
   if (p.startsWith('/_blob/') && request.method === 'GET') return vjBlob(p.slice(7), env);
   if ((p === '/tags' || p === '/tags.html' || p.startsWith('/tags/')) && request.method === 'GET') {
