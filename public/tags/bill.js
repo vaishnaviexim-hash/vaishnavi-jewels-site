@@ -326,7 +326,7 @@
     doc.setFillColor(243, 230, 211); doc.rect(M, y - 5, W - 2 * M, 8, "F"); row(cols.map(c => c[0]), true); y += 1;
     b.rows.forEach(r => { if (y > 250) { doc.addPage(); y = 20; }
       const dd = r.ct ? r.ct.toFixed(2) + " ct" + ((r.dias || []).length === 1 ? "\n@ " + Math.round(r.dias[0].rate).toLocaleString("en-IN") : "") + "\n" + fm(r.diaAmt) : "-";
-      const base = [(r.design ? r.design + " - " : "") + r.label + (r.cat ? "\n" + r.cat : ""), (r.gold || "-") + (Math.round(r.F) !== hF ? "\n@ " + Math.round(r.F).toLocaleString("en-IN") : ""), b.settle === "fine" ? g3(r.fine) + "\nfine" : fm(r.goldAmt) + (b.settle ? "\n" + g3(r.fine) + " fine" : ""), b.mode === "item" ? "in gold" : fm(r.making) + "\n@ " + r.mkRate + "/g", dd, r.other ? fm(r.other) : "-"];
+      const base = [(r.design ? r.design + " - " : "") + r.label + (r.cat ? "\n" + r.cat : ""), (r.gold || "-") + (Math.round(r.F) !== hF ? "\n@ " + Math.round(r.F).toLocaleString("en-IN") : ""), b.settle === "fine" ? g3(r.fine) + "\nfine" : fm(r.goldAmt) + (b.settle ? "\n" + g3(r.fine) + " fine" : ""), b.mode === "item" ? "in gold" : fm(r.making) /* owner 17/10 15:38: no making rate per g on the printed bill */, dd, r.other ? fm(r.other) : "-"];
       row(D ? base.concat([fm(r.amount), r.disc ? fm(r.disc) + (r.discTxt ? "\n(" + r.discTxt + ")" : "") : "-", fm(r.net)]) : base.concat([fm(r.amount)]), false, D ? 10 : 10.5, P ? (pics[r.id] || null) : undefined);
       doc.setDrawColor(225); doc.line(M, y - 3, W - M, y - 3); });
     y += 3; if (y > 240) { doc.addPage(); y = 20; }
