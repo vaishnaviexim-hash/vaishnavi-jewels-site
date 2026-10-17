@@ -1543,6 +1543,87 @@ async function vjDailyReport(env) {
   }
 }
 
+// Nightly backup of VJ Tags data (owner 17/10/2026 18:27, C-20261017-TAGSBACKUP). A Make schedule rings GET /hooks/vj-backup at
+// 00:05 IST (no data returned, no secret). Only from 23:55 to 00:45 IST and once per IST date, the worker exports every D1 table as
+// JSON (manifest with row counts + schema; photos stay in R2/KV), gzips it, keeps it under a random 128-bit one-time token (60 min)
+// and rings VJ_QUOTE_HOOK with ONLY {kind:'vj-backup', token}. Make fetches /hooks/vj-backupfile?t=token once (then it is deleted)
+// and saves it in the owner's private Drive folder "VJ Tags backups" (kept 15 days). Live bill-send / backup tokens are left out.
+const VJ_BK_WIN = [18 * 60 + 30, 21 * 60]; // TEMP end-to-end test 17/10 (real window 23:55-00:45 IST)
+const VJ_BK_TTL = 60 * 60e3;
+async function vjBackupBuild(env, ymd, now) {
+  const tabs = ((await env.DB.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite\\_%' ESCAPE '\\' AND name NOT LIKE '\\_cf\\_%' ESCAPE '\\' AND name NOT LIKE 'd1\\_%' ESCAPE '\\' ORDER BY name").all()).results) || [];
+  const cs = new CompressionStream('gzip'), w = cs.writable.getWriter(), out = new Response(cs.readable).arrayBuffer(), enc = new TextEncoder();
+  const put = s => w.write(enc.encode(s)), counts = {}, schema = {}; let skipped = 0, firstT = true;
+  await put('{"format":"vj-tags-backup-1","site":"' + VJ_HOST + '","date":"' + ymd + '","at":"' + new Date(now).toISOString() + '","photos":"not included (they stay in R2/KV)","tables":{');
+  for (const tb of tabs) {
+    const t = String(tb.name || ''); if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(t)) continue;
+    schema[t] = tb.sql || ''; counts[t] = 0;
+    await put((firstT ? '' : ',') + '"' + t + '":['); firstT = false;
+    const keep = r => !(t === 'vj_meta' && (/^backupfile:/.test(r.k) || (/^billsend:/.test(r.k) && /"status":"(queued|fetched)"/.test(r.v))));
+    const emit = async rows => { for (const r of rows) { if (!keep(r)) { skipped++; continue; } await put((counts[t] ? ',' : '') + JSON.stringify(r)); counts[t]++; } };
+    let last = -Infinity, paged = true;
+    try {
+      for (;;) {
+        const rows = ((await env.DB.prepare('SELECT rowid AS "__rid", * FROM "' + t + '" WHERE rowid > ? ORDER BY rowid LIMIT 3000').bind(last === -Infinity ? -9e15 : last).all()).results) || [];
+        if (!rows.length) break;
+        last = rows[rows.length - 1].__rid; for (const r of rows) delete r.__rid;
+        await emit(rows); if (rows.length < 3000) break;
+      }
+    } catch (e) { paged = false; }
+    if (!paged) { if (counts[t]) throw new Error('paging failed in ' + t); await emit(((await env.DB.prepare('SELECT * FROM "' + t + '"').all()).results) || []); }
+    await put(']');
+  }
+  await put('},"manifest":' + JSON.stringify({ tables: counts, rows: Object.values(counts).reduce((a, b) => a + b, 0), skippedLiveTokens: skipped, schema }) + '}');
+  await w.close();
+  return { gz: new Uint8Array(await out), counts };
+}
+async function vjBackup(env) {
+  const now = Date.now(), ist = new Date(now + 5.5 * 3600e3), mins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+  const inWin = VJ_BK_WIN[0] <= VJ_BK_WIN[1] ? (mins >= VJ_BK_WIN[0] && mins < VJ_BK_WIN[1]) : (mins >= VJ_BK_WIN[0] || mins < VJ_BK_WIN[1]);
+  if (!inWin) return reply('not now', 200);
+  if (!env.DB || !env.PHOTOS || !env.VJ_QUOTE_HOOK || !/^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_QUOTE_HOOK)) return reply('not set up', 503);
+  const ymd = new Date(now + 5.5 * 3600e3 + 10 * 60e3).toISOString().slice(0, 10); // IST date of the run (23:55-23:59 counts as the next day)
+  await vjMetaT(env);
+  // tidy: an export Make has collected, or never collected within 60 minutes, is removed
+  try { const old = ((await env.DB.prepare("SELECT k, v FROM vj_meta WHERE k LIKE 'backupfile:%' LIMIT 50").all()).results) || [];
+    for (const o of old) { const s = JSON.parse(o.v); if (s.status !== 'queued' || now - s.at > VJ_BK_TTL) { try { await env.PHOTOS.delete('backup-' + o.k.slice(11)); } catch (e) {} await env.DB.prepare('DELETE FROM vj_meta WHERE k = ?').bind(o.k).run(); } } } catch (e) {}
+  const key = 'backup:' + ymd;
+  const claim = await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO NOTHING').bind(key, new Date(now).toISOString()).run();
+  if (!claim.meta || claim.meta.changes !== 1) return reply('already done today', 200);
+  let token = '';
+  try {
+    const { gz, counts } = await vjBackupBuild(env, ymd, now);
+    token = [...crypto.getRandomValues(new Uint8Array(16))].map(x => x.toString(16).padStart(2, '0')).join('');
+    if (vjIsR2(env)) await env.PHOTOS.put('backup-' + token, gz, { httpMetadata: { contentType: 'application/gzip' } });
+    else await env.PHOTOS.put('backup-' + token, gz, { expirationTtl: 3600, metadata: { type: 'application/gzip' } });
+    await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('backupfile:' + token, JSON.stringify({ status: 'queued', at: now, ymd, bytes: gz.length })).run();
+    const r = await fetch(env.VJ_QUOTE_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(20000), body: JSON.stringify({ kind: 'vj-backup', token }) });
+    if (!r.ok) throw new Error('hook ' + r.status);
+    await vjAudit(env, { email: 'backup (Make)' }, 'backup', 'backup/' + ymd, 'queued ' + gz.length + ' bytes; ' + Object.entries(counts).map(([k, v]) => k + ' ' + v).join(', '));
+    return reply('ok', 200);
+  } catch (e) {
+    if (token) { try { await env.PHOTOS.delete('backup-' + token); } catch (e2) {} try { await env.DB.prepare('DELETE FROM vj_meta WHERE k = ?').bind('backupfile:' + token).run(); } catch (e2) {} }
+    try { await env.DB.prepare('DELETE FROM vj_meta WHERE k = ?').bind(key).run(); } catch (e2) {} // a later bell in the window may try again
+    return reply('failed', 502);
+  }
+}
+// Make side (outside Cloudflare Access): the gz once, then it is deleted; 410 afterwards or after 60 minutes
+async function vjBackupFile(url, env) {
+  const t = String(url.searchParams.get('t') || ''); if (!/^[a-f0-9]{32}$/.test(t)) return reply('not found', 404);
+  if (!env.DB || !env.PHOTOS) return reply('not set up', 503);
+  await vjMetaT(env);
+  const drop = async () => { try { await env.PHOTOS.delete('backup-' + t); } catch (e) {} };
+  const r = await env.DB.prepare('SELECT v FROM vj_meta WHERE k = ?').bind('backupfile:' + t).first(); if (!r) return reply('gone', 410);
+  const s = JSON.parse(r.v);
+  if (s.status !== 'queued' || Date.now() - s.at > VJ_BK_TTL) { await drop(); return reply('gone', 410); }
+  const u = await env.DB.prepare('UPDATE vj_meta SET v = ? WHERE k = ? AND v = ?').bind(JSON.stringify(Object.assign({}, s, { status: 'fetched', fetchedAt: Date.now() })), 'backupfile:' + t, r.v).run();
+  if (!u.meta || u.meta.changes !== 1) return reply('gone', 410);
+  const f = await vjPhotoGet(env, 'backup-' + t); if (!f) return reply('gone', 410);
+  const buf = await new Response(f.body).arrayBuffer(); await drop();
+  return new Response(buf, { status: 200, headers: { 'content-type': 'application/gzip', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'x-robots-tag': 'noindex',
+    'content-disposition': 'attachment; filename="VJTags_backup_' + String(s.ymd || '').replace(/[^0-9-]/g, '') + '.json.gz"' } });
+}
+
 async function vjHandle(request, env, ctx, url) {
   const p = url.pathname;
   const dev = env.VJ_DEV === '1';
@@ -1589,6 +1670,7 @@ export default {
     if (p === '/tags' || p === '/tags.html' || p.startsWith('/tags/') || p.startsWith('/api/vj/') || p.startsWith('/_blob/')) return vjHandle(request, env, ctx, url);
     if (p === '/hooks/vj-billpdf' || p === '/hooks/vj-billpdf-done') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjBillPdfHook(url, env, p.endsWith('-done')) : reply('Method not allowed', 405); // C-20261017-BILLWA
     if (p === '/hooks/vj-daily') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjDailyReport(env) : reply('Method not allowed', 405);
+    if (p === '/hooks/vj-backup' || p === '/hooks/vj-backupfile') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-backup' ? vjBackup(env) : vjBackupFile(url, env)) : reply('Method not allowed', 405); // C-20261017-TAGSBACKUP
     // gold rate pushed by Make (secret header); outside Cloudflare Access like the WhatsApp hook
     if (p === '/hooks/vj-gold') return (request.method === 'POST' && (url.hostname === VJ_HOST || env.VJ_DEV === '1')) ? vjGoldPush(request, env) : reply('Method not allowed', 405);
     if (url.pathname === '/hooks/whatsapp') {
