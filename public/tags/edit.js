@@ -25,8 +25,11 @@
     if (t.kind === "sample") { fMetal = inp((t.metal && t.metal.net) || 0, 110, "number"); wrap.append(row("Sample weight (g, priced as 14K)", fMetal)); }
     // gold lines
     const gBox = el("div", { style: "display:flex;flex-direction:column;gap:6px" });
-    const addGold = g => { const k = sel(KARATS, (g && g.k) || "14K", 80), n = inp(g ? g.net : "", 100, "number"), rm = el("button", { type: "button", className: "btn ghost", textContent: "Remove" });
-      const r = el("div", { style: "display:flex;gap:6px;align-items:center;flex-wrap:wrap" }, [k, n, "g", rm]); r._get = () => ({ k: k.value, net: num(n.value) }); rm.onclick = () => r.remove(); gBox.append(r); };
+    // C-20261017-CHAINTUNCH (owner 17/10/2026): a gold line with a tunch is a chain line (net x tunch x fine rate, no making); empty = not a chain
+    const addGold = g => { const k = sel(KARATS, (g && g.k) || "14K", 80), n = inp(g ? g.net : "", 100, "number"), tn = inp(g && g.tunch > 0 ? g.tunch : "", 90, "number"), rm = el("button", { type: "button", className: "btn ghost", textContent: "Remove" });
+      tn.placeholder = t.cat === "CH" ? "tunch 0.920" : "chain tunch";
+      const r = el("div", { style: "display:flex;gap:6px;align-items:center;flex-wrap:wrap" }, [k, n, "g", tn, rm]);
+      r._get = () => { const o = { k: k.value, net: num(n.value) }; if (String(tn.value).trim() !== "") o.tunch = Math.round(num(tn.value) * 1000) / 1000; return o; }; rm.onclick = () => r.remove(); gBox.append(r); };
     (t.gold || []).forEach(addGold);
     if (t.kind !== "sample") { wrap.append(el("strong", { textContent: "Gold" }), gBox, el("button", { type: "button", className: "btn ghost", textContent: "+ Gold line", onclick: () => addGold(null) })); }
     // diamond / stone lines
@@ -46,6 +49,8 @@
       const gold = [...gBox.children].map(r => r._get()).filter(g => g.net > 0);
       const dias = [...dBox.children].map(r => r._get()).filter(d => d.q && (d.ct > 0 || d.pcs > 0));
       if (gold.some(g => g.net > 500) || dias.some(d => d.ct > 200 || d.rate > 5e6)) { note.textContent = "A weight or rate looks wrong - check the numbers."; return; }
+      if (gold.some(g => g.tunch !== undefined && !(g.tunch >= 0.3 && g.tunch <= 1.1))) { note.textContent = "Chain tunch must be from 0.300 to 1.100 (e.g. 0.920), or empty if the line is not a chain."; return; }
+      if (t.cat === "CH" && t.kind !== "sample" && gold.some(g => g.tunch === undefined)) { note.textContent = "Chain: type the tunch on each gold line (e.g. 0.920)."; return; }
       const ppcs = num(fPPcs.value), prate = String(fPRate.value).trim() === "" ? 300 : num(fPRate.value);
       if (!(Number.isInteger(ppcs) && ppcs >= 0 && ppcs <= 10000) || ppcs > 0 && !(Number.isInteger(prate) && prate >= 1 && prate <= 100000)) { note.textContent = "Polki: pieces 0-10,000 and rate per piece Rs 1-1,00,000, whole numbers."; return; }
       const data = { designNo: fDesign.value.trim().slice(0, 30), remark: fRemark.value.trim().slice(0, 120), box: fBox.value.trim().slice(0, 60), other: Object.assign({}, t.other || {}, { amt: Math.max(0, num(fOther.value)) }), dias, polki: ppcs > 0 ? { pcs: ppcs, rate: prate } : null };
