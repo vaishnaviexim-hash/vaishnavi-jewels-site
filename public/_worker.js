@@ -597,18 +597,23 @@ function vjBillCalc(tags, o) {
   const gstPct = o.gst == null ? 3 : Number(o.gst);
   const rows = tags.map(t => {
     const gl = (t.kind === 'sample' ? [{ k: '14K', net: Number(t.metal && t.metal.net) || 0 }] : (Array.isArray(t.gold) ? t.gold : []))
-      .map(g => ({ k: String(g && g.k || ''), net: Number(g && g.net) || 0 })).filter(g => g.net > 0);
+      .map(g => ({ k: String(g && g.k || ''), net: Number(g && g.net) || 0, tn: (n => n >= 0.3 && n <= 1.1 ? n : 0)(Number(g && g.tunch)) })).filter(g => g.net > 0);
     const tr0 = Number(t.kind === 'order' && t.order && t.order.rate), trT = tr0 >= 2000 && tr0 <= 50000 ? tr0 : (t.kind === 'order' && Number(t.gold24gAtTag) >= 2000 && Number(t.gold24gAtTag) <= 50000 ? Number(t.gold24gAtTag) : 0), Fo = trT || F; // the gold rate typed on the tag is used; only tags without one use today's rate F (owner 17/10, C-20261017-TAGRATE; was C-20261016-ORDERRATE)
     const Fx = Number(o.frates && o.frates[t.id]), Fr = Fx >= 2000 && Fx <= 50000 ? Fx : Fo; // rate typed for this piece on the bill (C-20261016-PIECERATE)
-    const kr = k => Fr * (Number(pur[k]) || 0), g0 = gl[0];
+    // owner 17/10/2026 18:16 / 18:19 (C-20261017-CHAINTUNCH): a gold line marked as a chain (its own tunch tn) is gold = net x tunch x the fine rate,
+    // fine gold (Gold to Gold / Gold Item) = net x tunch, with no making and no extra wastage. Making, its 5 g limit (first non-chain line) and the
+    // Rs 1,000 minimum apply to the non-chain lines only.
+    const kr = k => Fr * (Number(pur[k]) || 0), g0 = gl.find(g => !g.tn);
     let mk = 0;
     // owner 17/10/2026 17:00 (C-20261017-MAKINGMIN): making Rs 650/g (750/g when the first gold line is up to 5 g), never below Rs 1,000 a piece,
     // plus 10% wastage on the gold - in every mode (W/s: wastage in the gold value; Nett: wastage added to the making; Gold to Gold: in the fine factor)
     const b = g0 ? (g0.net > m.limit ? m.base : m.small) : 0; if (g0 && mode !== 'item') mk = b;
-    let gold = 0, net = 0, fine = 0;
+    let gold = 0, net = 0, fine = 0, nc = 0, ng = 0;
     gl.forEach(g => { net += g.net;
+      if (g.tn) { if (fineMode) fine += g.net * g.tn; else gold += g.net * g.tn * Fr; return; }
+      nc += g.net;
       if (fineMode) fine += g.net * (VJ_FINE[mode][g.k] || 0);
-      else gold += g.net * kr(g.k) * (mode === 'ws' && g.k !== '24K' ? 1.1 : 1); });
+      else { const v = g.net * kr(g.k) * (mode === 'ws' && g.k !== '24K' ? 1.1 : 1); gold += v; ng += v; } });
     fine = Math.round(fine * 1000) / 1000;
     if (settle === 'amount') gold = fine * Fr;
     const ov = o.rates && Array.isArray(o.rates[t.id]) ? o.rates[t.id] : []; // rates edited on the bill (C-20261016-BILLALL); the tag is not changed
@@ -618,9 +623,9 @@ function vjBillCalc(tags, o) {
     const pk = t.polki && typeof t.polki === 'object' ? t.polki : null, ppcs = pk ? Math.max(0, Math.round(Number(pk.pcs) || 0)) : 0, ptag = pk ? Math.round(Number(pk.rate) || 0) : 0;
     const px = Number(o.prates && o.prates[t.id]), prate = ppcs ? (px >= 1 && px <= 100000 ? Math.round(px) : ptag) : 0;
     const r = { id: t.id, label: String(t.label || ''), design: String(t.designNo || ''), cat: String(t.catName || ''),
-      gold: gl.map(g => g.k + ' ' + g.net.toFixed(3) + ' g').join(' + '), F: Fr, Fdef: Fo, orderRate: Fo !== F, rateEdited: Fr !== Fo, net: Math.round(net * 1000) / 1000, fine, goldAmt: Math.round(gold),
+      gold: gl.map(g => g.k + ' ' + g.net.toFixed(3) + ' g' + (g.tn ? ', tunch ' + g.tn.toFixed(3) : '')).join(' + '), chain: gl.length > 0 && !g0, mkWt: Math.round(nc * 1000) / 1000, F: Fr, Fdef: Fo, orderRate: Fo !== F, rateEdited: Fr !== Fo, net: Math.round(net * 1000) / 1000, fine, goldAmt: Math.round(gold),
       mkRate: 0, making: 0, ct: Math.round(ct * 100) / 100, diaAmt: Math.round(dia), polkiPcs: ppcs, polkiRate: prate, polkiTagRate: ppcs ? ptag : 0, polki: ppcs * prate, other: Math.round(oth), dias: dl };
-    if (g0 && mode !== 'item' && net > 0) { let mkAmt = Math.max(mk * net, Number(m.min) || 0); if (mode === 'nett') mkAmt += gold * m.pct / 100; r.making = Math.round(mkAmt); r.mkRate = Math.round(r.making / net); }
+    if (g0 && mode !== 'item' && nc > 0) { let mkAmt = Math.max(mk * nc, Number(m.min) || 0); if (mode === 'nett') mkAmt += ng * m.pct / 100; r.making = Math.round(mkAmt); r.mkRate = Math.round(r.making / nc); }
     r.amount = r.goldAmt + r.making + r.diaAmt + r.polki + r.other;
     const dv = String(o.disc && o.disc[t.id] != null ? o.disc[t.id] : '').trim(), pm = dv.match(/^(\d+(?:\.\d+)?)\s*%$/), dn = Number(dv.replace(/[,\s]/g, ''));
     r.discTxt = pm ? Math.min(100, Number(pm[1])) + '%' : '';
