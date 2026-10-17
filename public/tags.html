@@ -59,7 +59,7 @@ input[readonly]{background:var(--sunk);color:var(--muted)}
 .photo .thumb img{width:100%;height:100%;object-fit:cover}
 .lines{display:flex;flex-direction:column;gap:8px}
 .ln{display:grid;gap:8px;align-items:end}
-.ln.g{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr) auto}
+.ln.g{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,.9fr) minmax(0,1.1fr) auto} /* C-20261017-CHAINTUNCH: Karat, Net, Chain tunch */
 .ln.d{grid-template-columns:minmax(0,1fr) minmax(0,1.1fr) minmax(0,.7fr) minmax(0,.8fr) minmax(0,1fr) minmax(0,1fr) auto} /* owner 17/10 17:27: Shape, Quality, Pcs, D Wt, Rate */
 .ln.o{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
 .ln.p{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr)}
@@ -363,14 +363,14 @@ function renderCheck(){
   top.appendChild(pcol);
   const h=document.createElement("div");const l=document.createElement("div");l.className="labelno";l.textContent=(t.designNo?t.designNo+" · ":"")+t.label;const c=document.createElement("div");c.className="hint";c.textContent=S.role==="sales"?(t.catName||""):(t.catName||"")+(t.remark?" · "+t.remark:"")+(t.kind==="sample"?" · sample":"")+(t.kind==="order"?" · order"+(t.order&&t.order.name?" for "+t.order.name:"")+(t.order&&t.order.due?", delivery "+t.order.due.split("-").reverse().join("-"):""):"");h.append(l,c);top.appendChild(h);card.appendChild(top);
   const tb=document.createElement("table");tb.className="sum";const add=(a,b,cl)=>{const tr=document.createElement("tr");if(cl)tr.className=cl;const x=document.createElement("td"),y=document.createElement("td");x.textContent=a;y.textContent=b;tr.append(x,y);tb.appendChild(tr)};
-  const pin=priceInput(t);pin.gold.forEach(g=>add("Gold "+g.k,g.net.toFixed(3)+" g"));pin.dias.forEach(d=>add(`${d.shape} ${d.q}`,`${d.ct.toFixed(2)} ct (${d.pcs})`+(d.rate>0?` @ ${fmt(d.rate)}`:"")));
+  const pin=priceInput(t);pin.gold.forEach(g=>add((g.tunch>0?"Chain ":"Gold ")+g.k,g.net.toFixed(3)+" g"+(g.tunch>0?" × tunch "+Number(g.tunch).toFixed(3):"")));pin.dias.forEach(d=>add(`${d.shape} ${d.q}`,`${d.ct.toFixed(2)} ct (${d.pcs})`+(d.rate>0?` @ ${fmt(d.rate)}`:"")));
   if(t.polki&&t.polki.pcs>0)add("Polki",`${t.polki.pcs} pc @ ${fmt(t.polki.rate)}`);
   if(t.other&&t.other.amt)add("Other charges",fmt(t.other.amt));
   const pr=price(priceInput(t)),s=st();
   if(t.kind==="sample"&&S.role!=="sales")add("Sample","not for sale - order estimate at 14K below");
   if(!pr)add("Price","gold rate not set","total");
   else if(S.role==="sales"){add("Price today",fmt(pr.final),"total")}
-  else{add("Gold value",fmt(pr.gold));add("Making",fmt(pr.making));if(pr.dia)add("Diamonds",fmt(pr.dia));if(pr.pol)add("Polki",fmt(pr.pol));if(pr.oth)add("Other",fmt(pr.oth));add(`GST ${s.gst}%`,fmt(pr.gst));add("Price today",fmt(pr.final),"total")}
+  else{add("Gold value",fmt(pr.gold));add("Making",pr.nt>0||!pr.ch?fmt(pr.making):"— (chain: none)");if(pr.dia)add("Diamonds",fmt(pr.dia));if(pr.pol)add("Polki",fmt(pr.pol));if(pr.oth)add("Other",fmt(pr.oth));add(`GST ${s.gst}%`,fmt(pr.gst));add("Price today",fmt(pr.final),"total")}
   card.appendChild(tb);
   const n=document.createElement("p");n.className="hint";n.textContent=pr?`At 24K ${fmt(s.gold24g)}/g${s.goldAt?", updated "+new Date(s.goldAt).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):""}.`+(t.priceAtTag?` Price when tagged: ${fmt(t.priceAtTag)}.`:""):"";card.appendChild(n);
   const acts=document.createElement("div");acts.style.cssText="display:flex;gap:8px;flex-wrap:wrap";
@@ -398,7 +398,7 @@ let lineSeq=0;
 function opt(sel,vals,cur){vals.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=v;sel.appendChild(o)});if(cur)sel.value=cur}
 function addGold(k,net){
   const id=++lineSeq,d=document.createElement("div");d.className="ln g";d.dataset.id=id;
-  d.innerHTML=`<label>Karat<select id="gk${id}"></select></label><label>Net gold wt (g)<input type="number" id="gn${id}" step="0.001" min="0" placeholder="0.000"></label><div class="val" id="gv${id}"></div><button type="button" class="x" aria-label="Remove gold line">✕</button>`;
+  d.innerHTML=`<label>Karat<select id="gk${id}"></select></label><label>Net gold wt (g)<input type="number" id="gn${id}" step="0.001" min="0" placeholder="0.000"></label><label>Chain tunch<input type="number" id="gt${id}" step="0.001" min="0.3" max="1.1" placeholder="chain only" inputmode="decimal"></label><div class="val" id="gv${id}"></div><button type="button" class="x" aria-label="Remove gold line">✕</button>`;
   $("goldLines").appendChild(d);opt($("gk"+id),KARATS,k||"14K"); /* owner 16/10/2026: default 14K */if(net)$("gn"+id).value=net;
   d.querySelector(".x").addEventListener("click",()=>{if($("goldLines").children.length>1){d.remove();update()}});
   update();
@@ -419,7 +419,7 @@ const firstBox=id=>{const l=$(id).lastElementChild,f=l&&l.querySelector("select,
 /* owner 17/10/2026 17:43 (C-20261017-DESIGNWARN): warn while typing a design number that is already tagged; saving is still allowed */
 (()=>{const dn=$("designNo"),w=document.createElement("div");w.id="dnWarn";w.style.cssText="font-size:14px;margin-top:4px;line-height:1.35";dn.parentNode.appendChild(w);
   const chk=()=>{const v=dn.value.trim().toUpperCase();w.textContent="";if(!v)return;const same=(S.tags||[]).filter(t=>String(t.designNo||"").trim().toUpperCase()===v);if(!same.length)return;
-    const wt=[...$("goldLines").querySelectorAll('input[type=number],input[inputmode=decimal]')].reduce((a,i)=>a+(Number(i.value)||0),0),gw=t=>(t.gold||[]).reduce((a,g)=>a+(Number(g&&g.net)||0),0);
+    const wt=[...$("goldLines").querySelectorAll('input[id^=gn]')].reduce((a,i)=>a+(Number(i.value)||0),0),gw=t=>(t.gold||[]).reduce((a,g)=>a+(Number(g&&g.net)||0),0);
     const twin=wt>0&&same.find(t=>Math.abs(gw(t)-wt)<0.0005);
     w.style.color=twin?"#b3261e":"#8a5a00";w.textContent=(twin?"Looks like a double tag: "+twin.label+" has the same design number and the same gold weight ("+gw(twin).toFixed(3)+" g).":"Design "+v+" is already tagged: "+same.slice(0,4).map(t=>t.label+" ("+gw(t).toFixed(3)+" g)").join(", ")+(same.length>4?" and "+(same.length-4)+" more":"")+".")+" You can still save if this is another piece."};
   dn.addEventListener("input",chk);$("goldLines").addEventListener("input",chk);dn.addEventListener("blur",chk);})();
@@ -435,7 +435,7 @@ CATS.forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textCon
 function kind(){return document.querySelector('input[name=kind]:checked').value}
 function readForm(){
   const k=kind(),cat=CATS.find(c=>c.id===$("cat").value)||CATS[0];
-  const gold=[...$("goldLines").children].map(r=>({k:$("gk"+r.dataset.id).value,net:num($("gn"+r.dataset.id).value)}));
+  const gold=[...$("goldLines").children].map(r=>{const i=r.dataset.id,g={k:$("gk"+i).value,net:num($("gn"+i).value)},tv=$("gt"+i).value.trim();if(tv!=="")g.tunch=Math.round(num(tv)*1000)/1000;return g}); /* owner 17/10/2026 (C-20261017-CHAINTUNCH): a gold line with a tunch is a chain line */
   const dias=[...$("diaLines").children].map(r=>{const i=r.dataset.id;const qq=$("dq"+i).value==="Other"?($("dqo"+i).value.trim().toUpperCase()||"OTHER?"):$("dq"+i).value;const sp=num($("dr"+i).value),sh=$("ds"+i).value,def=defRate(sh,qq);return {shape:sh,q:qq,ct:num($("dc"+i).value),pcs:Math.round(num($("dp"+i).value)),rate:sp>0?sp:(def||0),special:sp>0}}).filter(d=>d.ct>0||d.pcs>0||d.special);
   const mainK=(gold.find(g=>g.net>0)||gold[0]||{k:"14K"}).k;
   const prefix=k==="sample"?cat.s:cat.code+KNUM[mainK];
@@ -450,17 +450,20 @@ function price(t){
   /* Bills workbook, Nett mode: one making rate per piece, taken from the FIRST gold line
      (R-Making: Rs 650/g if that line is over 5 g, else 750; plus 10% of its karat rate; rounded up to Rs 100),
      charged on all gold lines together. */
-  const m=s.making,g0=t.gold.find(g=>g.net>0);let gold=0,making=0;const lines=[];
+  /* owner 17/10/2026 18:16 / 18:19 (C-20261017-CHAINTUNCH): a chain gold line = net x its tunch x the 24K rate, no making, no wastage;
+     making (its 5 g limit from the first non-chain line, Rs 1,000 minimum) and the 10% wastage are on the non-chain lines only */
+  const isT=g=>g.tunch>=0.3&&g.tunch<=1.1;
+  const m=s.making,g0=t.gold.find(g=>g.net>0&&!isT(g));let gold=0,making=0,ch=0;const lines=[];
   const pol=t.polki&&t.polki.pcs>0?t.polki.pcs*(t.polki.rate||0):0; /* polki pcs x rate per pc (C-20261017-POLKI) */
-  if(!g0){ /* no gold (e.g. Moti mala): fixed amount + diamonds, +GST, rounded up to Rs 10 (owner 13/10/2026) */
+  if(!t.gold.some(g=>g.net>0)){ /* no gold (e.g. Moti mala): fixed amount + diamonds, +GST, rounded up to Rs 10 (owner 13/10/2026) */
     const dia0=t.dias.reduce((a,d)=>a+d.ct*d.rate,0),oth0=(t.other&&t.other.amt)||0,sub0=up(dia0+pol+oth0,10),gst0=sub0*s.gst/100;
     return {gold:0,making:0,dia:dia0,pol,oth:oth0,sub:sub0,gst:gst0,final:sub0>0?up(sub0+gst0,10):0,lines,r24,mk:0};}
   /* owner 17/10/2026 17:00 (C-20261017-MAKINGMIN): making Rs 650/g (750/g when the first gold line is up to 5 g), minimum Rs 1,000 a piece, + 10% wastage on the gold */
-  let nt=0;t.gold.forEach(g=>{if(!(g.net>0))return;const kr=r24*(s.purity[g.k]||0);gold+=g.net*kr;nt+=g.net;lines.push({k:g.k,net:g.net,kr,mk:0});});
-  making=Math.max((g0.net>m.limit?m.base:m.small)*nt,Number(m.min)||1000)+gold*m.pct/100;const mk=Math.round(making/nt);lines.forEach(l=>{l.mk=mk});
+  let nt=0;t.gold.forEach(g=>{if(!(g.net>0))return;if(isT(g)){ch+=g.net*g.tunch*r24;lines.push({k:g.k,net:g.net,kr:r24*g.tunch,mk:0,tunch:g.tunch});return}const kr=r24*(s.purity[g.k]||0);gold+=g.net*kr;nt+=g.net;lines.push({k:g.k,net:g.net,kr,mk:0});});
+  making=g0?Math.max((g0.net>m.limit?m.base:m.small)*nt,Number(m.min)||1000)+gold*m.pct/100:0;const mk=nt?Math.round(making/nt):0;lines.forEach(l=>{if(!l.tunch)l.mk=mk});gold+=ch;
   const dia=t.dias.reduce((a,d)=>a+d.ct*d.rate,0),oth=t.other.amt||0;
   const sub=up(gold+making+dia+pol+oth,100),gst=sub*s.gst/100,final=up(sub+gst,1000); /* owner 16/10/2026 (C-20261016-ROUND1000): final price rounded UP to the nearest Rs 1,000 (was Rs 10,000) */
-  return {gold,making,dia,pol,oth,sub,gst,final,lines,r24,mk};
+  return {gold,making,dia,pol,oth,sub,gst,final,lines,r24,mk,nt,ch};
 }
 function problems(t){
   const p=[],s=st();
@@ -468,6 +471,8 @@ function problems(t){
   if(t.kind==="order"&&t.order.rate&&!(t.order.rate>=2000&&t.order.rate<=50000))p.push("The order's gold rate (F) looks wrong - type the 24K rate per gram.");
   if(!t.designNo)p.push("Enter the design number.");
   if(!t.gold.some(g=>g.net>0))p.push("Enter the net gold weight.");
+  t.gold.forEach((g,i)=>{if(g.tunch!==undefined&&!(g.tunch>=0.3&&g.tunch<=1.1))p.push(`Gold line ${i+1}: chain tunch must be from 0.300 to 1.100 (e.g. 0.920), or leave it empty if this line is not a chain.`)});
+  if(t.cat==="CH"&&t.kind!=="sample"&&t.gold.some(g=>g.net>0&&g.tunch===undefined))p.push("Chain: type the tunch on each gold line (e.g. 0.920). Rate of fine gold and tunch are kept separate; no making on a chain.");
   t.dias.forEach((d,i)=>{if(d.q==="OTHER?")p.push(`Diamond line ${i+1}: type the quality.`);if(!(d.ct>0))p.push(`Diamond line ${i+1}: enter the carat weight.`);if(t.kind!=="sample"&&!(d.rate>0))p.push(`Diamond line ${i+1}: no default rate for ${d.shape} ${d.q}. Enter the special rate.`)});
   if(t.polki&&!(Number.isInteger(t.polki.pcs)&&t.polki.pcs<=10000))p.push("Polki: pieces must be a whole number up to 10,000.");
   if(t.polki&&!(Number.isInteger(t.polki.rate)&&t.polki.rate>=1&&t.polki.rate<=100000))p.push("Polki: rate per piece must be a whole number from ₹1 to ₹1,00,000.");
@@ -563,7 +568,8 @@ function update(){
   if(!S.settings)return;
   const t=readForm(),s=st(),pr=t.kind!=="sample"?price(t):null;$("orderBox").hidden=t.kind!=="order";if(t.kind==="order"&&!$("oRate").value&&s.gold24g){$("oRate").value=Math.round(s.gold24g);t.order.rate=Math.round(s.gold24g)}
   [...$("goldLines").children].forEach(r=>{const i=r.dataset.id,net=num($("gn"+i).value),k=$("gk"+i).value;
-    $("gv"+i).textContent=s.gold24g&&net>0?fmt(net*s.gold24g*(s.purity[k]||0)):""});
+    const tv=$("gt"+i).value.trim(),tn=num(tv);$("gt"+i).placeholder=t.cat==="CH"&&t.kind!=="sample"?"e.g. 0.920":"chain only";
+    $("gv"+i).textContent=s.gold24g&&net>0?fmt(net*s.gold24g*(tv!==""&&tn>=0.3&&tn<=1.1?tn:(s.purity[k]||0)))+(tv!==""?" · chain":""):""});
   [...$("diaLines").children].forEach(r=>{const i=r.dataset.id,qq=$("dq"+i).value==="Other"?$("dqo"+i).value.trim().toUpperCase():$("dq"+i).value,def=defRate($("ds"+i).value,qq),sp=num($("dr"+i).value),rate=sp>0?sp:def,ct=num($("dc"+i).value);
     $("dr"+i).placeholder=def?"default "+def.toLocaleString("en-IN"):"enter rate";
     $("dv"+i).textContent=(rate&&ct>0?fmt(ct*rate):"")+(sp>0?" · special":(def&&ct>0?" · default":""));});
@@ -575,8 +581,8 @@ function update(){
   if(t.kind==="sample"){add("Sample","not priced");$("rateNote").textContent="Samples are never sold, so they carry no price code."}
   else if(!pr){add("Gold rate","not set");$("rateNote").textContent="Set today's 24K gold rate under Gold rate & settings."}
   else{
-    pr.lines.forEach(l=>add(`Gold ${l.k} ${l.net.toFixed(3)} g × ${fmt(l.kr)}/g`,fmt(l.net*l.kr)));
-    add(`Making ${fmt(pr.mk)}/g × ${pr.lines.reduce((a,l)=>a+l.net,0).toFixed(3)} g`,fmt(pr.making));
+    pr.lines.forEach(l=>add(l.tunch?`Chain ${l.k} ${l.net.toFixed(3)} g × tunch ${l.tunch.toFixed(3)} × ${fmt(pr.r24)}`:`Gold ${l.k} ${l.net.toFixed(3)} g × ${fmt(l.kr)}/g`,fmt(l.net*l.kr)));
+    if(pr.nt>0)add(`Making ${fmt(pr.mk)}/g × ${pr.nt.toFixed(3)} g`,fmt(pr.making));else add("Making","— (chain: none)");
     if(pr.dia)add("Diamonds",fmt(pr.dia));if(pr.pol)add(`Polki ${t.polki.pcs} pc × ${fmt(t.polki.rate)}`,fmt(pr.pol));if(pr.oth)add("Other charges",fmt(pr.oth));
     add("Total (rounded up to ₹100)",fmt(pr.sub));add(`GST ${s.gst}%`,fmt(pr.gst));add("Price (rounded up to ₹1,000)",fmt(pr.final),"total");
     $("rateNote").textContent=`24K gold at ${fmt(s.gold24g)}/g${s.goldAt?", set "+new Date(s.goldAt).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):""}. Diamond rates on the tag are final; only gold and making move with the rate.`;
@@ -806,7 +812,7 @@ async function renderList(){
           catch(e){nb.disabled=false;msg("Could not mark it ("+((e&&(e.code||e.message))||"error")+"). Only Abhinav can do this.","bad")}});lc.append(nb)}}}
     const it=c(t.catName||"");if(t.kind==="sample"){const s=document.createElement("span");s.className="pill s";s.textContent="sample";it.append(" ",s)}
     if(t.kind==="order"){const s=document.createElement("span");s.className="pill";s.textContent="order"+(t.order&&t.order.name?" · "+t.order.name:"");it.append(" ",s)}
-    c((t.gold||[]).length?(t.gold||[]).map(g=>g.k+" "+g.net.toFixed(3)).join(" + "):(t.metal&&t.metal.net?t.metal.k+" "+t.metal.net.toFixed(3):"—"),"num");
+    c((t.gold||[]).length?(t.gold||[]).map(g=>g.k+" "+g.net.toFixed(3)+(g.tunch>0?" chain T"+Number(g.tunch).toFixed(3):"")).join(" + "):(t.metal&&t.metal.net?t.metal.k+" "+t.metal.net.toFixed(3):"—"),"num");
     c((t.dias||[]).map(d=>d.q+" "+d.ct.toFixed(2)).join(", ")||"—");
     c(t.priceAtTag?fmt(t.priceAtTag):"—","num");
     const pt=price(priceInput(t));c(pt?fmt(pt.final):"—","num");
