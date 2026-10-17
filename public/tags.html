@@ -765,7 +765,7 @@ async function offerPDF(t){
 }
 function resetForm(keepKind){
   $("polkiRate").value="300"; /* C-20261017-POLKI: rate back to Rs 300, pcs empty */
-  ["otherAmt","designNo","polkiPcs"].concat(keepKind?[]:["oName","oMob","oCity","oDue","oRate"]).forEach(id=>$(id).value="");$("remark").value="TGL"; /* owner 17/10/2026: certificate list, TGL by default (C-20261017-CERTLIST) */ /* after a save the order customer stays, for the next piece of the same order */
+  ["otherAmt","designNo","polkiPcs"].concat(keepKind?[]:["oName","oMob","oCity","oDue","oRate"]).forEach(id=>$(id).value="");$("remark").value="TGL";{const w=$("dnWarn");if(w)w.textContent=""} /* owner 17/10/2026: certificate list, TGL by default (C-20261017-CERTLIST) */ /* after a save the order customer stays, for the next piece of the same order */
   $("goldLines").textContent="";$("diaLines").textContent="";addGold();addDia();
   S.photo=null;$("photo").value="";$("thumb").textContent="No photo yet";if(!keepKind)$("k-order").checked=true;update(); /* owner 17/10/2026: Order is the default */
 }
