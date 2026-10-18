@@ -25,7 +25,7 @@ export const business = {
   // showroom is also open on Sundays in the festive month before Diwali (R-065).
   // 2026: open every day until 7 Nov (F-020), closed 8-15 Nov, reopens Mon 16 Nov (F-017).
   hoursText: 'Monday to Saturday, 11 AM to 8 PM. Open Sundays in the festive month before Diwali: open every day, Sundays included, 11 AM to 8 PM until 7 November 2026. Closed 8 to 15 November 2026 for Diwali; open again, with appointments, from Monday 16 November.',
-  hoursShort: 'Mon to Sat 11 AM to 8 PM; open Sundays in the festive month before Diwali (every day until 7 Nov 2026); closed 8 to 15 Nov 2026, open again from Mon 16 Nov.',
+  hoursShort: 'Mon to Sat 11 AM to 8 PM; open Sundays in the festive month before Diwali (every day until 7 Nov 2026); closed 8 to 15 Nov 2026, open again, with appointments, from Mon 16 Nov.',
   payment: 'NEFT, UPI and cash (no EMI)',
   showroomSize: '2,500 sq ft',
   designs: '3,000+',
