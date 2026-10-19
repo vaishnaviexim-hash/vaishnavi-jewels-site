@@ -519,6 +519,7 @@ function vjQPrice(gold, dv, extra, st, mk) { // final price incl. GST, or 0 when
 const vjQOptRate = (d, opt, st) => { if (VJ_Q_NONDIA.test(String(d.q || '') + ' ' + String(d.code || ''))) return Number(d.rate) || 0; if (opt === 'lgd') return 23000;
   const q = opt === 'gh' ? 'VS GH' : 'VS IJ', sh = ['Round', 'Choki', 'Fancy'].includes(d.shape) ? d.shape : 'Round'; return Number(st.rates[q + '|' + sh]) || Number(st.rates[q + '|Round']) || 0; };
 const vjQNum = (v, lo, hi, int) => { if (v === '' || v == null) return null; const n = Number(v); return isFinite(n) && n >= lo && n <= hi && (!int || Number.isInteger(n)) ? n : NaN; };
+const vjSmpNet = t => Number(t && t.metal && t.metal.net) || (Array.isArray(t && t.gold) ? t.gold.reduce((a, g) => a + (Number(g && g.net) || 0), 0) : 0); // sample weight: old Onnet samples in metal.net, new-tag samples in gold lines (C-20261019-SAMPLEWT)
 const vjLineT = g => { const n = Number(g && g.tunch); return n >= 0.3 && n <= 1.1 ? n : 0; }; // a chain gold line's tunch, else 0 (C-20261017-CHAINTUNCH)
 const vjGTxt = n => { const s = String(Math.round(n * 1000) / 1000); return s.includes('.') ? s : s + '.0'; };
 async function vjQuote(request, env, who, ctx) {
@@ -559,7 +560,7 @@ async function vjQuote(request, env, who, ctx) {
       const t = JSON.parse(row.data), pk = t.polki && Number(t.polki.pcs) > 0 ? t.polki : null;
       const px = vjQNum(i.prate, 1, 100000, true); if (isNaN(px)) return vjDeny(400, no + ': polki rate per pc Rs 1-1,00,000');
       const prate = px ?? (pk ? Number(pk.rate) || 300 : 0), ppcs = pk ? Number(pk.pcs) || 0 : 0;
-      const gold = (t.kind === 'sample' ? [{ k: '14K', net: Number(t.metal && t.metal.net) || 0 }] : (Array.isArray(t.gold) ? t.gold : [])).map(g => ({ k: String(g && g.k || ''), net: Number(g && g.net) || 0, tunch: vjLineT(g) }));
+      const gold = (t.kind === 'sample' ? [{ k: '14K', net: vjSmpNet(t) }] : (Array.isArray(t.gold) ? t.gold : [])).map(g => ({ k: String(g && g.k || ''), net: Number(g && g.net) || 0, tunch: vjLineT(g) }));
       const dv = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).reduce((a, d) => a + (Number(d.ct) || 0) * vjQOptRate(d, VJ_Q_OPT[option], st), 0);
       const price = vjQPrice(gold, dv, ppcs * prate + (Number(t.other && t.other.amt) || 0), st, mk);
       if (!price) return vjDeny(400, 'a piece has no price - check its gold weight and the default diamond rates: ' + (t.label || id));
@@ -601,7 +602,7 @@ function vjBillCalc(tags, o) {
   const settle = fineMode ? (o.settle === 'amount' ? 'amount' : 'fine') : '';
   const gstPct = o.gst == null ? 3 : Number(o.gst);
   const rows = tags.map(t => {
-    const gl = (t.kind === 'sample' ? [{ k: '14K', net: Number(t.metal && t.metal.net) || 0 }] : (Array.isArray(t.gold) ? t.gold : []))
+    const gl = (t.kind === 'sample' ? [{ k: '14K', net: vjSmpNet(t) }] : (Array.isArray(t.gold) ? t.gold : []))
       .map(g => ({ k: String(g && g.k || ''), net: Number(g && g.net) || 0, tn: (n => n >= 0.3 && n <= 1.1 ? n : 0)(Number(g && g.tunch)) })).filter(g => g.net > 0);
     const tr0 = Number(t.kind === 'order' && t.order && t.order.rate), trT = tr0 >= 2000 && tr0 <= 50000 ? tr0 : (t.kind === 'order' && Number(t.gold24gAtTag) >= 2000 && Number(t.gold24gAtTag) <= 50000 ? Number(t.gold24gAtTag) : 0), Fo = trT || F; // the gold rate typed on the tag is used; only tags without one use today's rate F (owner 17/10, C-20261017-TAGRATE; was C-20261016-ORDERRATE)
     const Fx = Number(o.frates && o.frates[t.id]), Fr = Fx >= 2000 && Fx <= 50000 ? Fx : Fo; // rate typed for this piece on the bill (C-20261016-PIECERATE)
@@ -1341,7 +1342,7 @@ const VJ_PHOTO_F = new Set(['photo', 'photoAt', 'photoBy']);
 const VJ_PRINT_F = new Set(['code', 'priceAtTag', 'gold24gAtTag', 'queue', 'queueAt', 'printedAt']);
 const VJ_FIELD_NAME = { designNo: 'Design no.', label: 'Tag', catName: 'Category', remark: 'Remark', gold: 'Gold', dias: 'Diamonds', polki: 'Polki', other: 'Other charges',
   metal: 'Sample weight', box: 'Packet / box', kind: 'Order / stock / sample', order: 'Order customer', status: 'Status', photo: 'Photo', code: 'Price code', priceAtTag: 'Price when tagged' };
-const vjGoldTxt = t => t && t.kind === 'sample' ? ((t.metal && t.metal.net > 0) ? Number(t.metal.net).toFixed(3) + ' g (14K)' : '') : (Array.isArray(t && t.gold) ? t.gold.filter(g => g && g.net > 0).map(g => g.k + ' ' + Number(g.net).toFixed(3) + ' g' + (vjLineT(g) ? ' chain tunch ' + vjLineT(g).toFixed(3) : '')).join('; ') : '');
+const vjGoldTxt = t => t && t.kind === 'sample' ? (vjSmpNet(t) > 0 ? vjSmpNet(t).toFixed(3) + ' g (14K)' : '') : (Array.isArray(t && t.gold) ? t.gold.filter(g => g && g.net > 0).map(g => g.k + ' ' + Number(g.net).toFixed(3) + ' g' + (vjLineT(g) ? ' chain tunch ' + vjLineT(g).toFixed(3) : '')).join('; ') : '');
 const vjDiaTxt = t => (Array.isArray(t && t.dias) ? t.dias.filter(Boolean).map(d => `${d.shape || ''} ${d.q || ''} ${Number(d.ct || 0).toFixed(2)} ct${d.pcs ? ' (' + d.pcs + ')' : ''}`.replace(/\s+/g, ' ').trim()) : [])
   .concat(t && t.polki && t.polki.pcs > 0 ? ['Polki ' + t.polki.pcs + ' pc'] : []).join('; '); // + polki (C-20261017-POLKI)
 function vjValTxt(field, raw) {
@@ -1521,7 +1522,7 @@ async function vjDailyReport(env) {
         const miss = [];
         if (!t.photo) miss.push('no photo');
         if (!t.designNo) miss.push('no design no.');
-        const wt = sample ? (t.metal && t.metal.net > 0) : (t.gold || []).some(g => g.net > 0);
+        const wt = sample ? (vjSmpNet(t) > 0) : (t.gold || []).some(g => g.net > 0);
         if (!wt && !(t.other && t.other.amt > 0)) miss.push('no weight');
         if (!(t.dias || []).length && !(t.polki && t.polki.pcs > 0)) miss.push('no diamonds');
         if (!t.printedAt) miss.push('not printed');
