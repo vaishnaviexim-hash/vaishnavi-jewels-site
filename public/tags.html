@@ -131,11 +131,12 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
 
       <h2>2 · Piece</h2>
       <div class="seg" role="radiogroup" aria-label="Type">
-        <label><input type="radio" name="kind" id="k-order" value="order" checked> Order</label>
-        <label><input type="radio" name="kind" id="k-sale" value="sale"> Stock</label>
+        <label><input type="radio" name="kind" id="k-sale" value="sale" checked> Stock</label>
         <label><input type="radio" name="kind" id="k-sample" value="sample"> Sample</label>
       </div>
-      <!-- owner 16/10/2026 (C-20261016-ORDERS): a piece made for a customer's order -->
+      <!-- owner 19/10/2026 (C-20261019-TAGSNOORDER): a sample carries its karigar; the tag prints e.g. VLR14/MN -->
+      <div class="row" id="karBox" hidden><label>Karigar <select id="karigar"><option value="">Choose karigar…</option><option value="MN">MN</option><option value="BD">BD</option><option value="HR">HR</option><option value="RK">RK</option></select></label></div>
+      <!-- owner 16/10/2026 (C-20261016-ORDERS): a piece made for a customer's order (Order option removed 19/10/2026) -->
       <div class="row" id="orderBox" hidden>
         <label>Customer name <input id="oName" autocomplete="off" maxlength="60"></label>
         <label>Mobile <input id="oMob" inputmode="tel" autocomplete="off" maxlength="20" placeholder="98xxxxxxxx"></label>
@@ -196,7 +197,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
     <p class="hint">Weigh the piece and choose its category. The closest pieces by weight come first; check the diamonds and photo, then reprint its tag with the same old number.</p>
     <div class="row" style="align-items:end">
       <label style="flex:1 1 160px">Category <select id="fcat"></select></label>
-      <label style="flex:1 1 120px">Type <select id="fkd"><option value="">Any</option><option value="order">Order</option><option value="sale">Stock</option><option value="sample">Sample</option></select></label>
+      <label style="flex:1 1 120px">Type <select id="fkd"><option value="">Any</option><option value="sale">Stock</option><option value="sample">Sample</option></select></label>
       <label style="flex:1 1 140px">Weight on the scale (g) <input type="number" id="fwt" step="0.001" min="0" inputmode="decimal" placeholder="e.g. 7.880"></label>
       <label style="flex:1 1 120px">Within <select id="ftol"><option value="0.02">± 0.02 g</option><option value="0.05" selected>± 0.05 g</option><option value="0.1">± 0.10 g</option><option value="0.25">± 0.25 g</option><option value="1">± 1 g</option></select></label>
       <div><button type="button" class="btn" id="fgo">Find</button></div>
@@ -214,8 +215,8 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
   <section id="p-list" class="card" hidden>
     <div class="row" style="align-items:end">
       <label style="flex:2 1 220px">Search <input id="q" placeholder="Label, design no. (e.g. 1122), category, remark"></label>
-      <label style="flex:1 1 140px">Show <select id="fkind"><option value="">All</option><option value="order">Orders</option><option value="sale">Stock</option><option value="sample">Samples</option><option value="nophoto">Photo pending</option><option value="dup">Possible double tags</option></select></label>
-      <div><button type="button" class="btn ghost" id="ordRep">Orders report (Excel)</button></div>
+      <label style="flex:1 1 140px">Show <select id="fkind"><option value="">All</option><option value="sale">Stock</option><option value="sample">Samples</option><option value="nophoto">Photo pending</option><option value="dup">Possible double tags</option></select></label>
+      <div><button type="button" class="btn ghost" id="ordRep" hidden>Orders report (Excel)</button> <button type="button" class="btn ghost" id="ordDel" hidden style="color:#a12b2b">Delete all order tags</button></div>
     </div>
     <div class="row" style="align-items:center;gap:8px;margin:10px 0">
       <button type="button" class="btn" id="printQ" hidden>Print queue</button>
@@ -363,7 +364,7 @@ function renderCheck(){
   top.appendChild(pcol);
   const h=document.createElement("div");const l=document.createElement("div");l.className="labelno";l.textContent=(t.designNo?t.designNo+" · ":"")+t.label;const c=document.createElement("div");c.className="hint";c.textContent=S.role==="sales"?(t.catName||""):(t.catName||"")+(t.remark?" · "+t.remark:"")+(t.kind==="sample"?" · sample":"")+(t.kind==="order"?" · order"+(t.order&&t.order.name?" for "+t.order.name:"")+(t.order&&t.order.due?", delivery "+t.order.due.split("-").reverse().join("-"):""):"");h.append(l,c);top.appendChild(h);card.appendChild(top);
   const tb=document.createElement("table");tb.className="sum";const add=(a,b,cl)=>{const tr=document.createElement("tr");if(cl)tr.className=cl;const x=document.createElement("td"),y=document.createElement("td");x.textContent=a;y.textContent=b;tr.append(x,y);tb.appendChild(tr)};
-  const pin=priceInput(t);pin.gold.forEach(g=>add((g.tunch>0?"Chain ":"Gold ")+g.k,g.net.toFixed(3)+" g"+(g.tunch>0?" × tunch "+Number(g.tunch).toFixed(3):"")));pin.dias.forEach(d=>add(`${d.shape} ${d.q}`,`${d.ct.toFixed(2)} ct (${d.pcs})`+(d.rate>0?` @ ${fmt(d.rate)}`:"")));
+  const pin=priceInput(t);pin.gold.forEach(g=>add(g.k==="Chain"?"Chain":(g.tunch>0?"Chain ":"Gold ")+g.k,g.net.toFixed(3)+" g"+(g.tunch>0?" × tunch "+Number(g.tunch).toFixed(3):"")));pin.dias.forEach(d=>add(`${d.shape} ${d.q}`,`${d.ct.toFixed(2)} ct (${d.pcs})`+(d.rate>0?` @ ${fmt(d.rate)}`:"")));
   if(t.polki&&t.polki.pcs>0)add("Polki",`${t.polki.pcs} pc @ ${fmt(t.polki.rate)}`);
   if(t.other&&t.other.amt)add("Other charges",fmt(t.other.amt));
   const pr=price(priceInput(t)),s=st();
@@ -399,7 +400,7 @@ function opt(sel,vals,cur){vals.forEach(v=>{const o=document.createElement("opti
 function addGold(k,net){
   const id=++lineSeq,d=document.createElement("div");d.className="ln g";d.dataset.id=id;
   d.innerHTML=`<label>Karat<select id="gk${id}"></select></label><label>Net gold wt (g)<input type="number" id="gn${id}" step="0.001" min="0" placeholder="0.000"></label><label>Chain tunch<input type="number" id="gt${id}" step="0.001" min="0.3" max="1.1" placeholder="chain only" inputmode="decimal"></label><div class="val" id="gv${id}"></div><button type="button" class="x" aria-label="Remove gold line">✕</button>`;
-  $("goldLines").appendChild(d);opt($("gk"+id),KARATS,k||"14K"); /* owner 16/10/2026: default 14K */if(net)$("gn"+id).value=net;
+  $("goldLines").appendChild(d);opt($("gk"+id),KARATS.concat(["Chain"]),k||"14K"); /* owner 19/10/2026: Karat 'Chain' = tunch line (C-20261019-TAGSNOORDER) */ /* owner 16/10/2026: default 14K */if(net)$("gn"+id).value=net;
   d.querySelector(".x").addEventListener("click",()=>{if($("goldLines").children.length>1){d.remove();update()}});
   update();
 }
@@ -428,7 +429,12 @@ $("addDia").addEventListener("click",()=>{addDia();firstBox("diaLines")});
 ["goldLines","diaLines"].forEach(id=>{$(id).addEventListener("input",update);$(id).addEventListener("change",update)});
 ["cat","remark","otherAmt","polkiPcs","polkiRate"].forEach(id=>{$(id).addEventListener("input",update);$(id).addEventListener("change",update)});
 document.querySelectorAll('input[name=kind]').forEach(r=>r.addEventListener("change",update));
-["oName","oMob","oCity","oDue","oRate"].forEach(id=>$(id).addEventListener("input",update));
+["oName","oMob","oCity","oDue","oRate"].forEach(id=>$(id).addEventListener("input",update));$("karigar").addEventListener("change",update);
+/* owner 19/10/2026 (C-20261019-TAGSNOORDER): delete every saved order tag at once - owners only; the server keeps a copy of each */
+$("ordDel").addEventListener("click",async()=>{const b=$("ordDel"),list=S.tags.filter(t=>t.kind==="order");if(!S.owner||!list.length)return;
+  if(!confirm(`Delete all ${list.length} order tags? This cannot be undone here (a copy of each is kept in the records).`))return;b.disabled=true;let ok=0,bad=0;
+  for(const t of list){try{await S.db.doc("tags/"+t.id).delete("Wrong entry");ok++}catch(e){bad++}b.textContent=`Deleting… ${ok+bad} of ${list.length}`}
+  b.disabled=false;msg(`Order tags deleted: ${ok}`+(bad?`, ${bad} failed (press again)`:"")+".",bad?"warn":"ok");renderList()});
 CATS.forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=c.name;$("cat").appendChild(o)});
 $("cat").addEventListener("change",()=>{const c=$("cat").value==="CH";$("designNo").placeholder=c?"optional - e.g. Sid / Arun / Self":"e.g. 1436";$("designNo").required=!c}); /* C-20261017-CHAINDN */
 
@@ -436,13 +442,16 @@ $("cat").addEventListener("change",()=>{const c=$("cat").value==="CH";$("designN
 function kind(){return document.querySelector('input[name=kind]:checked').value}
 function readForm(){
   const k=kind(),cat=CATS.find(c=>c.id===$("cat").value)||CATS[0];
-  const gold=[...$("goldLines").children].map(r=>{const i=r.dataset.id,g={k:$("gk"+i).value,net:num($("gn"+i).value)},tv=$("gt"+i).value.trim();if(tv!=="")g.tunch=Math.round(num(tv)*1000)/1000;return g}); /* owner 17/10/2026 (C-20261017-CHAINTUNCH): a gold line with a tunch is a chain line */
+  const gold=[...$("goldLines").children].map(r=>{const i=r.dataset.id,g={k:$("gk"+i).value,net:num($("gn"+i).value)},tv=$("gt"+i).value.trim();if(g.k==="Chain"&&tv!=="")g.tunch=Math.round(num(tv)*1000)/1000;return g}); /* owner 17/10/2026 (C-20261017-CHAINTUNCH): a gold line with a tunch is a chain line */
   const dias=[...$("diaLines").children].map(r=>{const i=r.dataset.id;const qq=$("dq"+i).value==="Other"?($("dqo"+i).value.trim().toUpperCase()||"OTHER?"):$("dq"+i).value;const sp=num($("dr"+i).value),sh=$("ds"+i).value,def=defRate(sh,qq);return {shape:sh,q:qq,ct:num($("dc"+i).value),pcs:Math.round(num($("dp"+i).value)),rate:sp>0?sp:(def||0),special:sp>0}}).filter(d=>d.ct>0||d.pcs>0||d.special);
-  const mainK=(gold.find(g=>g.net>0)||gold[0]||{k:"14K"}).k;
+  const g1=gold.find(g=>g.net>0&&g.k!=="Chain")||gold.find(g=>g.k!=="Chain"),gc=gold.find(g=>g.k==="Chain"&&g.tunch>0),tk=x=>x>=0.88?"22K":x>=0.7?"18K":x>=0.5?"14K":"9K";
+  const mainK=g1?g1.k:gc?tk(gc.tunch):"14K"; /* a chain-only piece takes its karat from the tunch */
   const prefix=k==="sample"?cat.s:cat.code+KNUM[mainK];
+  /* owner 19/10/2026 (C-20261019-TAGSNOORDER): the printed code has no running number - stock VLR14, sample VLR14/MN (karigar); the number stays hidden in the QR */
+  const karigar=k==="sample"?$("karigar").value:"",pcode=cat.code+KNUM[mainK]+(k==="sample"?"/"+(karigar||"…"):"");
   const order=k==="order"?{name:$("oName").value.trim().slice(0,60),mobile:$("oMob").value.trim().slice(0,20),city:$("oCity").value.trim().slice(0,40),due:$("oDue").value||"",rate:num($("oRate").value)}:null; /* owner 16/10: the order is booked at this gold rate (C-20261016-ORDERRATE2) */
   const ppcs=num($("polkiPcs").value),prt=$("polkiRate").value.trim()===""?300:num($("polkiRate").value); /* C-20261017-POLKI: pcs x rate per pc (default Rs 300) */
-  return {kind:k,cat:cat.id,prefix,catName:cat.name.replace(/\s*\(.*\)$/,""),mainK,gold,dias,order,polki:ppcs>0?{pcs:ppcs,rate:prt}:null,
+  return {kind:k,cat:cat.id,prefix,pcode,karigar,catName:cat.name.replace(/\s*\(.*\)$/,""),mainK,gold,dias,order,polki:ppcs>0?{pcs:ppcs,rate:prt}:null,
     remark:$("remark").value.trim(),designNo:$("designNo").value.trim().toUpperCase(),other:{amt:num($("otherAmt").value)}};
 }
 /* ---------- price (Brain F-025 / F-044) ---------- */
@@ -476,7 +485,9 @@ function problems(t){
   else if(!/^[A-Z0-9][A-Z0-9\/.-]{0,29}$/.test(t.designNo))p.push("Design number: letters and numbers only (e.g. 1436 or VJ1436). Names like Sid / Self are allowed only for Chain tags.");
   if(!t.gold.some(g=>g.net>0))p.push("Enter the net gold weight.");
   t.gold.forEach((g,i)=>{if(g.tunch!==undefined&&!(g.tunch>=0.3&&g.tunch<=1.1))p.push(`Gold line ${i+1}: chain tunch must be from 0.300 to 1.100 (e.g. 0.920), or leave it empty if this line is not a chain.`)});
-  if(t.cat==="CH"&&t.kind!=="sample"&&t.gold.some(g=>g.net>0&&g.tunch===undefined))p.push("Chain: type the tunch on each gold line (e.g. 0.920). Rate of fine gold and tunch are kept separate; no making on a chain.");
+  if(t.cat==="CH"&&t.kind!=="sample"&&t.gold.some(g=>g.net>0&&g.tunch===undefined))p.push("Chain: choose Karat 'Chain' and type the tunch on each gold line (e.g. 0.920). No making on a chain.");
+  if(t.gold.some(g=>g.k==="Chain"&&g.net>0&&g.tunch===undefined))p.push("Karat Chain: type the tunch (e.g. 0.920).");
+  if(t.kind==="sample"&&!t.karigar)p.push("Choose the karigar for this sample (MN, BD, HR or RK).");
   t.dias.forEach((d,i)=>{if(d.q==="OTHER?")p.push(`Diamond line ${i+1}: type the quality.`);if(!(d.ct>0))p.push(`Diamond line ${i+1}: enter the carat weight.`);if(t.kind!=="sample"&&!(d.rate>0))p.push(`Diamond line ${i+1}: no default rate for ${d.shape} ${d.q}. Enter the special rate.`)});
   if(t.polki&&!(Number.isInteger(t.polki.pcs)&&t.polki.pcs<=10000))p.push("Polki: pieces must be a whole number up to 10,000.");
   if(t.polki&&!(Number.isInteger(t.polki.rate)&&t.polki.rate>=1&&t.polki.rate<=100000))p.push("Polki: rate per piece must be a whole number from ₹1 to ₹1,00,000.");
@@ -511,8 +522,9 @@ function tagPrims(t){
   const n=5,lh=(h-2*pad)/n,y=i=>pad+lh*(i+0.78);
   /* owner 13/10/2026: a sample's tag must look like any stock tag - no "Silver", no "SAMPLE", no remark (remarks say "sam..."), weight as G.Wt., diamond rates shown */
   const smp=t.kind==="sample";
-  const gl=(t.gold||[]).filter(g=>g.net>0),karats=gl.length?[...new Set(gl.map(g=>KNUM[g.k]+"kt"))].join("+"):(smp?"14kt":"");
-  const L=[{t:t.designNo?t.designNo:t.label,b:1,sz:7},{t:t.designNo?"("+t.label+")":"",sz:5.4},{t:karats,sz:5.4},{t:smp?"":t.remark,sz:5.2}];
+  const gl=(t.gold||[]).filter(g=>g.net>0),karats=gl.length?[...new Set(gl.map(g=>g.k==="Chain"?"Chain":KNUM[g.k]+"kt"))].join("+"):(smp?"14kt":"");
+  const lab=t.pcode||t.label; /* C-20261019-TAGSNOORDER: new tags print VLR14 / VLR14/MN; older tags keep their label */
+  const L=[{t:t.designNo?t.designNo:lab,b:1,sz:7},{t:t.designNo?"("+lab+")":"",sz:5.4},{t:karats,sz:5.4},{t:smp?"":t.remark,sz:5.2}];
   if(t.polki&&t.polki.pcs>0)L.push({t:"Polki "+t.polki.pcs+"pc",sz:5.2}); /* C-20261017-POLKI: the 5th row on the left is always free */
   L.forEach((l,i)=>{if(l.t)pr.push({k:"t",x:lx,y:y(i),t:l.t,b:l.b,sz:l.sz,maxW:lw})});
   const net=gl.reduce((a,g)=>a+g.net,0),mw=!gl.length&&t.metal&&t.metal.net?t.metal.net:0;
@@ -572,20 +584,21 @@ function update(){
   if(!S.settings)return;
   const t=readForm(),s=st(),pr=t.kind!=="sample"?price(t):null;$("orderBox").hidden=t.kind!=="order";if(t.kind==="order"&&!$("oRate").value&&s.gold24g){$("oRate").value=Math.round(s.gold24g);t.order.rate=Math.round(s.gold24g)}
   [...$("goldLines").children].forEach(r=>{const i=r.dataset.id,net=num($("gn"+i).value),k=$("gk"+i).value;
-    const tv=$("gt"+i).value.trim(),tn=num(tv);$("gt"+i).placeholder=t.cat==="CH"&&t.kind!=="sample"?"e.g. 0.920":"chain only";
-    $("gv"+i).textContent=s.gold24g&&net>0?fmt(net*s.gold24g*(tv!==""&&tn>=0.3&&tn<=1.1?tn:(s.purity[k]||0)))+(tv!==""?" · chain":""):""});
+    const ch=k==="Chain",tb=$("gt"+i);if(!ch&&tb.value!=="")tb.value="";tb.parentNode.style.visibility=ch?"visible":"hidden";tb.placeholder="e.g. 0.920";
+    const tv=tb.value.trim(),tn=num(tv);
+    $("gv"+i).textContent=s.gold24g&&net>0&&(!ch||tn>=0.3&&tn<=1.1)?fmt(net*s.gold24g*(ch?tn:(s.purity[k]||0)))+(ch?" · chain":""):""});
   [...$("diaLines").children].forEach(r=>{const i=r.dataset.id,qq=$("dq"+i).value==="Other"?$("dqo"+i).value.trim().toUpperCase():$("dq"+i).value,def=defRate($("ds"+i).value,qq),sp=num($("dr"+i).value),rate=sp>0?sp:def,ct=num($("dc"+i).value);
     $("dr"+i).placeholder=def?"default "+def.toLocaleString("en-IN"):"enter rate";
     $("dv"+i).textContent=(rate&&ct>0?fmt(ct*rate):"")+(sp>0?" · special":(def&&ct>0?" · default":""));});
   $("polkiVal").textContent=t.polki?`${t.polki.pcs} × ${fmt(t.polki.rate)} = ${fmt(t.polki.pcs*t.polki.rate)}`:"";
-  t.no=nextNo(t.prefix);t.label=t.prefix+"/"+t.no;t.code="";
-  $("lblPreview").textContent=t.label;
+  t.no=nextNo(t.prefix);t.label=t.prefix+"/"+t.no;t.code="";$("karBox").hidden=t.kind!=="sample";
+  $("lblPreview").textContent=t.pcode; /* C-20261019-TAGSNOORDER: printed code; the running number stays in the QR */
   const sum=$("sum");sum.textContent="";
   const add=(a,b,c)=>{const tr=document.createElement("tr");if(c)tr.className=c;const x=document.createElement("td"),y=document.createElement("td");x.textContent=a;y.textContent=b;tr.append(x,y);sum.appendChild(tr)};
   if(t.kind==="sample"){add("Sample","not priced");$("rateNote").textContent="Samples are never sold, so they carry no price code."}
   else if(!pr){add("Gold rate","not set");$("rateNote").textContent="Set today's 24K gold rate under Gold rate & settings."}
   else{
-    pr.lines.forEach(l=>add(l.tunch?`Chain ${l.k} ${l.net.toFixed(3)} g × tunch ${l.tunch.toFixed(3)} × ${fmt(pr.r24)}`:`Gold ${l.k} ${l.net.toFixed(3)} g × ${fmt(l.kr)}/g`,fmt(l.net*l.kr)));
+    pr.lines.forEach(l=>add(l.tunch?`Chain ${l.k==="Chain"?"":l.k+" "}${l.net.toFixed(3)} g × tunch ${l.tunch.toFixed(3)} × ${fmt(pr.r24)}`:`Gold ${l.k} ${l.net.toFixed(3)} g × ${fmt(l.kr)}/g`,fmt(l.net*l.kr)));
     if(pr.nt>0)add(`Making ${fmt(pr.mk)}/g × ${pr.nt.toFixed(3)} g`,fmt(pr.making));else add("Making","— (chain: none)");
     if(pr.dia)add("Diamonds",fmt(pr.dia));if(pr.pol)add(`Polki ${t.polki.pcs} pc × ${fmt(t.polki.rate)}`,fmt(pr.pol));if(pr.oth)add("Other charges",fmt(pr.oth));
     add("Total (rounded up to ₹100)",fmt(pr.sub));add(`GST ${s.gst}%`,fmt(pr.gst));add("Price (rounded up to ₹1,000)",fmt(pr.final),"total");
@@ -717,6 +730,7 @@ async function allocateAndSave(t,photoId){
     dias:t.dias,other:t.other,remark:t.remark,designNo:t.designNo||"",photo:photoId,status:t.kind==="sample"?"sample":t.kind==="order"?"order":"in_stock",createdBy:S.me||null,createdAt:new Date().toISOString(),
     gold24gAtTag:pr?pr.r24:null,priceAtTag:pr?pr.final:null,code:pr?codeFor(pr.final):null};
   if(t.kind==="order")body.order=t.order;
+  body.pcode=t.pcode;if(t.kind==="sample")body.karigar=t.karigar; /* C-20261019-TAGSNOORDER */
   if(t.polki)body.polki={pcs:t.polki.pcs,rate:t.polki.rate}; /* C-20261017-POLKI */
   await S.db.doc("tags/"+t.id).set(body);
   const last=Object.assign({},seeds);last[t.prefix]=Math.max(last[t.prefix]||0,t.no);await cref.set({last});S.counters=last;
@@ -779,13 +793,13 @@ function resetForm(keepKind){
   $("polkiRate").value="300"; /* C-20261017-POLKI: rate back to Rs 300, pcs empty */
   ["otherAmt","designNo","polkiPcs"].concat(keepKind?[]:["oName","oMob","oCity","oDue","oRate"]).forEach(id=>$(id).value="");$("remark").value="TGL";{const w=$("dnWarn");if(w)w.textContent=""} /* owner 17/10/2026: certificate list, TGL by default (C-20261017-CERTLIST) */ /* after a save the order customer stays, for the next piece of the same order */
   $("goldLines").textContent="";$("diaLines").textContent="";addGold();addDia();
-  S.photo=null;$("photo").value="";$("thumb").textContent="No photo yet";if(!keepKind)$("k-order").checked=true;update(); /* owner 17/10/2026: Order is the default */
+  S.photo=null;$("photo").value="";$("thumb").textContent="No photo yet";if(!keepKind){$("k-sale").checked=true;$("karigar").value=""}update(); /* owner 19/10/2026: Order removed, Stock is the default */
 }
 $("reset").addEventListener("click",()=>resetForm(false));
 
 /* ---------- list ---------- */
 async function renderList(){
-  const body=$("rows");body.textContent="";$("ordRep").hidden=S.role==="sales";
+  const body=$("rows");body.textContent="";$("ordRep").hidden=true;{const od=$("ordDel"),n=S.tags.filter(t=>t.kind==="order").length;od.hidden=!S.owner||!n;od.textContent="Delete all order tags ("+n+")"} /* C-20261019-TAGSNOORDER */
   const q=$("q").value.trim().toLowerCase(),fk=$("fkind").value;
   const qq=q.replace(/\s+/g,"");
   /* owner 17/10/2026 17:34 (C-20261017-DOUBLETAG): same design number + same total gold weight = possible double tag, highlighted in red */
