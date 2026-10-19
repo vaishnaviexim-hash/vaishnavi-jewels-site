@@ -512,7 +512,7 @@ function sampleRate(d){
 }
 /* owner 13/10/2026: a sample's recorded weight is already converted to gold weight; its estimate is priced as 14K */
 function priceInput(t){
-  if(t.kind==="sample")return {gold:[{k:"14K",net:(t.metal&&t.metal.net)||0}],dias:(t.dias||[]).map(d=>d.rate>0?d:Object.assign({},d,{rate:sampleRate(d)})),polki:t.polki||null,other:t.other||{amt:0}};
+  if(t.kind==="sample")return {gold:[{k:"14K",net:(t.metal&&t.metal.net)||(t.gold||[]).reduce((a,g)=>a+(Number(g&&g.net)||0),0)}] /* C-20261019-SAMPLEWT: new-tag samples keep their weight in gold lines */,dias:(t.dias||[]).map(d=>d.rate>0?d:Object.assign({},d,{rate:sampleRate(d)})),polki:t.polki||null,other:t.other||{amt:0}};
   return {gold:t.gold||[],dias:t.dias||[],polki:t.polki||null,other:t.other||{amt:0}};
 }
 function tagPrims(t){
