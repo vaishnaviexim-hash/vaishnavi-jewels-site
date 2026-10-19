@@ -26,7 +26,7 @@
       const rd = new Response(u).body.pipeThrough(new DecompressionStream("gzip")).getReader(), parts = []; let n = 0;
       for (;;) { const { done, value } = await rd.read(); if (done) break; n += value.length; if (n > MAX_JSON) { try { rd.cancel(); } catch (e) {} throw new Error(f.name + ": too large after unzipping"); } parts.push(value); }
       bytes = new Uint8Array(n); let o = 0; parts.forEach(p => { bytes.set(p, o); o += p.length; });
-    } else if (/\.gz$/i.test(f.name)) throw new Error(f.name + ": not a gzip file");
+    } // 19/10/2026: the night job's files are named .json.gz but stored as plain JSON - read them as they are (C-20261019-PHOTOIMPFIX)
     return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   }
   // Parse and check one file. keepImg=false keeps only the names (for the preview, so many files do not fill the memory).
