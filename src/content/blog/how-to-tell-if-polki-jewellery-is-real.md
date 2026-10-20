@@ -1,6 +1,6 @@
 ---
 title: "How can I tell if Polki jewellery is real?"
-description: "Real Polki uses uncut diamonds set in gold. Five checks before you buy: the stones in writing, gold weight on the bill, the hallmark, the back of the piece and the setting."
+description: "Real Polki uses uncut diamonds set in gold. Check the stones in writing, the gold weight on the bill, the hallmark and the back of the piece."
 pubDate: 2026-10-20
 tags: ["polki","bridal jewellery","buying guide","trust"]
 draft: false
