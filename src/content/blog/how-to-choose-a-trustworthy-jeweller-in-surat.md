@@ -1,6 +1,6 @@
 ---
 title: "How do I choose a trustworthy jeweller in Surat for diamond jewellery?"
-description: "Six checks to make before you pay: grading report, laser inscription, BIS HUID, an itemised invoice, written exchange terms and a jeweller who lets you take your time."
+description: "Six checks before you pay: grading report, laser inscription, BIS HUID, an itemised invoice, clear exchange terms and no pressure to decide."
 pubDate: 2026-10-20
 tags: ["buying guide","trust","certified diamonds","surat"]
 draft: false
