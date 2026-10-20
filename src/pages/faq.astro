@@ -59,6 +59,22 @@ groups.push({
   ],
 });
 
+// C-20261020-REACHFIX (20/10/2026): answers to real customer questions from the Questions tab
+groups.push({
+  title: 'Buying with confidence',
+  faqs: [
+    ["What should I ask a jeweller before buying a solitaire ring?", "Ask which laboratory graded the diamond and see the report; ask to see the report number laser-inscribed on the stone; confirm whether it is natural or lab-grown as stated on the report; check the gold karat and the BIS HUID on the band; and ask about resizing, exchange and buyback. At Vaishnavi Jewels we show you the report and the inscription before you pay. Read more in our guide: /blog/questions-to-ask-before-buying-a-solitaire-ring"],
+    ["How do I choose a trustworthy jeweller in Surat?", "Choose a jeweller who shows you the grading report and the matching laser inscription before you pay, whose gold carries a BIS HUID you can check in the BIS Care app, who gives an itemised invoice with gold weight and stones listed separately, and who explains exchange and buyback terms clearly. Vaishnavi Jewels has worked this way at Parle Point, Surat, since 2005."],
+    ["How do I see the laser inscription on my diamond, and can I see it once it is set?", "The report number is inscribed on the girdle, the thin outer edge of the diamond, and can be read under a 10x loupe or a microscope. In an open prong setting it usually stays visible; in a bezel setting it may be covered, so check it before the stone is set. We will show you the inscription in our showroom."],
+    ["How do I make sure my diamond is not swapped when I give my ring for resizing or repair?", "Note the report number and check the laser inscription before you hand over the ring, ask for a receipt that records the report number, and check the inscription again when you collect it. Our resizing and repairs are done in our own manufacturing unit, and we show you the inscription at handover and at collection."],
+    ["Does a lab-grown diamond come with a certificate and an inscription saying it is lab-grown?", "Yes. A lab-grown diamond grading report states clearly that the stone is laboratory-grown, and the report number is laser-inscribed on the diamond so you can match the two and verify the report on the laboratory website. Every Vaishnavi lab-grown solitaire comes with its own report and inscription."],
+    ["How can I tell if a diamond has been treated or clarity-enhanced?", "Read the grading report. Recognised laboratories note treatments such as clarity enhancement or colour treatment on the report, usually in the comments. If you are unsure, ask the jeweller to confirm in writing. Every solitaire we sell comes with a report you can verify on the laboratory website."],
+    ["Is my old gold jewellery without a HUID still valid?", "Yes. Hallmarking rules apply to jewellers when they sell, so gold jewellery you already own stays yours to wear, sell or exchange even without a HUID. If you want its purity confirmed, it can be tested and hallmarked at a BIS-recognised hallmarking centre through a registered jeweller. We also accept old gold from other jewellers in exchange for new jewellery."],
+    ["How do I know if a diamond in my ring is loose, and how often should I get the prongs checked?", "Hold the ring near your ear and tap it gently: a rattle, or a stone that moves when pressed lightly, means it is loose. Also look for bent or flattened prongs or prongs that catch on fabric. Get diamond jewellery checked once or twice a year, and stop wearing a piece straight away if a stone feels loose. Bring it to our showroom and we will check it."],
+    ["How can I tell if Polki jewellery is real?", "Real Polki uses uncut diamonds set in gold, usually with a foil backing. Ask for the stones to be described in writing on the invoice, check that the gold weight and karat are shown separately from the stones, and look closely: Polki stones are flat uncut diamonds, while Kundan-style pieces usually use glass or other stones. Read more in our guide: /blog/how-to-tell-if-polki-jewellery-is-real"],
+  ],
+});
+
 const all = groups.flatMap((g) => g.faqs);
 const faqSchema = {
   '@context': 'https://schema.org',
