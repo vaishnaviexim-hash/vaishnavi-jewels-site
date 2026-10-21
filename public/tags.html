@@ -203,8 +203,9 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
       <div><button type="button" class="btn" id="fgo">Find</button></div>
     </div>
     <div class="row" style="align-items:end;margin-top:14px" id="fphotoRow">
-      <label style="flex:2 1 240px">Or search by photo (compares with pieces that have a saved photo)
-        <input type="file" id="fphoto" accept="image/*" capture="environment"></label>
+      <label style="flex:2 1 240px">Or search by photo: choose from gallery, or Take photo (compares with pieces that have a saved photo)
+        <input type="file" id="fphoto" accept="image/*"></label>
+      <div><button type="button" class="btn ghost" id="fpcam">Take photo</button><input type="file" id="fpcamIn" accept="image/*" capture="environment" hidden></div>
       <div><button type="button" class="btn" id="fpgo" disabled>Search by photo</button></div>
     </div>
     <p class="hint" id="fphint" hidden></p>
@@ -909,6 +910,7 @@ async function smallBlob(src,mx){
   c.getContext("2d").drawImage(img,0,0,c.width,c.height);return await new Promise(r=>c.toBlob(r,"image/jpeg",0.82));
 }
 S.lostPhoto=null;
+$("fpcam").addEventListener("click",()=>$("fpcamIn").click());$("fpcamIn").addEventListener("change",()=>{const f=$("fpcamIn").files&&$("fpcamIn").files[0];if(!f)return;const dt=new DataTransfer();dt.items.add(f);$("fphoto").files=dt.files;$("fpcamIn").value="";$("fphoto").dispatchEvent(new Event("change",{bubbles:true}))}); /* owner 21/10/2026: photo search from gallery (file box) or camera (Take photo) */
 $("fphoto").addEventListener("change",async()=>{const f=$("fphoto").files&&$("fphoto").files[0];const box=$("fres");box.textContent=f?"Reading the photo…":"";
   S.lostPhoto=f?await smallBlob(URL.createObjectURL(f),900).catch(()=>null):null;$("fpgo").disabled=!S.lostPhoto;
   box.textContent=!f?"":S.lostPhoto?"Photo ready. Tap Search by photo.":"That photo could not be read. Try again with the camera, or a JPG.";});
