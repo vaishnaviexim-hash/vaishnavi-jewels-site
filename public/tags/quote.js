@@ -18,7 +18,7 @@
   const Q = { kind: "code", items: [], option: "gh", mk: "std", prates: {}, designs: [] }; // mk: "std" = settings making + 10% wastage, "flat" = Rs 1,600/g (owner 14/10)
   const FLAT_MK = 1600, PRATE = 300;
   // new-design estimate (C-20261017-QUOTEMODES): same karats, qualities (with the shop codes) and shapes as the New tag form
-  const DKARATS = ["14K", "18K", "22K", "9K", "24K"], DQUALS = ["CVD", "VS IJ", "VS HI", "VS GH", "VVS EF"], DSHAPES = ["Round", "Choki", "Fancy", "Solitaire"];
+  const DKARATS = ["14K", "18K", "22K", "9K", "24K"], DQUALS = ["CVD", "VS IJ", "VS HI", "VS GH", "VVS EF"], DSHAPES = ["Round", "Choki", "Fancy", "Solitaire", "Polki"];
   const QC = { "CVD": "42", "VS IJ": "2", "VS HI": "3", "VS GH": "4", "VVS EF": "5" };
   const DEF_RATES = { "CVD|Round": 23000, "CVD|Choki": 23000, "CVD|Fancy": 23000, "CVD|Solitaire": 23000, "VS GH|Round": 46000, "VS GH|Choki": 46000, "VS GH|Fancy": 85000, "VS HI|Round": 40000, "VS HI|Choki": 40000, "VS IJ|Round": 35000, "VS IJ|Choki": 35000 };
   const num = v => { const n = parseFloat(String(v == null ? "" : v).replace(/,/g, "")); return isFinite(n) ? n : 0; };
@@ -39,7 +39,7 @@
   }
   const polkiOf = t => (t.polki && Number(t.polki.pcs) > 0 ? { pcs: Number(t.polki.pcs), rate: Number(Q.prates[t.id]) || Number(t.polki.rate) || PRATE } : null);
   function optRate(d, opt, st) {
-    if (NON_DIAMOND.test(String(d.q || "") + " " + String(d.code || ""))) return Number(d.rate) || 0;
+    if (d.shape === "Polki" || NON_DIAMOND.test(String(d.q || "") + " " + String(d.code || ""))) return Number(d.rate) || 0;
     if (opt === "lgd") return LGD_RATE;
     const q = opt === "gh" ? "VS GH" : "VS IJ", sh = ["Round", "Choki", "Fancy"].includes(d.shape) ? d.shape : "Round";
     return Number(st.rates[q + "|" + sh]) || Number(st.rates[q + "|Round"]) || 0;
