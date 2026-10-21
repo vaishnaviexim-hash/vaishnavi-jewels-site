@@ -149,7 +149,7 @@ kbd{font-family:var(--f-mono);font-size:13px;background:var(--sunk);border:1px s
     <section class="card">
       <h2>Steps</h2>
       <ol class="steps">
-        <li><b>Print the 20 labels.</b> Open <b>Print labels</b> and download the label PDF (one 36 × 71 mm page per tag). These are jewellery tags: everything prints on the 26 × 25 mm flap, nothing on the tail, never over the chip. Print at 100% / actual size, no scaling.</li>
+        <li><b>Print the 20 labels.</b> Open <b>Print labels</b> and download the label PDF (one 36 × 71 mm page per tag). These are jewellery tags: everything prints on the 26 × 25 mm flap, which folds in half down the middle; nothing crosses the fold, nothing on the tail, never over the chip. Print at 100% / actual size, no scaling.</li>
         <li><b>Encode the chips.</b> Write each tag's EPC exactly as listed under <b>Tags</b> or on the A4 vendor sheet: 96-bit, 24 hex characters, EPC bank from word 2, PC word 3000. Example: VJD0001 → <span class="epc">0000000000564A4430303031</span>.
           <ul class="sub"><li>If you would rather keep your factory EPCs, that is fine: the Scan test links them to the right tag (step 6).</li></ul></li>
         <li><b>Set up DataWedge on the Zebra TC22R.</b> Open DataWedge → create a profile (for example "VJ demo") → Associated apps: <kbd>com.android.chrome</kbd> / <kbd>*</kbd>.
@@ -297,20 +297,23 @@ function fallbackSelect(btn){const cell=btn.closest("tr")&&btn.closest("tr").que
 const LW=36,LH=71,MOD=0.25;
 const FLAP={x:1,y:42,w:26,h:25},TAIL={x:9.5,y:5,w:3,h:37};
 const KEEP=[{n:"chip",x:1.8,y:44.5,w:5.7,h:7.5}];
-const ZONE={qr:{x:15.2,y:43.4,s:10.8},text:{x:2.3,w:23.4}};
+const ZONE={qr:{x:15.5,y:43.4,s:10},text:{x:1.9,w:11.3}},FOLD=14;
 function barBits(text){const o={};JsBarcode(o,text,{format:"CODE128"});return o.encodings.map(e=>e.data).join("")}
 function qrMatrix(text){const q=qrcode(0,"M");q.addData(text);q.make();const n=q.getModuleCount(),m=[];for(let r=0;r<n;r++){const row=[];for(let c=0;c<n;c++)row.push(q.isDark(r,c));m.push(row)}return m}
 function labelPrims(t){
   const P=[],tx=ZONE.text.x,mw=ZONE.text.w;
-  /* jewellery tag: print only on the 26 x 25 mm flap; QR top right, clear of the chip */
-  P.push({k:"qr",x:ZONE.qr.x,y:ZONE.qr.y,s:ZONE.qr.s,m:qrMatrix(t.no)});
-  P.push({k:"t",x:8.3,y:46.6,t:t.metal,sz:7,b:1,maxW:6.6});
-  P.push({k:"t",x:8.3,y:50.0,t:t.label.split("/")[0],sz:5.4,b:1,maxW:6.6});
-  P.push({k:"t",x:8.3,y:53.6,t:"DEMO",sz:4.2,c:"wm2",maxW:6.6});
-  P.push({k:"t",x:tx,y:57.6,t:t.no,sz:7.6,b:1,maxW:mw});
-  P.push({k:"t",x:tx,y:60.2,t:t.label+"  "+t.cat,sz:5.6,b:1,maxW:mw});
-  P.push({k:"t",x:tx,y:62.7,t:"G "+t.gross.toFixed(3)+"  N "+t.net.toFixed(3),sz:5.6,maxW:mw});
-  P.push({k:"t",x:tx,y:65.2,t:"Dia "+t.dia.toFixed(2)+" ct  "+t.box,sz:5.6,maxW:mw});
+  /* the flap folds in half down the middle (x 14): left half = front over the chip, right half = back. Nothing crosses the fold. */
+  P.push({k:"t",x:8.2,y:46.8,t:t.metal,sz:7,b:1,maxW:5});
+  P.push({k:"t",x:8.2,y:50.2,t:t.label.split("/")[0],sz:5.4,b:1,maxW:5});
+  P.push({k:"t",x:1.9,y:56.2,t:t.label,sz:6,b:1,maxW:11.3});
+  P.push({k:"t",x:1.9,y:59.0,t:"G "+t.gross.toFixed(3),sz:5.6,maxW:11.3});
+  P.push({k:"t",x:1.9,y:61.6,t:"N "+t.net.toFixed(3),sz:5.6,maxW:11.3});
+  P.push({k:"t",x:1.9,y:64.2,t:"Dia "+t.dia.toFixed(2)+" ct",sz:5.6,maxW:11.3});
+  P.push({k:"qr",x:15.5,y:43.4,s:10,m:qrMatrix(t.no)});
+  P.push({k:"t",x:15.0,y:57.0,t:t.no,sz:6.4,b:1,maxW:11.2});
+  P.push({k:"t",x:15.0,y:59.8,t:t.cat,sz:5.0,maxW:11.2});
+  P.push({k:"t",x:15.0,y:62.4,t:t.box,sz:5.6,maxW:11.2});
+  P.push({k:"t",x:15.0,y:65.0,t:"DEMO",sz:4.2,c:"wm2",maxW:11.2});
   return P;
 }
 let measureCtx=null;
@@ -324,6 +327,7 @@ function labelSVG(t){
   svg.appendChild(el("rect",{width:LW,height:LH,rx:1.5,fill:wm,"fill-opacity":.35}));
   [TAIL,FLAP].forEach(r=>svg.appendChild(el("rect",{x:r.x,y:r.y,width:r.w,height:r.h,fill:bg,stroke:"#8a8a8a","stroke-width":.2})));
   svg.appendChild(el("rect",{x:TAIL.x+.1,y:FLAP.y-.2,width:TAIL.w-.2,height:.4,fill:bg}));
+  svg.appendChild(el("line",{x1:FOLD,y1:FLAP.y,x2:FOLD,y2:FLAP.y+FLAP.h,stroke:"#8a8a8a","stroke-width":.2,"stroke-dasharray":"1 0.7"}));
   KEEP.forEach(z=>{svg.appendChild(el("rect",{x:z.x,y:z.y,width:z.w,height:z.h,fill:wm,"fill-opacity":.4,stroke:"#8a8a8a","stroke-width":.2,"stroke-dasharray":"0.8 0.6"}));
     const tl=el("text",{x:z.x+z.w/2,y:z.y+z.h/2+.6,"font-size":1.8,"text-anchor":"middle",fill:"#8a8a8a","font-family":"Helvetica, Arial, sans-serif"});tl.textContent="chip";svg.appendChild(tl)});
   const tt=el("text",{x:TAIL.x+TAIL.w/2+.6,y:TAIL.y+TAIL.h/2,"font-size":1.8,"text-anchor":"middle",fill:"#8a8a8a","font-family":"Helvetica, Arial, sans-serif",transform:`rotate(-90 ${TAIL.x+TAIL.w/2+.6} ${TAIL.y+TAIL.h/2})`});tt.textContent="tail · wraps the piece · no print";svg.appendChild(tt);
@@ -362,6 +366,7 @@ function tagOutline(doc,ox,oy){
   doc.rect(ox+TAIL.x,oy+TAIL.y,TAIL.w,TAIL.h,"S");doc.rect(ox+FLAP.x,oy+FLAP.y,FLAP.w,FLAP.h,"S");
   doc.setFillColor(255,255,255);doc.rect(ox+TAIL.x+0.15,oy+FLAP.y-0.2,TAIL.w-0.3,0.5,"F");
   KEEP.forEach(z=>{doc.setFillColor(232,232,232);doc.setDrawColor(150);doc.setLineDashPattern([0.8,0.6],0);doc.rect(ox+z.x,oy+z.y,z.w,z.h,"FD")});
+  doc.setDrawColor(120);doc.setLineDashPattern([1,0.7],0);doc.line(ox+FOLD,oy+FLAP.y,ox+FOLD,oy+FLAP.y+FLAP.h);
   doc.setLineDashPattern([],0);
 }
 function sheetPDF(){
@@ -389,8 +394,7 @@ function sheetPDF(){
   const line=(s,b,sz)=>{doc.setFont("helvetica",b?"bold":"normal");doc.setFontSize(sz||9.5);doc.splitTextToSize(s,134).forEach(l=>{doc.text(l,nx,ny);ny+=4.3})};
   line("Print goes only on the 26 x 25 mm flap of the jewellery tag (mm from the top-left of the 36 x 71 mm liner):",1);
   line("- Flap: x 1-27, y 42-67. The tail (x 9.5-12.5, y 5-42) wraps round the piece and is not printed.");
-  line("- QR code: 10.8 x 10.8 mm at x 15.2-26.0, y 43.4-54.2 (tag number).");
-  line("- Text: tag no., item code, purity, gross / net weight, diamond ct, box - x 2.3-25.7, y 44-65.8.");
+  line("- The flap folds in half along x 14 (dashed). Front (x 1.9-13.2): purity, item code, weights, diamond ct; the chip stays clear. Back (x 15-26.2): QR 10 x 10 mm at x 15.5-25.5, y 43.4-53.4, tag no., item, box. Nothing is printed within 1 mm of the fold.");
   line("- Kept clear (grey): the chip, x 1.8-7.5, y 44.5-52. Printing over the antenna is fine.");
   ny+=2;line("Please confirm before printing:",1);
   line("1. The flap position, the tail position and the chip position match this drawing (the chip must not be printed over).");
