@@ -502,7 +502,7 @@ const vjClean = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f<>]/
 // + 10% wastage on gold (or flat Rs 1,600/g), diamonds, polki pcs x rate, other; rounded up to Rs 100, + GST, up to Rs 1,000.
 const VJ_Q_OPT = { 'Natural VS GH': 'gh', 'Natural VS IJ': 'ij', 'Lab-grown': 'lgd' };
 const VJ_Q_NONDIA = /POL|EMR|MOZ|RUBY|PEARL|MOTI|STONE|KUNDAN/i;
-const VJ_Q_KARATS = ['14K', '18K', '22K', '9K', '24K'], VJ_Q_QUALS = ['CVD', 'VS IJ', 'VS HI', 'VS GH', 'VVS EF'], VJ_Q_SHAPES = ['Round', 'Choki', 'Fancy', 'Solitaire'];
+const VJ_Q_KARATS = ['14K', '18K', '22K', '9K', '24K'], VJ_Q_QUALS = ['CVD', 'VS IJ', 'VS HI', 'VS GH', 'VVS EF'], VJ_Q_SHAPES = ['Round', 'Choki', 'Fancy', 'Solitaire', 'Polki'];
 const VJ_DEF_RATES = { 'CVD|Round': 23000, 'CVD|Choki': 23000, 'CVD|Fancy': 23000, 'CVD|Solitaire': 23000, 'VS GH|Round': 46000, 'VS GH|Choki': 46000, 'VS GH|Fancy': 85000, 'VS HI|Round': 40000, 'VS HI|Choki': 40000, 'VS IJ|Round': 35000, 'VS IJ|Choki': 35000 };
 const vjQSt = s => ({ g: Number(s.gold24g) || 0, pur: Object.assign({ '24K': 1, '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.40 }, s.purity || {}),
   mk: Object.assign({ base: 650, small: 750, limit: 5, pct: 10, min: 1000 }, s.making || {}), gst: s.gst == null ? 3 : Number(s.gst), rates: s.defaultRates && typeof s.defaultRates === 'object' ? s.defaultRates : VJ_DEF_RATES });
@@ -516,7 +516,7 @@ function vjQPrice(gold, dv, extra, st, mk) { // final price incl. GST, or 0 when
   const mv = !g0 ? 0 : mk === 'flat' ? 1600 * nt : Math.max((g0.net > st.mk.limit ? st.mk.base : st.mk.small) * nt, Number(st.mk.min) || 0) + gv * st.mk.pct / 100;
   return vjQUp(vjQUp(gv + cv + mv + dv + extra, 100) * (1 + st.gst / 100), 1000);
 }
-const vjQOptRate = (d, opt, st) => { if (VJ_Q_NONDIA.test(String(d.q || '') + ' ' + String(d.code || ''))) return Number(d.rate) || 0; if (opt === 'lgd') return 23000;
+const vjQOptRate = (d, opt, st) => { if (d.shape === 'Polki' || VJ_Q_NONDIA.test(String(d.q || '') + ' ' + String(d.code || ''))) return Number(d.rate) || 0; if (opt === 'lgd') return 23000;
   const q = opt === 'gh' ? 'VS GH' : 'VS IJ', sh = ['Round', 'Choki', 'Fancy'].includes(d.shape) ? d.shape : 'Round'; return Number(st.rates[q + '|' + sh]) || Number(st.rates[q + '|Round']) || 0; };
 const vjQNum = (v, lo, hi, int) => { if (v === '' || v == null) return null; const n = Number(v); return isFinite(n) && n >= lo && n <= hi && (!int || Number.isInteger(n)) ? n : NaN; };
 const vjSmpNet = t => Number(t && t.metal && t.metal.net) || (Array.isArray(t && t.gold) ? t.gold.reduce((a, g) => a + (Number(g && g.net) || 0), 0) : 0); // sample weight: old Onnet samples in metal.net, new-tag samples in gold lines (C-20261019-SAMPLEWT)
