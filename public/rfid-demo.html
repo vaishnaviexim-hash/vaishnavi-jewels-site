@@ -182,7 +182,8 @@ kbd{font-family:var(--f-mono);font-size:13px;background:var(--sunk);border:1px s
       <h2>Label files</h2>
       <p class="hint">Jewellery RFID tags on a 36 × 71 mm liner. Only the white die-cut tag is printed: the 26 × 25 mm flap carries a 10.8 mm QR and the details; the tail wraps round the piece and the chip is kept clear. The vendor sheet lists tag number, QR payload and EPC on A4.</p>
       <div class="actions">
-        <button type="button" class="btn" id="dlLabels">Download label PDF (20)</button>
+        <button type="button" class="btn" id="dlLabels">Download labels for roll (36 × 71 mm)</button>
+        <button type="button" class="btn ghost" id="dlA4">Download labels on A4 (test sheet)</button>
         <button type="button" class="btn ghost" id="dlSheet">Download A4 vendor sheet</button>
       </div>
       <p class="hint" id="dlHint">If the download button does nothing, open this page in Chrome and try again.</p>
@@ -369,6 +370,20 @@ function tagOutline(doc,ox,oy){
   doc.setDrawColor(120);doc.setLineDashPattern([1,0.7],0);doc.line(ox+FOLD,oy+FLAP.y,ox+FOLD,oy+FLAP.y+FLAP.h);
   doc.setLineDashPattern([],0);
 }
+function a4PDF(){
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",format:"a4",compress:true});
+  doc.setProperties({title:"VJ vendor demo labels A4",subject:WM});
+  const cols=5,rows=3,gx=5,gy=8,mx=(210-(cols*LW+(cols-1)*gx))/2,my=24,per=cols*rows,pages=Math.ceil(TAGS.length/per);
+  TAGS.forEach((t,i)=>{const k=i%per;if(i&&k===0)doc.addPage("a4");
+    if(k===0){const pg=Math.floor(i/per)+1;doc.setFont("helvetica","bold");doc.setFontSize(12);doc.setTextColor(0,0,0);
+      doc.text("VJ Inventory - RFID jewellery tags, A4 test sheet ("+pg+"/"+pages+")",14,12);
+      doc.setFont("helvetica","normal");doc.setFontSize(9);doc.setTextColor(60,60,60);
+      doc.text("Print at 100% / actual size. Solid line = tag outline (cut or lay a real tag over it to check position). Dashed = fold. Grey = chip, never print.",14,17.5);}
+    const c=k%cols,r=Math.floor(k/cols),ox=mx+c*(LW+gx),oy=my+r*(LH+gy);
+    doc.setDrawColor(200);doc.setLineWidth(0.15);doc.setLineDashPattern([0.6,0.6],0);doc.rect(ox,oy,LW,LH,"S");doc.setLineDashPattern([],0);
+    tagOutline(doc,ox,oy);drawPrimsPDF(doc,labelPrims(t),ox,oy)});
+  return doc.output("blob");
+}
 function sheetPDF(){
   const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",format:"a4",compress:true});
   doc.setProperties({title:"VJ vendor demo - EPC encoding sheet",subject:WM});
@@ -451,6 +466,7 @@ async function saveFile(name,data,fallback){
   if(fallback)fallback();return false;
 }
 $("dlLabels").addEventListener("click",async()=>{const ok=await saveFile("VJ-vendor-demo-labels-36x71.pdf",labelsPDF());if(!ok)$("dlHint").classList.add("banner","warn")});
+$("dlA4").addEventListener("click",async()=>{const ok=await saveFile("VJ-jewellery-tags-A4-sheet.pdf",a4PDF());if(!ok)$("dlHint").classList.add("banner","warn")});
 $("dlSheet").addEventListener("click",async()=>{const ok=await saveFile("VJ-vendor-demo-EPC-sheet-A4.pdf",sheetPDF());if(!ok)$("dlHint").classList.add("banner","warn")});
 window.__vj={labelsPDF,sheetPDF,TAGS};
 
