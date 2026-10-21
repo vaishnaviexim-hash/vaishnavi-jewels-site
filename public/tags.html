@@ -158,10 +158,10 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
       <div class="lines" id="diaLines"></div>
       <button type="button" class="add" id="addDia">+ Add diamond line</button>
 
-      <h2 hidden>5 · Polki</h2>
-      <div class="ln p" id="polkiLine" hidden><label>Pcs<input type="number" id="polkiPcs" min="0" max="10000" step="1" placeholder="0" inputmode="numeric"></label><label>Rate per pc (₹)<input type="number" id="polkiRate" min="1" max="100000" step="1" value="300" inputmode="numeric"></label><div class="val" id="polkiVal"></div></div>
+      <h2>5 · Polki setting (per piece)</h2>
+      <div class="ln p" id="polkiLine"><label>Pcs<input type="number" id="polkiPcs" min="0" max="10000" step="1" placeholder="0" inputmode="numeric"></label><label>Rate per pc (₹)<input type="number" id="polkiRate" min="1" max="100000" step="1" value="300" inputmode="numeric"></label><div class="val" id="polkiVal"></div></div>
 
-      <h2>5 · Other charges</h2>
+      <h2>6 · Other charges</h2>
       <div class="row"><label>Colour stones and other charges (₹) <input type="number" id="otherAmt" min="0" step="1" placeholder="0"></label></div>
     </section>
 
@@ -296,7 +296,7 @@ const CATS=[
  {id:"VNP",name:"Nose Pin (VNP)",code:"VNP",s:"SVNP"}
 ];
 const KARATS=["22K","18K","14K","9K"],KNUM={"22K":"22","18K":"18","14K":"14","9K":"9"};
-const SHAPES=["Round","Choki","Fancy","Solitaire","Polki"], /* owner 21/10/2026: Polki is a diamond line priced per ct (own rate); the old per-piece Polki box is hidden */QUALS=["CVD","VS GH","VVS EF","VS HI","VS IJ","Other"];
+const SHAPES=["Round","Choki","Fancy","Solitaire","Polki"], /* owner 21/10/2026: Polki stones = a diamond line priced per ct (own rate); the per-piece box below is the Polki SETTING charge */QUALS=["CVD","VS GH","VVS EF","VS HI","VS IJ","Other"];
 const DEF_RATES={"CVD|Round":23000,"CVD|Choki":23000,"CVD|Fancy":23000,"CVD|Solitaire":23000,"VS GH|Round":46000,"VS GH|Choki":46000,"VS GH|Fancy":85000,"VS HI|Round":40000,"VS HI|Choki":40000,"VS IJ|Round":35000,"VS IJ|Choki":35000};
 function defRate(shape,q){const r=(S.settings&&S.settings.defaultRates)||DEF_RATES;const v=r[q+"|"+shape];return typeof v==="number"&&v>0?v:null}
 const DEF={gold24g:null,goldAt:null,purity:{"22K":0.92,"18K":0.76,"14K":0.60,"9K":0.40},making:{base:650,small:750,limit:5,pct:10},gst:3,tag:{w:100,h:15,printW:70}};
@@ -365,13 +365,13 @@ function renderCheck(){
   const h=document.createElement("div");const l=document.createElement("div");l.className="labelno";l.textContent=(t.designNo?t.designNo+" · ":"")+t.label;const c=document.createElement("div");c.className="hint";c.textContent=S.role==="sales"?(t.catName||""):(t.catName||"")+(t.remark?" · "+t.remark:"")+(t.kind==="sample"?" · sample":"")+(t.kind==="order"?" · order"+(t.order&&t.order.name?" for "+t.order.name:"")+(t.order&&t.order.due?", delivery "+t.order.due.split("-").reverse().join("-"):""):"");h.append(l,c);top.appendChild(h);card.appendChild(top);
   const tb=document.createElement("table");tb.className="sum";const add=(a,b,cl)=>{const tr=document.createElement("tr");if(cl)tr.className=cl;const x=document.createElement("td"),y=document.createElement("td");x.textContent=a;y.textContent=b;tr.append(x,y);tb.appendChild(tr)};
   const pin=priceInput(t);pin.gold.forEach(g=>add(g.k==="Chain"?"Chain":(g.tunch>0?"Chain ":"Gold ")+g.k,g.net.toFixed(3)+" g"+(g.tunch>0?" × tunch "+Number(g.tunch).toFixed(3):"")));pin.dias.forEach(d=>add(`${d.shape} ${d.q}`,`${d.ct.toFixed(2)} ct (${d.pcs})`+(d.rate>0?` @ ${fmt(d.rate)}`:"")));
-  if(t.polki&&t.polki.pcs>0)add("Polki",`${t.polki.pcs} pc @ ${fmt(t.polki.rate)}`);
+  if(t.polki&&t.polki.pcs>0)add("Polki setting",`${t.polki.pcs} pc @ ${fmt(t.polki.rate)}`);
   if(t.other&&t.other.amt)add("Other charges",fmt(t.other.amt));
   const pr=price(priceInput(t)),s=st();
   if(t.kind==="sample"&&S.role!=="sales")add("Sample","not for sale - order estimate at 14K below");
   if(!pr)add("Price","gold rate not set","total");
   else if(S.role==="sales"){add("Price today",fmt(pr.final),"total")}
-  else{add("Gold value",fmt(pr.gold));add("Making",pr.nt>0||!pr.ch?fmt(pr.making):"— (chain: none)");if(pr.dia)add("Diamonds",fmt(pr.dia));if(pr.pol)add("Polki",fmt(pr.pol));if(pr.oth)add("Other",fmt(pr.oth));add(`GST ${s.gst}%`,fmt(pr.gst));add("Price today",fmt(pr.final),"total")}
+  else{add("Gold value",fmt(pr.gold));add("Making",pr.nt>0||!pr.ch?fmt(pr.making):"— (chain: none)");if(pr.dia)add("Diamonds",fmt(pr.dia));if(pr.pol)add("Polki setting",fmt(pr.pol));if(pr.oth)add("Other",fmt(pr.oth));add(`GST ${s.gst}%`,fmt(pr.gst));add("Price today",fmt(pr.final),"total")}
   card.appendChild(tb);
   const n=document.createElement("p");n.className="hint";n.textContent=pr?`At 24K ${fmt(s.gold24g)}/g${s.goldAt?", updated "+new Date(s.goldAt).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):""}.`+(t.priceAtTag?` Price when tagged: ${fmt(t.priceAtTag)}.`:""):"";card.appendChild(n);
   const acts=document.createElement("div");acts.style.cssText="display:flex;gap:8px;flex-wrap:wrap";
@@ -601,7 +601,7 @@ function update(){
   else{
     pr.lines.forEach(l=>add(l.tunch?`Chain ${l.k==="Chain"?"":l.k+" "}${l.net.toFixed(3)} g × tunch ${l.tunch.toFixed(3)} × ${fmt(pr.r24)}`:`Gold ${l.k} ${l.net.toFixed(3)} g × ${fmt(l.kr)}/g`,fmt(l.net*l.kr)));
     if(pr.nt>0)add(`Making ${fmt(pr.mk)}/g × ${pr.nt.toFixed(3)} g`,fmt(pr.making));else add("Making","— (chain: none)");
-    if(pr.dia)add("Diamonds",fmt(pr.dia));if(pr.pol)add(`Polki ${t.polki.pcs} pc × ${fmt(t.polki.rate)}`,fmt(pr.pol));if(pr.oth)add("Other charges",fmt(pr.oth));
+    if(pr.dia)add("Diamonds",fmt(pr.dia));if(pr.pol)add(`Polki setting ${t.polki.pcs} pc × ${fmt(t.polki.rate)}`,fmt(pr.pol));if(pr.oth)add("Other charges",fmt(pr.oth));
     add("Total (rounded up to ₹100)",fmt(pr.sub));add(`GST ${s.gst}%`,fmt(pr.gst));add("Price (rounded up to ₹1,000)",fmt(pr.final),"total");
     $("rateNote").textContent=`24K gold at ${fmt(s.gold24g)}/g${s.goldAt?", set "+new Date(s.goldAt).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):""}. Diamond rates on the tag are final; only gold and making move with the rate.`;
   }
