@@ -149,7 +149,7 @@ kbd{font-family:var(--f-mono);font-size:13px;background:var(--sunk);border:1px s
     <section class="card">
       <h2>Steps</h2>
       <ol class="steps">
-        <li><b>Print the 20 labels.</b> Open <b>Print labels</b> and download the label PDF (one 36 × 71 mm portrait page per tag). The print stays clear of the antenna and the chip block. Print at 100% / actual size, no scaling.</li>
+        <li><b>Print the 20 labels.</b> Open <b>Print labels</b> and download the label PDF (one 36 × 71 mm page per tag). These are jewellery tags: everything prints on the 26 × 25 mm flap, nothing on the tail, never over the chip. Print at 100% / actual size, no scaling.</li>
         <li><b>Encode the chips.</b> Write each tag's EPC exactly as listed under <b>Tags</b> or on the A4 vendor sheet: 96-bit, 24 hex characters, EPC bank from word 2, PC word 3000. Example: VJD0001 → <span class="epc">0000000000564A4430303031</span>.
           <ul class="sub"><li>If you would rather keep your factory EPCs, that is fine: the Scan test links them to the right tag (step 6).</li></ul></li>
         <li><b>Set up DataWedge on the Zebra TC22R.</b> Open DataWedge → create a profile (for example "VJ demo") → Associated apps: <kbd>com.android.chrome</kbd> / <kbd>*</kbd>.
@@ -161,9 +161,9 @@ kbd{font-family:var(--f-mono);font-size:13px;background:var(--sunk);border:1px s
           </ul>
           Other readers work the same way: any scanner or RFID reader in keyboard (HID / wedge) mode that types the value and presses Enter. A Zebra RFD40 sled must be in HID keyboard mode; browsers cannot talk to it over Bluetooth directly.</li>
         <li><b>Open Scan test in Chrome on the TC22R.</b> The big box takes the scans; the on-screen keyboard stays hidden so the list is visible. Tap <b>Type</b> if you want to enter a value by hand.</li>
-        <li><b>Scan all 20 barcodes, then all 20 QR codes.</b> Choose <b>Code 128</b> or <b>QR</b> above the box before each round so each code is ticked in the right column. Each good scan beeps and turns green.</li>
+        <li><b>Scan all 20 QR codes.</b> Choose <b>QR</b> above the box first so each code is ticked in the right column (the flap is too small for a 1D barcode). Each good scan beeps and turns green.</li>
         <li><b>Read all 20 RFID chips</b>, one tag at a time, close to the reader. With factory EPCs, scan a tag's barcode and its chip one after the other (either order, within 10 seconds) and tap <b>Link</b>, or <b>Link all</b> at the end.</li>
-        <li><b>Read the totals.</b> A pass is <span class="mono">Barcode 20/20 · QR 20/20 · RFID 20/20 · Linked 20/20</span>. Anything unknown or repeated is listed under the checklist. Download the results CSV and send it to Vaishnavi Jewels.</li>
+        <li><b>Read the totals.</b> A pass is <span class="mono">QR 20/20 · RFID 20/20 · Linked 20/20</span>. Anything unknown or repeated is listed under the checklist. Download the results CSV and send it to Vaishnavi Jewels.</li>
       </ol>
       <p class="hint">No phone handheld? Use <b>Photo scan</b> on the Scan test page: take a photo of a label and the page reads the barcode and QR from it (works in Chrome on Android and in Safari on iPhone).</p>
     </section>
@@ -172,15 +172,15 @@ kbd{font-family:var(--f-mono);font-size:13px;background:var(--sunk);border:1px s
   <!-- TAGS -->
   <section id="p-tags" class="card" hidden>
     <h2>The 20 test tags (dummy data)</h2>
-    <p class="hint">Barcode (Code 128) and QR both carry the tag number only. The RFID EPC is the tag number in ASCII hex, padded with zeros in front to 24 characters.</p>
-    <div class="list"><table class="items" id="tagTable"><thead><tr><th>Tag no.</th><th>Label</th><th>Category</th><th>Metal</th><th>Gross g</th><th>Net g</th><th>Dia ct</th><th>Box</th><th>Barcode / QR</th><th>RFID EPC to encode</th><th></th></tr></thead><tbody id="tagRows"></tbody></table></div>
+    <p class="hint">The QR carries the tag number only. The RFID EPC is the tag number in ASCII hex, padded with zeros in front to 24 characters.</p>
+    <div class="list"><table class="items" id="tagTable"><thead><tr><th>Tag no.</th><th>Label</th><th>Category</th><th>Metal</th><th>Gross g</th><th>Net g</th><th>Dia ct</th><th>Box</th><th>QR</th><th>RFID EPC to encode</th><th></th></tr></thead><tbody id="tagRows"></tbody></table></div>
   </section>
 
   <!-- LABELS -->
   <div id="p-labels" class="stack" hidden>
     <section class="card">
       <h2>Label files</h2>
-      <p class="hint">Labels are 36 × 71 mm portrait RFID tags. The grey areas in the preview show the antenna and the chip block, which are never printed on. Code 128 runs down the left side at 0.25 mm module; the QR is 13 mm, top right. The vendor sheet lists tag number, barcode payload and EPC on A4.</p>
+      <p class="hint">Jewellery RFID tags on a 36 × 71 mm liner. Only the white die-cut tag is printed: the 26 × 25 mm flap carries a 10.8 mm QR and the details; the tail wraps round the piece and the chip is kept clear. The vendor sheet lists tag number, QR payload and EPC on A4.</p>
       <div class="actions">
         <button type="button" class="btn" id="dlLabels">Download label PDF (20)</button>
         <button type="button" class="btn ghost" id="dlSheet">Download A4 vendor sheet</button>
@@ -198,8 +198,8 @@ kbd{font-family:var(--f-mono);font-size:13px;background:var(--sunk);border:1px s
     </div>
     <section class="card">
       <div class="seg" role="radiogroup" aria-label="Printed code being scanned">
-        <label><input type="radio" name="mode" id="m-bar" value="barcode" checked> Code 128</label>
-        <label><input type="radio" name="mode" id="m-qr" value="qr"> QR</label>
+        <label><input type="radio" name="mode" id="m-bar" value="barcode"> Code 128</label>
+        <label><input type="radio" name="mode" id="m-qr" value="qr" checked> QR</label>
       </div>
       <input id="scanIn" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="none" enterkeyhint="go" placeholder="Pull the trigger to scan a barcode, QR or RFID tag" aria-label="Scanner input">
       <div class="scanstate"><span class="dot" id="focusDot"></span><span id="focusTxt">Ready</span>
@@ -295,29 +295,22 @@ function fallbackSelect(btn){const cell=btn.closest("tr")&&btn.closest("tr").que
    Tag: 36 x 71 mm portrait RFID label (owner's drawing). Keep-out zones include about 1 mm tolerance:
    antenna column (3 mm wide, from 5 mm below the top) and the loop + chip block (26 x 25 mm at the bottom). */
 const LW=36,LH=71,MOD=0.25;
-const KEEP=[{n:"antenna",x:12.5,y:3.5,w:5,h:38.5},{n:"loop + chip",x:6,y:42,w:29,h:29}];
-const ZONE={bar:{x:4.0,y:4.0,w:7.0},qr:{x:20,y:2,s:13},text:{x:18.5,y:17,w:16,h:24.5}};
+const FLAP={x:1,y:42,w:26,h:25},TAIL={x:9.5,y:5,w:3,h:37};
+const KEEP=[{n:"chip",x:1.8,y:44.5,w:5.7,h:7.5}];
+const ZONE={qr:{x:15.2,y:43.4,s:10.8},text:{x:2.3,w:23.4}};
 function barBits(text){const o={};JsBarcode(o,text,{format:"CODE128"});return o.encodings.map(e=>e.data).join("")}
 function qrMatrix(text){const q=qrcode(0,"M");q.addData(text);q.make();const n=q.getModuleCount(),m=[];for(let r=0;r<n;r++){const row=[];for(let c=0;c<n;c++)row.push(q.isDark(r,c));m.push(row)}return m}
 function labelPrims(t){
   const P=[],tx=ZONE.text.x,mw=ZONE.text.w;
-  /* watermark first, light grey, kept off the barcode, the QR and the chip block */
-  P.push({k:"t",x:2.2,y:40.6,t:"vendor demo",sz:4.4,c:"wm",ang:50});
-  /* QR, top right, clear of the antenna column */
+  /* jewellery tag: print only on the 26 x 25 mm flap; QR top right, clear of the chip */
   P.push({k:"qr",x:ZONE.qr.x,y:ZONE.qr.y,s:ZONE.qr.s,m:qrMatrix(t.no)});
-  /* Code 128 running down the left column (bars across the width), human-readable text beside it */
-  const bits=barBits(t.no),len=bits.length*MOD;
-  P.push({k:"vbars",x:ZONE.bar.x,y:ZONE.bar.y,w:ZONE.bar.w,bits});
-  P.push({k:"t",x:3.4,y:ZONE.bar.y+len/2,t:t.no,sz:5.2,b:1,ang:90,anchor:"middle"});
-  /* text block under the QR */
-  P.push({k:"t",x:tx,y:19.6,t:t.no,sz:8,b:1,maxW:mw});
-  P.push({k:"t",x:tx,y:23.0,t:t.label,sz:6.6,b:1,maxW:mw});
-  P.push({k:"t",x:tx,y:26.2,t:t.metal+"  "+t.cat,sz:6,maxW:mw});
-  P.push({k:"t",x:tx,y:29.4,t:"G.Wt "+t.gross.toFixed(3),sz:6,maxW:mw});
-  P.push({k:"t",x:tx,y:32.6,t:"N.Wt "+t.net.toFixed(3),sz:6,maxW:mw});
-  P.push({k:"t",x:tx,y:35.8,t:"Dia "+t.dia.toFixed(2)+" ct",sz:6,maxW:mw});
-  P.push({k:"t",x:tx,y:38.8,t:t.box,sz:6,maxW:mw});
-  P.push({k:"t",x:tx,y:41.3,t:"VENDOR DEMO",sz:4.2,c:"wm2",maxW:mw});
+  P.push({k:"t",x:8.3,y:46.6,t:t.metal,sz:7,b:1,maxW:6.6});
+  P.push({k:"t",x:8.3,y:50.0,t:t.label.split("/")[0],sz:5.4,b:1,maxW:6.6});
+  P.push({k:"t",x:8.3,y:53.6,t:"DEMO",sz:4.2,c:"wm2",maxW:6.6});
+  P.push({k:"t",x:tx,y:57.6,t:t.no,sz:7.6,b:1,maxW:mw});
+  P.push({k:"t",x:tx,y:60.2,t:t.label+"  "+t.cat,sz:5.6,b:1,maxW:mw});
+  P.push({k:"t",x:tx,y:62.7,t:"G "+t.gross.toFixed(3)+"  N "+t.net.toFixed(3),sz:5.6,maxW:mw});
+  P.push({k:"t",x:tx,y:65.2,t:"Dia "+t.dia.toFixed(2)+" ct  "+t.box,sz:5.6,maxW:mw});
   return P;
 }
 let measureCtx=null;
@@ -327,11 +320,13 @@ function labelSVG(t){
   const NS="http://www.w3.org/2000/svg",el=(n,a)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);return e};
   const cs=getComputedStyle(document.documentElement),ink=cs.getPropertyValue("--tagink").trim()||"#111",bg=cs.getPropertyValue("--tagbg").trim()||"#fff",wm=cs.getPropertyValue("--tagwm").trim()||"#ccc";
   const svg=el("svg",{viewBox:`0 0 ${LW} ${LH}`,role:"img","aria-label":"Label "+t.no});
-  svg.appendChild(el("rect",{width:LW,height:LH,rx:1.5,fill:bg}));
-  /* preview only: where the inlay sits (never printed) */
-  KEEP.forEach(z=>{svg.appendChild(el("rect",{x:z.x,y:z.y,width:z.w,height:z.h,fill:wm,"fill-opacity":.25,stroke:wm,"stroke-width":.2,"stroke-dasharray":"0.8 0.6"}));
-    const tl=el("text",{x:z.x+z.w/2,y:z.n==="antenna"?z.y+z.h/2:z.y+z.h/2,"font-size":1.8,"text-anchor":"middle",fill:"#8a8a8a","font-family":"Helvetica, Arial, sans-serif"});
-    if(z.n==="antenna")tl.setAttribute("transform",`rotate(-90 ${z.x+z.w/2} ${z.y+z.h/2})`);tl.textContent=z.n==="antenna"?"antenna · no print":"loop + chip · no print";svg.appendChild(tl)});
+  /* preview only: the liner (grey) and the die-cut jewellery tag (white): tail + flap; the chip is never printed on */
+  svg.appendChild(el("rect",{width:LW,height:LH,rx:1.5,fill:wm,"fill-opacity":.35}));
+  [TAIL,FLAP].forEach(r=>svg.appendChild(el("rect",{x:r.x,y:r.y,width:r.w,height:r.h,fill:bg,stroke:"#8a8a8a","stroke-width":.2})));
+  svg.appendChild(el("rect",{x:TAIL.x+.1,y:FLAP.y-.2,width:TAIL.w-.2,height:.4,fill:bg}));
+  KEEP.forEach(z=>{svg.appendChild(el("rect",{x:z.x,y:z.y,width:z.w,height:z.h,fill:wm,"fill-opacity":.4,stroke:"#8a8a8a","stroke-width":.2,"stroke-dasharray":"0.8 0.6"}));
+    const tl=el("text",{x:z.x+z.w/2,y:z.y+z.h/2+.6,"font-size":1.8,"text-anchor":"middle",fill:"#8a8a8a","font-family":"Helvetica, Arial, sans-serif"});tl.textContent="chip";svg.appendChild(tl)});
+  const tt=el("text",{x:TAIL.x+TAIL.w/2+.6,y:TAIL.y+TAIL.h/2,"font-size":1.8,"text-anchor":"middle",fill:"#8a8a8a","font-family":"Helvetica, Arial, sans-serif",transform:`rotate(-90 ${TAIL.x+TAIL.w/2+.6} ${TAIL.y+TAIL.h/2})`});tt.textContent="tail · wraps the piece · no print";svg.appendChild(tt);
   labelPrims(t).forEach(o=>{
     if(o.k==="qr"){const n=o.m.length,c=o.s/n;let d="";o.m.forEach((r,ri)=>r.forEach((v,ci)=>{if(v)d+=`M${(o.x+ci*c).toFixed(3)} ${(o.y+ri*c).toFixed(3)}h${c.toFixed(3)}v${c.toFixed(3)}h-${c.toFixed(3)}z`}));svg.appendChild(el("path",{d,fill:ink}))}
     else if(o.k==="vbars"){let d="";runs(o.bits).forEach(([i,n])=>{d+=`M${o.x} ${(o.y+i*MOD).toFixed(3)}h${o.w}v${(n*MOD).toFixed(3)}h-${o.w}z`});svg.appendChild(el("path",{d,fill:ink}))}
@@ -415,9 +410,9 @@ window.__vj={labelsPDF,sheetPDF,TAGS};
 
 /* ---------- scan test state ---------- */
 const PAIR_MS=10000;
-const S={run:null,events:[],links:{},dismiss:{},pending:[],mode:"barcode",sound:true,typing:false};
+const S={run:null,events:[],links:{},dismiss:{},pending:[],mode:"qr",sound:true,typing:false};
 function newRun(){return new Date().toISOString().replace(/[-:]/g,"").slice(0,15)+"-"+Math.random().toString(36).slice(2,6)}
-function load(){try{const j=JSON.parse(localStorage.getItem("vjdemo.v1")||"null");if(j&&j.run){S.run=j.run;S.events=j.events||[];S.links=j.links||{};S.pending=j.pending||[];S.mode=j.mode||"barcode";S.sound=j.sound!==false;S.dismiss=j.dismiss||{}}}catch(e){}if(!S.run)S.run=newRun()}
+function load(){try{const j=JSON.parse(localStorage.getItem("vjdemo.v1")||"null");if(j&&j.run){S.run=j.run;S.events=j.events||[];S.links=j.links||{};S.pending=j.pending||[];S.mode=j.mode||"qr";S.sound=j.sound!==false;S.dismiss=j.dismiss||{}}}catch(e){}if(!S.run)S.run=newRun()}
 function persist(){try{localStorage.setItem("vjdemo.v1",JSON.stringify({run:S.run,events:S.events.slice(-2000),links:S.links,pending:S.pending,mode:S.mode,sound:S.sound,dismiss:S.dismiss}))}catch(e){}}
 load();
 document.querySelector(`input[name=mode][value="${S.mode}"]`).checked=true;
