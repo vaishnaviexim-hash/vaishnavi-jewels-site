@@ -159,7 +159,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
       <button type="button" class="add" id="addDia">+ Add diamond line</button>
 
       <h2>5 · Polki setting (per piece)</h2>
-      <div class="ln p" id="polkiLine"><label>Pcs<input type="number" id="polkiPcs" min="0" max="10000" step="1" placeholder="0" inputmode="numeric"></label><label>Rate per pc (₹)<input type="number" id="polkiRate" min="1" max="100000" step="1" value="300" inputmode="numeric"></label><div class="val" id="polkiVal"></div></div>
+      <div class="ln p" id="polkiLine"><label>Pcs (from Polki lines)<input type="number" id="polkiPcs" placeholder="0" readonly tabindex="-1"></label><label>Rate per pc (₹)<input type="number" id="polkiRate" min="1" max="100000" step="1" value="300" inputmode="numeric"></label><div class="val" id="polkiVal"></div></div>
 
       <h2>6 · Other charges</h2>
       <div class="row"><label>Colour stones and other charges (₹) <input type="number" id="otherAmt" min="0" step="1" placeholder="0"></label></div>
@@ -451,7 +451,7 @@ function readForm(){
   /* owner 19/10/2026 (C-20261019-TAGSNOORDER): the printed code has no running number - stock VLR14, sample VLR14/MN (karigar); the number stays hidden in the QR */
   const karigar=k==="sample"?$("karigar").value:"",pcode=cat.code+KNUM[mainK]+(k==="sample"?"/"+(karigar||"…"):"");
   const order=k==="order"?{name:$("oName").value.trim().slice(0,60),mobile:$("oMob").value.trim().slice(0,20),city:$("oCity").value.trim().slice(0,40),due:$("oDue").value||"",rate:num($("oRate").value)}:null; /* owner 16/10: the order is booked at this gold rate (C-20261016-ORDERRATE2) */
-  const ppcs=num($("polkiPcs").value),prt=$("polkiRate").value.trim()===""?300:num($("polkiRate").value); /* C-20261017-POLKI: pcs x rate per pc (default Rs 300) */
+  const ppcs=dias.filter(d=>d.shape==="Polki").reduce((a,d)=>a+(d.pcs||0),0), /* owner 21/10/2026: Polki setting pcs = pcs on the Polki diamond lines; rate stays editable */prt=$("polkiRate").value.trim()===""?300:num($("polkiRate").value); /* C-20261017-POLKI: pcs x rate per pc (default Rs 300) */
   return {kind:k,cat:cat.id,prefix,pcode,karigar,catName:cat.name.replace(/\s*\(.*\)$/,""),mainK,gold,dias,order,polki:ppcs>0?{pcs:ppcs,rate:prt}:null,
     remark:$("remark").value.trim(),designNo:$("designNo").value.trim().toUpperCase(),other:{amt:num($("otherAmt").value)}};
 }
@@ -591,7 +591,7 @@ function update(){
   [...$("diaLines").children].forEach(r=>{const i=r.dataset.id,qq=$("dq"+i).value==="Other"?$("dqo"+i).value.trim().toUpperCase():$("dq"+i).value,def=defRate($("ds"+i).value,qq),sp=num($("dr"+i).value),rate=sp>0?sp:def,ct=num($("dc"+i).value);
     $("dr"+i).placeholder=def?"default "+def.toLocaleString("en-IN"):"enter rate";
     $("dv"+i).textContent=(rate&&ct>0?fmt(ct*rate):"")+(sp>0?" · special":(def&&ct>0?" · default":""));});
-  $("polkiVal").textContent=t.polki?`${t.polki.pcs} × ${fmt(t.polki.rate)} = ${fmt(t.polki.pcs*t.polki.rate)}`:"";
+  $("polkiPcs").value=t.polki?t.polki.pcs:"";$("polkiVal").textContent=t.polki?`${t.polki.pcs} × ${fmt(t.polki.rate)} = ${fmt(t.polki.pcs*t.polki.rate)}`:"";
   t.no=nextNo(t.prefix);t.label=t.prefix+"/"+t.no;t.code="";$("karBox").hidden=t.kind!=="sample";
   $("lblPreview").textContent=t.pcode; /* C-20261019-TAGSNOORDER: printed code; the running number stays in the QR */
   const sum=$("sum");sum.textContent="";
