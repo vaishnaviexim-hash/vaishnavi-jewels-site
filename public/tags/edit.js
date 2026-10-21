@@ -34,7 +34,7 @@
     if (t.kind !== "sample") { wrap.append(el("strong", { textContent: "Gold" }), gBox, el("button", { type: "button", className: "btn ghost", textContent: "+ Gold line", onclick: () => addGold(null) })); }
     // diamond / stone lines
     const dBox = el("div", { style: "display:flex;flex-direction:column;gap:6px" });
-    const SH = ["Round", "Choki", "Fancy", "Solitaire"];
+    const SH = ["Round", "Choki", "Fancy", "Solitaire", "Polki"];
     const addDia = d => { const q = inp(d ? d.q : "VS GH", 110), sh = sel(SH, (d && d.shape) || "Round", 95), pcs = inp(d ? d.pcs : "", 60, "number"), ct = inp(d ? d.ct : "", 70, "number"), rate = inp(d ? d.rate : 0, 90, "number"), rm = el("button", { type: "button", className: "btn ghost", textContent: "Remove" });
       const r = el("div", { style: "display:flex;gap:6px;align-items:center;flex-wrap:wrap" }, [q, sh, pcs, "pcs", ct, "ct", "Rs/ct", rate, rm]);
       r._get = () => { const nq = q.value.trim(), out = { code: d && d.q === nq ? d.code : nq, ct: num(ct.value), pcs: Math.round(num(pcs.value)), q: nq, rate: num(rate.value), shape: sh.value, special: num(rate.value) > 0 }; return out; };
