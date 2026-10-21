@@ -1,0 +1,621 @@
+<!doctype html><html lang="en"><head><meta name="robots" content="noindex,nofollow"><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>VJ Inventory Vendor Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Cormorant+SC:wght@600&display=swap">
+<style>
+/* Layout: same workbench look as VJ Inventory — slim header, pill tabs, cards; one column on a 6-inch handheld, wider tables on desktop */
+:root{
+  --bg:#f5f4f1; --surface:#ffffff; --sunk:#ece9e3; --line:#d9d4ca; --fg:#1f2328; --muted:#5f6670;
+  --gold:#8a6a22; --gold-soft:#f3ead6; --ok:#1d7a4a; --ok-soft:#e3f2ea; --warn:#9a5b00; --warn-soft:#fbefd9; --bad:#b0302a; --bad-soft:#f8e2e0;
+  --wm:rgba(138,106,34,.11); --tagbg:#ffffff; --tagink:#111111; --tagwm:#c9c9c9;
+  --f-display:"Cormorant SC", Georgia, serif; --f-body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; --f-mono:"IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --r:6px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#15171a; --surface:#1d2024; --sunk:#25292e; --line:#363b42; --fg:#e8e6e1; --muted:#a0a6ae;
+  --gold:#d9b25e; --gold-soft:#33291a; --ok:#5ec48d; --ok-soft:#183025; --warn:#e3a54b; --warn-soft:#33270f; --bad:#ef7d75; --bad-soft:#3a1d1b;
+  --wm:rgba(217,178,94,.10); --tagbg:#f7f7f5; --tagink:#111111; --tagwm:#c9c9c9; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#15171a; --surface:#1d2024; --sunk:#25292e; --line:#363b42; --fg:#e8e6e1; --muted:#a0a6ae;
+  --gold:#d9b25e; --gold-soft:#33291a; --ok:#5ec48d; --ok-soft:#183025; --warn:#e3a54b; --warn-soft:#33270f; --bad:#ef7d75; --bad-soft:#3a1d1b;
+  --wm:rgba(217,178,94,.10); --tagbg:#f7f7f5; --tagink:#111111; --tagwm:#c9c9c9; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.45}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px 64px;position:relative;z-index:1}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;padding-block:4px 10px;border-bottom:1px solid var(--line)}
+header h1{font-family:var(--f-display);font-size:28px;font-weight:600;letter-spacing:.02em;margin:0;color:var(--gold)}
+.demo{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;background:var(--bad);color:var(--surface);padding:2px 8px;border-radius:999px}
+header .sub{color:var(--muted);font-size:13px;flex-basis:100%}
+nav{display:flex;gap:6px;margin-block:12px;flex-wrap:wrap}
+nav button{font:inherit;font-weight:500;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:10px 16px;min-height:44px;border-radius:999px;cursor:pointer}
+nav button[aria-selected="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.banner{padding:10px 14px;border-radius:var(--r);font-size:14px;margin:0}
+.banner.warn{background:var(--warn-soft);color:var(--warn)} .banner.bad{background:var(--bad-soft);color:var(--bad)} .banner.ok{background:var(--ok-soft);color:var(--ok)} .banner.info{background:var(--gold-soft);color:var(--gold)}
+.stack{display:flex;flex-direction:column;gap:14px}
+section.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+h2{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:600}
+h3{font-size:16px;margin:0;text-wrap:balance}
+p{margin:0}
+.hint{font-size:13px;color:var(--muted)}
+.mono,.code{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.list{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table.items{width:100%;border-collapse:collapse;font-size:14px;font-variant-numeric:tabular-nums}
+table.items th{text-align:left;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.items td{padding:8px;border-bottom:1px solid var(--line);vertical-align:middle}
+table.items td.num{font-family:var(--f-mono);text-align:right;white-space:nowrap}
+#tagTable{min-width:980px}
+.epc{font-family:var(--f-mono);font-weight:600;letter-spacing:.02em;white-space:nowrap}
+.epc .z{color:var(--muted);font-weight:400}
+.pill{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--sunk);color:var(--muted);white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.warn{background:var(--warn-soft);color:var(--warn)}
+button.btn{font:inherit;font-weight:600;border-radius:var(--r);padding:10px 16px;min-height:44px;cursor:pointer;border:1px solid var(--fg);background:var(--fg);color:var(--bg)}
+button.btn.ghost{background:transparent;color:var(--fg);border-color:var(--line)}
+button.btn.gold{background:var(--gold);border-color:var(--gold);color:var(--surface)}
+button.btn.danger{background:var(--bad);border-color:var(--bad);color:var(--surface)}
+button.btn.sm{min-height:36px;padding:6px 10px;font-size:13px}
+button.btn:disabled{opacity:.45;cursor:not-allowed}
+label.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;border-radius:var(--r);padding:10px 16px;min-height:44px;cursor:pointer;border:1px solid var(--line);color:var(--fg);background:transparent}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+@media (prefers-reduced-motion:no-preference){button.btn{transition:transform .08s}button.btn:active{transform:translateY(1px)}}
+
+/* watermark on every screen */
+.wm{position:fixed;inset:0;pointer-events:none;z-index:40;overflow:hidden}
+.wm div{position:absolute;left:-50%;top:-50%;width:200%;height:200%;transform:rotate(-24deg);display:flex;flex-direction:column;gap:64px;justify-content:center}
+.wm span{display:block;white-space:nowrap;font-family:var(--f-display);font-size:26px;letter-spacing:.06em;color:var(--wm);user-select:none}
+.wm span:nth-child(even){padding-left:160px}
+
+/* totals */
+.totals{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.tot{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;display:flex;flex-direction:column;gap:0;min-width:0}
+.tot b{font-family:var(--f-mono);font-size:24px;font-weight:600;line-height:1.15;font-variant-numeric:tabular-nums}
+.tot span{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tot.full{border-color:var(--ok);background:var(--ok-soft)} .tot.full b{color:var(--ok)}
+.totline{font-family:var(--f-mono);font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
+.sticky{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:var(--bg);padding-block:6px;display:flex;flex-direction:column;gap:6px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:41;background:var(--bg)}
+
+/* scan box */
+#scanIn{font-family:var(--f-mono);font-size:22px;font-weight:500;letter-spacing:.03em;width:100%;min-width:0;padding:14px;border:2px solid var(--gold);border-radius:var(--r);background:var(--bg);color:var(--fg);text-transform:uppercase}
+#scanIn::placeholder{text-transform:none;font-family:var(--f-body);font-size:16px;color:var(--muted);letter-spacing:0}
+.scanstate{font-size:13px;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--muted);display:inline-block}
+.dot.on{background:var(--ok)}
+.seg{display:flex;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.seg label{flex:1;display:flex;justify-content:center;align-items:center;gap:6px;padding:10px 8px;min-height:44px;cursor:pointer;color:var(--fg);font-size:14px;text-align:center}
+.seg input{margin:0}
+.seg label:has(input:checked){background:var(--gold-soft);color:var(--gold);font-weight:600}
+.last{border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:2px;background:var(--sunk);min-height:72px}
+.last .big{font-family:var(--f-mono);font-size:22px;font-weight:600;overflow-wrap:anywhere}
+.last.ok{background:var(--ok-soft);color:var(--ok)} .last.bad{background:var(--bad-soft);color:var(--bad)} .last.warn{background:var(--warn-soft);color:var(--warn)}
+@media (prefers-reduced-motion:no-preference){.last.flash{animation:fl .5s ease-out}@keyframes fl{0%{transform:scale(1.02);filter:brightness(1.15)}100%{transform:none;filter:none}}}
+.pair{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:var(--r);background:var(--bg)}
+.pair .mono{overflow-wrap:anywhere;min-width:0}
+.ck td.c{text-align:center;font-size:18px;font-weight:600}
+.ck td.c.y{color:var(--ok)} .ck td.c.n{color:var(--line)}
+.ck tr.done td:first-child{box-shadow:inset 3px 0 0 var(--ok)}
+#ckTable{min-width:0}
+@media (max-width:560px){#ckTable th:nth-child(7),#ckTable td:nth-child(7){display:none}#ckTable th,#ckTable td{padding:7px 4px}.totline{display:none}}
+@media (max-width:380px){#ckTable th:nth-child(2),#ckTable td:nth-child(2){display:none}}
+.log{font-family:var(--f-mono);font-size:13px;display:flex;flex-direction:column;gap:2px;max-height:320px;overflow:auto}
+.log div{display:grid;grid-template-columns:72px minmax(0,1fr);gap:8px;padding:3px 0;border-bottom:1px dashed var(--line)}
+.log div span:last-child{overflow-wrap:anywhere}
+select{font:inherit;font-size:15px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:8px 10px;min-height:40px}
+textarea{font-family:var(--f-mono);font-size:12px;width:100%;min-height:140px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:var(--r);padding:8px}
+
+/* labels */
+.labels{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr));gap:10px}
+.lab{background:var(--sunk);border-radius:var(--r);padding:8px;min-width:0}
+.lab svg{display:block;width:100%;height:auto;filter:drop-shadow(0 1px 2px rgba(0,0,0,.18))}
+ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px;max-width:70ch}
+ol.steps li::marker{font-family:var(--f-mono);color:var(--gold);font-weight:600}
+ul.sub{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px;font-size:14px}
+kbd{font-family:var(--f-mono);font-size:13px;background:var(--sunk);border:1px solid var(--line);border-radius:4px;padding:0 5px}
+#qrtmp{position:absolute;left:-9999px;width:300px;height:300px}
+
+@page label{size:36mm 71mm;margin:0}
+@page sheet{size:A4;margin:12mm}
+@media print{
+  .wm{display:none}
+  body *{visibility:hidden}
+  #p-labels .labels,#p-labels .labels *{visibility:visible}
+  #p-labels .labels{position:absolute;left:0;top:0;display:block;page:label}
+  #p-labels .lab{padding:0;background:#fff;break-after:page;width:36mm;height:71mm}
+  #p-labels .lab svg{width:36mm;height:71mm;filter:none}
+}
+</style>
+
+<div class="wm" id="wm" aria-hidden="true"><div></div></div>
+<div id="qrtmp"></div>
+
+<div class="wrap">
+  <header>
+    <h1>VJ Inventory</h1>
+    <span class="demo">Vendor demo</span>
+    <span class="sub">Vaishnavi Jewels, Surat · RFID and barcode tag test · 20 made-up pieces, no prices, not linked to the real stock system</span>
+  </header>
+
+  <nav role="tablist">
+    <button role="tab" id="t-howto" data-tab="howto" aria-selected="true">How to test</button>
+    <button role="tab" id="t-tags" data-tab="tags" aria-selected="false">Tags (20)</button>
+    <button role="tab" id="t-labels" data-tab="labels" aria-selected="false">Print labels</button>
+    <button role="tab" id="t-scan" data-tab="scan" aria-selected="false">Scan test</button>
+  </nav>
+
+  <!-- HOW TO TEST -->
+  <div id="p-howto" class="stack">
+    <p class="banner info">This page proves three things for each of the 20 test tags: the printed barcode and QR scan, the RFID chip reads, and both point to the same piece.</p>
+    <section class="card">
+      <h2>Steps</h2>
+      <ol class="steps">
+        <li><b>Print the 20 labels.</b> Open <b>Print labels</b> and download the label PDF (one 36 × 71 mm portrait page per tag). The print stays clear of the antenna and the chip block. Print at 100% / actual size, no scaling.</li>
+        <li><b>Encode the chips.</b> Write each tag's EPC exactly as listed under <b>Tags</b> or on the A4 vendor sheet: 96-bit, 24 hex characters, EPC bank from word 2, PC word 3000. Example: VJD0001 → <span class="epc">0000000000564A4430303031</span>.
+          <ul class="sub"><li>If you would rather keep your factory EPCs, that is fine: the Scan test links them to the right tag (step 6).</li></ul></li>
+        <li><b>Set up DataWedge on the Zebra TC22R.</b> Open DataWedge → create a profile (for example "VJ demo") → Associated apps: <kbd>com.android.chrome</kbd> / <kbd>*</kbd>.
+          <ul class="sub">
+            <li>Barcode input: on, with Code 128 and QR Code enabled.</li>
+            <li>RFID input: on. Tag read mode: Single. Lower the antenna transmit power (start near 10 dBm) so only the tag on top of the reader is read, not the whole tray.</li>
+            <li>Keystroke output: on. Basic data formatting: Send data on, <b>Send ENTER key on</b>, for both the barcode and the RFID plugin. No prefix, or the AIM code ID if you want the page to tell QR from Code 128 by itself.</li>
+            <li>If characters go missing, set an inter-character delay of 10–20 ms.</li>
+          </ul>
+          Other readers work the same way: any scanner or RFID reader in keyboard (HID / wedge) mode that types the value and presses Enter. A Zebra RFD40 sled must be in HID keyboard mode; browsers cannot talk to it over Bluetooth directly.</li>
+        <li><b>Open Scan test in Chrome on the TC22R.</b> The big box takes the scans; the on-screen keyboard stays hidden so the list is visible. Tap <b>Type</b> if you want to enter a value by hand.</li>
+        <li><b>Scan all 20 barcodes, then all 20 QR codes.</b> Choose <b>Code 128</b> or <b>QR</b> above the box before each round so each code is ticked in the right column. Each good scan beeps and turns green.</li>
+        <li><b>Read all 20 RFID chips</b>, one tag at a time, close to the reader. With factory EPCs, scan a tag's barcode and its chip one after the other (either order, within 10 seconds) and tap <b>Link</b>, or <b>Link all</b> at the end.</li>
+        <li><b>Read the totals.</b> A pass is <span class="mono">Barcode 20/20 · QR 20/20 · RFID 20/20 · Linked 20/20</span>. Anything unknown or repeated is listed under the checklist. Download the results CSV and send it to Vaishnavi Jewels.</li>
+      </ol>
+      <p class="hint">No phone handheld? Use <b>Photo scan</b> on the Scan test page: take a photo of a label and the page reads the barcode and QR from it (works in Chrome on Android and in Safari on iPhone).</p>
+    </section>
+  </div>
+
+  <!-- TAGS -->
+  <section id="p-tags" class="card" hidden>
+    <h2>The 20 test tags (dummy data)</h2>
+    <p class="hint">Barcode (Code 128) and QR both carry the tag number only. The RFID EPC is the tag number in ASCII hex, padded with zeros in front to 24 characters.</p>
+    <div class="list"><table class="items" id="tagTable"><thead><tr><th>Tag no.</th><th>Label</th><th>Category</th><th>Metal</th><th>Gross g</th><th>Net g</th><th>Dia ct</th><th>Box</th><th>Barcode / QR</th><th>RFID EPC to encode</th><th></th></tr></thead><tbody id="tagRows"></tbody></table></div>
+  </section>
+
+  <!-- LABELS -->
+  <div id="p-labels" class="stack" hidden>
+    <section class="card">
+      <h2>Label files</h2>
+      <p class="hint">Labels are 36 × 71 mm portrait RFID tags. The grey areas in the preview show the antenna and the chip block, which are never printed on. Code 128 runs down the left side at 0.25 mm module; the QR is 13 mm, top right. The vendor sheet lists tag number, barcode payload and EPC on A4.</p>
+      <div class="actions">
+        <button type="button" class="btn" id="dlLabels">Download label PDF (20)</button>
+        <button type="button" class="btn ghost" id="dlSheet">Download A4 vendor sheet</button>
+      </div>
+      <p class="hint" id="dlHint">If the download button does nothing, open this page in Chrome and try again.</p>
+    </section>
+    <div class="labels" id="labelGrid"></div>
+  </div>
+
+  <!-- SCAN TEST -->
+  <div id="p-scan" class="stack" hidden>
+    <div class="sticky">
+      <div class="totals" id="totals"></div>
+      <div class="totline" id="totline"></div>
+    </div>
+    <section class="card">
+      <div class="seg" role="radiogroup" aria-label="Printed code being scanned">
+        <label><input type="radio" name="mode" id="m-bar" value="barcode" checked> Code 128</label>
+        <label><input type="radio" name="mode" id="m-qr" value="qr"> QR</label>
+      </div>
+      <input id="scanIn" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="none" enterkeyhint="go" placeholder="Pull the trigger to scan a barcode, QR or RFID tag" aria-label="Scanner input">
+      <div class="scanstate"><span class="dot" id="focusDot"></span><span id="focusTxt">Ready</span>
+        <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn ghost sm" id="typeBtn">Type</button>
+          <label class="btn sm" for="photo" style="min-height:36px;padding:6px 10px;font-size:13px">Photo scan<input type="file" id="photo" accept="image/*" capture="environment" hidden></label>
+          <button type="button" class="btn ghost sm" id="soundBtn" aria-pressed="true">Sound on</button>
+        </span>
+      </div>
+      <div class="last" id="last"><span class="hint">Last scan</span><span class="big">—</span><span id="lastSub" class="hint">Scan a tag to start.</span></div>
+      <div id="pairBox" class="stack" hidden></div>
+    </section>
+
+    <section class="card">
+      <h2>Checklist</h2>
+      <div class="list"><table class="items ck" id="ckTable"><thead><tr><th>Tag</th><th>Label</th><th style="text-align:center">Bar</th><th style="text-align:center">QR</th><th style="text-align:center">RFID</th><th style="text-align:center">Link</th><th>EPC read</th></tr></thead><tbody id="ckRows"></tbody></table></div>
+    </section>
+
+    <section class="card" id="unkCard" hidden>
+      <h2>Unknown scans</h2>
+      <p class="hint">Values that did not match any of the 20 tags. An unknown RFID chip can be linked to its tag here.</p>
+      <div id="unkList" class="stack"></div>
+    </section>
+    <section class="card" id="dupCard" hidden>
+      <h2>Repeat scans</h2>
+      <div id="dupList" class="log"></div>
+    </section>
+
+    <section class="card">
+      <h2>Scan log</h2>
+      <div class="log" id="log"><p class="hint">No scans yet.</p></div>
+      <p class="hint" id="syncTxt">Saving: checking…</p>
+      <div class="actions">
+        <button type="button" class="btn" id="csvBtn">Download results CSV</button>
+        <button type="button" class="btn ghost" id="resetBtn">Reset test</button>
+        <span id="resetConfirm" hidden class="actions"><span class="hint">Clear all scans on this device?</span><button type="button" class="btn danger sm" id="resetYes">Clear scans</button><button type="button" class="btn ghost sm" id="resetLinks">Clear scans and links</button><button type="button" class="btn ghost sm" id="resetNo">Keep</button></span>
+      </div>
+      <div id="csvBox" hidden class="stack"><p class="hint">Downloads are not available here. Copy the results below and send them.</p><textarea id="csvText" readonly></textarea><div class="actions"><button type="button" class="btn ghost sm" id="csvCopy">Copy</button></div></div>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+const WM="Vaishnavi Jewels \u2013 vendor demo";
+
+/* ---------- dummy data (made up; nothing from real stock) ---------- */
+const CATN={VLR:"Ring",ER:"Earrings",VP:"Pendant",VBR:"Bracelet",NS:"Necklace set",BAN:"Bangle",MS:"Mangalsutra",PS:"Pendant set"};
+const RAW=[
+ ["VLR/D01","18K",4.512,3.980,0.42,"D1"],["VLR/D02","14K",3.870,3.410,0.36,"D1"],["ER/D01","18K",5.240,4.610,0.58,"D1"],["ER/D02","14K",3.960,3.520,0.30,"D1"],
+ ["VP/D01","18K",2.880,2.540,0.25,"D1"],["VP/D02","14K",2.150,1.890,0.18,"D1"],["VBR/D01","18K",11.420,10.050,1.12,"D1"],["VBR/D02","14K",9.760,8.640,0.86,"D1"],
+ ["NS/D01","18K",28.650,25.310,3.24,"D1"],["NS/D02","18K",22.430,19.870,2.46,"D1"],["BAN/D01","18K",16.880,15.020,1.08,"D2"],["BAN/D02","14K",14.320,12.760,0.92,"D2"],
+ ["MS/D01","18K",8.940,7.880,0.64,"D2"],["MS/D02","14K",7.210,6.380,0.48,"D2"],["PS/D01","18K",7.650,6.770,0.72,"D2"],["PS/D02","14K",6.180,5.460,0.54,"D2"],
+ ["VLR/D03","18K",6.020,5.310,1.01,"D2"],["ER/D03","18K",4.380,3.860,0.80,"D2"],["VP/D03","18K",3.420,3.010,0.50,"D2"],["VBR/D03","18K",13.150,11.590,2.05,"D2"]];
+const asciiHex=s=>[...s].map(c=>c.charCodeAt(0).toString(16).toUpperCase().padStart(2,"0")).join("");
+const epcOf=no=>asciiHex(no).padStart(24,"0");
+const TAGS=RAW.map((r,i)=>{const no="VJD"+String(i+1).padStart(4,"0");return {no,label:r[0],cat:CATN[r[0].split("/")[0]],metal:r[1],gross:r[2],net:r[3],dia:r[4],box:"Box "+r[5],epc:epcOf(no)}});
+const BYNO=new Map(TAGS.map(t=>[t.no,t])),BYEPC=new Map(TAGS.map(t=>[t.epc,t.no]));
+
+/* ---------- watermark ---------- */
+(function(){const d=$("wm").firstElementChild;for(let i=0;i<22;i++){const s=document.createElement("span");s.textContent=(WM+"   \u00b7   ").repeat(6);d.appendChild(s)}})();
+
+/* ---------- tabs ---------- */
+const TABS=["howto","tags","labels","scan"];
+function showTab(tab){if(!TABS.includes(tab))tab="howto";
+  document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===tab?"true":"false"));
+  TABS.forEach(k=>$("p-"+k).hidden=k!==tab);
+  if(tab==="labels")renderLabels();
+  if(tab==="scan"){render();focusScan()}
+  try{localStorage.setItem("vjdemo.tab",tab)}catch(e){}
+}
+document.querySelectorAll("nav button").forEach(b=>b.addEventListener("click",()=>{showTab(b.dataset.tab);try{history.replaceState(null,"","#"+b.dataset.tab)}catch(e){}}));
+window.addEventListener("hashchange",()=>showTab(location.hash.slice(1)));
+
+/* ---------- tags table ---------- */
+function epcNode(epc){const s=document.createElement("span");s.className="epc";const m=epc.match(/^(0*)(.*)$/);const z=document.createElement("span");z.className="z";z.textContent=m[1];s.append(z,m[2]);return s}
+function copyText(txt,btn){const done=()=>{const o=btn.textContent;btn.textContent="Copied";setTimeout(()=>btn.textContent=o,1200)};
+  try{navigator.clipboard.writeText(txt).then(done,()=>fallbackSelect(btn))}catch(e){fallbackSelect(btn)}}
+function fallbackSelect(btn){const cell=btn.closest("tr")&&btn.closest("tr").querySelector(".epc");if(cell){const r=document.createRange();r.selectNodeContents(cell);const s=getSelection();s.removeAllRanges();s.addRange(r)}btn.textContent="Selected";}
+(function(){const tb=$("tagRows");TAGS.forEach(t=>{const tr=document.createElement("tr");
+  const cells=[[t.no,"mono"],[t.label,""],[t.cat,""],[t.metal,""],[t.gross.toFixed(3),"num"],[t.net.toFixed(3),"num"],[t.dia.toFixed(2),"num"],[t.box,""],[t.no,"mono"]];
+  cells.forEach(([v,c])=>{const td=document.createElement("td");if(c)td.className=c;td.textContent=v;tr.appendChild(td)});
+  const e=document.createElement("td");e.appendChild(epcNode(t.epc));tr.appendChild(e);
+  const b=document.createElement("td");const bt=document.createElement("button");bt.type="button";bt.className="btn ghost sm";bt.textContent="Copy EPC";bt.addEventListener("click",()=>copyText(t.epc,bt));b.appendChild(bt);tr.appendChild(b);
+  tb.appendChild(tr)})})();
+
+/* ---------- label drawing: one set of primitives (mm, origin top-left) for screen preview and PDF ----------
+   Tag: 36 x 71 mm portrait RFID label (owner's drawing). Keep-out zones include about 1 mm tolerance:
+   antenna column (3 mm wide, from 5 mm below the top) and the loop + chip block (26 x 25 mm at the bottom). */
+const LW=36,LH=71,MOD=0.25;
+const KEEP=[{n:"antenna",x:12.5,y:3.5,w:5,h:38.5},{n:"loop + chip",x:6,y:42,w:29,h:29}];
+const ZONE={bar:{x:4.0,y:4.0,w:7.0},qr:{x:20,y:2,s:13},text:{x:18.5,y:17,w:16,h:24.5}};
+function barBits(text){const o={};JsBarcode(o,text,{format:"CODE128"});return o.encodings.map(e=>e.data).join("")}
+function qrMatrix(text){const q=qrcode(0,"M");q.addData(text);q.make();const n=q.getModuleCount(),m=[];for(let r=0;r<n;r++){const row=[];for(let c=0;c<n;c++)row.push(q.isDark(r,c));m.push(row)}return m}
+function labelPrims(t){
+  const P=[],tx=ZONE.text.x,mw=ZONE.text.w;
+  /* watermark first, light grey, kept off the barcode, the QR and the chip block */
+  P.push({k:"t",x:2.2,y:40.6,t:"vendor demo",sz:4.4,c:"wm",ang:50});
+  /* QR, top right, clear of the antenna column */
+  P.push({k:"qr",x:ZONE.qr.x,y:ZONE.qr.y,s:ZONE.qr.s,m:qrMatrix(t.no)});
+  /* Code 128 running down the left column (bars across the width), human-readable text beside it */
+  const bits=barBits(t.no),len=bits.length*MOD;
+  P.push({k:"vbars",x:ZONE.bar.x,y:ZONE.bar.y,w:ZONE.bar.w,bits});
+  P.push({k:"t",x:3.4,y:ZONE.bar.y+len/2,t:t.no,sz:5.2,b:1,ang:90,anchor:"middle"});
+  /* text block under the QR */
+  P.push({k:"t",x:tx,y:19.6,t:t.no,sz:8,b:1,maxW:mw});
+  P.push({k:"t",x:tx,y:23.0,t:t.label,sz:6.6,b:1,maxW:mw});
+  P.push({k:"t",x:tx,y:26.2,t:t.metal+"  "+t.cat,sz:6,maxW:mw});
+  P.push({k:"t",x:tx,y:29.4,t:"G.Wt "+t.gross.toFixed(3),sz:6,maxW:mw});
+  P.push({k:"t",x:tx,y:32.6,t:"N.Wt "+t.net.toFixed(3),sz:6,maxW:mw});
+  P.push({k:"t",x:tx,y:35.8,t:"Dia "+t.dia.toFixed(2)+" ct",sz:6,maxW:mw});
+  P.push({k:"t",x:tx,y:38.8,t:t.box,sz:6,maxW:mw});
+  P.push({k:"t",x:tx,y:41.3,t:"VENDOR DEMO",sz:4.2,c:"wm2",maxW:mw});
+  return P;
+}
+let measureCtx=null;
+function fitText(s,sz,b,maxW){if(!maxW)return s;if(!measureCtx)measureCtx=document.createElement("canvas").getContext("2d");measureCtx.font=(b?"700 ":"400 ")+(sz*0.3528*10)+"px Helvetica, Arial, sans-serif";while(s.length>3&&measureCtx.measureText(s).width/10>maxW)s=s.slice(0,-1);return s}
+function runs(bits){const r=[];let i=0;while(i<bits.length){if(bits[i]==="1"){let j=i;while(j<bits.length&&bits[j]==="1")j++;r.push([i,j-i]);i=j}else i++}return r}
+function labelSVG(t){
+  const NS="http://www.w3.org/2000/svg",el=(n,a)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);return e};
+  const cs=getComputedStyle(document.documentElement),ink=cs.getPropertyValue("--tagink").trim()||"#111",bg=cs.getPropertyValue("--tagbg").trim()||"#fff",wm=cs.getPropertyValue("--tagwm").trim()||"#ccc";
+  const svg=el("svg",{viewBox:`0 0 ${LW} ${LH}`,role:"img","aria-label":"Label "+t.no});
+  svg.appendChild(el("rect",{width:LW,height:LH,rx:1.5,fill:bg}));
+  /* preview only: where the inlay sits (never printed) */
+  KEEP.forEach(z=>{svg.appendChild(el("rect",{x:z.x,y:z.y,width:z.w,height:z.h,fill:wm,"fill-opacity":.25,stroke:wm,"stroke-width":.2,"stroke-dasharray":"0.8 0.6"}));
+    const tl=el("text",{x:z.x+z.w/2,y:z.n==="antenna"?z.y+z.h/2:z.y+z.h/2,"font-size":1.8,"text-anchor":"middle",fill:"#8a8a8a","font-family":"Helvetica, Arial, sans-serif"});
+    if(z.n==="antenna")tl.setAttribute("transform",`rotate(-90 ${z.x+z.w/2} ${z.y+z.h/2})`);tl.textContent=z.n==="antenna"?"antenna · no print":"loop + chip · no print";svg.appendChild(tl)});
+  labelPrims(t).forEach(o=>{
+    if(o.k==="qr"){const n=o.m.length,c=o.s/n;let d="";o.m.forEach((r,ri)=>r.forEach((v,ci)=>{if(v)d+=`M${(o.x+ci*c).toFixed(3)} ${(o.y+ri*c).toFixed(3)}h${c.toFixed(3)}v${c.toFixed(3)}h-${c.toFixed(3)}z`}));svg.appendChild(el("path",{d,fill:ink}))}
+    else if(o.k==="vbars"){let d="";runs(o.bits).forEach(([i,n])=>{d+=`M${o.x} ${(o.y+i*MOD).toFixed(3)}h${o.w}v${(n*MOD).toFixed(3)}h-${o.w}z`});svg.appendChild(el("path",{d,fill:ink}))}
+    else{const a={x:o.x,y:o.y,"font-size":(o.sz*0.3528).toFixed(3),"font-family":"Helvetica, Arial, sans-serif","font-weight":o.b?"700":"400",fill:o.c?wm:ink};
+      if(o.c==="wm2")a.fill="#8a8a8a";if(o.anchor)a["text-anchor"]=o.anchor;if(o.ang)a.transform=`rotate(${-o.ang} ${o.x} ${o.y})`;
+      const e=el("text",a);e.textContent=fitText(o.t,o.sz,o.b,o.maxW);svg.appendChild(e)}
+  });
+  return svg;
+}
+let labelsDone=false;
+function renderLabels(){if(labelsDone)return;labelsDone=true;const g=$("labelGrid");TAGS.forEach(t=>{const d=document.createElement("div");d.className="lab";d.appendChild(labelSVG(t));g.appendChild(d)})}
+function drawPrimsPDF(doc,P,ox,oy){
+  ox=ox||0;oy=oy||0;
+  P.forEach(o=>{
+    if(o.k==="qr"){const n=o.m.length,c=o.s/n;doc.setFillColor(0,0,0);o.m.forEach((r,ri)=>r.forEach((v,ci)=>{if(v)doc.rect(ox+o.x+ci*c,oy+o.y+ri*c,c+0.01,c+0.01,"F")}))}
+    else if(o.k==="vbars"){doc.setFillColor(0,0,0);runs(o.bits).forEach(([i,n])=>doc.rect(ox+o.x,oy+o.y+i*MOD,o.w,n*MOD,"F"))}
+    else{doc.setFont("helvetica",o.b?"bold":"normal");doc.setFontSize(o.sz);
+      if(o.c==="wm")doc.setTextColor(185,185,185);else if(o.c==="wm2")doc.setTextColor(130,130,130);else doc.setTextColor(0,0,0);
+      let s=o.t;if(o.maxW)while(s.length>3&&doc.getTextWidth(s)>o.maxW)s=s.slice(0,-1);
+      let x=ox+o.x,y=oy+o.y;
+      if(o.anchor==="middle"){const w=doc.getTextWidth(s);if(o.ang===90)y+=w/2;else x-=w/2}
+      const opt={};if(o.ang)opt.angle=o.ang;doc.text(s,x,y,opt)}
+  });
+}
+function labelsPDF(){
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:"portrait",unit:"mm",format:[LW,LH],compress:true});
+  doc.setProperties({title:"VJ vendor demo labels 36x71",subject:WM});
+  TAGS.forEach((t,i)=>{if(i)doc.addPage([LW,LH],"portrait");drawPrimsPDF(doc,labelPrims(t))});
+  return doc.output("blob");
+}
+function sheetPDF(){
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",format:"a4",compress:true});
+  doc.setProperties({title:"VJ vendor demo - EPC encoding sheet",subject:WM});
+  /* diagonal repeating watermark under everything */
+  doc.setFont("helvetica","bold");doc.setFontSize(22);doc.setTextColor(228,228,228);
+  for(let y=30;y<320;y+=48)for(let x=-40;x<210;x+=120)doc.text(WM,x,y,{angle:30});
+  doc.setTextColor(0,0,0);doc.setFont("helvetica","bold");doc.setFontSize(15);doc.text("VJ Inventory - RFID test tags (VENDOR DEMO)",14,17);
+  doc.setFont("helvetica","normal");doc.setFontSize(9.5);
+  ["Dummy data for a tag test. No prices, not real stock.","Barcode (Code 128) and QR payload = tag number exactly, e.g. VJD0001.","RFID: write the EPC exactly as shown - 96-bit, 24 hex characters, EPC bank from word 2, PC 3000.","EPC = tag number in ASCII hex, padded with zeros in front."].forEach((l,i)=>doc.text(l,14,23.5+i*4.4));
+  const cols=[[14,"#"],[22,"Tag no. = barcode/QR"],[64,"Label"],[86,"EPC to encode (hex)"],[150,"Item"],[178,"Metal"],[192,"Box"]];
+  let y=45;doc.setFont("helvetica","bold");doc.setFontSize(9);cols.forEach(([x,h])=>doc.text(h,x,y));doc.setDrawColor(150);doc.line(14,y+2,198,y+2);
+  TAGS.forEach((t,i)=>{y+=7.8;doc.setFont("helvetica","normal");doc.setFontSize(10);doc.text(String(i+1),14,y);
+    doc.setFont("courier","bold");doc.setFontSize(11);doc.text(t.no,22,y);doc.setFont("helvetica","normal");doc.setFontSize(10);doc.text(t.label,64,y);
+    doc.setFont("courier","bold");doc.setFontSize(10.5);doc.text(t.epc,86,y);doc.setFont("helvetica","normal");doc.setFontSize(9);doc.text(t.cat,150,y);doc.text(t.metal,178,y);doc.text(t.box.replace("Box ",""),192,y);
+    doc.setDrawColor(220);doc.line(14,y+2.6,198,y+2.6)});
+  /* 1:1 diagram of the print zones on the 36 x 71 mm tag */
+  const ox=16,oy=212;
+  doc.setFont("helvetica","bold");doc.setFontSize(10);doc.setTextColor(0,0,0);doc.text("Print layout on the 36 x 71 mm tag (actual size)",ox,oy-3);
+  doc.setDrawColor(0);doc.setLineWidth(0.3);doc.setFillColor(255,255,255);doc.rect(ox,oy,LW,LH,"FD");
+  doc.setLineWidth(0.2);
+  KEEP.forEach(z=>{doc.setFillColor(232,232,232);doc.setDrawColor(150);doc.setLineDashPattern([0.8,0.6],0);doc.rect(ox+z.x,oy+z.y,z.w,z.h,"FD")});
+  doc.setLineDashPattern([],0);
+  drawPrimsPDF(doc,labelPrims(TAGS[0]),ox,oy);
+  doc.setFont("helvetica","normal");doc.setFontSize(5.5);doc.setTextColor(90,90,90);
+  doc.text("antenna - no print",ox+15,oy+30,{angle:90});doc.text("loop + chip block - no print",ox+20.5,oy+57,{align:"center"});
+  const nx=64;let ny=oy+2;doc.setTextColor(0,0,0);
+  const line=(s,b,sz)=>{doc.setFont("helvetica",b?"bold":"normal");doc.setFontSize(sz||9.5);doc.splitTextToSize(s,134).forEach(l=>{doc.text(l,nx,ny);ny+=4.3})};
+  line("Zones used (mm from the top-left corner, label face up, chip block at the bottom):",1);
+  line("- Code 128 barcode: module 0.25 mm (2 dots at 203 dpi), bars across the width, x 4.0-11.0, y 4.0-29.3; quiet zone at least 2.5 mm above and below.");
+  line("- QR code: 13 x 13 mm at x 20.0-33.0, y 2.0-15.0.");
+  line("- Text: x 18.5-34.5, y 17-41.5. Small grey watermark only in free areas, never on the codes.");
+  line("- Kept clear (grey): antenna column x 12.5-17.5, y 3.5-42; loop + chip block x 6-35, y 42-71 (drawing size plus about 1 mm).");
+  ny+=2;line("Please confirm before printing:",1);
+  line("1. The IC position and the printable area match this drawing (the chip must not be printed over).");
+  line("2. Is the tag printed on one face only, and which face?");
+  line("3. Which edge feeds into the printer first. The barcode bars run across the 36 mm width; if they look rough, tell us.");
+  doc.setFontSize(8.5);doc.setTextColor(110,110,110);doc.setFont("helvetica","normal");doc.text(WM.replace("–","-")+" - generated "+new Date().toISOString().slice(0,10),14,291);
+  return doc.output("blob");
+}
+
+/* ---------- capabilities (all optional) ---------- */
+const C={db:null,user:null,dl:null,uid:null,dbOk:null};
+async function saveFile(name,data,fallback){
+  try{const blob=data instanceof Blob?data:new Blob([data],{type:name.endsWith(".csv")?"text/csv":"application/octet-stream"});
+    const u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);return true}catch(e){}
+  if(fallback)fallback();return false;
+}
+$("dlLabels").addEventListener("click",async()=>{const ok=await saveFile("VJ-vendor-demo-labels-36x71.pdf",labelsPDF());if(!ok)$("dlHint").classList.add("banner","warn")});
+$("dlSheet").addEventListener("click",async()=>{const ok=await saveFile("VJ-vendor-demo-EPC-sheet-A4.pdf",sheetPDF());if(!ok)$("dlHint").classList.add("banner","warn")});
+window.__vj={labelsPDF,sheetPDF,TAGS};
+
+/* ---------- scan test state ---------- */
+const PAIR_MS=10000;
+const S={run:null,events:[],links:{},dismiss:{},pending:[],mode:"barcode",sound:true,typing:false};
+function newRun(){return new Date().toISOString().replace(/[-:]/g,"").slice(0,15)+"-"+Math.random().toString(36).slice(2,6)}
+function load(){try{const j=JSON.parse(localStorage.getItem("vjdemo.v1")||"null");if(j&&j.run){S.run=j.run;S.events=j.events||[];S.links=j.links||{};S.pending=j.pending||[];S.mode=j.mode||"barcode";S.sound=j.sound!==false;S.dismiss=j.dismiss||{}}}catch(e){}if(!S.run)S.run=newRun()}
+function persist(){try{localStorage.setItem("vjdemo.v1",JSON.stringify({run:S.run,events:S.events.slice(-2000),links:S.links,pending:S.pending,mode:S.mode,sound:S.sound,dismiss:S.dismiss}))}catch(e){}}
+load();
+document.querySelector(`input[name=mode][value="${S.mode}"]`).checked=true;
+document.querySelectorAll("input[name=mode]").forEach(r=>r.addEventListener("change",()=>{S.mode=r.value;persist();focusScan()}));
+
+/* Parse one scanned string. Returns {kind:'code'|'epc'|'other', value, sym?, tag?} */
+const AIM={C:"barcode",Q:"qr"};
+function parse(raw){
+  let s=String(raw||"").replace(/[\u0000-\u001f\u007f]/g,"").trim();let sym=null;
+  const aim=s.match(/^\](.)(\d)/);if(aim){sym=AIM[aim[1].toUpperCase()]||null;s=s.slice(3)}
+  if(s.includes("#"))s=s.slice(s.lastIndexOf("#")+1);
+  s=s.replace(/^(EPC|RFID|TAG|UII|BARCODE|QR|DATA)\s*[:=]?\s*/i,"");
+  const u=s.toUpperCase();const compact=u.replace(/[\s:\-_.]/g,"");
+  const code=compact.match(/^VJD\d{4}$/)||(!/^[0-9A-F]+$/.test(compact)&&compact.match(/VJD\d{4}/));
+  if(code)return {kind:"code",value:code[0],sym,tag:BYNO.has(code[0])?code[0]:null};
+  if(/^[0-9A-F]{16,64}$/.test(compact)){
+    const cands=[compact];if(compact.length>24){cands.push(compact.slice(-24),compact.slice(4,28),compact.slice(0,24))}
+    for(const c of cands){if(BYEPC.has(c))return {kind:"epc",value:c,tag:BYEPC.get(c),how:"encoded"};if(S.links[c])return {kind:"epc",value:c,tag:S.links[c].tag,how:"linked"}}
+    for(const c of cands){const a=hexAscii(c);if(a&&BYNO.has(a))return {kind:"epc",value:c,tag:a,how:"encoded"}}
+    return {kind:"epc",value:compact,tag:null};
+  }
+  return {kind:"other",value:u||String(raw),sym,tag:null};
+}
+function hexAscii(h){if(h.length%2)return null;let s="";for(let i=0;i<h.length;i+=2){const b=parseInt(h.slice(i,i+2),16);if(b===0&&!s)continue;if(b<32||b>126)return null;s+=String.fromCharCode(b)}return s}
+window.__vj.parse=parse;
+
+function device(){const ua=navigator.userAgent||"";const m=ua.match(/Android [\d.]+; ([^;)]+)/);return (m?m[1].replace(/ Build.*/,"").trim()+" · ":"")+(/Android/.test(ua)?"Android":/iPhone|iPad/.test(ua)?"iOS":/Windows/.test(ua)?"Windows":/Mac/.test(ua)?"Mac":"Other")+" · "+(/Edg\//.test(ua)?"Edge":/Chrome\//.test(ua)?"Chrome":/Safari\//.test(ua)?"Safari":/Firefox\//.test(ua)?"Firefox":"browser")}
+const DEV=device();
+
+/* ---------- handle a scan ---------- */
+function handleScan(raw,via,camSym){
+  const parts=String(raw).split(/[\r\n\t]+/).map(x=>x.trim()).filter(Boolean);
+  parts.forEach(p=>handleOne(p,via,camSym));
+}
+function handleOne(raw,via,camSym){
+  const now=Date.now(),r=parse(raw);
+  let type;
+  if(r.kind==="code")type=camSym||r.sym||S.mode;else if(r.kind==="epc")type="rfid";else type="other";
+  const tag=r.tag;
+  const prior=S.events.find(e=>e.tag&&e.tag===tag&&e.type===type);
+  const ev={id:now.toString(36)+Math.random().toString(36).slice(2,6),t:new Date(now).toISOString(),ms:now,raw:String(raw).slice(0,200),value:r.value,type,tag:tag||null,via,known:!!tag,how:r.how||null,dup:!!prior};
+  S.events.push(ev);
+  /* pairing of unknown EPCs with a printed code, either order, within 10 s */
+  if(type==="rfid"&&!tag){
+    const lastCode=[...S.events].reverse().find(e=>(e.type==="barcode"||e.type==="qr")&&e.tag&&now-e.ms<=PAIR_MS&&e!==ev&&needsChip(e.tag));
+    if(lastCode)addPending(r.value,lastCode.tag);
+  }else if((type==="barcode"||type==="qr")&&tag&&needsChip(tag)){
+    const lastUnk=[...S.events].reverse().find(e=>e.type==="rfid"&&!e.tag&&!S.links[e.value]&&now-e.ms<=PAIR_MS&&!S.pending.some(p=>p.epc===e.value));
+    if(lastUnk)addPending(lastUnk.value,tag);
+  }
+  persist();dbScan(ev);feedback(ev);render();
+}
+/* a tag can take a factory EPC only while no chip has been read for it and none is waiting to be linked */
+function needsChip(tag){if(S.pending.some(p=>p.tag===tag))return false;if(Object.values(S.links).some(l=>l.tag===tag))return false;return !S.events.some(e=>e.type==="rfid"&&e.tag===tag)}
+function addPending(epc,tag){if(S.links[epc]||S.pending.some(p=>p.epc===epc))return;S.pending.push({epc,tag,ms:Date.now()})}
+function linkEPC(epc,tag,how){
+  S.links[epc]={tag,how,t:new Date().toISOString()};S.pending=S.pending.filter(p=>p.epc!==epc);
+  persist();dbLink(epc,tag,how);render();
+}
+/* an event's tag, counting EPCs linked after they were scanned */
+const evTag=e=>e.tag||(e.type==="rfid"&&S.links[e.value]?S.links[e.value].tag:null);
+
+/* ---------- feedback ---------- */
+let actx=null;
+function beep(kind){if(!S.sound)return;try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();const seq=kind==="ok"?[[1046,.09]]:kind==="dup"?[[740,.06],[740,.06]]:[[220,.25]];let t=actx.currentTime;seq.forEach(([f,d])=>{const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=f;o.type="square";g.gain.value=.06;o.connect(g);g.connect(actx.destination);o.start(t);o.stop(t+d);t+=d+.05})}catch(e){}}
+const TYPE_NAME={barcode:"Code 128 barcode",qr:"QR code",rfid:"RFID chip",other:"unrecognised value"};
+function feedback(ev){
+  const box=$("last"),tg=evTag(ev);let cls,big,sub;
+  if(tg){const t=BYNO.get(tg);cls=ev.dup?"warn":"ok";big=tg+" \u00b7 "+t.label;sub=TYPE_NAME[ev.type]+(ev.type==="rfid"?" "+ev.value+(ev.how==="linked"?" (linked)":""):"")+(ev.dup?" · already scanned":" · "+t.cat+", "+t.metal);beep(ev.dup?"dup":"ok")}
+  else{cls="bad";big=ev.value.length>32?ev.value.slice(0,32)+"…":ev.value;const pend=ev.type==="rfid"&&S.pending.find(p=>p.epc===ev.value);
+    sub=ev.type==="rfid"?(pend?"Unknown RFID chip · link it to "+pend.tag+" below":"Unknown RFID chip · now scan this tag's barcode or QR to link it"):ev.type==="other"?"Not one of the 20 test tags":TYPE_NAME[ev.type]+" not in the list of 20 tags";beep("bad")}
+  if(ev.type!=="rfid"&&ev.tag&&S.pending.some(p=>p.tag===ev.tag&&Date.now()-p.ms<1500))sub+=" · link the RFID chip read just before";
+  box.className="last "+cls;box.textContent="";
+  const a=document.createElement("span");a.className="hint";a.style.color="inherit";a.textContent=new Date(ev.ms).toLocaleTimeString()+" · via "+ev.via;
+  const b=document.createElement("span");b.className="big";b.textContent=big;const c=document.createElement("span");c.textContent=sub;box.append(a,b,c);
+  void box.offsetWidth;box.classList.add("flash");
+}
+
+/* ---------- render scan page ---------- */
+function stats(){
+  const per={};TAGS.forEach(t=>per[t.no]={barcode:false,qr:false,rfid:false,epcs:new Set()});
+  S.events.forEach(e=>{const tg=evTag(e);if(!tg||!per[tg])return;if(e.type==="barcode"||e.type==="qr"||e.type==="rfid")per[tg][e.type]=true;if(e.type==="rfid")per[tg].epcs.add(e.value)});
+  let b=0,q=0,r=0,l=0;TAGS.forEach(t=>{const p=per[t.no];p.linked=(p.barcode||p.qr)&&p.rfid;b+=p.barcode;q+=p.qr;r+=p.rfid;l+=p.linked});
+  return {per,b,q,r,l};
+}
+function render(){
+  const st=stats(),N=TAGS.length;
+  const tot=$("totals");tot.textContent="";
+  [["Barcode",st.b],["QR",st.q],["RFID",st.r],["Linked",st.l]].forEach(([n,v])=>{const d=document.createElement("div");d.className="tot"+(v===N?" full":"");const b=document.createElement("b");b.textContent=v+"/"+N;const s=document.createElement("span");s.textContent=n;d.append(b,s);tot.appendChild(d)});
+  $("totline").textContent=`Barcode ${st.b}/${N} · QR ${st.q}/${N} · RFID ${st.r}/${N} · Linked ${st.l}/${N}`;
+  const tb=$("ckRows");tb.textContent="";
+  TAGS.forEach(t=>{const p=st.per[t.no],tr=document.createElement("tr");if(p.linked&&p.barcode&&p.qr)tr.className="done";
+    const a=document.createElement("td");a.className="mono";a.textContent=t.no;const bl=document.createElement("td");bl.textContent=t.label;tr.append(a,bl);
+    ["barcode","qr","rfid","linked"].forEach(k=>{const td=document.createElement("td");td.className="c "+(p[k]?"y":"n");td.textContent=p[k]?"\u2713":"\u00b7";td.setAttribute("aria-label",p[k]?"yes":"no");tr.appendChild(td)});
+    const e=document.createElement("td");e.className="mono";e.style.fontSize="12px";e.textContent=[...p.epcs].map(x=>x===t.epc?"encoded":"…"+x.slice(-8)).join(", ")||"";tr.appendChild(e);tb.appendChild(tr)});
+  /* pending links */
+  const pb=$("pairBox");pb.textContent="";const pend=S.pending.filter(p=>!S.links[p.epc]);
+  pb.hidden=!pend.length;
+  if(pend.length){const h=document.createElement("h3");h.textContent=pend.length===1?"Link this RFID chip?":`Link ${pend.length} RFID chips?`;pb.appendChild(h);
+    pend.forEach(p=>{const d=document.createElement("div");d.className="pair";const m=document.createElement("span");m.className="mono";m.textContent=p.epc;const arrow=document.createElement("span");arrow.textContent="\u2192 "+p.tag+" ("+BYNO.get(p.tag).label+")";
+      const y=document.createElement("button");y.type="button";y.className="btn gold";y.textContent="Link this RFID to "+p.tag;y.addEventListener("click",()=>{linkEPC(p.epc,p.tag,"pair");focusScan()});
+      const n=document.createElement("button");n.type="button";n.className="btn ghost sm";n.textContent="Ignore";n.addEventListener("click",()=>{S.pending=S.pending.filter(x=>x!==p);persist();render();focusScan()});
+      d.append(m,arrow,y,n);pb.appendChild(d)});
+    if(pend.length>1){const all=document.createElement("button");all.type="button";all.className="btn";all.textContent=`Link all ${pend.length}`;all.addEventListener("click",()=>{pend.forEach(p=>linkEPC(p.epc,p.tag,"pair-bulk"));focusScan()});pb.appendChild(all)}}
+  /* unknowns */
+  const unk=new Map();S.events.forEach(e=>{if(!evTag(e)){const k=e.type+"|"+e.value;const u=unk.get(k)||{e,n:0};u.n++;unk.set(k,u)}});
+  const ul=$("unkList");ul.textContent="";$("unkCard").hidden=!unk.size;
+  unk.forEach(({e,n})=>{const d=document.createElement("div");d.className="pair";const m=document.createElement("span");m.className="mono";m.textContent=e.value;const ty=document.createElement("span");ty.className="pill bad";ty.textContent=TYPE_NAME[e.type]+(n>1?" ×"+n:"");d.append(m,ty);
+    if(e.type==="rfid"){const sel=document.createElement("select");sel.setAttribute("aria-label","Tag for this RFID chip");const o0=document.createElement("option");o0.value="";o0.textContent="Link to tag…";sel.appendChild(o0);
+      TAGS.forEach(t=>{const o=document.createElement("option");o.value=t.no;o.textContent=t.no+" · "+t.label;sel.appendChild(o)});
+      const pp=S.pending.find(p=>p.epc===e.value);if(pp)sel.value=pp.tag;
+      const b=document.createElement("button");b.type="button";b.className="btn sm";b.textContent="Link";b.addEventListener("click",()=>{if(sel.value){linkEPC(e.value,sel.value,"manual");focusScan()}});d.append(sel,b)}
+    ul.appendChild(d)});
+  /* duplicates */
+  const dups=S.events.filter(e=>e.dup&&evTag(e));const dl=$("dupList");dl.textContent="";$("dupCard").hidden=!dups.length;
+  dups.slice(-100).reverse().forEach(e=>{const d=document.createElement("div");const a=document.createElement("span");a.textContent=new Date(e.ms).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"});const b=document.createElement("span");b.textContent=evTag(e)+" · "+TYPE_NAME[e.type];d.append(a,b);dl.appendChild(d)});
+  /* log */
+  const lg=$("log");lg.textContent="";if(!S.events.length){const p=document.createElement("p");p.className="hint";p.textContent="No scans yet.";lg.appendChild(p)}
+  S.events.slice(-80).reverse().forEach(e=>{const d=document.createElement("div");const a=document.createElement("span");a.textContent=new Date(e.ms).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"});const b=document.createElement("span");const tg=evTag(e);b.textContent=(tg?tg:"UNKNOWN")+" · "+e.type+(e.type==="rfid"?" "+e.value:"")+(e.dup?" · repeat":"")+" · "+e.via;if(!tg)b.style.color="var(--bad)";d.append(a,b);lg.appendChild(d)});
+  window.__vj.stats=()=>{const s=stats();return {b:s.b,q:s.q,r:s.r,l:s.l,pending:S.pending.length,events:S.events.length,links:Object.keys(S.links).length}};
+}
+
+/* ---------- scanner input (keyboard wedge: DataWedge keystroke, HID scanners) ---------- */
+const inp=$("scanIn");
+const editable=el=>el&&el!==inp&&(el.tagName==="SELECT"||el.tagName==="TEXTAREA"||(el.tagName==="INPUT"&&!["radio","checkbox","file","button"].includes(el.type)));
+function scanVisible(){return !$("p-scan").hidden}
+function focusScan(){if(scanVisible()&&!editable(document.activeElement)){try{inp.focus({preventScroll:true})}catch(e){inp.focus()}}}
+let idleT=null;
+function submitInput(){clearTimeout(idleT);const v=inp.value;inp.value="";if(v.trim())handleScan(v,S.typing?"typed":"scanner")}
+inp.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key==="Tab"){if(inp.value.trim()||e.key==="Enter"){e.preventDefault();submitInput()}}});
+inp.addEventListener("input",()=>{clearTimeout(idleT);const c=inp.value.trim().toUpperCase().replace(/\s/g,"");
+  /* readers set up without an Enter suffix: submit a complete value after a short pause */
+  if(/^(\]..)?VJD\d{4}$/.test(c)||/^[0-9A-F]{24}$/.test(c))idleT=setTimeout(submitInput,450)});
+inp.addEventListener("paste",e=>{const t=(e.clipboardData||window.clipboardData).getData("text");if(/[\r\n]/.test(t)){e.preventDefault();handleScan(inp.value+t,"pasted");inp.value=""}});
+inp.addEventListener("focus",()=>{$("focusDot").classList.add("on");$("focusTxt").textContent="Ready for the next scan"});
+inp.addEventListener("blur",()=>{$("focusDot").classList.remove("on");$("focusTxt").textContent="Tap here to scan";setTimeout(focusScan,250)});
+/* keys typed while focus is elsewhere on the scan page go into the box */
+document.addEventListener("keydown",e=>{if(!scanVisible()||document.activeElement===inp||editable(document.activeElement)||e.ctrlKey||e.metaKey||e.altKey)return;
+  if(e.key.length===1){e.preventDefault();inp.value+=e.key;inp.dispatchEvent(new Event("input"));focusScan()}else if(e.key==="Enter"&&inp.value){e.preventDefault();submitInput();focusScan()}});
+document.addEventListener("click",e=>{if(scanVisible()&&!e.target.closest("button,select,input,label,a,textarea"))focusScan()});
+$("typeBtn").addEventListener("click",()=>{S.typing=!S.typing;inp.setAttribute("inputmode",S.typing?"text":"none");$("typeBtn").textContent=S.typing?"Hide keyboard":"Type";inp.blur();setTimeout(()=>inp.focus(),50)});
+$("soundBtn").addEventListener("click",()=>{S.sound=!S.sound;$("soundBtn").textContent=S.sound?"Sound on":"Sound off";$("soundBtn").setAttribute("aria-pressed",S.sound);persist();if(S.sound)beep("ok");focusScan()});
+$("soundBtn").textContent=S.sound?"Sound on":"Sound off";
+
+/* ---------- photo scan (camera app → image → decode) ---------- */
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement("script");s.src=src;s.onload=res;s.onerror=()=>rej(new Error("load"));document.head.appendChild(s)})}
+async function decodePhoto(file){
+  if("BarcodeDetector" in window){try{const sup=await BarcodeDetector.getSupportedFormats();const f=["qr_code","code_128"].filter(x=>sup.includes(x));
+    if(f.length){const det=new BarcodeDetector({formats:f});const bmp=await createImageBitmap(file);const r=await det.detect(bmp);if(r.length)return r.map(x=>({text:x.rawValue,sym:x.format==="qr_code"?"qr":"barcode"}))}}catch(e){}}
+  if(!window.Html5Qrcode)await loadScript("https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js");
+  const F=window.Html5QrcodeSupportedFormats,out=[];
+  /* the barcode runs down the tag, so a portrait photo also gets a turned copy */
+  let turned=null;try{const bmp=await createImageBitmap(file);const c=document.createElement("canvas");c.width=bmp.height;c.height=bmp.width;const x=c.getContext("2d");x.translate(c.width/2,c.height/2);x.rotate(Math.PI/2);x.drawImage(bmp,-bmp.width/2,-bmp.height/2);const bl=await new Promise(r=>c.toBlob(r,"image/png"));turned=new File([bl],"turned.png",{type:"image/png"})}catch(e){}
+  for(const [fmt,sym] of [[F.CODE_128,"barcode"],[F.QR_CODE,"qr"]]){for(const img of [file,turned]){if(!img)continue;try{const h=new Html5Qrcode("qrtmp",{formatsToSupport:[fmt],verbose:false});const r=await h.scanFileV2(img,false);out.push({text:r.decodedText,sym});try{h.clear()}catch(e){}break}catch(e){}}}
+  return out;
+}
+$("photo").addEventListener("change",async e=>{const f=e.target.files&&e.target.files[0];e.target.value="";if(!f)return;
+  const box=$("last");box.className="last";box.textContent="";const s=document.createElement("span");s.className="big";s.textContent="Reading photo…";box.appendChild(s);
+  let res=[];try{res=await decodePhoto(f)}catch(err){}
+  if(!res.length){box.className="last bad";box.textContent="";const b=document.createElement("span");b.className="big";b.textContent="No code found";const c=document.createElement("span");c.textContent="Hold the phone 10–15 cm from the label, in good light, and fill the frame with the label.";box.append(b,c);beep("bad");focusScan();return}
+  res.forEach(r=>handleOne(r.text,"photo",r.sym));focusScan()});
+
+/* ---------- reset / CSV ---------- */
+$("resetBtn").addEventListener("click",()=>{$("resetConfirm").hidden=false;$("resetBtn").hidden=true});
+$("resetNo").addEventListener("click",()=>{$("resetConfirm").hidden=true;$("resetBtn").hidden=false;focusScan()});
+function doReset(links){S.run=newRun();S.events=[];S.pending=[];if(links){const old=Object.keys(S.links);S.links={};dbUnlink(old)}persist();$("resetConfirm").hidden=true;$("resetBtn").hidden=false;const b=$("last");b.className="last";b.textContent="";const s=document.createElement("span");s.className="big";s.textContent="Test reset";b.appendChild(s);render();focusScan()}
+$("resetYes").addEventListener("click",()=>doReset(false));$("resetLinks").addEventListener("click",()=>doReset(true));
+const q=v=>{v=v==null?"":String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+function csv(){
+  const st=stats(),N=TAGS.length,L=[];
+  L.push(["VJ Inventory vendor demo - scan test results"].map(q).join(","));
+  L.push(["Run",S.run,"Device",DEV,"Exported",new Date().toISOString()].map(q).join(","));
+  L.push(["Totals",`Barcode ${st.b}/${N}`,`QR ${st.q}/${N}`,`RFID ${st.r}/${N}`,`Linked ${st.l}/${N}`].map(q).join(","));L.push("");
+  L.push(["Tag","Label","Barcode","QR","RFID","Linked","EPC encoded","EPCs read"].join(","));
+  TAGS.forEach(t=>{const p=st.per[t.no];L.push([t.no,t.label,p.barcode?"yes":"no",p.qr?"yes":"no",p.rfid?"yes":"no",p.linked?"yes":"no",t.epc,[...p.epcs].join(" ")].map(q).join(","))});L.push("");
+  L.push(["Linked factory EPC","Tag","How"].join(","));Object.entries(S.links).forEach(([k,v])=>L.push([k,v.tag,v.how].map(q).join(",")));L.push("");
+  L.push(["Time","Raw value","Read as","Type","Tag","Result","Via"].join(","));
+  S.events.forEach(e=>{const tg=evTag(e);L.push([e.t,e.raw,e.value,e.type,tg||"",tg?(e.dup?"repeat":"ok"):"unknown",e.via].map(q).join(","))});
+  return L.join("\r\n");
+}
+$("csvBtn").addEventListener("click",async()=>{const data=csv();const ok=await saveFile("VJ-vendor-demo-scan-results-"+S.run+".csv",data);
+  if(!ok){$("csvBox").hidden=false;$("csvText").value=data}else $("csvBox").hidden=true});
+$("csvCopy").addEventListener("click",()=>{const t=$("csvText");try{navigator.clipboard.writeText(t.value).then(()=>$("csvCopy").textContent="Copied",()=>{t.select()})}catch(e){t.select()}});
+
+/* ---------- shared results log (db) ---------- */
+function sync(txt,cls){const p=$("syncTxt");p.textContent=txt;p.className=cls?"banner "+cls:"hint"}
+let chain=Promise.resolve();
+function dbWrite(fn){if(!C.db||C.dbOk===false)return;chain=chain.then(async()=>{for(let a=0;a<2;a++){try{await fn();if(C.dbOk!==true){C.dbOk=true;sync("Every scan is also saved to the shared results log for Vaishnavi Jewels.","ok")}return}catch(e){if(e&&e.code==="unavailable"&&a===0){await new Promise(r=>setTimeout(r,800+Math.random()*800));continue}
+  if(e&&(e.code==="invalid_argument"||e.code==="not_granted"||e.code==="revoked"||e.code==="capability_disabled")){C.dbOk=false;sync("Results are kept on this device only. Download the CSV at the end and send it to Vaishnavi Jewels.","warn")}return}}})}
+function dbScan(ev){dbWrite(()=>C.db.collection("scans").doc(ev.id).set({run:S.run,at:ev.t,raw:ev.raw,value:ev.value,type:ev.type,tag:ev.tag,known:ev.known,how:ev.how,repeat:ev.dup,via:ev.via,device:DEV,user:C.uid||null}))}
+function dbLink(epc,tag,how){dbWrite(()=>C.db.collection("links").doc(epc).set({epc,tag,how,run:S.run,at:new Date().toISOString(),device:DEV,user:C.uid||null}))}
+function dbUnlink(list){list.forEach(epc=>dbWrite(()=>C.db.collection("links").doc(epc).delete()))}
+sync("Results are kept on this device. Download the CSV at the end and send it to Vaishnavi Jewels.","warn");
+
+render();
+const start=(location.hash||"").slice(1);let t0=TABS.includes(start)?start:null;if(!t0){try{t0=localStorage.getItem("vjdemo.tab")}catch(e){}}
+showTab(t0||"howto");
+})();
+</script>
+
+</body></html>
