@@ -357,7 +357,49 @@ function labelsPDF(){
   TAGS.forEach((t,i)=>{if(i)doc.addPage([LW,LH],"portrait");drawPrimsPDF(doc,labelPrims(t))});
   return doc.output("blob");
 }
+function tagOutline(doc,ox,oy){
+  doc.setLineDashPattern([],0);doc.setDrawColor(0);doc.setLineWidth(0.25);
+  doc.rect(ox+TAIL.x,oy+TAIL.y,TAIL.w,TAIL.h,"S");doc.rect(ox+FLAP.x,oy+FLAP.y,FLAP.w,FLAP.h,"S");
+  doc.setFillColor(255,255,255);doc.rect(ox+TAIL.x+0.15,oy+FLAP.y-0.2,TAIL.w-0.3,0.5,"F");
+  KEEP.forEach(z=>{doc.setFillColor(232,232,232);doc.setDrawColor(150);doc.setLineDashPattern([0.8,0.6],0);doc.rect(ox+z.x,oy+z.y,z.w,z.h,"FD")});
+  doc.setLineDashPattern([],0);
+}
 function sheetPDF(){
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",format:"a4",compress:true});
+  doc.setProperties({title:"VJ vendor demo - EPC encoding sheet",subject:WM});
+  doc.setFont("helvetica","bold");doc.setFontSize(22);doc.setTextColor(228,228,228);
+  for(let y=30;y<320;y+=48)for(let x=-40;x<210;x+=120)doc.text(WM,x,y,{angle:30});
+  doc.setTextColor(0,0,0);doc.setFont("helvetica","bold");doc.setFontSize(15);doc.text("VJ Inventory - RFID jewellery tags (VENDOR DEMO)",14,17);
+  doc.setFont("helvetica","normal");doc.setFontSize(9.5);
+  ["Dummy data for a tag test. No prices, not real stock.","QR payload = tag number exactly, e.g. VJD0001. (No 1D barcode: the 26 mm flap is too small for one.)","RFID: write the EPC exactly as shown - 96-bit, 24 hex characters, EPC bank from word 2, PC 3000.","EPC = tag number in ASCII hex, padded with zeros in front."].forEach((l,i)=>doc.text(l,14,23.5+i*4.4));
+  const cols=[[14,"#"],[22,"Tag no. = QR"],[56,"Label"],[80,"EPC to encode (hex)"],[146,"Item"],[176,"Metal"],[192,"Box"]];
+  let y=45;doc.setFont("helvetica","bold");doc.setFontSize(9);cols.forEach(([x,h])=>doc.text(h,x,y));doc.setDrawColor(150);doc.line(14,y+2,198,y+2);
+  TAGS.forEach((t,i)=>{y+=7.8;doc.setFont("helvetica","normal");doc.setFontSize(10);doc.text(String(i+1),14,y);
+    doc.setFont("courier","bold");doc.setFontSize(11);doc.text(t.no,22,y);doc.setFont("helvetica","normal");doc.setFontSize(10);doc.text(t.label,56,y);
+    doc.setFont("courier","bold");doc.setFontSize(10.5);doc.text(t.epc,80,y);doc.setFont("helvetica","normal");doc.setFontSize(9);doc.text(t.cat,146,y);doc.text(t.metal,176,y);doc.text(t.box.replace("Box ",""),192,y);
+    doc.setDrawColor(220);doc.line(14,y+2.6,198,y+2.6)});
+  const ox=16,oy=212;
+  doc.setFont("helvetica","bold");doc.setFontSize(10);doc.setTextColor(0,0,0);doc.text("Print layout on the 36 x 71 mm tag (actual size)",ox,oy-3);
+  doc.setDrawColor(190);doc.setLineWidth(0.2);doc.setLineDashPattern([0.6,0.6],0);doc.rect(ox,oy,LW,LH,"S");
+  tagOutline(doc,ox,oy);
+  drawPrimsPDF(doc,labelPrims(TAGS[0]),ox,oy);
+  doc.setFont("helvetica","normal");doc.setFontSize(5);doc.setTextColor(90,90,90);
+  doc.text("tail - no print",ox+TAIL.x+2.1,oy+30,{angle:90});doc.text("chip",ox+3.2,oy+49);
+  const nx=64;let ny=oy+2;doc.setTextColor(0,0,0);
+  const line=(s,b,sz)=>{doc.setFont("helvetica",b?"bold":"normal");doc.setFontSize(sz||9.5);doc.splitTextToSize(s,134).forEach(l=>{doc.text(l,nx,ny);ny+=4.3})};
+  line("Print goes only on the 26 x 25 mm flap of the jewellery tag (mm from the top-left of the 36 x 71 mm liner):",1);
+  line("- Flap: x 1-27, y 42-67. The tail (x 9.5-12.5, y 5-42) wraps round the piece and is not printed.");
+  line("- QR code: 10.8 x 10.8 mm at x 15.2-26.0, y 43.4-54.2 (tag number).");
+  line("- Text: tag no., item code, purity, gross / net weight, diamond ct, box - x 2.3-25.7, y 44-65.8.");
+  line("- Kept clear (grey): the chip, x 1.8-7.5, y 44.5-52. Printing over the antenna is fine.");
+  ny+=2;line("Please confirm before printing:",1);
+  line("1. The flap position, the tail position and the chip position match this drawing (the chip must not be printed over).");
+  line("2. Which face of the tag is printed, and which edge feeds into the printer first.");
+  line("3. That the TVS LP-45 (203 dpi) prints the QR sharply at this size, and whether it can encode the chips.");
+  doc.setFontSize(8.5);doc.setTextColor(110,110,110);doc.setFont("helvetica","normal");doc.text(WM.replace("–","-")+" - generated "+new Date().toISOString().slice(0,10),14,291);
+  return doc.output("blob");
+}
+function sheetPDF_old(){
   const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",format:"a4",compress:true});
   doc.setProperties({title:"VJ vendor demo - EPC encoding sheet",subject:WM});
   /* diagonal repeating watermark under everything */
