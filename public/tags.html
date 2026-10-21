@@ -158,10 +158,10 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
       <div class="lines" id="diaLines"></div>
       <button type="button" class="add" id="addDia">+ Add diamond line</button>
 
-      <h2>5 · Polki</h2>
-      <div class="ln p" id="polkiLine"><label>Pcs<input type="number" id="polkiPcs" min="0" max="10000" step="1" placeholder="0" inputmode="numeric"></label><label>Rate per pc (₹)<input type="number" id="polkiRate" min="1" max="100000" step="1" value="300" inputmode="numeric"></label><div class="val" id="polkiVal"></div></div>
+      <h2 hidden>5 · Polki</h2>
+      <div class="ln p" id="polkiLine" hidden><label>Pcs<input type="number" id="polkiPcs" min="0" max="10000" step="1" placeholder="0" inputmode="numeric"></label><label>Rate per pc (₹)<input type="number" id="polkiRate" min="1" max="100000" step="1" value="300" inputmode="numeric"></label><div class="val" id="polkiVal"></div></div>
 
-      <h2>6 · Other charges</h2>
+      <h2>5 · Other charges</h2>
       <div class="row"><label>Colour stones and other charges (₹) <input type="number" id="otherAmt" min="0" step="1" placeholder="0"></label></div>
     </section>
 
@@ -256,7 +256,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
     <p class="hint">Making per g is rounded up to ₹100. Total is rounded up to ₹100, then 3% GST, then rounded up to ₹1,000 (no-gold pieces: ₹10).</p>
     <h2>Default diamond rates (₹ per ct)</h2>
     <p class="hint">Used when the special rate is left blank on a tag. Blank here means staff must enter a rate.</p>
-    <div class="list"><table class="items rates" style="min-width:520px"><thead><tr><th>Quality</th><th>Round</th><th>Choki</th><th>Fancy</th><th>Solitaire</th></tr></thead><tbody id="defRows"></tbody></table></div>
+    <div class="list"><table class="items rates" style="min-width:520px"><thead><tr><th>Quality</th><th>Round</th><th>Choki</th><th>Fancy</th><th>Solitaire</th><th>Polki</th></tr></thead><tbody id="defRows"></tbody></table></div>
     <h2>Tag size</h2>
     <div class="row">
       <label>Tag width (mm) <input type="number" id="tw" step="1"></label>
@@ -296,7 +296,7 @@ const CATS=[
  {id:"VNP",name:"Nose Pin (VNP)",code:"VNP",s:"SVNP"}
 ];
 const KARATS=["22K","18K","14K","9K"],KNUM={"22K":"22","18K":"18","14K":"14","9K":"9"};
-const SHAPES=["Round","Choki","Fancy","Solitaire"],QUALS=["CVD","VS GH","VVS EF","VS HI","VS IJ","Other"];
+const SHAPES=["Round","Choki","Fancy","Solitaire","Polki"], /* owner 21/10/2026: Polki is a diamond line priced per ct (own rate); the old per-piece Polki box is hidden */QUALS=["CVD","VS GH","VVS EF","VS HI","VS IJ","Other"];
 const DEF_RATES={"CVD|Round":23000,"CVD|Choki":23000,"CVD|Fancy":23000,"CVD|Solitaire":23000,"VS GH|Round":46000,"VS GH|Choki":46000,"VS GH|Fancy":85000,"VS HI|Round":40000,"VS HI|Choki":40000,"VS IJ|Round":35000,"VS IJ|Choki":35000};
 function defRate(shape,q){const r=(S.settings&&S.settings.defaultRates)||DEF_RATES;const v=r[q+"|"+shape];return typeof v==="number"&&v>0?v:null}
 const DEF={gold24g:null,goldAt:null,purity:{"22K":0.92,"18K":0.76,"14K":0.60,"9K":0.40},making:{base:650,small:750,limit:5,pct:10},gst:3,tag:{w:100,h:15,printW:70}};
@@ -413,6 +413,7 @@ function addDia(){
    let buf="",tm=0;q.addEventListener("keydown",e=>{if(!/^[0-9]$/.test(e.key))return;e.preventDefault();const t=Date.now();buf=(t-tm<900?buf:"")+e.key;tm=t;const v=BY[buf]||(buf.length>1?BY[e.key]:null);if(v&&q.value!==v){q.value=v;q.dispatchEvent(new Event("change",{bubbles:true}))}if(!BY[buf]&&BY[e.key])buf=e.key})}
   d.querySelector(".x").addEventListener("click",()=>{d.remove();update()});
   $("dq"+id).addEventListener("change",()=>{const o=$("dq"+id).value==="Other";$("dqo"+id).hidden=!o;if(o)$("dqo"+id).focus()});
+  $("ds"+id).addEventListener("change",()=>{const p=$("ds"+id).value==="Polki";$("dr"+id).placeholder=p?"enter ₹/ct":"default";if(p&&$("dq"+id).value!=="Other"){$("dq"+id).value="Other";$("dqo"+id).hidden=false;$("dqo"+id).value="POLKI"}}); /* owner 21/10/2026: Polki per ct - quality POLKI, rate per ct must be typed */
   update();
 }
 /* owner 17/10/2026 17:42: after adding a line the cursor goes to its first box (Karat / Shape) */
@@ -499,7 +500,7 @@ function nextNo(prefix){let mx=S.counters[prefix]||0;S.tags.forEach(t=>{if(t.pre
 function codeFor(final){const k=Math.max(1,Math.ceil(final/1000));const a="abcdefghijkmnprstuvwxyz",r3=()=>{let o="";const b=new Uint32Array(3);crypto.getRandomValues(b);b.forEach(x=>o+=a[x%a.length]);return o};return r3()+k+r3()}
 
 /* ---------- tag drawing (one layout for preview and PDF, per Brain F-043) ---------- */
-function diaText(d){const sh={Round:"",Choki:"Ch ",Fancy:"F ",Solitaire:"Sol "}[d.shape]??"";return `${sh}${d.q} ${d.ct.toFixed(2)}(${d.pcs})${d.rate?Math.round(d.rate):""}`}
+function diaText(d){const sh={Round:"",Choki:"Ch ",Fancy:"F ",Solitaire:"Sol ",Polki:"Pk "}[d.shape]??"";return `${sh}${d.shape==="Polki"&&d.q==="POLKI"?"":d.q+" "}${d.ct.toFixed(2)}(${d.pcs})${d.rate?Math.round(d.rate):""}`}
 /* rate for a sample's stone line (Onnet code like RVS-SI-GH, BVS.SI.GH, MVS-SI-GH): today's default rate for that shape + colour,
    never below the F-066 minimums. Shown on the tag only; samples are not priced. */
 const MINR={Round:{EF:75000,FG:65000,GH:46000,HI:40000,IJ:35000,JK:33000},Choki:{EF:75000,FG:65000,GH:46000,HI:40000,IJ:40000,JK:40000},Fancy:{EF:95000,FG:90000,GH:85000,HI:85000,IJ:75000,JK:65000}};
