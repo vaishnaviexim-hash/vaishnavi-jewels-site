@@ -499,9 +499,11 @@ const DEV=device();
 /* ---------- handle a scan ---------- */
 function handleScan(raw,via,camSym){
   const parts=String(raw).split(/[\r\n\t]+/).map(x=>x.trim()).filter(Boolean);
-  parts.forEach(p=>handleOne(p,via,camSym));
+  const out=[];parts.forEach(p=>{const c=p.toUpperCase().replace(/[\s:\-_.]/g,"");if(/^[0-9A-F]+$/.test(c)&&c.length>=48&&c.length%24===0){for(let i=0;i<c.length;i+=24)out.push(c.slice(i,i+24))}else out.push(p)});
+  const nR=new Set(out.filter(p=>/^[0-9A-F]{24}$/i.test(p))).size;
+  out.forEach(p=>handleOne(p,via,camSym,nR>1));
 }
-function handleOne(raw,via,camSym){
+function handleOne(raw,via,camSym,multi){
   const now=Date.now(),r=parse(raw);
   let type;
   if(r.kind==="code")type=camSym||r.sym||S.mode;else if(r.kind==="epc")type="rfid";else type="other";
@@ -510,7 +512,8 @@ function handleOne(raw,via,camSym){
   const ev={id:now.toString(36)+Math.random().toString(36).slice(2,6),t:new Date(now).toISOString(),ms:now,raw:String(raw).slice(0,200),value:r.value,type,tag:tag||null,via,known:!!tag,how:r.how||null,dup:!!prior};
   S.events.push(ev);
   /* pairing of unknown EPCs with a printed code, either order, within 10 s */
-  if(type==="rfid"&&!tag){
+  if(multi)ev.multi=true;
+  if(type==="rfid"&&!tag&&!multi){
     const lastCode=[...S.events].reverse().find(e=>(e.type==="barcode"||e.type==="qr")&&e.tag&&now-e.ms<=PAIR_MS&&e!==ev&&needsChip(e.tag));
     if(lastCode)linkEPC(r.value,lastCode.tag,"auto");
   }else if((type==="barcode"||type==="qr")&&tag&&needsChip(tag)){
@@ -537,7 +540,7 @@ function feedback(ev){
   const box=$("last"),tg=evTag(ev);let cls,big,sub;
   if(tg){const t=BYNO.get(tg);cls=ev.dup?"warn":"ok";big=tg+" \u00b7 "+t.label;sub=TYPE_NAME[ev.type]+(ev.type==="rfid"?" "+ev.value+(ev.how==="linked"?" (linked)":""):"")+(ev.dup?" · already scanned":" · "+t.cat+", "+t.metal);beep(ev.dup?"dup":"ok")}
   else{cls="bad";big=ev.value.length>32?ev.value.slice(0,32)+"…":ev.value;const pend=ev.type==="rfid"&&S.pending.find(p=>p.epc===ev.value);
-    sub=ev.type==="rfid"?(pend?"Unknown RFID chip · link it to "+pend.tag+" below":"Unknown RFID chip · now scan this tag's barcode or QR to link it"):ev.type==="other"?"Not one of the 20 test tags":TYPE_NAME[ev.type]+" not in the list of 20 tags";beep("bad")}
+    sub=ev.type==="rfid"&&ev.multi?"Several RFID chips read at once · keep other tags away and read one tag":ev.type==="rfid"?(pend?"Unknown RFID chip · link it to "+pend.tag+" below":"Unknown RFID chip · now scan this tag's barcode or QR to link it"):ev.type==="other"?"Not one of the 20 test tags":TYPE_NAME[ev.type]+" not in the list of 20 tags";beep("bad")}
   if(ev.type!=="rfid"&&ev.tag&&S.pending.some(p=>p.tag===ev.tag&&Date.now()-p.ms<1500))sub+=" · link the RFID chip read just before";
   box.className="last "+cls;box.textContent="";
   const a=document.createElement("span");a.className="hint";a.style.color="inherit";a.textContent=new Date(ev.ms).toLocaleTimeString()+" · via "+ev.via;
