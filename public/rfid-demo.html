@@ -180,7 +180,7 @@ kbd{font-family:var(--f-mono);font-size:13px;background:var(--sunk);border:1px s
   <div id="p-labels" class="stack" hidden>
     <section class="card">
       <h2>Label files</h2>
-      <p class="hint">Jewellery RFID tags, 100 × 15 mm roll: 70 mm print area (folds in half at 35 mm) + 30 mm tail on the right, which is not printed. Left half: 12.5 mm QR, tag no., item and purity. Right half: weights, diamond ct and box. The vendor sheet lists tag number, QR payload and EPC on A4.</p>
+      <p class="hint">Jewellery RFID tags, 100 × 15 mm roll: 70 mm print area (folds in half at 35 mm) + 30 mm tail on the right, which is not printed. Left half: 14 mm QR (full tag height), tag no., item and purity. Right half: weights, diamond ct and box. The vendor sheet lists tag number, QR payload and EPC on A4.</p>
       <div class="actions">
         <button type="button" class="btn" id="dlLabels">Download labels for roll (100 × 15 mm)</button>
         <button type="button" class="btn ghost" id="dlA4">Download labels on A4 (test sheet)</button>
@@ -302,8 +302,8 @@ const ZONE={qr:{x:1,y:1.25,s:12.5},text:{x:14.7,w:19.5}},FOLD=PW/2;
 function barBits(text){const o={};JsBarcode(o,text,{format:"CODE128"});return o.encodings.map(e=>e.data).join("")}
 function qrMatrix(text){const q=qrcode(0,"M");q.addData(text);q.make();const n=q.getModuleCount(),m=[];for(let r=0;r<n;r++){const row=[];for(let c=0;c<n;c++)row.push(q.isDark(r,c));m.push(row)}return m}
 function labelPrims(t){
-  const P=[],lx=14.7,lw=FOLD-lx-0.8,rx=FOLD+0.8,rw=PW-rx-1,y=i=>1+2.6*(i+0.78);
-  P.push({k:"qr",x:1,y:1.25,s:12.5,m:qrMatrix(t.no)});
+  const P=[],lx=15.4,lw=FOLD-lx-0.8,rx=FOLD+0.8,rw=PW-rx-1,y=i=>1+2.6*(i+0.78);
+  P.push({k:"qr",x:0.6,y:0.5,s:14,m:qrMatrix(t.no)});
   P.push({k:"t",x:lx,y:y(0),t:t.no,sz:7,b:1,maxW:lw});
   P.push({k:"t",x:lx,y:y(1),t:t.label,sz:5.6,maxW:lw});
   P.push({k:"t",x:lx,y:y(2),t:t.metal,sz:5.6,b:1,maxW:lw});
@@ -402,7 +402,7 @@ function sheetPDF(){
   const line=(s,b,sz)=>{doc.setFont("helvetica",b?"bold":"normal");doc.setFontSize(sz||9.5);doc.splitTextToSize(s,178).forEach(l=>{doc.text(l,nx,ny);ny+=4.3})};
   line("Same roll size as our Ornate tags: 100 x 15 mm, 70 mm print area + 30 mm tail on the right (mm from the top-left of the tag):",1);
   line("- Print area x 0-70. The tail (x 70-100) wraps round the piece and is not printed.");
-  line("- The print area folds in half at x 35 (dashed). Left half: QR 12.5 x 12.5 mm at x 1-13.5, tag no., item, purity. Right half: gross/net weight, diamond ct, box. Nothing is printed within 0.8 mm of the fold.");
+  line("- The print area folds in half at x 35 (dashed). Left half: QR 14 x 14 mm at x 0.6-14.6, y 0.5-14.5, tag no., item, purity. Right half: gross/net weight, diamond ct, box. Nothing is printed within 0.8 mm of the fold.");
   ny+=2;line("Please confirm before printing:",1);
   line("1. Where the RFID chip sits on this tag (print area or tail) - we keep text off the chip bump if needed.");
   line("2. Which face of the tag is printed, and which edge feeds into the printer first.");
