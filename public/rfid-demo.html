@@ -552,7 +552,7 @@ function feedback(ev){
 function stats(){
   const per={};TAGS.forEach(t=>per[t.no]={barcode:false,qr:false,rfid:false,epcs:new Set()});
   S.events.forEach(e=>{const tg=evTag(e);if(!tg||!per[tg])return;if(e.type==="barcode"||e.type==="qr"||e.type==="rfid")per[tg][e.type]=true;if(e.type==="rfid")per[tg].epcs.add(e.value)});
-  let b=0,q=0,r=0,l=0;TAGS.forEach(t=>{const p=per[t.no];p.linked=(p.barcode||p.qr)&&p.rfid;b+=p.barcode;q+=p.qr;r+=p.rfid;l+=p.linked});
+  let b=0,q=0,r=0,l=0;TAGS.forEach(t=>{const p=per[t.no];p.linked=p.rfid&&(p.barcode||p.qr||Object.values(S.links).some(l=>l.tag===t.no));b+=p.barcode;q+=p.qr;r+=p.rfid;l+=p.linked});
   return {per,b,q,r,l};
 }
 function render(){
