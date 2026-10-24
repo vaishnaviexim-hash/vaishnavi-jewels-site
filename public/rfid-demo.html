@@ -162,7 +162,7 @@ kbd{font-family:var(--f-mono);font-size:13px;background:var(--sunk);border:1px s
           Other readers work the same way: any scanner or RFID reader in keyboard (HID / wedge) mode that types the value and presses Enter. A Zebra RFD40 sled must be in HID keyboard mode; browsers cannot talk to it over Bluetooth directly.</li>
         <li><b>Open Scan test in Chrome on the TC22R.</b> The big box takes the scans; the on-screen keyboard stays hidden so the list is visible. Tap <b>Type</b> if you want to enter a value by hand.</li>
         <li><b>Scan all 20 QR codes.</b> Choose <b>QR</b> above the box first so each code is ticked in the right column (the flap is too small for a 1D barcode). Each good scan beeps and turns green.</li>
-        <li><b>Read all 20 RFID chips</b>, one tag at a time, close to the reader. With factory EPCs, scan a tag's barcode and its chip one after the other (either order, within 10 seconds) and tap <b>Link</b>, or <b>Link all</b> at the end.</li>
+        <li><b>Read all 20 RFID chips</b>, one tag at a time, close to the reader. With factory EPCs, scan a tag's barcode and its chip one after the other (either order, within 20 seconds): they link automatically. A chip read on its own can still be linked by hand from the list under the checklist.</li>
         <li><b>Read the totals.</b> A pass is <span class="mono">QR 20/20 · RFID 20/20 · Linked 20/20</span>. Anything unknown or repeated is listed under the checklist. Download the results CSV and send it to Vaishnavi Jewels.</li>
       </ol>
       <p class="hint">No phone handheld? Use <b>Photo scan</b> on the Scan test page: take a photo of a label and the page reads the barcode and QR from it (works in Chrome on Android and in Safari on iPhone).</p>
@@ -463,7 +463,7 @@ $("dlSheet").addEventListener("click",async()=>{const ok=await saveFile("VJ-vend
 window.__vj={labelsPDF,sheetPDF,TAGS};
 
 /* ---------- scan test state ---------- */
-const PAIR_MS=10000;
+const PAIR_MS=20000;
 const S={run:null,events:[],links:{},dismiss:{},pending:[],mode:"qr",sound:true,typing:false};
 function newRun(){return new Date().toISOString().replace(/[-:]/g,"").slice(0,15)+"-"+Math.random().toString(36).slice(2,6)}
 function load(){try{const j=JSON.parse(localStorage.getItem("vjdemo.v1")||"null");if(j&&j.run){S.run=j.run;S.events=j.events||[];S.links=j.links||{};S.pending=j.pending||[];S.mode=j.mode||"qr";S.sound=j.sound!==false;S.dismiss=j.dismiss||{}}}catch(e){}if(!S.run)S.run=newRun()}
@@ -512,10 +512,10 @@ function handleOne(raw,via,camSym){
   /* pairing of unknown EPCs with a printed code, either order, within 10 s */
   if(type==="rfid"&&!tag){
     const lastCode=[...S.events].reverse().find(e=>(e.type==="barcode"||e.type==="qr")&&e.tag&&now-e.ms<=PAIR_MS&&e!==ev&&needsChip(e.tag));
-    if(lastCode)addPending(r.value,lastCode.tag);
+    if(lastCode)linkEPC(r.value,lastCode.tag,"auto");
   }else if((type==="barcode"||type==="qr")&&tag&&needsChip(tag)){
     const lastUnk=[...S.events].reverse().find(e=>e.type==="rfid"&&!e.tag&&!S.links[e.value]&&now-e.ms<=PAIR_MS&&!S.pending.some(p=>p.epc===e.value));
-    if(lastUnk)addPending(lastUnk.value,tag);
+    if(lastUnk)linkEPC(lastUnk.value,tag,"auto");
   }
   persist();dbScan(ev);feedback(ev);render();
 }
