@@ -517,7 +517,7 @@ function handleOne(raw,via,camSym,multi){
     const lastCode=[...S.events].reverse().find(e=>(e.type==="barcode"||e.type==="qr")&&e.tag&&now-e.ms<=PAIR_MS&&e!==ev&&needsChip(e.tag));
     if(lastCode)linkEPC(r.value,lastCode.tag,"auto");
   }else if((type==="barcode"||type==="qr")&&tag&&needsChip(tag)){
-    const lastUnk=[...S.events].reverse().find(e=>e.type==="rfid"&&!e.tag&&!S.links[e.value]&&now-e.ms<=PAIR_MS&&!S.pending.some(p=>p.epc===e.value));
+    const lastUnk=[...S.events].reverse().find(e=>e.type==="rfid"&&!e.tag&&!e.multi&&!S.links[e.value]&&now-e.ms<=PAIR_MS&&!S.pending.some(p=>p.epc===e.value));
     if(lastUnk)linkEPC(lastUnk.value,tag,"auto");
   }
   persist();dbScan(ev);feedback(ev);render();
