@@ -105,7 +105,7 @@ select{font:inherit;font-size:15px;color:var(--fg);background:var(--bg);border:1
 textarea{font-family:var(--f-mono);font-size:12px;width:100%;min-height:140px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:var(--r);padding:8px}
 
 /* labels */
-.labels{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr));gap:10px}
+.labels{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:10px}
 .lab{background:var(--sunk);border-radius:var(--r);padding:8px;min-width:0}
 .lab svg{display:block;width:100%;height:auto;filter:drop-shadow(0 1px 2px rgba(0,0,0,.18))}
 ol.steps{margin:0;padding-left:22px;display:flex;flex-direction:column;gap:10px;max-width:70ch}
@@ -114,15 +114,15 @@ ul.sub{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4
 kbd{font-family:var(--f-mono);font-size:13px;background:var(--sunk);border:1px solid var(--line);border-radius:4px;padding:0 5px}
 #qrtmp{position:absolute;left:-9999px;width:300px;height:300px}
 
-@page label{size:36mm 71mm;margin:0}
+@page label{size:100mm 15mm;margin:0}
 @page sheet{size:A4;margin:12mm}
 @media print{
   .wm{display:none}
   body *{visibility:hidden}
   #p-labels .labels,#p-labels .labels *{visibility:visible}
   #p-labels .labels{position:absolute;left:0;top:0;display:block;page:label}
-  #p-labels .lab{padding:0;background:#fff;break-after:page;width:36mm;height:71mm}
-  #p-labels .lab svg{width:36mm;height:71mm;filter:none}
+  #p-labels .lab{padding:0;background:#fff;break-after:page;width:100mm;height:15mm}
+  #p-labels .lab svg{width:100mm;height:15mm;filter:none}
 }
 </style>
 
@@ -149,7 +149,7 @@ kbd{font-family:var(--f-mono);font-size:13px;background:var(--sunk);border:1px s
     <section class="card">
       <h2>Steps</h2>
       <ol class="steps">
-        <li><b>Print the 20 labels.</b> Open <b>Print labels</b> and download the label PDF (one 36 × 71 mm page per tag). These are jewellery tags: everything prints on the 26 × 25 mm flap, which folds in half down the middle; nothing crosses the fold, nothing on the tail, never over the chip. Print at 100% / actual size, no scaling.</li>
+        <li><b>Print the 20 labels.</b> Open <b>Print labels</b> and download the label PDF (one 100 × 15 mm page per tag, the same roll size as our Ornate tags: 70 mm print area + 30 mm tail on the right). The 70 mm print area folds in half; nothing crosses the fold and nothing prints on the tail. Print at 100% / actual size, no scaling.</li>
         <li><b>Encode the chips.</b> Write each tag's EPC exactly as listed under <b>Tags</b> or on the A4 vendor sheet: 96-bit, 24 hex characters, EPC bank from word 2, PC word 3000. Example: VJD0001 → <span class="epc">0000000000564A4430303031</span>.
           <ul class="sub"><li>If you would rather keep your factory EPCs, that is fine: the Scan test links them to the right tag (step 6).</li></ul></li>
         <li><b>Set up DataWedge on the Zebra TC22R.</b> Open DataWedge → create a profile (for example "VJ demo") → Associated apps: <kbd>com.android.chrome</kbd> / <kbd>*</kbd>.
@@ -180,9 +180,9 @@ kbd{font-family:var(--f-mono);font-size:13px;background:var(--sunk);border:1px s
   <div id="p-labels" class="stack" hidden>
     <section class="card">
       <h2>Label files</h2>
-      <p class="hint">Jewellery RFID tags on a 36 × 71 mm liner. Only the white die-cut tag is printed: the 26 × 25 mm flap carries a 10.8 mm QR and the details; the tail wraps round the piece and the chip is kept clear. The vendor sheet lists tag number, QR payload and EPC on A4.</p>
+      <p class="hint">Jewellery RFID tags, 100 × 15 mm roll: 70 mm print area (folds in half at 35 mm) + 30 mm tail on the right, which is not printed. Left half: 12.5 mm QR, tag no., item and purity. Right half: weights, diamond ct and box. The vendor sheet lists tag number, QR payload and EPC on A4.</p>
       <div class="actions">
-        <button type="button" class="btn" id="dlLabels">Download labels for roll (36 × 71 mm)</button>
+        <button type="button" class="btn" id="dlLabels">Download labels for roll (100 × 15 mm)</button>
         <button type="button" class="btn ghost" id="dlA4">Download labels on A4 (test sheet)</button>
         <button type="button" class="btn ghost" id="dlSheet">Download A4 vendor sheet</button>
       </div>
@@ -293,28 +293,26 @@ function fallbackSelect(btn){const cell=btn.closest("tr")&&btn.closest("tr").que
   tb.appendChild(tr)})})();
 
 /* ---------- label drawing: one set of primitives (mm, origin top-left) for screen preview and PDF ----------
-   Tag: 36 x 71 mm portrait RFID label (owner's drawing). Keep-out zones include about 1 mm tolerance:
-   antenna column (3 mm wide, from 5 mm below the top) and the loop + chip block (26 x 25 mm at the bottom). */
-const LW=36,LH=71,MOD=0.25;
-const FLAP={x:1,y:42,w:26,h:25},TAIL={x:9.5,y:5,w:3,h:37};
-const KEEP=[{n:"chip",x:1.8,y:44.5,w:5.7,h:7.5}];
-const ZONE={qr:{x:15.5,y:43.4,s:10},text:{x:1.9,w:11.3}},FOLD=14;
+   Tag: 100 x 15 mm landscape jewellery RFID tag (owner's roll, 24/10/2026): 70 mm print area on the left, 30 mm tail on the right (no print).
+   The print area folds in half at 35 mm: left half = front, right half = back. Nothing crosses the fold. */
+const LW=100,LH=15,MOD=0.25,PW=70;
+const FLAP={x:0,y:0,w:PW,h:LH},TAIL={x:PW,y:0,w:LW-PW,h:LH};
+const KEEP=[];
+const ZONE={qr:{x:1,y:1.25,s:12.5},text:{x:14.7,w:19.5}},FOLD=PW/2;
 function barBits(text){const o={};JsBarcode(o,text,{format:"CODE128"});return o.encodings.map(e=>e.data).join("")}
 function qrMatrix(text){const q=qrcode(0,"M");q.addData(text);q.make();const n=q.getModuleCount(),m=[];for(let r=0;r<n;r++){const row=[];for(let c=0;c<n;c++)row.push(q.isDark(r,c));m.push(row)}return m}
 function labelPrims(t){
-  const P=[],tx=ZONE.text.x,mw=ZONE.text.w;
-  /* the flap folds in half down the middle (x 14): left half = front over the chip, right half = back. Nothing crosses the fold. */
-  P.push({k:"t",x:8.2,y:46.8,t:t.metal,sz:7,b:1,maxW:5});
-  P.push({k:"t",x:8.2,y:50.2,t:t.label.split("/")[0],sz:5.4,b:1,maxW:5});
-  P.push({k:"t",x:1.9,y:56.2,t:t.label,sz:6,b:1,maxW:11.3});
-  P.push({k:"t",x:1.9,y:59.0,t:"G "+t.gross.toFixed(3),sz:5.6,maxW:11.3});
-  P.push({k:"t",x:1.9,y:61.6,t:"N "+t.net.toFixed(3),sz:5.6,maxW:11.3});
-  P.push({k:"t",x:1.9,y:64.2,t:"Dia "+t.dia.toFixed(2)+" ct",sz:5.6,maxW:11.3});
-  P.push({k:"qr",x:15.5,y:43.4,s:10,m:qrMatrix(t.no)});
-  P.push({k:"t",x:15.0,y:57.0,t:t.no,sz:6.4,b:1,maxW:11.2});
-  P.push({k:"t",x:15.0,y:59.8,t:t.cat,sz:5.0,maxW:11.2});
-  P.push({k:"t",x:15.0,y:62.4,t:t.box,sz:5.6,maxW:11.2});
-  P.push({k:"t",x:15.0,y:65.0,t:"DEMO",sz:4.2,c:"wm2",maxW:11.2});
+  const P=[],lx=14.7,lw=FOLD-lx-0.8,rx=FOLD+0.8,rw=PW-rx-1,y=i=>1+2.6*(i+0.78);
+  P.push({k:"qr",x:1,y:1.25,s:12.5,m:qrMatrix(t.no)});
+  P.push({k:"t",x:lx,y:y(0),t:t.no,sz:7,b:1,maxW:lw});
+  P.push({k:"t",x:lx,y:y(1),t:t.label,sz:5.6,maxW:lw});
+  P.push({k:"t",x:lx,y:y(2),t:t.metal,sz:5.6,b:1,maxW:lw});
+  P.push({k:"t",x:lx,y:y(3),t:t.cat,sz:5.2,maxW:lw});
+  P.push({k:"t",x:lx,y:y(4),t:"DEMO",sz:4.2,c:"wm2",maxW:lw});
+  P.push({k:"t",x:rx,y:y(0),t:"G.Wt. "+t.gross.toFixed(3),sz:5.8,b:1,maxW:rw});
+  P.push({k:"t",x:rx,y:y(1),t:"N.Wt. "+t.net.toFixed(3),sz:5.6,maxW:rw});
+  P.push({k:"t",x:rx,y:y(2),t:"Dia "+t.dia.toFixed(2)+" ct",sz:5.6,maxW:rw});
+  P.push({k:"t",x:rx,y:y(3),t:t.box,sz:5.4,maxW:rw});
   return P;
 }
 let measureCtx=null;
@@ -324,14 +322,12 @@ function labelSVG(t){
   const NS="http://www.w3.org/2000/svg",el=(n,a)=>{const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);return e};
   const cs=getComputedStyle(document.documentElement),ink=cs.getPropertyValue("--tagink").trim()||"#111",bg=cs.getPropertyValue("--tagbg").trim()||"#fff",wm=cs.getPropertyValue("--tagwm").trim()||"#ccc";
   const svg=el("svg",{viewBox:`0 0 ${LW} ${LH}`,role:"img","aria-label":"Label "+t.no});
-  /* preview only: the liner (grey) and the die-cut jewellery tag (white): tail + flap; the chip is never printed on */
-  svg.appendChild(el("rect",{width:LW,height:LH,rx:1.5,fill:wm,"fill-opacity":.35}));
-  [TAIL,FLAP].forEach(r=>svg.appendChild(el("rect",{x:r.x,y:r.y,width:r.w,height:r.h,fill:bg,stroke:"#8a8a8a","stroke-width":.2})));
-  svg.appendChild(el("rect",{x:TAIL.x+.1,y:FLAP.y-.2,width:TAIL.w-.2,height:.4,fill:bg}));
-  svg.appendChild(el("line",{x1:FOLD,y1:FLAP.y,x2:FOLD,y2:FLAP.y+FLAP.h,stroke:"#8a8a8a","stroke-width":.2,"stroke-dasharray":"1 0.7"}));
-  KEEP.forEach(z=>{svg.appendChild(el("rect",{x:z.x,y:z.y,width:z.w,height:z.h,fill:wm,"fill-opacity":.4,stroke:"#8a8a8a","stroke-width":.2,"stroke-dasharray":"0.8 0.6"}));
-    const tl=el("text",{x:z.x+z.w/2,y:z.y+z.h/2+.6,"font-size":1.8,"text-anchor":"middle",fill:"#8a8a8a","font-family":"Helvetica, Arial, sans-serif"});tl.textContent="chip";svg.appendChild(tl)});
-  const tt=el("text",{x:TAIL.x+TAIL.w/2+.6,y:TAIL.y+TAIL.h/2,"font-size":1.8,"text-anchor":"middle",fill:"#8a8a8a","font-family":"Helvetica, Arial, sans-serif",transform:`rotate(-90 ${TAIL.x+TAIL.w/2+.6} ${TAIL.y+TAIL.h/2})`});tt.textContent="tail · wraps the piece · no print";svg.appendChild(tt);
+  /* preview only: the 100 x 15 tag (white print area + grey tail, never printed) and the fold line */
+  svg.appendChild(el("rect",{width:LW,height:LH,rx:1.5,fill:bg,stroke:"#8a8a8a","stroke-width":.2}));
+  svg.appendChild(el("rect",{x:TAIL.x,y:.1,width:TAIL.w-.1,height:LH-.2,fill:wm,"fill-opacity":.35}));
+  svg.appendChild(el("line",{x1:FOLD,y1:.6,x2:FOLD,y2:LH-.6,stroke:"#8a8a8a","stroke-width":.2,"stroke-dasharray":"1 0.7"}));
+  svg.appendChild(el("line",{x1:PW,y1:0,x2:PW,y2:LH,stroke:"#8a8a8a","stroke-width":.2}));
+  const tt=el("text",{x:TAIL.x+TAIL.w/2,y:LH/2+.8,"font-size":2.4,"text-anchor":"middle",fill:"#8a8a8a","font-family":"Helvetica, Arial, sans-serif"});tt.textContent="tail · no print";svg.appendChild(tt);
   labelPrims(t).forEach(o=>{
     if(o.k==="qr"){const n=o.m.length,c=o.s/n;let d="";o.m.forEach((r,ri)=>r.forEach((v,ci)=>{if(v)d+=`M${(o.x+ci*c).toFixed(3)} ${(o.y+ri*c).toFixed(3)}h${c.toFixed(3)}v${c.toFixed(3)}h-${c.toFixed(3)}z`}));svg.appendChild(el("path",{d,fill:ink}))}
     else if(o.k==="vbars"){let d="";runs(o.bits).forEach(([i,n])=>{d+=`M${o.x} ${(o.y+i*MOD).toFixed(3)}h${o.w}v${(n*MOD).toFixed(3)}h-${o.w}z`});svg.appendChild(el("path",{d,fill:ink}))}
@@ -357,28 +353,27 @@ function drawPrimsPDF(doc,P,ox,oy){
   });
 }
 function labelsPDF(){
-  const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:"portrait",unit:"mm",format:[LW,LH],compress:true});
-  doc.setProperties({title:"VJ vendor demo labels 36x71",subject:WM});
-  TAGS.forEach((t,i)=>{if(i)doc.addPage([LW,LH],"portrait");drawPrimsPDF(doc,labelPrims(t))});
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:"landscape",unit:"mm",format:[LW,LH],compress:true});
+  doc.setProperties({title:"VJ vendor demo labels 100x15",subject:WM});
+  TAGS.forEach((t,i)=>{if(i)doc.addPage([LW,LH],"landscape");drawPrimsPDF(doc,labelPrims(t))});
   return doc.output("blob");
 }
 function tagOutline(doc,ox,oy){
   doc.setLineDashPattern([],0);doc.setDrawColor(0);doc.setLineWidth(0.25);
-  doc.rect(ox+TAIL.x,oy+TAIL.y,TAIL.w,TAIL.h,"S");doc.rect(ox+FLAP.x,oy+FLAP.y,FLAP.w,FLAP.h,"S");
-  doc.setFillColor(255,255,255);doc.rect(ox+TAIL.x+0.15,oy+FLAP.y-0.2,TAIL.w-0.3,0.5,"F");
-  KEEP.forEach(z=>{doc.setFillColor(232,232,232);doc.setDrawColor(150);doc.setLineDashPattern([0.8,0.6],0);doc.rect(ox+z.x,oy+z.y,z.w,z.h,"FD")});
-  doc.setDrawColor(120);doc.setLineDashPattern([1,0.7],0);doc.line(ox+FOLD,oy+FLAP.y,ox+FOLD,oy+FLAP.y+FLAP.h);
+  doc.rect(ox,oy,LW,LH,"S");doc.line(ox+PW,oy,ox+PW,oy+LH);
+  doc.setFillColor(232,232,232);doc.rect(ox+PW+0.15,oy+0.15,LW-PW-0.3,LH-0.3,"F");
+  doc.setDrawColor(120);doc.setLineDashPattern([1,0.7],0);doc.line(ox+FOLD,oy+0.6,ox+FOLD,oy+LH-0.6);
   doc.setLineDashPattern([],0);
 }
 function a4PDF(){
   const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:"mm",format:"a4",compress:true});
   doc.setProperties({title:"VJ vendor demo labels A4",subject:WM});
-  const cols=5,rows=3,gx=5,gy=8,mx=(210-(cols*LW+(cols-1)*gx))/2,my=24,per=cols*rows,pages=Math.ceil(TAGS.length/per);
+  const cols=1,rows=12,gx=0,gy=6,mx=(210-(cols*LW+(cols-1)*gx))/2,my=24,per=cols*rows,pages=Math.ceil(TAGS.length/per);
   TAGS.forEach((t,i)=>{const k=i%per;if(i&&k===0)doc.addPage("a4");
     if(k===0){const pg=Math.floor(i/per)+1;doc.setFont("helvetica","bold");doc.setFontSize(12);doc.setTextColor(0,0,0);
       doc.text("VJ Inventory - RFID jewellery tags, A4 test sheet ("+pg+"/"+pages+")",14,12);
       doc.setFont("helvetica","normal");doc.setFontSize(9);doc.setTextColor(60,60,60);
-      doc.text("Print at 100% / actual size. Solid line = tag outline (cut or lay a real tag over it to check position). Dashed = fold. Grey = chip, never print.",14,17.5);}
+      doc.text("Print at 100% / actual size. Solid line = tag outline (cut or lay a real tag over it to check position). Dashed = fold at 35 mm. Grey = tail, never printed.",14,17.5);}
     const c=k%cols,r=Math.floor(k/cols),ox=mx+c*(LW+gx),oy=my+r*(LH+gy);
     doc.setDrawColor(200);doc.setLineWidth(0.15);doc.setLineDashPattern([0.6,0.6],0);doc.rect(ox,oy,LW,LH,"S");doc.setLineDashPattern([],0);
     tagOutline(doc,ox,oy);drawPrimsPDF(doc,labelPrims(t),ox,oy)});
@@ -399,20 +394,17 @@ function sheetPDF(){
     doc.setFont("courier","bold");doc.setFontSize(10.5);doc.text(t.epc,80,y);doc.setFont("helvetica","normal");doc.setFontSize(9);doc.text(t.cat,146,y);doc.text(t.metal,176,y);doc.text(t.box.replace("Box ",""),192,y);
     doc.setDrawColor(220);doc.line(14,y+2.6,198,y+2.6)});
   const ox=16,oy=212;
-  doc.setFont("helvetica","bold");doc.setFontSize(10);doc.setTextColor(0,0,0);doc.text("Print layout on the 36 x 71 mm tag (actual size)",ox,oy-3);
-  doc.setDrawColor(190);doc.setLineWidth(0.2);doc.setLineDashPattern([0.6,0.6],0);doc.rect(ox,oy,LW,LH,"S");
+  doc.setFont("helvetica","bold");doc.setFontSize(10);doc.setTextColor(0,0,0);doc.text("Print layout on the 100 x 15 mm tag (actual size)",ox,oy-3);
   tagOutline(doc,ox,oy);
   drawPrimsPDF(doc,labelPrims(TAGS[0]),ox,oy);
-  doc.setFont("helvetica","normal");doc.setFontSize(5);doc.setTextColor(90,90,90);
-  doc.text("tail - no print",ox+TAIL.x+2.1,oy+30,{angle:90});doc.text("chip",ox+3.2,oy+49);
-  const nx=64;let ny=oy+2;doc.setTextColor(0,0,0);
-  const line=(s,b,sz)=>{doc.setFont("helvetica",b?"bold":"normal");doc.setFontSize(sz||9.5);doc.splitTextToSize(s,134).forEach(l=>{doc.text(l,nx,ny);ny+=4.3})};
-  line("Print goes only on the 26 x 25 mm flap of the jewellery tag (mm from the top-left of the 36 x 71 mm liner):",1);
-  line("- Flap: x 1-27, y 42-67. The tail (x 9.5-12.5, y 5-42) wraps round the piece and is not printed.");
-  line("- The flap folds in half along x 14 (dashed). Front (x 1.9-13.2): purity, item code, weights, diamond ct; the chip stays clear. Back (x 15-26.2): QR 10 x 10 mm at x 15.5-25.5, y 43.4-53.4, tag no., item, box. Nothing is printed within 1 mm of the fold.");
-  line("- Kept clear (grey): the chip, x 1.8-7.5, y 44.5-52. Printing over the antenna is fine.");
+  doc.setFont("helvetica","normal");doc.setFontSize(6);doc.setTextColor(90,90,90);doc.text("tail - no print",ox+PW+8,oy+8.5);
+  const nx=16;let ny=oy+LH+8;doc.setTextColor(0,0,0);
+  const line=(s,b,sz)=>{doc.setFont("helvetica",b?"bold":"normal");doc.setFontSize(sz||9.5);doc.splitTextToSize(s,178).forEach(l=>{doc.text(l,nx,ny);ny+=4.3})};
+  line("Same roll size as our Ornate tags: 100 x 15 mm, 70 mm print area + 30 mm tail on the right (mm from the top-left of the tag):",1);
+  line("- Print area x 0-70. The tail (x 70-100) wraps round the piece and is not printed.");
+  line("- The print area folds in half at x 35 (dashed). Left half: QR 12.5 x 12.5 mm at x 1-13.5, tag no., item, purity. Right half: gross/net weight, diamond ct, box. Nothing is printed within 0.8 mm of the fold.");
   ny+=2;line("Please confirm before printing:",1);
-  line("1. The flap position, the tail position and the chip position match this drawing (the chip must not be printed over).");
+  line("1. Where the RFID chip sits on this tag (print area or tail) - we keep text off the chip bump if needed.");
   line("2. Which face of the tag is printed, and which edge feeds into the printer first.");
   line("3. That the TVS LP-45 (203 dpi) prints the QR sharply at this size, and whether it can encode the chips.");
   doc.setFontSize(8.5);doc.setTextColor(110,110,110);doc.setFont("helvetica","normal");doc.text(WM.replace("–","-")+" - generated "+new Date().toISOString().slice(0,10),14,291);
@@ -465,7 +457,7 @@ async function saveFile(name,data,fallback){
     const u=URL.createObjectURL(blob),a=document.createElement("a");a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000);return true}catch(e){}
   if(fallback)fallback();return false;
 }
-$("dlLabels").addEventListener("click",async()=>{const ok=await saveFile("VJ-vendor-demo-labels-36x71.pdf",labelsPDF());if(!ok)$("dlHint").classList.add("banner","warn")});
+$("dlLabels").addEventListener("click",async()=>{const ok=await saveFile("VJ-vendor-demo-labels-100x15.pdf",labelsPDF());if(!ok)$("dlHint").classList.add("banner","warn")});
 $("dlA4").addEventListener("click",async()=>{const ok=await saveFile("VJ-jewellery-tags-A4-sheet.pdf",a4PDF());if(!ok)$("dlHint").classList.add("banner","warn")});
 $("dlSheet").addEventListener("click",async()=>{const ok=await saveFile("VJ-vendor-demo-EPC-sheet-A4.pdf",sheetPDF());if(!ok)$("dlHint").classList.add("banner","warn")});
 window.__vj={labelsPDF,sheetPDF,TAGS};
