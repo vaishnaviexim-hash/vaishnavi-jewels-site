@@ -300,10 +300,10 @@ const FLAP={x:0,y:0,w:PW,h:LH},TAIL={x:PW,y:0,w:LW-PW,h:LH};
 const KEEP=[];
 const ZONE={qr:{x:1,y:1.25,s:12.5},text:{x:14.7,w:19.5}},FOLD=PW/2;
 function barBits(text){const o={};JsBarcode(o,text,{format:"CODE128"});return o.encodings.map(e=>e.data).join("")}
-function qrMatrix(text){const q=qrcode(0,"M");q.addData(text);q.make();const n=q.getModuleCount(),m=[];for(let r=0;r<n;r++){const row=[];for(let c=0;c<n;c++)row.push(q.isDark(r,c));m.push(row)}return m}
+function qrMatrix(text){const q=qrcode(1,"L");q.addData(text);q.make();const n=q.getModuleCount(),m=[];for(let r=0;r<n;r++){const row=[];for(let c=0;c<n;c++)row.push(q.isDark(r,c));m.push(row)}return m}
 function labelPrims(t){
-  const P=[],lx=15.4,lw=FOLD-lx-0.8,rx=FOLD+0.8,rw=PW-rx-1,y=i=>1+2.6*(i+0.78);
-  P.push({k:"qr",x:0.6,y:0.5,s:14,m:qrMatrix(t.no)});
+  const P=[],lx=15.6,lw=FOLD-lx-0.8,rx=FOLD+0.8,rw=PW-rx-1,y=i=>1+2.6*(i+0.78);
+  P.push({k:"qr",x:2.6,y:2,s:11,m:qrMatrix(t.no)});
   P.push({k:"t",x:lx,y:y(0),t:t.no,sz:7,b:1,maxW:lw});
   P.push({k:"t",x:lx,y:y(1),t:t.label,sz:5.6,maxW:lw});
   P.push({k:"t",x:lx,y:y(2),t:t.metal,sz:5.6,b:1,maxW:lw});
