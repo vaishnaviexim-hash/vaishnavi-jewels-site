@@ -177,9 +177,10 @@
     document.addEventListener("keydown", e => { if (e.key === "Enter" && e.target && e.target.id === "cq") fixQ(); }, true);
     document.addEventListener("click", e => { if (e.target && e.target.id === "cgo") fixQ(); }, true); } catch (e) {}
   // Read-only helpers for the Quote tab (quote.js): the current stock list and settings from this page's copy.
-  window.VJ_TAGS = () => [...cache.entries()].filter(([p]) => p.startsWith("tags/")).map(([p, e]) => Object.assign({ id: p.slice(5) }, clone(e.data)));
+  window.VJ_TAGS_ALL = () => [...cache.entries()].filter(([p]) => p.startsWith("tags/")).map(([p, e]) => Object.assign({ id: p.slice(5) }, clone(e.data)));
+  window.VJ_TAGS = () => window.VJ_TAGS_ALL().filter(t => t.status !== "sold"); // owner 26/10 (C-20261026-SOLD): sold pieces are not stock (the bill page still sees them)
   window.VJ_SETTINGS = () => { const e = cache.get("settings/main"); return e ? clone(e.data) : {}; };
-  start().then(() => { if (me) (me.role === "sales" ? ["/tags/bill.js", "/tags/party.js", "/tags/keys.js"] : ["/tags/quote.js", "/tags/bill.js", "/tags/find.js", "/tags/link.js", "/tags/party.js", "/tags/keys.js"]).concat(me.role === "admin" ? ["/tags/edit.js", "/tags/photoimp.js"] : me.role === "staff" ? ["/tags/edit.js"] : []).forEach(src => { const s = document.createElement("script"); s.src = src + "?v=20261026b"; /* owner 26/10: staff get Edit tag too; ?v= so phones load the new files */ document.body.appendChild(s); }); }).catch(() => {});
+  start().then(() => { if (me) (me.role === "sales" ? ["/tags/bill.js", "/tags/party.js", "/tags/keys.js"] : ["/tags/quote.js", "/tags/bill.js", "/tags/find.js", "/tags/link.js", "/tags/party.js", "/tags/keys.js"]).concat(me.role === "admin" ? ["/tags/edit.js", "/tags/photoimp.js"] : me.role === "staff" ? ["/tags/edit.js"] : []).forEach(src => { const s = document.createElement("script"); s.src = src + "?v=20261026c"; /* owner 26/10: staff get Edit tag too; ?v= so phones load the new files */ document.body.appendChild(s); }); }).catch(() => {});
   const caps = { db, user, assets, downloads, sample };
   window.VJ_WEBSITE = true;
   window.claude = Object.freeze({
