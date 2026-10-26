@@ -423,7 +423,7 @@
         wa.dataset.sure = "1"; sendWA(b, blob, wa, m); } // owner 26/10 17:30 (C-20261026-BILLWAAUTO): saving sends the bill to the customer's mobile on WhatsApp at once
       else m.textContent += " No 10-digit mobile, so it was not sent on WhatsApp.";
       const canFile = (() => { try { return !!(navigator.canShare && navigator.canShare({ files: [file] })); } catch (e) { return false; } })();
-      if (canFile) { const sh = document.createElement("button"); sh.type = "button"; sh.className = "btn ghost"; sh.textContent = "Share (WhatsApp)";
+      if (canFile && /Android|iPhone|iPad/i.test(navigator.userAgent)) { const sh = document.createElement("button"); // owner 26/10: on the computer the Windows share box is confusing - Aashvi sends instead sh.type = "button"; sh.className = "btn ghost"; sh.textContent = "Share (WhatsApp)";
         sh.onclick = async () => { try { await navigator.share({ files: [file] }); } catch (e) {} }; out.append(sh); }
     } catch (e) { m.textContent = "Not saved: " + (e.message || e) + "."; }
     $("bsave").disabled = false;
