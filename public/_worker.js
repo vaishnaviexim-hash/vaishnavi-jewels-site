@@ -666,6 +666,7 @@ async function vjBill(request, env, who) { // every login may make bills (owner 
   let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
   if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
   const no = String(b && b.no || '').trim().toUpperCase(), name = vjClean(b && b.name, 60), city = vjClean(b && b.city, 40);
+  const editNo = String(b && b.edit || '').trim().toUpperCase().slice(0, 20); // owner 26/10/2026 (C-20261026-BILLEDIT): update a saved bill, same number
   const mobile = vjPhone(b && b.mobile);
   const date = String(b && b.date || ''), F = Math.round(Number(b && b.F) * 100) / 100, mode = ['ws', 'nett', 'g2g', 'item'].includes(b && b.mode) ? b.mode : '';
   const settle = b && b.settle === 'amount' ? 'amount' : 'fine';
@@ -693,7 +694,7 @@ async function vjBill(request, env, who) { // every login may make bills (owner 
   // cannot go on another Bill until that bill is cancelled. Estimates are not limited and do not block a Bill.
   const onBill = async () => { const hit = new Map();
     (((await env.DB.prepare("SELECT no, data FROM vj_bills WHERE no LIKE 'B-%' ORDER BY ts").all()).results) || []).forEach(x => {
-      let d; try { d = JSON.parse(x.data); } catch (e) { return; } if (!d || d.cancelled) return;
+      let d; try { d = JSON.parse(x.data); } catch (e) { return; } if (!d || d.cancelled || (editNo && d.no === editNo)) return;
       (d.rows || []).forEach(r => { const id = String(r.id || ''); if (ids.includes(id) && !hit.has(id)) hit.set(id, d); }); });
     return hit; };
   const dupMsg = hit => { const [id, d] = [...hit.entries()][0], t = tags.find(x => x.id === id) || {};
@@ -705,6 +706,22 @@ async function vjBill(request, env, who) { // every login may make bills (owner 
   const calc = vjBillCalc(tags, { F, mode, settle, disc, rates, frates, prates, purity: s.purity, making: s.making, gst: s.gst });
   calc.rows.forEach((r, i) => { const ph = tags[i].photo; if (typeof ph === 'string' && /^[0-9a-f]{32}$/.test(ph)) r.photo = ph; }); // owner 16/10: photo on the bill
   const bill = Object.assign({ no, title, date, name, city, mobile, F, nbb: !!(b && b.nbb === true), by: who.email, byName: who.name, at: new Date().toISOString() }, calc); // nbb: 'No Buy Back No Exchange' stamp (owner 17/10, C-20261017-NBB)
+  if (editNo) { // C-20261026-BILLEDIT (owner 26/10/2026 17:32 'i should be able to edit the bill'): owners only; the old version is kept in vj_bill_old
+    if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji can edit a saved bill');
+    const old = await env.DB.prepare('SELECT ts, email, data FROM vj_bills WHERE no = ?').bind(editNo).first();
+    if (!old) return vjDeny(404, 'bill ' + editNo + ' not found');
+    let od; try { od = JSON.parse(old.data); } catch (e) { return vjDeny(500, 'saved bill unreadable'); }
+    if (od.cancelled) return vjDeny(409, 'a cancelled bill cannot be edited');
+    if (od.settled || od.original) return vjDeny(409, 'a settled bill cannot be edited');
+    if ((od.title || 'Bill') !== title) return vjDeny(400, 'a bill stays a bill (and an estimate an estimate) when edited');
+    await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bill_old (no TEXT, ts INTEGER, email TEXT, data TEXT)').run();
+    bill.no = editNo; bill.firstAt = od.firstAt || od.at; bill.firstBy = od.firstBy || od.by;
+    bill.edits = (Array.isArray(od.edits) ? od.edits : []).concat([{ at: bill.at, by: who.email, byName: who.name, oldTotal: od.total, newTotal: bill.total }]).slice(-20);
+    await env.DB.batch([env.DB.prepare('INSERT INTO vj_bill_old (no, ts, email, data) VALUES (?, ?, ?, ?)').bind(editNo, Date.now(), who.email, old.data),
+      env.DB.prepare('UPDATE vj_bills SET data = ? WHERE no = ?').bind(JSON.stringify(bill), editNo)]);
+    await vjAudit(env, who, 'bill-edit', 'bills/' + editNo, `${od.total} -> ${bill.total} | ${name} ${mobile} | ${ids.join(',')}`);
+    return vjJson({ ok: true, bill, edited: true });
+  }
   // C-20261016-BILLBOOK / BILLAUTO: bills B-YYMM-NN and estimates E-YYMM-NN are numbered automatically, from 01 every month (by the date)
   for (let i = 0; ; i++) {
     {
