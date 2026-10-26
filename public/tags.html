@@ -355,6 +355,8 @@ function renderCheck(){
   const card=document.createElement("div");card.className="card";card.style.cssText="display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:var(--r);padding:14px";
   if(many.length>1){const p=document.createElement("p");p.textContent=`${many.length} pieces match ${q} (tag number or design number). Tap the right one:`;card.appendChild(p);const w=document.createElement("div");w.style.cssText="display:flex;flex-wrap:wrap;gap:8px";
     many.forEach(x=>{const b=document.createElement("button");b.type="button";b.className="btn ghost";b.textContent=(x.designNo?x.designNo+" · ":"")+x.label+(x.catName?" · "+x.catName:"");b.addEventListener("click",()=>{$("cq").value=x.label;renderCheck()});w.appendChild(b)});card.appendChild(w);box.appendChild(card);return}
+  if(!t&&!many.length&&S.sold&&S.sold.length){const sd=S.sold.find(x=>(x.code&&x.code.toLowerCase()===q.toLowerCase())||x.id===id||tagId(x.label)===id||(/^\d{1,6}$/.test(q)&&(String(x.no)===String(+q)||String(x.designNo||"")===q))||String(x.designNo||"").toUpperCase()===q.toUpperCase());
+    if(sd){const so=sd.sold||{};card.textContent=`${sd.designNo?sd.designNo+" · ":""}${sd.label} is SOLD on bill ${so.no||""}${so.date?" ("+so.date.split("-").reverse().join("-")+(so.name?", "+so.name:"")+")":""}. It is no longer in stock. To bring it back, cancel that bill.`;box.appendChild(card);return}} /* C-20261026-SOLD */
   if(!t){card.textContent=!S.tags.length?"Loading stock…":/^[a-z]{3}\d+[a-z]{3}$/i.test(q)?`No piece has the code ${q}. Pieces imported from Onnet get their code when their new tag is printed; until then type the tag number (e.g. 809).`:`No piece with tag ${raw.trim()} in VJ Inventory.`;box.appendChild(card);return}
   const top=document.createElement("div");top.style.cssText="display:flex;gap:12px;align-items:center;flex-wrap:wrap";
   /* owner 16/10/2026: Add photo sits right next to the photo / Photo pending box */
@@ -684,7 +686,8 @@ function resub(){
 let retagT=null;
 function retag(){if(retagT)return;retagT=setTimeout(()=>{retagT=null;
   const m=new Map();Object.values(S.parts).forEach(a=>a.forEach(t=>m.set(t.id,t)));
-  S.tags=[...m.values()].sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))||String(a.label).localeCompare(String(b.label),"en",{numeric:true}));
+  const allT=[...m.values()];S.sold=allT.filter(t=>t.status==="sold"); /* owner 26/10 (C-20261026-SOLD): billed pieces are not stock */
+  S.tags=allT.filter(t=>t.status!=="sold").sort((a,b)=>String(b.createdAt).localeCompare(String(a.createdAt))||String(a.label).localeCompare(String(b.label),"en",{numeric:true}));
   update();renderImport();updQ();if(!$("p-list").hidden)renderList();if(!$("p-check").hidden)renderCheck()},400)}
 
 /* ---------- one-time import of the Onnet samples (owner only; C-20261013 'total stock chahiye') ---------- */
