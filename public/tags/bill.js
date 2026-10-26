@@ -137,7 +137,7 @@
       </div>
       <h2>Saved bills &amp; estimates</h2>
       <div class="row" style="align-items:end"><label style="flex:0 1 200px">Month <input id="bmonth" type="month"></label><label style="flex:0 1 220px">Customer mobile (all bills) <input id="bfmob" inputmode="tel" autocomplete="off" maxlength="14" placeholder="type mobile no."></label>
-        <div class="actions" style="margin:0"><button type="button" class="btn ghost" id="bxl">Download summary (Excel)</button><button type="button" class="btn ghost" id="bxlall">All months (Excel)</button></div></div>
+        <div class="actions" style="margin:0"><button type="button" class="btn ghost" id="bxl">Download summary (Excel)</button><button type="button" class="btn ghost" id="bxlall">All months (Excel)</button><button type="button" class="btn ghost" id="bxwa" hidden>WhatsApp party bills</button></div></div>
       <div class="list"><table class="items" style="min-width:640px"><thead><tr><th>Date</th><th>Number</th><th>Type</th><th>Customer</th><th>Total</th><th>Fine gold</th><th>By</th><th></th></tr></thead><tbody id="bbook"></tbody></table></div>
       <p class="hint" id="bbookmsg"></p>`;
     $("p-rates").parentNode.insertBefore(sec, $("p-rates"));
@@ -150,7 +150,7 @@
     document.querySelectorAll("input[name=bset]").forEach(r => r.addEventListener("change", () => { B.settle = r.value; render(); }));
     document.querySelectorAll("input[name=btitle]").forEach(r => r.addEventListener("change", () => { B.title = r.value; numField(); }));
     $("bmonth").value = today().slice(0, 7); $("bmonth").addEventListener("change", loadBook); { let tm = 0; $("bfmob").addEventListener("input", () => { clearTimeout(tm); tm = setTimeout(loadBook, 350); }); } // owner 26/10 17:58: type a mobile no. and see all that customer's bills
-    $("bxl").addEventListener("click", () => xl($("bmonth").value || today().slice(0, 7))); $("bxlall").addEventListener("click", () => xl("all"));
+    $("bxl").addEventListener("click", () => xl($("bmonth").value || today().slice(0, 7))); $("bxlall").addEventListener("click", () => xl("all")); $("bxwa").addEventListener("click", e => partyWA(e.currentTarget));
     $("bF").addEventListener("input", render); $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); }); $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
     $("bclear").addEventListener("click", () => { B.editNo = null; { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.nbb = false; $("bnbb").checked = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
     $("bsave").addEventListener("click", save);
@@ -167,7 +167,7 @@
     n.placeholder = "automatic (" + (e ? "E-" : "B-") + d.slice(2, 4) + d.slice(5, 7) + "-01, 02 …)"; }
   async function loadBook() {
     const body = $("bbook"), m = $("bbookmsg"); if (!body) return; const mo = $("bmonth").value || today().slice(0, 7); const fq = String(($("bfmob") || {}).value || "").replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""); const byMob = fq.length >= 4;
-    try { const r = await fetch("/api/vj/bills?month=" + encodeURIComponent(byMob ? "all" : mo), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); if (byMob) j.bills = j.bills.filter(b => String(b.mobile || "").replace(/\D/g, "").includes(fq));
+    try { const r = await fetch("/api/vj/bills?month=" + encodeURIComponent(byMob ? "all" : mo), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); if (byMob) j.bills = j.bills.filter(b => String(b.mobile || "").replace(/\D/g, "").includes(fq)); { const pb = byMob ? j.bills.find(b => !b.cancelled) : null; B.party = pb ? { name: pb.name, city: pb.city, mobile: pb.mobile } : null; $("bxwa").hidden = !pb; $("bxl").textContent = pb ? "Download party bills (Excel)" : "Download summary (Excel)"; $("bxlall").hidden = !!pb; }
       body.textContent = ""; let tot = 0;
       let nc = 0;
       // owner 16/10: a cancelled bill's line leaves the screen for everyone (still kept, still in the Excel) (C-20261016-HIDECANCELLED, C-20261016-NOSHOWCANCELLED)
@@ -300,8 +300,22 @@
       const b = j.bill, blob = await makePdf(b, B.photos), a = document.createElement("a"); a.href = URL.createObjectURL(blob);
       a.download = `${b.title} ${b.no.replace(/[^A-Z0-9\-]/g, "-")} ${String(b.name).replace(/[^A-Za-z0-9 .\-]/g, "").trim().slice(0, 40)}.pdf`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
     } catch (e) { $("bbookmsg").textContent = "Could not open " + no + " (" + (e.message || e) + ")."; } btn.disabled = false; }
+  // owner 26/10 18:03: with a customer mobile typed, Excel = that party's bills (all months), file named "Party name, City"; WhatsApp sends it from his own WhatsApp
+  const partyQ = () => { const q = String(($("bfmob") || {}).value || "").replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""); return q.length >= 4 && B.party ? q : ""; };
+  const partyName = () => [B.party.name, B.party.city].map(x => String(x || "").replace(/[^A-Za-z0-9 .\-]/g, "").trim()).filter(Boolean).join(", ").slice(0, 60) || "Party bills";
+  async function partyFile() { const q = partyQ(); const r = await fetch("/api/vj/bills.xlsx?month=all", { credentials: "same-origin", headers: { "x-vj-mob": q } }); if (!r.ok) throw new Error(r.status);
+    return new File([await r.blob()], partyName() + ".xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }); }
+  async function partyWA(btn) { const m = $("bbookmsg"); btn.disabled = true; try { const f = await partyFile(), p = B.party, mob = String(p.mobile || "").replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "");
+      const txt = `Dear ${p.name},\nPlease find attached the summary of your bills with Vaishnavi Jewels.\n\nShilpi & Abhinav\nMihir Bhai`;
+      let can = false; try { can = !!(navigator.canShare && navigator.canShare({ files: [f] })); } catch (e) {}
+      if (can) { try { await navigator.share({ files: [f], text: txt }); m.textContent = "Choose WhatsApp and " + p.name + " in the share box."; return; } catch (e) { if (e && e.name === "AbortError") return; } }
+      const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+      window.open((/^[6-9]\d{9}$/.test(mob) ? "https://wa.me/91" + mob : "https://wa.me/") + "?text=" + encodeURIComponent(txt), "_blank", "noopener");
+      m.textContent = `WhatsApp opened for ${p.name} with the message. The Excel "${f.name}" is in Downloads - drag it into the chat.`;
+    } catch (e) { m.textContent = "Could not make the Excel (" + (e.message || e) + ")."; } finally { btn.disabled = false; } }
   async function xl(mo) {
-    try { const r = await fetch("/api/vj/bills.xlsx?month=" + encodeURIComponent(mo), { credentials: "same-origin" }); if (!r.ok) throw new Error(r.status);
+    try { if (partyQ()) { const f = partyFile(), a = document.createElement("a"); a.href = URL.createObjectURL(await f); a.download = (await f).name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000); return; }
+      const r = await fetch("/api/vj/bills.xlsx?month=" + encodeURIComponent(mo), { credentials: "same-origin" }); if (!r.ok) throw new Error(r.status);
       const a = document.createElement("a"); a.href = URL.createObjectURL(await r.blob()); a.download = "VJ_Bills_" + (mo === "all" ? "all" : mo.split("-").reverse().join("-")) + ".xlsx";
       document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
     } catch (e) { $("bbookmsg").textContent = "Could not make the Excel (" + (e.message || e) + ")."; } }
