@@ -15,7 +15,7 @@
   const PUR = { "24K": 1, "22K": 0.92, "18K": 0.76, "14K": 0.60, "9K": 0.385 }; // 9K = 38.5 tunch (owner 26/10 19:00)
   const fmt = n => "Rs " + Math.round(n).toLocaleString("en-IN");
   const up = (n, s) => Math.ceil(Math.round(n * 100) / 100 / s) * s;
-  const Q = { kind: "code", items: [], option: "gh", mk: "std", prates: {}, designs: [] }; // mk: "std" = settings making + 10% wastage, "flat" = Rs 1,600/g (owner 14/10)
+  const Q = { kind: "code", items: [], option: "gh", mk: "std", pay: "amount", prates: {}, designs: [] }; // mk: "std" = settings making + 10% wastage, "flat" = Rs 1,600/g (owner 14/10)
   const FLAT_MK = 1600, PRATE = 300;
   // new-design estimate (C-20261017-QUOTEMODES): same karats, qualities (with the shop codes) and shapes as the New tag form
   const DKARATS = ["14K", "18K", "22K", "9K", "24K"], DQUALS = ["CVD", "VS IJ", "VS HI", "VS GH", "VVS EF"], DSHAPES = ["Round", "Choki", "Fancy", "Solitaire", "Polki"];
@@ -30,10 +30,17 @@
   // price incl. GST (same rule as the server's vjQPrice): gold + making (std / flat) + diamonds + extra (polki + other), up to Rs 100, + GST, up to Rs 1,000
   // chain gold lines (C-20261017-CHAINTUNCH): net x tunch x 24K rate, no making, no wastage; making on the other lines only
   const lineT = g => { const n = Number(g && g.tunch); return n >= 0.3 && n <= 1.1 ? n : 0; };
+  const G2G = { "9K": 0.4235, "14K": 0.66, "18K": 0.836, "22K": 1.06, "24K": 1 }; // C-20261026-QG2G
   function calc(gold, dv, extra, st, mk) {
+    calc.fine = 0;
     if (!gold.some(g => g.net > 0) || !st.g) return 0;
     const g0 = gold.find(g => g.net > 0 && !lineT(g)); let gv = 0, cv = 0, nt = 0;
     gold.forEach(g => { if (g.net > 0) { const tn = lineT(g); if (tn) cv += g.net * st.g * tn; else { gv += g.net * st.g * (Number(st.pur[g.k]) || 0); nt += g.net; } } });
+    if (Q.pay === "g2g" || Q.pay === "g2gn") { // owner 26/10 19:02 (C-20261026-QG2G): Gold to Gold - fine gold apart, rupees = making (+ 10% wastage on Nett) + diamonds + other + GST (same rule as the server)
+      const nf = Q.pay === "g2gn"; let fine = 0; gold.forEach(g => { if (g.net > 0) { const tn = lineT(g); fine += g.net * (tn || (nf ? (Number(st.pur[g.k]) || 0) : (G2G[g.k] || 0))); } });
+      calc.fine = Math.round(fine * 1000) / 1000;
+      const mv2 = !g0 ? 0 : mk === "flat" ? FLAT_MK * nt : Math.max((g0.net > st.mk.limit ? st.mk.base : st.mk.small) * nt, Number(st.mk.min) || 0) + (nf ? gv * st.mk.pct / 100 : 0);
+      return up(up(mv2 + dv + extra, 100) * (1 + st.gst / 100), 100); }
     const mv = !g0 ? 0 : mk === "flat" ? FLAT_MK * nt : Math.max((g0.net > st.mk.limit ? st.mk.base : st.mk.small) * nt, Number(st.mk.min) || 0) + gv * st.mk.pct / 100;
     return up(up(gv + cv + mv + dv + extra, 100) * (1 + st.gst / 100), 1000); // owner 16/10/2026: nearest Rs 1,000 (was 10,000)
   }
@@ -49,8 +56,8 @@
     const gold = (t.kind === "sample" ? [{ k: "14K", net: (t.metal && t.metal.net) || 0 }] : (t.gold || [])).map(g => ({ k: String(g.k || ""), net: Number(g.net) || 0, tunch: lineT(g) }));
     // C-20261017-MAKINGMIN (owner 17/10): std = 650/g (750 up to 5 g), minimum Rs 1,000 a piece, + 10% wastage on gold; flat = Rs 1,600/g
     let dv = 0, missing = false; (t.dias || []).filter(Boolean).forEach(d => { const r = optRate(d, opt, st); if (!(r > 0) && !NON_DIAMOND.test(d.q || "")) missing = true; dv += (Number(d.ct) || 0) * r; });
-    const pk = polkiOf(t), final = calc(gold, dv, (pk ? pk.pcs * pk.rate : 0) + (Number(t.other && t.other.amt) || 0), st, Q.mk);
-    return final ? { final, missing } : null;
+    const pk = polkiOf(t), final = calc(gold, dv, (pk ? pk.pcs * pk.rate : 0) + (Number(t.other && t.other.amt) || 0), st, Q.mk), fine = calc.fine;
+    return final ? { final, missing, fine } : null;
   }
   // one new-design line: {desc, k, net, dias:[{q, shape, ct, rate, edited}], ppcs, prate, other}
   const newDesign = () => ({ desc: "", k: "14K", net: "", tunch: "", dias: [], ppcs: "", prate: String(PRATE), other: "" });
@@ -103,6 +110,10 @@
       <div class="seg" role="radiogroup" aria-label="Making" style="margin-top:8px">
         <label><input type="radio" name="qmk" value="std" checked> <span id="qmkstd">Making Rs 650/g + 10% wastage on gold</span></label>
         <label><input type="radio" name="qmk" value="flat"> Making Rs 1,600/g</label></div>
+      <div class="seg" role="radiogroup" aria-label="Payment" style="margin-top:8px">
+        <label><input type="radio" name="qpay" value="amount" checked> In rupees</label>
+        <label><input type="radio" name="qpay" value="g2g"> Gold to Gold W/s</label>
+        <label><input type="radio" name="qpay" value="g2gn"> Gold to Gold Nett</label></div>
       </div>
       <h2 id="qcusth">3 · Customer</h2>
       <div class="actions" id="qcbox" hidden><button type="button" class="btn ghost" id="qcontact">Pick from phone contacts</button></div>
@@ -123,9 +134,10 @@
     $("qadd").addEventListener("click", pick); $("qq").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); pick(); } });
     document.querySelectorAll('input[name=qopt]').forEach(r => r.addEventListener("change", () => { Q.option = r.value; render(); }));
     document.querySelectorAll('input[name=qmk]').forEach(r => r.addEventListener("change", () => { Q.mk = r.value; render(); }));
+    document.querySelectorAll('input[name=qpay]').forEach(r => r.addEventListener("change", () => { Q.pay = r.value; render(); })); // C-20261026-QG2G
     document.querySelectorAll('input[name=qkind]').forEach(r => r.addEventListener("change", () => { Q.kind = r.value; kindView(); }));
     $("qdadd").addEventListener("click", () => { Q.designs.push(newDesign()); drawDesigns(); });
-    $("qclear").addEventListener("click", () => { Q.items = []; Q.prates = {}; Q.designs = [newDesign()]; Q.mk = "std"; document.querySelector('input[name=qmk][value=std]').checked = true; ["qname", "qmob", "qcity", "qq"].forEach(i => $(i).value = ""); $("qmsg").textContent = ""; if ($("qsharebox")) $("qsharebox").hidden = true; drawDesigns(); render(); });
+    $("qclear").addEventListener("click", () => { Q.items = []; Q.prates = {}; Q.designs = [newDesign()]; Q.mk = "std"; document.querySelector('input[name=qmk][value=std]').checked = true; Q.pay = "amount"; document.querySelector('input[name=qpay][value=amount]').checked = true; ["qname", "qmob", "qcity", "qq"].forEach(i => $(i).value = ""); $("qmsg").textContent = ""; if ($("qsharebox")) $("qsharebox").hidden = true; drawDesigns(); render(); });
     Q.designs = [newDesign()]; drawDesigns(); kindView();
     $("qsend").addEventListener("click", send);
     // C-20261017-QUOTEWA (owner 17/10): Aashvi sends the quote PDF from the business WhatsApp; second tap confirms the number
@@ -194,19 +206,19 @@
   }
   function prices() { // live prices of the design lines and the estimate total (no redraw, so typing is not interrupted)
     if (Q.kind !== "design") return; const st = settings(); let total = 0, miss = [];
-    Q.designs.forEach((d, i) => { const p = designPrice(d), x = designIn(d, st); total += p;
-      const c = document.querySelector('[data-qd="' + i + '"]'); if (c) c.textContent = p ? fmt(p) : "—";
+    let ftot = 0; Q.designs.forEach((d, i) => { const p = designPrice(d), f = p ? calc.fine : 0, x = designIn(d, st); total += p; ftot += f;
+      const c = document.querySelector('[data-qd="' + i + '"]'); if (c) c.textContent = p ? fmt(p) + fineTxt(f) : "—";
       const pv = document.querySelector('[data-qp="' + i + '"]'); if (pv) pv.textContent = x.ppcs > 0 && Number.isInteger(x.prate) ? `Polki ${x.ppcs} pc × ${fmt(x.prate)} = ${fmt(x.ppcs * x.prate)}` : "";
       if (x.bad.length && (num(d.net) > 0 || d.dias.length || num(d.ppcs) > 0)) miss.push("Design " + (i + 1) + ": check " + x.bad.join(", ")); });
-    $("qtotal").textContent = total && st.g ? fmt(total) : "—"; Q.total = total;
+    $("qtotal").textContent = total && st.g ? fmt(total) + fineTxt(ftot) : "—"; Q.total = total;
     $("qnote").textContent = !st.g ? "Today's gold rate is not set (Gold rate & settings) - prices cannot be worked out." :
       (miss.length ? miss.join(". ") + ". " : "") + `At 24K ${fmt(st.g)}/g. ${mkText(st, null, "std", true)}. Estimate only: final price depends on actual weights and the gold rate on the day of billing.`;
   }
   function render() {
     if (Q.kind === "design") { prices(); return; }
-    const body = $("qrows"); if (!body) return; body.textContent = ""; let total = 0, miss = false;
+    const body = $("qrows"); if (!body) return; body.textContent = ""; let total = 0, miss = false, ftot = 0;
     Q.items.forEach((t, i) => {
-      const p = priceFor(t, Q.option); if (p) { total += p.final; if (p.missing) miss = true; }
+      const p = priceFor(t, Q.option); if (p) { total += p.final; ftot += p.fine || 0; if (p.missing) miss = true; }
       const tr = document.createElement("tr"); const c = (x, cl) => { const td = document.createElement("td"); if (cl) td.className = cl; td.textContent = x; tr.appendChild(td); return td; };
       const ph = document.createElement("td"); if (t.photo) { const im = document.createElement("img"); im.alt = ""; im.src = "/_blob/" + t.photo; ph.appendChild(im); } tr.appendChild(ph);
       c((t.designNo ? t.designNo + " · " : "") + t.label); c(t.catName || "");
@@ -216,17 +228,19 @@
         const ri = document.createElement("input"); ri.className = "qprate"; ri.inputMode = "numeric"; ri.autocomplete = "off"; ri.style.cssText = "width:64px;text-align:right;padding:4px 6px"; ri.value = pk.rate;
         ri.addEventListener("change", () => { const v = num(ri.value); if (Number.isInteger(v) && v >= 1 && v <= 100000 && v !== Number(t.polki.rate)) Q.prates[t.id] = v; else delete Q.prates[t.id]; render(); });
         td.append(pk.pcs + " pc @ ", ri); } tr.appendChild(td); }
-      c(p ? fmt(p.final) : "—", "num");
+      c(p ? fmt(p.final) + fineTxt(p.fine) : "—", "num");
       const x = document.createElement("td"); const rm = document.createElement("button"); rm.type = "button"; rm.className = "btn ghost"; rm.textContent = "Remove"; rm.addEventListener("click", () => { Q.items.splice(i, 1); render(); }); x.appendChild(rm); tr.appendChild(x);
       body.appendChild(tr);
     });
     const st = settings(); $("qmkstd").textContent = mkText(st, null, "std");
-    $("qtotal").textContent = Q.items.length && st.g ? fmt(total) : "—";
+    $("qtotal").textContent = Q.items.length && st.g ? fmt(total) + fineTxt(ftot) : "—";
     $("qnote").textContent = !st.g ? "Today's gold rate is not set (Gold rate & settings) - prices cannot be worked out." :
       (miss ? "Some diamond lines have no rate in the default table for this option - fill the table under Gold rate & settings. " : "") +
       `At 24K ${fmt(st.g)}/g${st.at ? ", " + new Date(st.at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" }) : ""}. ${OPTS[Q.option]}${Q.option === "lgd" ? " at Rs 23,000 per ct" : ""}. Approximate, valid today.`;
     Q.total = total;
   }
+  const fineTxt = f => f ? " + " + Number(f).toFixed(3) + " g fine gold" : ""; // C-20261026-QG2G
+  const payText = () => Q.pay === "g2g" ? "Gold to Gold (W/s): fine gold = weight x 14K 0.66 / 18K 0.836 / 22K 1.06 / 9K 0.4235; amount = making, diamonds and other charges + GST." : Q.pay === "g2gn" ? "Gold to Gold (Nett): fine gold = net weight x karat purity; amount = making + 10% wastage, diamonds and other charges + GST." : "";
   // the making line shown on screen and printed in the PDF (std uses the rates in Gold rate & settings)
   function mkText(st, items, kind, des) {
     if ((kind || Q.mk) === "flat") return "Making Rs " + FLAT_MK.toLocaleString("en-IN") + "/g";
@@ -253,7 +267,7 @@
       const parts = [q.weights ? `${d.k} gold ${d.net.toFixed(3)} g` : `${d.k} gold`].concat(d.dias.length ? [q.weights ? "diamonds " + dq.map(z => d.dias.filter(x => x.q === z).reduce((a, x) => a + x.ct, 0).toFixed(2) + " ct " + z).join(" + ") : "diamonds " + dq.join(" + ")] : [])
         .concat(d.ppcs ? [q.weights ? "polki " + d.ppcs + " pcs" : "polki"] : []);
       doc.text(doc.splitTextToSize(parts.join(", "), W - 2 * M - 45), M, y + 12); doc.setTextColor(20);
-      doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.text(fmt(d.price), W - M, y + 8, { align: "right" });
+      doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.text(fmt(d.price), W - M, y + 8, { align: "right" }); if (d.fine) { doc.setFontSize(10); doc.text("+ " + d.fine.toFixed(3) + " g fine gold", W - M, y + 13, { align: "right" }); }
       y += 18; doc.setDrawColor(225); doc.line(M, y - 2, W - M, y - 2);
     }
     else for (const t of q.items) {
@@ -269,12 +283,12 @@
         : [...new Set((t.gold || []).map(g => g.k))].length && !q.weights ? [...new Set((t.gold || []).map(g => g.k))].join(" + ") + " gold" : (t.gold || []).map(g => g.k + " gold " + g.net.toFixed(3) + " g").join(" + ");
       const pk = t.polkiQ; // polki as the server priced it (C-20261017-POLKI)
       doc.text(`${goldTxt}${ct ? (q.weights ? ", diamonds " + ct.toFixed(2) + " ct" : ", diamonds") : ""}${pk ? (q.weights ? ", polki " + pk.pcs + " pcs" : ", polki") : ""}`, x, y + 12); doc.setTextColor(20);
-      doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.text(fmt(t.price), W - M, y + 8, { align: "right" });
+      doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.text(fmt(t.price), W - M, y + 8, { align: "right" }); if (t.fine) { doc.setFontSize(10); doc.text("+ " + t.fine.toFixed(3) + " g fine gold", W - M, y + 13, { align: "right" }); }
       y += h + 4; doc.setDrawColor(225); doc.line(M, y - 2, W - M, y - 2);
     }
-    y += 4; doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.text("Total (incl. 3% GST)", M, y); doc.text(fmt(q.total), W - M, y, { align: "right" });
+    y += 4; doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.text("Total (incl. 3% GST)", M, y); doc.text(fmt(q.total), W - M, y, { align: "right" }); if (q.fineTotal) { y += 7; doc.text("Fine gold to give", M, y); doc.text(q.fineTotal.toFixed(3) + " g", W - M, y, { align: "right" }); }
     y += 10; doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(90);
-    doc.text(doc.splitTextToSize((q.design ? "Final price depends on actual weights and the gold rate on the day of billing. Estimate at today's gold rate. " : "Approximate prices at today's gold rate, valid today. ") + "All diamonds are third-party certified (IGI / EGL / TGL) and all gold is BIS HUID hallmarked. Made in our own manufacturing unit in Surat. Our representative will confirm the exact price.", W - 2 * M), M, y);
+    doc.text(doc.splitTextToSize((q.payNote ? q.payNote + " " : "") + (q.design ? "Final price depends on actual weights and the gold rate on the day of billing. Estimate at today's gold rate. " : "Approximate prices at today's gold rate, valid today. ") + "All diamonds are third-party certified (IGI / EGL / TGL) and all gold is BIS HUID hallmarked. Made in our own manufacturing unit in Surat. Our representative will confirm the exact price.", W - 2 * M), M, y);
     return doc.output("blob");
   }
   async function aashvi(no, blob, name, m, label) {
@@ -303,15 +317,15 @@
     try {
       // the server prices every line again (from the tags or the weights typed) and returns the figures the PDF prints
       const r = await fetch("/api/vj/quote", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-        body: JSON.stringify(design ? { kind: "design", name, mobile: mob, city, items: dIn.map(x => ({ desc: x.desc, k: x.k, net: x.net, ...(x.tunch ? { tunch: x.tunch } : {}), dias: x.dias, ppcs: x.ppcs, prate: x.prate, other: x.other })) }
-          : { kind: "tags", name, mobile: mob, city, option: OPTS[Q.option], mk: Q.mk, items: items.map(i => ({ id: i.id, ...(Q.prates[i.id] ? { prate: Q.prates[i.id] } : {}) })) }) });
+        body: JSON.stringify(design ? { kind: "design", pay: Q.pay, name, mobile: mob, city, items: dIn.map(x => ({ desc: x.desc, k: x.k, net: x.net, ...(x.tunch ? { tunch: x.tunch } : {}), dias: x.dias, ppcs: x.ppcs, prate: x.prate, other: x.other })) }
+          : { kind: "tags", pay: Q.pay, name, mobile: mob, city, option: OPTS[Q.option], mk: Q.mk, items: items.map(i => ({ id: i.id, ...(Q.prates[i.id] ? { prate: Q.prates[i.id] } : {}) })) }) });
       const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("server " + r.status));
       if (!Array.isArray(j.items) || j.items.length !== (design ? dIn.length : items.length)) throw new Error("unexpected reply from the server");
       const pagePrice = design ? Q.total : items.reduce((a, t) => a + t.price, 0);
-      const pItems = design ? dIn.map((x, i) => Object.assign({}, x, { price: j.items[i].price })) : items.map((t, i) => Object.assign(t, { price: j.items[i].price, polkiQ: j.items[i].polki }));
+      const pItems = design ? dIn.map((x, i) => Object.assign({}, x, { price: j.items[i].price, fine: j.items[i].fine || 0 })) : items.map((t, i) => Object.assign(t, { price: j.items[i].price, fine: j.items[i].fine || 0, polkiQ: j.items[i].polki }));
       const changed = pagePrice !== j.total;
       m.textContent = "Making the PDF…";
-      const blob = await makePdf({ qno: j.qno, design, name, city, option: OPTS[Q.option], items: pItems, total: j.total, photos: !design && $("qphoto").checked, weights: $("qwt").checked, making: design ? mkText(st, Q.designs, "std", true) : mkText(st, items) });
+      const blob = await makePdf({ qno: j.qno, design, name, city, option: OPTS[Q.option], items: pItems, total: j.total, fineTotal: j.fineTotal || 0, payNote: payText(), photos: !design && $("qphoto").checked, weights: $("qwt").checked, making: design ? mkText(st, Q.designs, "std", true) : mkText(st, items) });
       const fname = `${name.replace(/[^A-Za-z0-9 .\-]/g, "").trim().slice(0, 40) || "Quote"} ${design ? "Estimate" : { gh: "VSGH", ij: "VSIJ", lgd: "LGD" }[Q.option]}.pdf`, // owner 14/10: file named e.g. "Krishna VSGH.pdf"
         text = `Dear ${name}, thank you for your interest in Vaishnavi Jewels. Please find your ${design ? "estimate" : "quotation"} ${j.qno} attached. Our team will call you shortly.`;
       if (changed) $("qtotal").textContent = fmt(j.total);
