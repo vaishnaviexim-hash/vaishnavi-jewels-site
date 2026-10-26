@@ -1,6 +1,7 @@
 ---
 import InfoPage from '../layouts/InfoPage.astro';
 import { business as b } from '../data/business.js';
+import autoFaqs from '../data/faq-auto.json';
 
 // Answer-first FAQ: the first sentence of every answer is the direct answer,
 // so search engines and AI assistants can quote it as-is.
@@ -81,6 +82,10 @@ groups.push({
     ["What should I get in writing about exchange and buyback when I buy diamond jewellery?", "Ask for an itemised invoice that lists the gold weight and karat, the diamond details and the report numbers, and ask the jeweller to explain their exchange and buyback terms clearly before you pay. We explain our exchange and buyback policy for your specific piece; buyback and exchange are done against the original bill / challan along with the piece's certificate, so please keep both safe. Jewellery bought under a scheme is not eligible for buyback. Cash buyback is available for up to 10 years from the bill date. Call or WhatsApp +91 99980 43886 for the details."],
   ],
 });
+
+// C-20261026-QSUPERVISOR: answers to every new customer question from the weekly research (Questions tab), added each Monday
+const autoList = (Array.isArray(autoFaqs) ? autoFaqs : []).filter((x) => x && x.q && x.a).map((x) => [String(x.q), String(x.a)]);
+if (autoList.length) groups.push({ title: 'More questions customers ask', faqs: autoList });
 
 const all = groups.flatMap((g) => g.faqs);
 const faqSchema = {
