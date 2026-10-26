@@ -327,7 +327,7 @@ async function runImport(){
 }
 function applyRole(){
   const r=S.role||"staff";
-  const hide=r==="admin"?[]:r==="staff"?["rates"]:["new","list","find","rates"];
+  const hide=r==="admin"?[]:r==="staff"?["rates"]:r==="tagger"?["list","find","rates"]:["new","list","find","rates"]; /* tagger (Shyam, owner 26/10 18:07): New tag, Tag, Saved bills only */
   if(String(S.me||"").toLowerCase()!=="vaishnaviexim@gmail.com"&&!hide.includes("list"))hide.push("list"); /* owner 26/10/2026 17:48: Tagged pieces only for Abhinav (vaishnaviexim) */
   hide.forEach(k=>{const b=document.querySelector('nav button[data-tab="'+k+'"]');if(b)b.hidden=true});
   if(r==="sales")showTab("check");
