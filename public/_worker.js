@@ -941,6 +941,14 @@ async function vjContactPush(env, ctx, c) {
     if (ctx && ctx.waitUntil) ctx.waitUntil(p); else await p;
   } catch (e) {}
 }
+async function vjSummaryHook(url, env) { // C-20261026-TAGSUMMARY: one-time hand-out of the daily tags summary (counts and totals only)
+  const t = String(url.searchParams.get('t') || ''); if (!/^[a-f0-9]{32}$/.test(t)) return reply('not found', 404);
+  await vjMetaT(env);
+  const r = await env.DB.prepare('SELECT v FROM vj_meta WHERE k = ?').bind('summary:' + t).first(); if (!r) return reply('gone', 410);
+  const del = await env.DB.prepare('DELETE FROM vj_meta WHERE k = ? AND v = ?').bind('summary:' + t, r.v).run(); if (!del.meta || del.meta.changes !== 1) return reply('gone', 410);
+  const s = JSON.parse(r.v); if (Date.now() - s.at > 3600e3) return reply('gone', 410);
+  return vjJson({ text: s.text, date: s.date });
+}
 async function vjContactHook(url, env) {
   const t = String(url.searchParams.get('t') || ''); if (!/^[a-f0-9]{32}$/.test(t)) return reply('not found', 404);
   await vjMetaT(env);
@@ -1606,6 +1614,40 @@ async function vjDailyReport(env) {
   if (!claim.meta || claim.meta.changes !== 1) return reply('already done today', 200);
   const post = body => fetch(env.VJ_QUOTE_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(20000), body: JSON.stringify(body) });
   let sentText = false;
+  // owner 26/10/2026 20:20 (C-20261026-TAGSUMMARY): only a SHORT summary, no details and no Excel - new tags made (order tags not
+  // counted: they are billed straight away), old tags edited, tags deleted, bills and estimates made with their amounts. It no longer
+  // goes to Abhinav's WhatsApp in the evening: Make 8190722 keeps it in the Daily_Reports tab and the 07:35 morning report/PDF shows it.
+  try {
+    const audit = ((await env.DB.prepare("SELECT ts, email, action, path FROM audit WHERE path LIKE 'tags/%' AND action IN ('create', 'update', 'set', 'delete') AND ts >= ? ORDER BY ts").bind(dayStart).all()).results) || [];
+    const delRows = ((await env.DB.prepare("SELECT path, data FROM vj_deleted WHERE ts >= ?").bind(dayStart).all()).results) || [];
+    const all = ((await env.DB.prepare("SELECT path, data FROM docs WHERE path LIKE 'tags/%'").all()).results) || [];
+    const byPath = new Map(all.map(r => { let d = {}; try { d = JSON.parse(r.data); } catch (e) {} return [r.path, d]; }));
+    const delMap = new Map(delRows.map(r => { let d = {}; try { d = JSON.parse(r.data); } catch (e) {} return [r.path, d]; }));
+    const isOrder = p => { const t = byPath.get(p) || delMap.get(p) || {}; return t.kind === 'order'; };
+    const created = new Set(), edited = new Set(), gone = new Set();
+    for (const a of audit) { if (isOrder(a.path)) continue; if (a.action === 'create') created.add(a.path); else if (a.action === 'delete') gone.add(a.path); else edited.add(a.path); }
+    for (const p of created) edited.delete(p);
+    for (const p of gone) edited.delete(p);
+    let samples = 0; for (const p of created) if ((byPath.get(p) || delMap.get(p) || {}).kind === 'sample') samples++;
+    if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
+    const bills = ((((await env.DB.prepare('SELECT data FROM vj_bills WHERE ts >= ?').bind(dayStart).all()).results) || []).map(r => { try { return JSON.parse(r.data); } catch (e) { return null; } })).filter(b => b && !b.cancelled);
+    const sum = arr => arr.reduce((s, b) => s + (Number(b.total) || 0), 0), fineSum = arr => arr.reduce((s, b) => s + (Number(b.fine) || 0), 0);
+    const inr = n => 'Rs ' + Math.round(n).toLocaleString('en-IN');
+    const B = bills.filter(b => b.title !== 'Estimate'), E = bills.filter(b => b.title === 'Estimate');
+    const fg = arr => fineSum(arr) > 0 ? ' + fine gold ' + fineSum(arr).toFixed(3) + ' g' : '';
+    const day = ist.toUTCString().slice(0, 11);
+    const text = `VJ Tags - daily report, ${day} (summary)\nNew tags made: ${created.size}${samples ? ' (samples ' + samples + ')' : ''} (order tags not counted)\nOld tags edited: ${edited.size}\nTags deleted: ${gone.size}\nBills made: ${B.length}${B.length ? ', total ' + inr(sum(B)) + fg(B) : ''}\nEstimates made: ${E.length}${E.length ? ', total ' + inr(sum(E)) : ''}`;
+    // only a random one-time token leaves the worker; Make 8190722 (hook 3981296) fetches the summary once from /hooks/vj-summary
+    const token = [...crypto.getRandomValues(new Uint8Array(16))].map(x => x.toString(16).padStart(2, '0')).join('');
+    await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('summary:' + token, JSON.stringify({ text, date: ymd, at: Date.now() })).run();
+    const r = await fetch('https://hook.eu1.make.com/84wle1719458c6yrefvpv79x9oiqqu4b', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(20000), body: JSON.stringify({ token }) });
+    if (!r.ok) throw new Error('hook ' + r.status);
+    return reply('sent summary', 200);
+  } catch (e) {
+    await env.DB.prepare('DELETE FROM vj_meta WHERE k = ?').bind(key).run(); // let a later bell try again
+    return reply('failed', 502);
+  }
+  // eslint-disable-next-line no-unreachable -- old detailed report (text + Excel), kept unused since 26/10/2026 (owner wants only the summary)
   try {
     const audit = ((await env.DB.prepare("SELECT ts, email, action, path, detail FROM audit WHERE path LIKE 'tags/%' AND action IN ('create', 'update', 'set', 'delete') AND ts >= ? ORDER BY ts").bind(dayStart).all()).results) || [];
     const changes = ((await env.DB.prepare("SELECT ts, email, path, field, old, new FROM vj_changes WHERE ts >= ? ORDER BY ts").bind(dayStart).all()).results) || [];
@@ -1783,6 +1825,7 @@ export default {
     const url = new URL(request.url);
     const p = url.pathname;
     if (p === '/tags' || p === '/tags.html' || p.startsWith('/tags/') || p.startsWith('/api/vj/') || p.startsWith('/_blob/')) return vjHandle(request, env, ctx, url);
+    if (p === '/hooks/vj-summary') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjSummaryHook(url, env) : reply('Method not allowed', 405); // C-20261026-TAGSUMMARY
     if (p === '/hooks/vj-contact') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjContactHook(url, env) : reply('Method not allowed', 405); // C-20261026-CONTACTS
     if (p === '/hooks/vj-billpdf' || p === '/hooks/vj-billpdf-done') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjBillPdfHook(url, env, p.endsWith('-done')) : reply('Method not allowed', 405); // C-20261017-BILLWA
     if (p === '/hooks/vj-daily') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjDailyReport(env) : reply('Method not allowed', 405);
