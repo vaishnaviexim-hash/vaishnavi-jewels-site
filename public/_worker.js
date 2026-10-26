@@ -517,7 +517,7 @@ const VJ_Q_OPT = { 'Natural VS GH': 'gh', 'Natural VS IJ': 'ij', 'Lab-grown': 'l
 const VJ_Q_NONDIA = /POL|EMR|MOZ|RUBY|PEARL|MOTI|STONE|KUNDAN/i;
 const VJ_Q_KARATS = ['14K', '18K', '22K', '9K', '24K'], VJ_Q_QUALS = ['CVD', 'VS IJ', 'VS HI', 'VS GH', 'VVS EF'], VJ_Q_SHAPES = ['Round', 'Choki', 'Fancy', 'Solitaire', 'Polki'];
 const VJ_DEF_RATES = { 'CVD|Round': 23000, 'CVD|Choki': 23000, 'CVD|Fancy': 23000, 'CVD|Solitaire': 23000, 'VS GH|Round': 46000, 'VS GH|Choki': 46000, 'VS GH|Fancy': 85000, 'VS HI|Round': 40000, 'VS HI|Choki': 40000, 'VS IJ|Round': 35000, 'VS IJ|Choki': 35000 };
-const vjQSt = s => ({ g: Number(s.gold24g) || 0, pur: Object.assign({ '24K': 1, '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.40 }, s.purity || {}),
+const vjQSt = s => ({ g: Number(s.gold24g) || 0, pur: Object.assign({ '24K': 1, '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.385 }, s.purity || {}),
   mk: Object.assign({ base: 650, small: 750, limit: 5, pct: 10, min: 1000 }, s.making || {}), gst: s.gst == null ? 3 : Number(s.gst), rates: s.defaultRates && typeof s.defaultRates === 'object' ? s.defaultRates : VJ_DEF_RATES });
 const vjQUp = (n, s) => Math.ceil(Math.round(n * 100) / 100 / s) * s;
 function vjQPrice(gold, dv, extra, st, mk) { // final price incl. GST, or 0 when it cannot be worked out
@@ -609,7 +609,7 @@ async function vjQuote(request, env, who, ctx) {
 // rupee amount, never more than it. Rupee total less discount, rounded UP to Rs 1,000; GST to the nearest rupee.
 const VJ_FINE = { g2g: { '9K': 0.4235, '14K': 0.66, '18K': 0.836, '22K': 1.06, '24K': 1 }, item: { '9K': 0.54, '14K': 0.74, '18K': 0.90, '22K': 1.06, '24K': 1 } };
 function vjBillCalc(tags, o) {
-  const pur = Object.assign({ '24K': 1, '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.40 }, o.purity || {});
+  const pur = Object.assign({ '24K': 1, '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.385 }, o.purity || {}); // 9K = 38.5 tunch (owner 26/10 19:00)
   const m = Object.assign({ base: 650, small: 750, limit: 5, pct: 10, min: 1000 }, o.making || {}), F = Number(o.F) || 0;
   const mode = ['ws', 'nett', 'g2g', 'item'].includes(o.mode) ? o.mode : 'ws', fineMode = mode === 'g2g' || mode === 'item';
   const settle = fineMode ? (o.settle === 'amount' ? 'amount' : 'fine') : '';
@@ -1537,7 +1537,7 @@ async function vjOrdersReport(env, who) {
   const ph = ['Tag', 'Design no.', 'Category', 'Gold', 'Diamonds', 'Price when tagged (Rs)', 'Photo', 'Printed', 'Made by', 'Tagged on', 'Remark'];
   // amount = the tag's price at the order's own gold rate (rate on the day it was tagged), same rule as Price check (owner 16/10: 'a column of Amount also')
   const sRow = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first(), S0 = sRow ? JSON.parse(sRow.data) : {};
-  const up = (n, s) => Math.ceil(Math.round(n * 100) / 100 / s) * s, pur = Object.assign({ '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.40 }, S0.purity || {});
+  const up = (n, s) => Math.ceil(Math.round(n * 100) / 100 / s) * s, pur = Object.assign({ '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.385 }, S0.purity || {});
   const mkS = Object.assign({ base: 650, small: 750, limit: 5, pct: 10, min: 1000 }, S0.making || {}), gstP = S0.gst == null ? 3 : Number(S0.gst), r24 = Number(S0.gold24g) || 0;
   const priceToday = t => { const r24o = Number(t.gold24gAtTag) || r24; if (!r24o) return 0; /* the order's own rate (C-20261016-ORDERRATE) */ const gl = (Array.isArray(t.gold) ? t.gold : []).filter(g => g && g.net > 0), dias = Array.isArray(t.dias) ? t.dias.filter(Boolean) : [];
     const dia = dias.reduce((a, d) => a + (Number(d.ct) || 0) * (Number(d.rate) || 0), 0) + (t.polki && Number(t.polki.pcs) > 0 ? Number(t.polki.pcs) * (Number(t.polki.rate) || 0) : 0) /* polki, C-20261017-POLKI */, oth = Number(t.other && t.other.amt) || 0;
