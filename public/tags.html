@@ -305,7 +305,7 @@ const KARATS=["22K","18K","14K","9K"],KNUM={"22K":"22","18K":"18","14K":"14","9K
 const SHAPES=["Round","Choki","Fancy","Solitaire","Polki"], /* owner 21/10/2026: Polki stones = a diamond line priced per ct (own rate); the per-piece box below is the Polki SETTING charge */QUALS=["CVD","VS GH","VVS EF","VS HI","VS IJ","Party diamond","Other"]; /* owner 26/10/2026 18:26: Party diamond (customer's own) = a quality in the list, setting Rs 3,000/ct by default, rate box editable (C-20261026-PARTYDIA) */
 const DEF_RATES={"CVD|Round":23000,"CVD|Choki":23000,"CVD|Fancy":23000,"CVD|Solitaire":23000,"VS GH|Round":46000,"VS GH|Choki":46000,"VS GH|Fancy":85000,"VS HI|Round":40000,"VS HI|Choki":40000,"VS IJ|Round":35000,"VS IJ|Choki":35000};
 function defRate(shape,q){if(q==="Party diamond")return 3000;const r=(S.settings&&S.settings.defaultRates)||DEF_RATES;const v=r[q+"|"+shape];return typeof v==="number"&&v>0?v:null}
-const DEF={gold24g:null,goldAt:null,purity:{"22K":0.92,"18K":0.76,"14K":0.60,"9K":0.40},making:{base:650,small:750,limit:5,pct:10},gst:3,tag:{w:100,h:15,printW:70}};
+const DEF={gold24g:null,goldAt:null,purity:{"22K":0.92,"18K":0.76,"14K":0.60,"9K":0.385} /* 9K = 38.5 tunch (owner 26/10 19:00) */,making:{base:650,small:750,limit:5,pct:10},gst:3,tag:{w:100,h:15,printW:70}};
 const S={sel:new Set(),subs:{},parts:{},db:null,user:null,assets:null,dl:null,me:null,owner:false,canWrite:null,settings:null,counters:{},tags:[],photo:null,busy:false};
 const fmt=n=>"₹"+Math.round(n).toLocaleString("en-IN");
 const num=v=>{const x=parseFloat(v);return isFinite(x)?x:0};
