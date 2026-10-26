@@ -109,7 +109,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
 
   <nav role="tablist">
     <button role="tab" id="t-new" aria-selected="true" data-tab="new">New tag</button>
-    <button role="tab" id="t-check" aria-selected="false" data-tab="check">Price check</button>
+    <button role="tab" id="t-check" aria-selected="false" data-tab="check">Tag</button>
     <button role="tab" id="t-list" aria-selected="false" data-tab="list">Tagged pieces</button>
     <button role="tab" id="t-find" aria-selected="false" data-tab="find">Find lost tag</button>
     <button role="tab" id="t-rates" aria-selected="false" data-tab="rates">Gold rate &amp; settings</button>
@@ -328,7 +328,7 @@ async function runImport(){
 function applyRole(){
   const r=S.role||"staff";
   const hide=r==="admin"?[]:r==="staff"?["rates"]:["new","list","find","rates"];
-  if(String(S.me||"").toLowerCase()==="vaishnavioffice@gmail.com"&&!hide.includes("list"))hide.push("list"); /* owner 26/10/2026 17:46: no Tagged pieces tab for the Vaishnavi office login */
+  if(String(S.me||"").toLowerCase()!=="vaishnaviexim@gmail.com"&&!hide.includes("list"))hide.push("list"); /* owner 26/10/2026 17:48: Tagged pieces only for Abhinav (vaishnaviexim) */
   hide.forEach(k=>{const b=document.querySelector('nav button[data-tab="'+k+'"]');if(b)b.hidden=true});
   if(r==="sales")showTab("check");
   if(r==="admin"){$("importCard").hidden=false;$("impFile").addEventListener("change",()=>{$("impGo").disabled=!($("impFile").files&&$("impFile").files[0])});$("impGo").addEventListener("click",runImport)}
