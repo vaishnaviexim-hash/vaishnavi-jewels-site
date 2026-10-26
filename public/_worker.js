@@ -981,7 +981,7 @@ async function vjBillBook(url, env, who, mobQ) { // a sales login sees only the 
   const subT = bills.reduce((a, b) => a + (Number(b.sub) || 0), 0);
   if (short.length) short.push(['', '', '', 'TOTAL (' + short.length + ')', '', '', '', subT, tot[2], tot[3], Math.round(tot[4] * 1000) / 1000 || '']);
   const xlsx = vjXlsx([
-    { name: 'Summary (print)', land: true, head: ['Date', 'Number', 'Type', 'Customer', 'Design no. - Item', 'Mobile', 'City', 'Amount before GST (Rs)', 'GST (Rs)', 'Total amount (Rs)', 'Fine gold (g)'], rows: short, widths: [11, 12, 8, 20, 26, 16, 12, 14, 10, 14, 10], wrap: [3, 4], mark: r => String(r[3]).startsWith('TOTAL') },
+    { name: 'Summary (print)', land: true, head: ['Date', 'Number', 'Type', 'Customer', 'Design no. - Item', 'Mobile', 'City', 'Amount before GST (Rs)', 'GST (Rs)', 'Total amount (Rs)', 'Fine gold to receive (g)'], rows: short, widths: [11, 12, 8, 20, 26, 16, 12, 14, 10, 14, 10], wrap: [3, 4], mark: r => String(r[3]).startsWith('TOTAL') },
     { name: 'Bills and estimates', head, rows, widths: [11, 12, 9, 26, 22, 15, 12, 20, 10, 34, 12, 11, 12, 12, 10, 13, 12, 12], wrap: [3, 9], mark: r => String(r[3]).startsWith('CANCELLED') || String(r[4]).startsWith('TOTAL') },
     { name: 'Pieces', mark: r => r[3] === 'CANCELLED', head: ['Date', 'Number', 'Type', 'Status', 'Customer', 'Tag', 'Design no.', 'Category', 'Gold', 'Fine gold (g)', 'Gold value', 'Making', 'Diamonds (ct)', 'Diamond value', 'Polki (pcs)', 'Polki amount', 'Other', 'Amount', 'Discount', 'Net'], rows: pieces,
       widths: [11, 12, 9, 11, 22, 14, 12, 14, 20, 10, 12, 10, 10, 12, 9, 12, 9, 12, 10, 12] }]);
