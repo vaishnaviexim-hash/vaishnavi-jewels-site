@@ -328,6 +328,7 @@ async function runImport(){
 function applyRole(){
   const r=S.role||"staff";
   const hide=r==="admin"?[]:r==="staff"?["rates"]:["new","list","find","rates"];
+  if(String(S.me||"").toLowerCase()==="vaishnavioffice@gmail.com"&&!hide.includes("list"))hide.push("list"); /* owner 26/10/2026 17:46: no Tagged pieces tab for the Vaishnavi office login */
   hide.forEach(k=>{const b=document.querySelector('nav button[data-tab="'+k+'"]');if(b)b.hidden=true});
   if(r==="sales")showTab("check");
   if(r==="admin"){$("importCard").hidden=false;$("impFile").addEventListener("change",()=>{$("impGo").disabled=!($("impFile").files&&$("impFile").files[0])});$("impGo").addEventListener("click",runImport)}
