@@ -95,9 +95,12 @@
     const nav = document.querySelector("nav"); if (!nav || $("t-bill")) return;
     const b = document.createElement("button"); b.setAttribute("role", "tab"); b.id = "t-bill"; b.dataset.tab = "bill"; b.textContent = "Bill"; b.setAttribute("aria-selected", "false"); b.textContent = "Saved bills"; // owner 26/10/2026: new bills start from Price check > Bill now; this tab shows the saved bills (17:43 'where did my bills go?')
     const nt = nav.querySelector('[data-tab="new"]'); nav.insertBefore(b, nt ? nt.nextSibling : nav.querySelector('[data-tab="rates"]')); // owner 16/10: New tag, Bill, then the rest
+    // owner 26/10/2026 17:48: menu order New tag, Tag, Tagged pieces, Find lost tag, Saved bills, (Ledger), Quote, Gold rate & settings
+    const order = () => { const n = document.querySelector("nav"); if (!n) return; ["new", "check", "list", "find", "bill", "ledger", "quote", "rates"].forEach(k => { const x = n.querySelector('[data-tab="' + k + '"]'); if (x) n.appendChild(x); }); };
+    order(); setTimeout(order, 1500); setTimeout(order, 5000);
     const sec = document.createElement("section"); sec.id = "p-bill"; sec.className = "card"; sec.hidden = true;
     sec.innerHTML = `
-      <div class="actions" style="margin:0 0 8px"><button type="button" class="btn ghost" id="bback">&larr; Back to Price check</button></div>
+      <div class="actions" style="margin:0 0 8px"><button type="button" class="btn ghost" id="bback">&larr; Back to Tag</button></div>
       <h2>1 · Pieces</h2>
       <div class="row" style="align-items:end"><label style="flex:2 1 220px">Code on the tag, tag number or design number <input id="bq" autocomplete="off" placeholder="e.g. abc270xyz, 803 or 1436"></label>
       <div><button type="button" class="btn" id="badd">Add piece</button></div></div>
