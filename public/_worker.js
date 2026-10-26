@@ -915,15 +915,17 @@ async function vjBillSendStatus(url, env) {
 }
 // Make side (outside Cloudflare Access): one-time hand-out of the number + PDF, then the result
 // C-20261026-CONTACTS (owner 26/10 19:02): every customer made in VJ Tags goes to the main contacts DB (VJ_Contacts_DB) - Bill / order =
-// Customer, Estimate = Visitor; matched by phone only, the bill name is final. Core (Make 7947805) collects it with a one-time token.
+// Customer, Estimate = Visitor; matched by phone only, the bill name is final. Make 8188589 collects it with a one-time token.
 async function vjContactPush(env, ctx, c) {
   try {
     const d = String(c && c.mobile || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, ''), name = String(c && c.name || '').trim().replace(/\s*ji$/i, '').slice(0, 60);
-    if (!/^[6-9]\d{9}$/.test(d) || !name || !env.VJ_QUOTE_HOOK || !/^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_QUOTE_HOOK)) return;
+    if (!/^[6-9]\d{9}$/.test(d) || !name) return;
     await vjMetaT(env);
     const token = [...crypto.getRandomValues(new Uint8Array(16))].map(x => x.toString(16).padStart(2, '0')).join('');
     await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('contact:' + token, JSON.stringify({ name, phone: '91' + d, city: vjClean(c.city, 40), type: c.type === 'Visitor' ? 'Visitor' : 'Customer', src: vjClean(c.src, 60), at: Date.now() })).run();
-    const p = fetch(env.VJ_QUOTE_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000), body: JSON.stringify({ kind: 'vj-contact', token }) }).catch(() => {});
+    // Make scenario 8188589 (hook 3980538). Only the random token is sent; the scenario fetches the contact once from /hooks/vj-contact, so a stranger
+    // posting to this hook gets nothing and can add nothing.
+    const p = fetch('https://hook.eu1.make.com/fm6vpfid6yh8ist1jrl7e2n39tsno1nl', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000), body: JSON.stringify({ token }) }).catch(() => {});
     if (ctx && ctx.waitUntil) ctx.waitUntil(p); else await p;
   } catch (e) {}
 }
