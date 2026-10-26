@@ -454,7 +454,7 @@ function kind(){return document.querySelector('input[name=kind]:checked').value}
 function readForm(){
   const k=kind(),cat=CATS.find(c=>c.id===$("cat").value)||CATS[0];
   const gold=[...$("goldLines").children].map(r=>{const i=r.dataset.id,g={k:$("gk"+i).value,net:num($("gn"+i).value)},tv=$("gt"+i).value.trim();if(g.k==="Chain"&&tv!=="")g.tunch=Math.round(num(tv)*1000)/1000;return g}); /* owner 17/10/2026 (C-20261017-CHAINTUNCH): a gold line with a tunch is a chain line */
-  const dias=[...$("diaLines").children].map(r=>{const i=r.dataset.id;const qq=$("dq"+i).value==="Other"?($("dqo"+i).value.trim().toUpperCase()||"OTHER?"):$("dq"+i).value;const sp=num($("dr"+i).value),sh=$("ds"+i).value,def=defRate(sh,qq);return {shape:sh,q:qq,ct:num($("dc"+i).value),pcs:Math.round(num($("dp"+i).value)),rate:sp>0?sp:(def||0),special:sp>0}}).filter(d=>d.ct>0||d.pcs>0||d.special);
+  const dias=[...$("diaLines").children].map(r=>{const i=r.dataset.id;const qq=$("dq"+i).value==="Other"?($("dqo"+i).value.trim().toUpperCase()||"OTHER?"):$("dq"+i).value;const sp=num($("dr"+i).value),sh=$("ds"+i).value,def=defRate(sh,qq),z=qq==="Party diamond"&&$("dr"+i).value.trim()!==""&&sp===0; /* owner 26/10 18:38: Party diamond with 0 typed = no setting charge */return {shape:sh,q:qq,ct:num($("dc"+i).value),pcs:Math.round(num($("dp"+i).value)),rate:z?0:(sp>0?sp:(def||0)),special:sp>0||z}}).filter(d=>d.ct>0||d.pcs>0||d.special);
   const g1=gold.find(g=>g.net>0&&g.k!=="Chain")||gold.find(g=>g.k!=="Chain"),gc=gold.find(g=>g.k==="Chain"&&g.tunch>0),tk=x=>x>=0.88?"22K":x>=0.7?"18K":x>=0.5?"14K":"9K";
   const mainK=g1?g1.k:gc?tk(gc.tunch):"14K"; /* a chain-only piece takes its karat from the tunch */
   const prefix=k==="sample"?cat.s:cat.code+KNUM[mainK];
@@ -504,7 +504,7 @@ function problems(t){
   if(t.cat==="CH"&&t.kind!=="sample"&&t.gold.some(g=>g.net>0&&g.tunch===undefined))p.push("Chain: choose Karat 'Chain' and type the tunch on each gold line (e.g. 0.920). No making on a chain.");
   if(t.gold.some(g=>g.k==="Chain"&&g.net>0&&g.tunch===undefined))p.push("Karat Chain: type the tunch (e.g. 0.920).");
   if(t.kind==="sample"&&!t.karigar)p.push("Choose the karigar for this sample (MN, BD, HR or RK).");
-  t.dias.forEach((d,i)=>{if(d.q==="OTHER?")p.push(`Diamond line ${i+1}: type the quality.`);if(!(d.ct>0))p.push(`Diamond line ${i+1}: enter the carat weight.`);if(t.kind!=="sample"&&!(d.rate>0))p.push(`Diamond line ${i+1}: no default rate for ${d.shape} ${d.q}. Enter the special rate.`)});
+  t.dias.forEach((d,i)=>{if(d.q==="OTHER?")p.push(`Diamond line ${i+1}: type the quality.`);if(!(d.ct>0))p.push(`Diamond line ${i+1}: enter the carat weight.`);if(t.kind!=="sample"&&!(d.rate>0)&&d.q!=="Party diamond")p.push(`Diamond line ${i+1}: no default rate for ${d.shape} ${d.q}. Enter the special rate.`)});
   if(t.polki&&!(Number.isInteger(t.polki.pcs)&&t.polki.pcs<=10000))p.push("Polki: pieces must be a whole number up to 10,000.");
   if(t.polki&&!(Number.isInteger(t.polki.rate)&&t.polki.rate>=1&&t.polki.rate<=100000))p.push("Polki: rate per piece must be a whole number from ₹1 to ₹1,00,000.");
   if(t.pdia&&!(t.pdia.ct>0&&t.pdia.ct<=1000))p.push("Party diamond: carats from 0.01 to 1,000.");
@@ -606,9 +606,9 @@ function update(){
     const ch=k==="Chain",tb=$("gt"+i);if(!ch&&tb.value!=="")tb.value="";tb.parentNode.style.visibility=ch?"visible":"hidden";tb.placeholder="e.g. 0.920";
     const tv=tb.value.trim(),tn=num(tv);
     $("gv"+i).textContent=s.gold24g&&net>0&&(!ch||tn>=0.3&&tn<=1.1)?fmt(net*s.gold24g*(ch?tn:(s.purity[k]||0)))+(ch?" · chain":""):""});
-  [...$("diaLines").children].forEach(r=>{const i=r.dataset.id,qq=$("dq"+i).value==="Other"?$("dqo"+i).value.trim().toUpperCase():$("dq"+i).value,def=defRate($("ds"+i).value,qq),sp=num($("dr"+i).value),rate=sp>0?sp:def,ct=num($("dc"+i).value);
+  [...$("diaLines").children].forEach(r=>{const i=r.dataset.id,qq=$("dq"+i).value==="Other"?$("dqo"+i).value.trim().toUpperCase():$("dq"+i).value,def=defRate($("ds"+i).value,qq),sp=num($("dr"+i).value),z=qq==="Party diamond"&&$("dr"+i).value.trim()!==""&&sp===0,rate=z?0:sp>0?sp:def,ct=num($("dc"+i).value);
     $("dr"+i).placeholder=def?"default "+def.toLocaleString("en-IN"):"enter rate";
-    $("dv"+i).textContent=(rate&&ct>0?fmt(ct*rate):"")+(sp>0?" · special":(def&&ct>0?" · default":""));});
+    $("dv"+i).textContent=z&&ct>0?"₹0 · no charge":(rate&&ct>0?fmt(ct*rate):"")+(sp>0?" · special":(def&&ct>0?" · default":""));});
   $("pdVal").textContent=t.pdia?`${t.pdia.ct} ct × ${fmt(t.pdia.rate)} = ${fmt(Math.round(t.pdia.ct*t.pdia.rate))}`:"";$("certNoBox").hidden=$("remark").value==="TGL";
   $("polkiPcs").value=t.polki?t.polki.pcs:"";$("polkiVal").textContent=t.polki?`${t.polki.pcs} × ${fmt(t.polki.rate)} = ${fmt(t.polki.pcs*t.polki.rate)}`:"";
   t.no=nextNo(t.prefix);t.label=t.prefix+"/"+t.no;t.code="";$("karBox").hidden=t.kind!=="sample";
