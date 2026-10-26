@@ -172,10 +172,10 @@
   async function loadBook() {
     const body = $("bbook"), m = $("bbookmsg"); if (!body) return; const mo = $("bmonth").value || today().slice(0, 7); const fq = String(($("bfmob") || {}).value || "").replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""); const byMob = fq.length >= 4;
     try { const r = await fetch("/api/vj/bills?month=" + encodeURIComponent(byMob ? "all" : mo), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); if (byMob) j.bills = j.bills.filter(b => String(b.mobile || "").replace(/\D/g, "").includes(fq)); { const pb = byMob ? j.bills.find(b => !b.cancelled) : null; B.party = pb ? { name: pb.name, city: pb.city, mobile: pb.mobile } : null; $("bxwa").hidden = !pb; $("bxl").textContent = pb ? "Download party bills (Excel)" : "Download summary (Excel)"; $("bxlall").hidden = !!pb; }
-      body.textContent = ""; let tot = 0;
+      body.textContent = ""; let tot = 0, ft = 0; // ft: fine gold to receive (Gold to Gold / Gold Item bills) - kept apart from the rupees (owner 26/10 18:54)
       let nc = 0;
       // owner 16/10: a cancelled bill's line leaves the screen for everyone (still kept, still in the Excel) (C-20261016-HIDECANCELLED, C-20261016-NOSHOWCANCELLED)
-      j.bills.slice().reverse().forEach(b => { if (b.cancelled) { nc++; return; } else tot += b.total || 0; const tr = document.createElement("tr"); const td = (x, cl) => { const e = document.createElement("td"); if (cl) e.className = cl; e.textContent = x; tr.appendChild(e); return e; };
+      j.bills.slice().reverse().forEach(b => { if (b.cancelled) { nc++; return; } else { tot += b.total || 0; ft += Number(b.fine) || 0; } const tr = document.createElement("tr"); const td = (x, cl) => { const e = document.createElement("td"); if (cl) e.className = cl; e.textContent = x; tr.appendChild(e); return e; };
         td(dmy(b.date)); td(b.no); const ty = td(b.title); if (b.cancelled) { const s = document.createElement("div"); s.style.cssText = "color:#a12b2b;font-weight:600"; s.textContent = "CANCELLED"; const r = document.createElement("div"); r.className = "hint"; r.textContent = b.cancelled; ty.append(s, r); tr.style.opacity = "0.75"; }
         td(b.name + (b.city ? ", " + b.city : "")); { const tt = td(fmt(b.total), "num"); if (b.received != null) tt.appendChild(Object.assign(document.createElement("div"), { className: "hint", textContent: b.settled ? "Settled" : "Paid " + fmt(b.received) + " · Bal " + fmt(b.balance) })); } /* C-20261017-LEDGER */ td(b.fine ? g3(b.fine) : "—", "num"); td(b.by || "");
         const x = document.createElement("td"); x.style.whiteSpace = "nowrap"; const o = document.createElement("button"); o.type = "button"; o.className = "btn ghost"; o.textContent = "PDF"; o.addEventListener("click", () => reprint(b.no, o)); x.appendChild(o);
@@ -187,7 +187,7 @@
         tr.appendChild(x); body.appendChild(tr); });
       m.textContent = j.bills.length ? `${j.bills.length} in this month${nc ? " (" + nc + " cancelled)" : ""}, total ${fmt(tot)}${nc ? " without the cancelled ones" : ""}.` : "Nothing saved in this month.";
       const live = j.bills.length - nc; // C-20261016-HIDECANCELLED
-      m.textContent = byMob ? (live ? live + " bill" + (live === 1 ? "" : "s") + " for mobile " + fq + " (all months), total " + fmt(tot) + "." : "No bills for mobile " + fq + ".") : (live ? live + " in this month, total " + fmt(tot) + "." : "Nothing saved in this month.") + (nc ? " " + nc + " cancelled " + (nc === 1 ? "bill" : "bills") + " hidden (kept in the Excel, marked CANCELLED)." : "");
+      m.textContent = byMob ? (live ? live + " bill" + (live === 1 ? "" : "s") + " for mobile " + fq + " (all months): amount " + fmt(tot) + (ft ? " + fine gold " + g3(ft) : "") + "." : "No bills for mobile " + fq + ".") : (live ? live + " in this month: amount " + fmt(tot) + (ft ? " + fine gold " + g3(ft) : "") + "." : "Nothing saved in this month.") + (nc ? " " + nc + " cancelled " + (nc === 1 ? "bill" : "bills") + " hidden (kept in the Excel, marked CANCELLED)." : "");
     } catch (e) { m.textContent = "Could not load the saved bills (" + (e.message || e) + ")."; }
   }
   // owners only (C-20261016-BILL3WAY): 1 erase everything, 2 cancel the bill only (pieces stay - orders stay orders), 3 cancel and move order pieces to stock
