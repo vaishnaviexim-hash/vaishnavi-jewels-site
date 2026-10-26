@@ -334,13 +334,13 @@
   function add(t) { if (!B.items.includes(t.id)) B.items.push(t.id); $("bq").value = ""; $("bpick").textContent = ""; fillCustomer(t); render(); $("bq").focus(); }
   // an Order piece brings its customer: only empty boxes are filled; a different customer is flagged, never overwritten
   function fillCustomer(t) { const o = t.kind === "order" && t.order, h = $("bcusthint"); if (!o || !o.name) return;
-    const same = !$("bname").value.trim() || $("bname").value.trim().toLowerCase() === String(o.name).toLowerCase();
+    const nj = v => String(v || "").trim().replace(/\s*ji$/i, "").toLowerCase(), same = !$("bname").value.trim() || nj($("bname").value) === nj(o.name);
     if (!same) { h.textContent = `Note: ${t.label} is an order for ${o.name}${o.mobile ? " (" + o.mobile + ")" : ""}, not ${$("bname").value.trim()}.`; return; }
     if (!$("bname").value.trim()) $("bname").value = o.name; if (!$("bmob").value.trim() && o.mobile) $("bmob").value = o.mobile; if (!$("bcity").value.trim() && o.city) $("bcity").value = o.city;
     h.textContent = `Filled from order ${t.label}: ${o.name}${o.mobile ? ", " + o.mobile : ""}${o.city ? ", " + o.city : ""}.`;
     // owner 26/10 18:31 (C-20261026-ORDERTAG): no mobile on the order -> take it from the saved parties when exactly one party has this name; otherwise it is typed at billing
     if (!$("bmob").value.trim()) fetch("/api/vj/parties?q=" + encodeURIComponent(o.name), { credentials: "same-origin", cache: "no-store" }).then(r => r.ok ? r.json() : null).then(j => {
-      const m = ((j && j.parties) || []).filter(p => String(p.name || "").trim().toLowerCase() === String(o.name).trim().toLowerCase() && p.mobile), mobs = [...new Set(m.map(p => p.mobile))];
+      const m = ((j && j.parties) || []).filter(p => String(p.name || "").trim().replace(/\s*ji$/i, "").toLowerCase() === String(o.name).trim().replace(/\s*ji$/i, "").toLowerCase() && p.mobile), mobs = [...new Set(m.map(p => p.mobile))];
       if (mobs.length === 1 && !$("bmob").value.trim()) { $("bmob").value = mobs[0]; if (!$("bcity").value.trim() && m[0].city) $("bcity").value = m[0].city; h.textContent += " Mobile " + mobs[0] + " taken from saved parties."; }
       else if (!$("bmob").value.trim()) h.textContent += " Type the mobile number."; }).catch(() => {}); }
   const F = () => Number(String($("bF").value).replace(/[^0-9.]/g, "")) || 0;
@@ -464,7 +464,7 @@
   }
   async function save() {
     const m = $("bmsg"), out = $("bout"); out.hidden = true;
-    const body = { no: $("bno").value.trim(), name: $("bname").value.trim(), city: $("bcity").value.trim(), mobile: $("bmob").value.trim().slice(0, 20),
+    const body = { no: $("bno").value.trim(), name: (n => n && !/ji$/i.test(n) ? n + " ji" : n)($("bname").value.trim().slice(0, 57)) /* owner 26/10 18:45: 'ji' added on the bill automatically (Prachi -> Prachi ji) */, city: $("bcity").value.trim(), mobile: $("bmob").value.trim().slice(0, 20),
       date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, title: B.title, nbb: !!B.nbb, ids: B.items.slice(), disc: Object.assign({}, B.disc), rates: JSON.parse(JSON.stringify(B.rates)), frates: Object.assign({}, B.frates), prates: Object.assign({}, B.prates), pdrates: Object.assign({}, B.pdrates), edit: B.editNo || "" };
     if (!body.name) { m.textContent = "Enter the customer's name."; return; }
     let dg = body.mobile.replace(/\D/g, ""); if (dg.length === 12 && dg.startsWith("91")) dg = dg.slice(2); // phone copy like "+91 98xxx xxxxx" is fine
