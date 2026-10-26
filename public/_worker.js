@@ -521,6 +521,17 @@ const VJ_DEF_RATES = { 'CVD|Round': 23000, 'CVD|Choki': 23000, 'CVD|Fancy': 2300
 const vjQSt = s => ({ g: Number(s.gold24g) || 0, pur: Object.assign({ '24K': 1, '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.385 }, s.purity || {}),
   mk: Object.assign({ base: 650, small: 750, limit: 5, pct: 10, min: 1000 }, s.making || {}), gst: s.gst == null ? 3 : Number(s.gst), rates: s.defaultRates && typeof s.defaultRates === 'object' ? s.defaultRates : VJ_DEF_RATES });
 const vjQUp = (n, s) => Math.ceil(Math.round(n * 100) / 100 / s) * s;
+// C-20261026-QG2G (owner 26/10 19:02): a quote can also be Gold to Gold - W/s (fine = weight x 14K 0.66 / 18K 0.836 / 22K 1.06 / 9K 0.4235, making in rupees)
+// or Nett (fine = net x karat purity, making + 10% wastage in rupees); rupees (making, diamonds, polki, other) up to Rs 100, + GST, up to Rs 100.
+const VJ_Q_G2G = { '9K': 0.4235, '14K': 0.66, '18K': 0.836, '22K': 1.06, '24K': 1 };
+function vjQPay(gold, dv, extra, st, mk, pay) {
+  if (pay !== 'g2g' && pay !== 'g2gn') return { price: vjQPrice(gold, dv, extra, st, mk), fine: 0 };
+  if (!gold.some(g => g.net > 0) || !st.g) return { price: 0, fine: 0 };
+  const nf = pay === 'g2gn', g0 = gold.find(g => g.net > 0 && !vjLineT(g)); let gv = 0, nt = 0, fine = 0;
+  gold.forEach(g => { if (g.net > 0) { const tn = vjLineT(g); if (tn) fine += g.net * tn; else { gv += g.net * st.g * (Number(st.pur[g.k]) || 0); nt += g.net; fine += g.net * (nf ? (Number(st.pur[g.k]) || 0) : (VJ_Q_G2G[g.k] || 0)); } } });
+  const mv = !g0 ? 0 : mk === 'flat' ? 1600 * nt : Math.max((g0.net > st.mk.limit ? st.mk.base : st.mk.small) * nt, Number(st.mk.min) || 0) + (nf ? gv * st.mk.pct / 100 : 0);
+  return { price: vjQUp(vjQUp(mv + dv + extra, 100) * (1 + st.gst / 100), 100), fine: Math.round(fine * 1000) / 1000 };
+}
 function vjQPrice(gold, dv, extra, st, mk) { // final price incl. GST, or 0 when it cannot be worked out
   if (!gold.some(g => g.net > 0) || !st.g) return 0;
   // chain lines (C-20261017-CHAINTUNCH): net x tunch x fine rate, no making, no wastage; making and wastage on the other lines only,
@@ -544,6 +555,7 @@ async function vjQuote(request, env, who, ctx) {
   const name = vjClean(b && b.name, 60), city = vjClean(b && b.city, 40), mobile = String(b && b.mobile || '').replace(/\D/g, '');
   const design = b && b.kind === 'design', mk = !design && b && b.mk === 'flat' ? 'flat' : 'std';
   const option = design ? 'Estimate - new design' : (VJ_Q_OPT[b && b.option] ? b.option : '');
+  const pay = ['g2g', 'g2gn'].includes(b && b.pay) ? b.pay : 'amount'; // C-20261026-QG2G
   const raw = Array.isArray(b && b.items) ? b.items : [];
   if (!name || !city || !/^(91)?[6-9]\d{9}$/.test(mobile) || !option || !raw.length) return vjDeny(400, 'name, 10-digit mobile, city, option and at least one piece are required');
   if (raw.length > (design ? 10 : 20)) return vjDeny(400, design ? 'at most 10 designs in one estimate' : 'at most 20 pieces in one quote');
@@ -565,9 +577,9 @@ async function vjQuote(request, env, who, ctx) {
         if (!q || !shape || !(ct > 0) || !(rate > 0) || isNaN(pcs)) return vjDeny(400, no + ': each diamond line needs quality, shape, ct (up to 200), a rate per ct, and whole pcs');
         dias.push({ q, pcs, shape, ct: Math.round(ct * 1000) / 1000, rate: Math.round(rate) }); }
       const dv = dias.reduce((a, d) => a + d.ct * d.rate, 0);
-      const tunch = Math.round(tn * 1000) / 1000, price = vjQPrice([{ k, net, tunch }], dv, (ppcs ? ppcs * prate : 0) + other, st, 'std');
+      const tunch = Math.round(tn * 1000) / 1000, pq = vjQPay([{ k, net, tunch }], dv, (ppcs ? ppcs * prate : 0) + other, st, 'std', pay), price = pq.price, fine = pq.fine;
       if (!price) return vjDeny(400, no + ': no price');
-      items.push({ newDesign: true, desc: vjClean(i.desc, 60) || (tunch ? 'Chain' : 'New design'), k, net: Math.round(net * 1000) / 1000, ...(tunch ? { tunch } : {}), dias, ...(ppcs ? { polki: { pcs: ppcs, rate: prate } } : {}), other, price });
+      items.push({ newDesign: true, desc: vjClean(i.desc, 60) || (tunch ? 'Chain' : 'New design'), k, net: Math.round(net * 1000) / 1000, ...(tunch ? { tunch } : {}), dias, ...(ppcs ? { polki: { pcs: ppcs, rate: prate } } : {}), other, price, fine });
     } else {
       const id = String(i.id || ''); if (!/^[A-Za-z0-9_\-.~]{1,60}$/.test(id) || items.some(x => x.id === id)) return vjDeny(400, no + ': bad piece');
       const row = await env.DB.prepare('SELECT data FROM docs WHERE path = ?').bind('tags/' + id).first(); if (!row) return vjDeny(404, 'a piece is no longer in stock: ' + id);
@@ -576,26 +588,26 @@ async function vjQuote(request, env, who, ctx) {
       const prate = px ?? (pk ? Number(pk.rate) || 300 : 0), ppcs = pk ? Number(pk.pcs) || 0 : 0;
       const gold = (t.kind === 'sample' ? [{ k: '14K', net: vjSmpNet(t) }] : (Array.isArray(t.gold) ? t.gold : [])).map(g => ({ k: String(g && g.k || ''), net: Number(g && g.net) || 0, tunch: vjLineT(g) }));
       const dv = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).reduce((a, d) => a + (Number(d.ct) || 0) * vjQOptRate(d, VJ_Q_OPT[option], st), 0);
-      const price = vjQPrice(gold, dv, ppcs * prate + (Number(t.other && t.other.amt) || 0), st, mk);
+      const pq = vjQPay(gold, dv, ppcs * prate + (Number(t.other && t.other.amt) || 0), st, mk, pay), price = pq.price, fine = pq.fine;
       if (!price) return vjDeny(400, 'a piece has no price - check its gold weight and the default diamond rates: ' + (t.label || id));
-      items.push({ id, label: vjClean(t.label, 40), design: vjClean(t.designNo, 30), ...(ppcs ? { polki: { pcs: ppcs, rate: prate } } : {}), price });
+      items.push({ id, label: vjClean(t.label, 40), design: vjClean(t.designNo, 30), ...(ppcs ? { polki: { pcs: ppcs, rate: prate } } : {}), price, fine });
     }
   }
-  const total = items.reduce((a, x) => a + x.price, 0);
+  const total = items.reduce((a, x) => a + x.price, 0), fineTotal = Math.round(items.reduce((a, x) => a + (x.fine || 0), 0) * 1000) / 1000;
   const ist = new Date(Date.now() + 5.5 * 3600e3), d = ist.toISOString().slice(2, 10).replace(/-/g, '');
   const qno = 'Q-' + d + '-' + [...crypto.getRandomValues(new Uint8Array(4))].map(x => '23456789ABCDEFGHJKMNPQRSTUVWXYZ'[x % 31]).join('');
-  const doc = { qno, kind: design ? 'design' : 'tags', name, mobile: mobile.slice(-10), city, option, mk, items, total, gold24g: st.g, by: who.email, at: new Date().toISOString() };
+  const doc = { qno, kind: design ? 'design' : 'tags', name, mobile: mobile.slice(-10), city, option, mk, pay, items, total, fineTotal, gold24g: st.g, by: who.email, at: new Date().toISOString() };
   await env.DB.prepare('INSERT INTO docs (path, data, version, updated_at, updated_by) VALUES (?, ?, 1, ?, ?)').bind('quotes/' + qno, JSON.stringify(doc), Date.now(), who.email).run();
   await vjAudit(env, who, 'quote', 'quotes/' + qno, (design ? 'estimate ' : '') + name + ' ' + doc.mobile + ' ' + total);
   if (env.VJ_QUOTE_HOOK && /^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_QUOTE_HOOK)) {
-    const inr = n => 'Rs ' + Number(n).toLocaleString('en-IN');
+    const inr = n => 'Rs ' + Number(n).toLocaleString('en-IN'), fg = n => n ? ' + fine gold ' + Number(n).toFixed(3) + ' g' : '';
     const txt = i => i.newDesign ? 'New design: ' + [i.desc + ' ' + i.k + ' ' + vjGTxt(i.net) + ' g' + (i.tunch ? ' tunch ' + i.tunch.toFixed(3) : ''), ...i.dias.map(x => x.ct.toFixed(2) + ' ct ' + x.q), ...(i.polki ? ['Polki ' + i.polki.pcs + ' pc'] : [])].join(', ')
       : (i.design ? i.design + ' (' + i.label + ')' : i.label) + (i.polki ? ', Polki ' + i.polki.pcs + ' pc' : '');
     ctx.waitUntil(fetch(env.VJ_QUOTE_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000),
-      body: JSON.stringify({ qno, name, mobile: '+91 ' + doc.mobile, city, option, total: inr(total) + ' incl. GST', by: who.name && who.name !== 'Owner' ? who.name : who.email,
-        items: items.map(i => txt(i) + ' ' + inr(i.price)).join('; ') }) }).catch(() => {}));
+      body: JSON.stringify({ qno, name, mobile: '+91 ' + doc.mobile, city, option, total: inr(total) + ' incl. GST' + fg(fineTotal) + (pay === 'amount' ? '' : pay === 'g2g' ? ' (Gold to Gold W/s)' : ' (Gold to Gold Nett)'), by: who.name && who.name !== 'Owner' ? who.name : who.email,
+        items: items.map(i => txt(i) + ' ' + inr(i.price) + fg(i.fine)).join('; ') }) }).catch(() => {}));
   }
-  return vjJson({ ok: true, qno, items: items.map(i => ({ id: i.id || null, price: i.price, polki: i.polki || null })), total, gold24g: st.g });
+  return vjJson({ ok: true, qno, items: items.map(i => ({ id: i.id || null, price: i.price, fine: i.fine || 0, polki: i.polki || null })), total, fineTotal, pay, gold24g: st.g });
 }
 
 // VJ_BILL_CALC_START (same function in tags/bill.js - keep both copies identical)
