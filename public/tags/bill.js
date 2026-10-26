@@ -336,7 +336,12 @@
     const same = !$("bname").value.trim() || $("bname").value.trim().toLowerCase() === String(o.name).toLowerCase();
     if (!same) { h.textContent = `Note: ${t.label} is an order for ${o.name}${o.mobile ? " (" + o.mobile + ")" : ""}, not ${$("bname").value.trim()}.`; return; }
     if (!$("bname").value.trim()) $("bname").value = o.name; if (!$("bmob").value.trim() && o.mobile) $("bmob").value = o.mobile; if (!$("bcity").value.trim() && o.city) $("bcity").value = o.city;
-    h.textContent = `Filled from order ${t.label}: ${o.name}${o.mobile ? ", " + o.mobile : ""}${o.city ? ", " + o.city : ""}.`; }
+    h.textContent = `Filled from order ${t.label}: ${o.name}${o.mobile ? ", " + o.mobile : ""}${o.city ? ", " + o.city : ""}.`;
+    // owner 26/10 18:31 (C-20261026-ORDERTAG): no mobile on the order -> take it from the saved parties when exactly one party has this name; otherwise it is typed at billing
+    if (!$("bmob").value.trim()) fetch("/api/vj/parties?q=" + encodeURIComponent(o.name), { credentials: "same-origin", cache: "no-store" }).then(r => r.ok ? r.json() : null).then(j => {
+      const m = ((j && j.parties) || []).filter(p => String(p.name || "").trim().toLowerCase() === String(o.name).trim().toLowerCase() && p.mobile), mobs = [...new Set(m.map(p => p.mobile))];
+      if (mobs.length === 1 && !$("bmob").value.trim()) { $("bmob").value = mobs[0]; if (!$("bcity").value.trim() && m[0].city) $("bcity").value = m[0].city; h.textContent += " Mobile " + mobs[0] + " taken from saved parties."; }
+      else if (!$("bmob").value.trim()) h.textContent += " Type the mobile number."; }).catch(() => {}); }
   const F = () => Number(String($("bF").value).replace(/[^0-9.]/g, "")) || 0;
   function calcNow() { const s = settings(), all = tags(); const list = B.items.map(id => all.find(t => t.id === id)).filter(Boolean);
     return vjBillCalc(list, { F: F(), mode: B.mode, settle: B.settle, disc: B.disc, rates: B.rates, frates: B.frates, prates: B.prates, pdrates: B.pdrates, purity: s.purity, making: s.making, gst: s.gst }); }
