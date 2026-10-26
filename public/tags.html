@@ -133,16 +133,17 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
       <div class="seg" role="radiogroup" aria-label="Type">
         <label><input type="radio" name="kind" id="k-sale" value="sale" checked> Stock</label>
         <label><input type="radio" name="kind" id="k-sample" value="sample"> Sample</label>
+        <label><input type="radio" name="kind" id="k-order" value="order"> Order</label> <!-- owner 26/10/2026 18:31 (C-20261026-ORDERTAG): order pieces entered like a new tag, marked with the party; party name + gold rate required -->
       </div>
       <!-- owner 19/10/2026 (C-20261019-TAGSNOORDER): a sample carries its karigar; the tag prints e.g. VLR14/MN -->
       <div class="row" id="karBox" hidden><label>Karigar <select id="karigar"><option value="">Choose karigar…</option><option value="MN">MN</option><option value="BD">BD</option><option value="HR">HR</option><option value="RK">RK</option></select></label></div>
       <!-- owner 16/10/2026 (C-20261016-ORDERS): a piece made for a customer's order (Order option removed 19/10/2026) -->
       <div class="row" id="orderBox" hidden>
-        <label>Customer name <input id="oName" autocomplete="off" maxlength="60"></label>
-        <label>Mobile <input id="oMob" inputmode="tel" autocomplete="off" maxlength="20" placeholder="98xxxxxxxx"></label>
+        <label>Party name (required) <input id="oName" autocomplete="off" maxlength="60"></label>
+        <label>Mobile (if known) <input id="oMob" inputmode="tel" autocomplete="off" maxlength="20" placeholder="98xxxxxxxx"></label>
         <label>City <input id="oCity" autocomplete="off" maxlength="40"></label>
         <label>Delivery date <input id="oDue" type="date"></label>
-        <label>Gold rate (F) for this order, 24K/g <input id="oRate" inputmode="decimal" autocomplete="off"></label>
+        <label>Gold rate (F) for this order, 24K/g (required) <input id="oRate" inputmode="decimal" autocomplete="off"></label>
       </div>
       <div class="row">
         <label>Category <select id="cat"></select></label>
@@ -491,7 +492,8 @@ function price(t){
 }
 function problems(t){
   const p=[],s=st();
-  if(t.kind==="order"&&!t.order.name)p.push("Enter the customer's name for this order.");
+  if(t.kind==="order"&&!t.order.name)p.push("Enter the party name for this order.");
+  if(t.kind==="order"&&!t.order.rate)p.push("Enter the gold rate (F, 24K per g) for this order.");
   if(t.kind==="order"&&t.order.rate&&!(t.order.rate>=2000&&t.order.rate<=50000))p.push("The order's gold rate (F) looks wrong - type the 24K rate per gram.");
   /* owner 17/10/2026 (C-20261017-CHAINDN): Chain tags - design number optional, free text (e.g. Sid / Arun / Self); all other tags - required, letters and numbers only */
   if(t.cat==="CH"){if(t.designNo&&(t.designNo.length>30||/[<>"`]/.test(t.designNo)))p.push("Chain design number / name: up to 30 letters, numbers or spaces (e.g. Sid, Arun, Self), or leave it empty.")}
@@ -599,7 +601,7 @@ function tagPDF(t){
 /* ---------- live update ---------- */
 function update(){
   if(!S.settings)return;
-  const t=readForm(),s=st(),pr=t.kind!=="sample"?price(t):null;$("orderBox").hidden=t.kind!=="order";if(t.kind==="order"&&!$("oRate").value&&s.gold24g){$("oRate").value=Math.round(s.gold24g);t.order.rate=Math.round(s.gold24g)}
+  const t=readForm(),s=st(),pr=t.kind!=="sample"?price(t):null;$("orderBox").hidden=t.kind!=="order";if(t.kind==="order"&&s.gold24g)$("oRate").placeholder="today "+Math.round(s.gold24g); /* C-20261026-ORDERTAG: the order's rate is typed, never filled in */
   [...$("goldLines").children].forEach(r=>{const i=r.dataset.id,net=num($("gn"+i).value),k=$("gk"+i).value;
     const ch=k==="Chain",tb=$("gt"+i);if(!ch&&tb.value!=="")tb.value="";tb.parentNode.style.visibility=ch?"visible":"hidden";tb.placeholder="e.g. 0.920";
     const tv=tb.value.trim(),tn=num(tv);
