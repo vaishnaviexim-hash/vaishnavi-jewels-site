@@ -6,7 +6,7 @@
   "use strict";
   const $ = id => document.getElementById(id);
   const fmt = n => "Rs " + Math.round(n).toLocaleString("en-IN");
-  const B = { items: [], mode: "ws", settle: "fine", title: "Bill", photos: true, nbb: false, disc: {}, rates: {}, frates: {}, prates: {} }; // prates: polki rate per pc for this bill (C-20261017-POLKI)
+  const B = { items: [], mode: "ws", settle: "fine", title: "Bill", photos: true, nbb: false, disc: {}, rates: {}, frates: {}, prates: {}, pdrates: {} }; // prates: polki rate per pc for this bill (C-20261017-POLKI)
   const MODES = { ws: "W/s", nett: "Nett", g2g: "Gold to Gold", item: "Gold Item" };
   const fineMode = () => B.mode === "g2g" || B.mode === "item";
   const g3 = n => Number(n || 0).toFixed(3) + " g";
@@ -60,11 +60,14 @@
       // polki (C-20261017-POLKI): pcs x the tag's rate per pc; the rate can be changed on the bill (prates), the tag is not changed
       const pk = t.polki && typeof t.polki === 'object' ? t.polki : null, ppcs = pk ? Math.max(0, Math.round(Number(pk.pcs) || 0)) : 0, ptag = pk ? Math.round(Number(pk.rate) || 0) : 0;
       const px = Number(o.prates && o.prates[t.id]), prate = ppcs ? (px >= 1 && px <= 100000 ? Math.round(px) : ptag) : 0;
+    // party diamond (C-20261026-PARTYDIA, owner 26/10 18:14): the customer's own diamonds - setting charge ct x rate per ct (Rs 3,000 default), rate changeable on the bill (pdrates)
+    const pdo = t.pdia && typeof t.pdia === 'object' ? t.pdia : null, pdCt = pdo ? Math.max(0, Math.round((Number(pdo.ct) || 0) * 1000) / 1000) : 0, pdPcs = pdo ? Math.max(0, Math.round(Number(pdo.pcs) || 0)) : 0, pdTag = pdCt ? (Math.round(Number(pdo.rate)) || 3000) : 0;
+    const pdx = Number(o.pdrates && o.pdrates[t.id]), pdRate = pdCt ? (pdx >= 1 && pdx <= 100000 ? Math.round(pdx) : pdTag) : 0;
       const r = { id: t.id, label: String(t.label || ''), design: String(t.designNo || ''), cat: String(t.catName || ''),
         gold: gl.map(g => g.k + ' ' + g.net.toFixed(3) + ' g' + (g.tn ? ', tunch ' + g.tn.toFixed(3) : '')).join(' + '), chain: gl.length > 0 && !g0, mkWt: Math.round(nc * 1000) / 1000, F: Fr, Fdef: Fo, orderRate: Fo !== F, rateEdited: Fr !== Fo, net: Math.round(net * 1000) / 1000, fine, goldAmt: Math.round(gold),
-        mkRate: 0, making: 0, ct: Math.round(ct * 100) / 100, diaAmt: Math.round(dia), polkiPcs: ppcs, polkiRate: prate, polkiTagRate: ppcs ? ptag : 0, polki: ppcs * prate, other: Math.round(oth), dias: dl };
+        mkRate: 0, making: 0, ct: Math.round(ct * 100) / 100, diaAmt: Math.round(dia), polkiPcs: ppcs, polkiRate: prate, polkiTagRate: ppcs ? ptag : 0, polki: ppcs * prate, pdCt, pdPcs, pdRate, pdTagRate: pdTag, pd: Math.round(pdCt * pdRate), cert: String(t.remark || '').slice(0, 10), certNo: String(t.certNo || '').slice(0, 30), other: Math.round(oth), dias: dl };
       if (g0 && mode !== 'item' && nc > 0) { let mkAmt = Math.max(mk * nc, Number(m.min) || 0); if (mode === 'nett') mkAmt += ng * m.pct / 100; r.making = Math.round(mkAmt); r.mkRate = Math.round(r.making / nc); }
-      r.amount = r.goldAmt + r.making + r.diaAmt + r.polki + r.other;
+      r.amount = r.goldAmt + r.making + r.diaAmt + r.polki + r.pd + r.other;
       const dv = String(o.disc && o.disc[t.id] != null ? o.disc[t.id] : '').trim(), pm = dv.match(/^(\d+(?:\.\d+)?)\s*%$/), dn = Number(dv.replace(/[,\s]/g, ''));
       r.discTxt = pm ? Math.min(100, Number(pm[1])) + '%' : '';
       r.disc = Math.round(Math.min(r.amount, pm ? r.amount * Math.min(100, Number(pm[1])) / 100 : (dn > 0 ? dn : 0)));
@@ -105,7 +108,7 @@
       <div class="row" style="align-items:end"><label style="flex:2 1 220px">Code on the tag, tag number or design number <input id="bq" autocomplete="off" placeholder="e.g. abc270xyz, 803 or 1436"></label>
       <div><button type="button" class="btn" id="badd">Add piece</button></div></div>
       <div id="bpick" class="row" style="gap:8px"></div>
-      <div class="list"><table class="items" style="min-width:820px"><thead><tr><th>Piece</th><th>Gold</th><th>Gold value</th><th>Making</th><th>Diamonds</th><th id="bpolh" hidden>Polki</th><th>Other</th><th>Amount</th><th>Discount<br><span style="font-weight:400;text-transform:none">Rs or %</span></th><th>Net</th><th></th></tr></thead><tbody id="brows"></tbody></table></div>
+      <div class="list"><table class="items" style="min-width:820px"><thead><tr><th>Piece</th><th>Gold</th><th>Gold value</th><th>Making</th><th>Diamonds</th><th id="bpolh" hidden>Polki / Party dia.</th><th>Other</th><th>Amount</th><th>Discount<br><span style="font-weight:400;text-transform:none">Rs or %</span></th><th>Net</th><th></th></tr></thead><tbody id="brows"></tbody></table></div>
       <h2>2 · Customer &amp; bill</h2>
       <p class="hint" id="bcusthint"></p>
       <div class="row"><label>Mobile No. <input id="bmob" inputmode="tel" autocomplete="off" maxlength="20" placeholder="98xxxxxxxx"></label>
@@ -152,7 +155,7 @@
     $("bmonth").value = today().slice(0, 7); $("bmonth").addEventListener("change", loadBook); { let tm = 0; $("bfmob").addEventListener("input", () => { clearTimeout(tm); tm = setTimeout(loadBook, 350); }); } // owner 26/10 17:58: type a mobile no. and see all that customer's bills
     $("bxl").addEventListener("click", () => xl($("bmonth").value || today().slice(0, 7))); $("bxlall").addEventListener("click", () => xl("all")); $("bxwa").addEventListener("click", e => partyWA(e.currentTarget));
     $("bF").addEventListener("input", render); $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); }); $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
-    $("bclear").addEventListener("click", () => { B.editNo = null; { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.nbb = false; $("bnbb").checked = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
+    $("bclear").addEventListener("click", () => { B.editNo = null; { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.nbb = false; $("bnbb").checked = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; B.pdrates = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
     $("bsave").addEventListener("click", save);
     $("bback").addEventListener("click", () => { const c = document.querySelector('nav button[data-tab="check"]'); if (c) c.click(); });
   }
@@ -277,7 +280,8 @@
       b.rows.forEach(x => { if (x.discTxt) B.disc[x.id] = x.discTxt; else if (x.disc > 0) B.disc[x.id] = String(x.disc);
         if (Math.round(x.F) !== Math.round(b.F)) B.frates[x.id] = x.F;
         const ds = x.dias || []; if (ds.some(d => d.rate !== d.tagRate)) { const a = ds.map(() => 0); ds.forEach((d, k) => { a[d.idx != null ? d.idx : k] = d.rate !== d.tagRate ? d.rate : 0; }); B.rates[x.id] = a; }
-        if (x.polkiPcs && x.polkiRate !== x.polkiTagRate) B.prates[x.id] = x.polkiRate; });
+        if (x.polkiPcs && x.polkiRate !== x.polkiTagRate) B.prates[x.id] = x.polkiRate;
+        if (x.pdCt && x.pdRate !== x.pdTagRate) B.pdrates[x.id] = x.pdRate; });
       B.editNo = b.no; $("bno").value = b.no; const n = $("beditnote"); n.hidden = false;
       n.textContent = `Editing ${b.title} ${b.no} (${b.name}). Change what you need, then Update - it keeps the same number. Clear = stop editing.`;
       $("bsave").textContent = "Update bill & make PDF"; render(); $("p-bill").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -335,14 +339,14 @@
     h.textContent = `Filled from order ${t.label}: ${o.name}${o.mobile ? ", " + o.mobile : ""}${o.city ? ", " + o.city : ""}.`; }
   const F = () => Number(String($("bF").value).replace(/[^0-9.]/g, "")) || 0;
   function calcNow() { const s = settings(), all = tags(); const list = B.items.map(id => all.find(t => t.id === id)).filter(Boolean);
-    return vjBillCalc(list, { F: F(), mode: B.mode, settle: B.settle, disc: B.disc, rates: B.rates, frates: B.frates, prates: B.prates, purity: s.purity, making: s.making, gst: s.gst }); }
+    return vjBillCalc(list, { F: F(), mode: B.mode, settle: B.settle, disc: B.disc, rates: B.rates, frates: B.frates, prates: B.prates, pdrates: B.pdrates, purity: s.purity, making: s.making, gst: s.gst }); }
   function goldCell(r, c) { return c.settle === "fine" ? g3(r.fine) + " fine" : fmt(r.goldAmt) + (c.settle ? " (" + g3(r.fine) + " fine)" : ""); }
   function mkCell(r, c) { return r.chain ? "— (chain)" /* C-20261017-CHAINTUNCH: no making on chain lines */ : c.mode === "item" ? "in gold" : fmt(r.making) + " (" + r.mkRate + "/g" + (r.mkWt > 0 && Math.abs(r.mkWt - r.wt) > 0.0005 ? " on " + r.mkWt.toFixed(3) + " g" : "") + ")"; }
   function noteText(mode, rows) { const ch = (rows || []).some(r => /tunch/.test(r.gold || "")); // C-20261017-CHAINTUNCH
     return (mode === "ws" || mode === "g2g" ? "Gold includes 10% wastage" + (ch ? " (chains: gold x tunch, no making)" : "") + ". " : ch ? "Chains: gold x tunch, no making. " : "") + (mode === "item" ? "Making is included in the gold. " : ""); }
   function render() {
     const body = $("brows"); if (!body) return; body.textContent = "";
-    const c = calcNow(), ok = F() >= 2000, hasPol = c.rows.some(r => r.polkiPcs > 0); $("bpolh").hidden = !hasPol;
+    const c = calcNow(), ok = F() >= 2000, hasPol = c.rows.some(r => r.polkiPcs > 0 || r.pdCt > 0); $("bpolh").hidden = !hasPol;
     c.rows.forEach((r, i) => {
       const tr = document.createElement("tr"); const td = (x, cl) => { const e = document.createElement("td"); if (cl) e.className = cl; e.textContent = x; tr.appendChild(e); };
       td((r.design ? r.design + " · " : "") + r.label + (r.cat ? " · " + r.cat : "")); { // fine gold rate (24K per g) for this piece: an order's own rate, otherwise today's rate; editable (C-20261016-PIECERATE)
@@ -361,7 +365,11 @@
       if (r.dias.length) { const dv = document.createElement("div"); dv.dataset.dia = r.id; dv.style.fontWeight = "600"; dv.textContent = "= " + fmt(r.diaAmt); dt.appendChild(dv); }
       tr.appendChild(dt);
       if (hasPol) { // polki pcs x rate per pc; the rate can be changed for this bill only (C-20261017-POLKI)
-        const pt = document.createElement("td"); pt.className = "num"; if (!r.polkiPcs) pt.textContent = "—"; else {
+        const pt = document.createElement("td"); pt.className = "num"; if (!r.polkiPcs && !r.pdCt) pt.textContent = "—"; if (r.pdCt) { // party diamond setting ct x rate per ct, changeable for this bill (C-20261026-PARTYDIA)
+          const ln = document.createElement("div"); ln.style.cssText = "white-space:nowrap;margin:2px 0"; const pi = document.createElement("input"); pi.className = "brate"; pi.inputMode = "numeric"; pi.autocomplete = "off"; pi.style.cssText = "width:64px;text-align:right;padding:4px 6px"; pi.value = r.pdRate || ""; pi.title = "Setting rate per ct (tag: " + (r.pdTagRate || "-") + ")";
+          pi.addEventListener("input", () => { const v = Number(pi.value.replace(/[^0-9.]/g, "")) || 0; if (Number.isInteger(v) && v >= 1 && v <= 100000 && v !== r.pdTagRate) B.pdrates[r.id] = v; else delete B.pdrates[r.id]; totals(); });
+          ln.append(`Party ${r.pdCt} ct${r.pdPcs ? " (" + r.pdPcs + ")" : ""} @ `, pi); const pv = document.createElement("div"); pv.dataset.pd = r.id; pv.style.fontWeight = "600"; pv.textContent = "= " + fmt(r.pd); pt.append(ln, pv); }
+        if (r.polkiPcs) {
           const ln = document.createElement("div"); ln.style.cssText = "white-space:nowrap;margin:2px 0";
           const pi = document.createElement("input"); pi.className = "brate"; pi.inputMode = "numeric"; pi.autocomplete = "off"; pi.style.cssText = "width:64px;text-align:right;padding:4px 6px"; pi.value = r.polkiRate || ""; pi.title = "Rate per pc (tag: " + (r.polkiTagRate || "-") + ")";
           pi.addEventListener("input", () => { const v = Number(pi.value.replace(/[^0-9.]/g, "")) || 0; if (Number.isInteger(v) && v >= 1 && v <= 100000 && v !== r.polkiTagRate) B.prates[r.id] = v; else delete B.prates[r.id]; totals(); });
@@ -372,14 +380,14 @@
       di.addEventListener("input", () => { B.disc[r.id] = di.value.trim(); totals(); }); dc.appendChild(di); tr.appendChild(dc);
       const nt = document.createElement("td"); nt.className = "num"; nt.dataset.net = r.id; nt.textContent = ok ? fmt(r.net) : "—"; tr.appendChild(nt);
       const x = document.createElement("td"), rm = document.createElement("button"); rm.type = "button"; rm.className = "btn ghost"; rm.textContent = "Remove";
-      rm.addEventListener("click", () => { delete B.disc[r.id]; delete B.rates[r.id]; delete B.frates[r.id]; delete B.prates[r.id]; B.items.splice(i, 1); render(); }); x.appendChild(rm); tr.appendChild(x); body.appendChild(tr);
+      rm.addEventListener("click", () => { delete B.disc[r.id]; delete B.rates[r.id]; delete B.frates[r.id]; delete B.prates[r.id]; delete B.pdrates[r.id]; B.items.splice(i, 1); render(); }); x.appendChild(rm); tr.appendChild(x); body.appendChild(tr);
     });
     totals(c);
   }
   function totals(c) {
     c = c || calcNow(); const ok = F() >= 2000, has = c.rows.length && ok;
     c.rows.forEach(r => { const n = document.querySelector('[data-net="' + r.id + '"]'); if (n) n.textContent = ok ? fmt(r.net) + (r.discTxt ? " (" + r.discTxt + ")" : "") : "—";
-      const dv = document.querySelector('[data-dia="' + r.id + '"]'); if (dv) dv.textContent = "= " + fmt(r.diaAmt); const pv = document.querySelector('[data-pol="' + r.id + '"]'); if (pv) pv.textContent = "= " + fmt(r.polki); const am = document.querySelector('[data-amt="' + r.id + '"]'); if (am) am.textContent = ok ? fmt(r.amount) : "—"; });
+      const dv = document.querySelector('[data-dia="' + r.id + '"]'); if (dv) dv.textContent = "= " + fmt(r.diaAmt); const pv = document.querySelector('[data-pol="' + r.id + '"]'); if (pv) pv.textContent = "= " + fmt(r.polki); const pdv = document.querySelector('[data-pd="' + r.id + '"]'); if (pdv) pdv.textContent = "= " + fmt(r.pd); const am = document.querySelector('[data-amt="' + r.id + '"]'); if (am) am.textContent = ok ? fmt(r.amount) : "—"; });
     $("bdiscrow").hidden = !c.disc; $("bdisc").textContent = "- " + fmt(c.sum - c.sub);
     $("bsettle").hidden = !fineMode(); $("bsettle").style.display = fineMode() ? "" : "none"; /* .seg sets display:flex, which beats [hidden] */ $("bfinerow").hidden = !(c.settle === "fine" && c.rows.length); $("bfine").firstChild.textContent = g3(c.fine);
     $("bmodehint").textContent = { ws: "Gold x karat rate + 10% wastage; making Rs 650/g (750/g up to 5 g), minimum Rs 1,000 a piece.", nett: "Gold x karat rate; making Rs 650/g (750 up to 5 g), minimum Rs 1,000, + 10% wastage on the gold.",
@@ -419,8 +427,8 @@
         : [["Piece", 30, "l"], ["Gold", 21, "l"], ["Gold value", 19, "r"], ["Making", 18, "r"], ["Diamonds", 21, "r"], ["Other", 12, "r"], ["Amount", 19, "r"], ["Discount", 21, "r"], ["Net", 21, "r"]])
       : P ? [["Piece", 60, "l"], ["Gold", 23, "l"], ["Gold value", 21, "r"], ["Making", 20, "r"], ["Diamonds", 21, "r"], ["Other", 15, "r"], ["Amount", 22, "r"]] // 182 mm = page width less margins
       : [["Piece", 42, "l"], ["Gold", 25, "l"], ["Gold value", 23, "r"], ["Making", 22, "r"], ["Diamonds", 24, "r"], ["Other", 20, "r"], ["Amount", 26, "r"]];
-    const PK = (b.rows || []).some(r => Number(r.polkiPcs) > 0); // owner 17/10: a Polki column only when a piece has polki (C-20261017-POLKI)
-    if (PK) { const sc = (182 - 18) / 182; cols.forEach(c => { c[1] = Math.round(c[1] * sc * 10) / 10; }); cols.splice(cols.findIndex(c => c[0] === "Diamonds") + 1, 0, ["Polki", 18, "r"]); }
+    const PK = (b.rows || []).some(r => Number(r.polkiPcs) > 0 || Number(r.pdCt) > 0); // owner 17/10: a Polki column only when a piece has polki (C-20261017-POLKI)
+    if (PK) { const sc = (182 - 18) / 182; cols.forEach(c => { c[1] = Math.round(c[1] * sc * 10) / 10; }); cols.splice(cols.findIndex(c => c[0] === "Diamonds") + 1, 0, [(b.rows || []).some(r => Number(r.pdCt) > 0) ? ((b.rows || []).some(r => Number(r.polkiPcs) > 0) ? "Polki/Party" : "Party dia.") : "Polki", 18, "r"]); }
     const fm = D ? (n => Math.round(n).toLocaleString("en-IN")) : fmt;
     if (D) { doc.setFont("helvetica", "italic"); doc.setFontSize(9); doc.setTextColor(90); doc.text("Amounts in Rs", W - M, y - 1.5, { align: "right" }); doc.setTextColor(20); y += 4; }
     const row = (vals, bold, size, pic) => { doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setFontSize(size || 10.5); let x = M, h = 0;
@@ -431,7 +439,7 @@
     doc.setFillColor(243, 230, 211); doc.rect(M, y - 5, W - 2 * M, 8, "F"); row(cols.map(c => c[0]), true, PK && D ? 9 : undefined); y += 1;
     b.rows.forEach(r => { if (y > 250) { doc.addPage(); y = 20; }
       const dd = r.ct ? (r.dias || []).filter(d => d.ct > 0).map(d => ((d.shape ? d.shape + " " : "") + d.q).trim() + "\n" + d.ct.toFixed(2) + " ct @ " + Math.round(d.rate).toLocaleString("en-IN")).join("\n") + "\n= " + fm(r.diaAmt) : "-"; // owner 26/10: every diamond line with its shape, quality, ct and rate (C-20261026-DIASHAPE)
-      const base = [(r.design ? r.design + " - " : "") + r.label + (r.cat ? "\n" + r.cat : ""), (/tunch/.test(r.gold || "") ? r.gold.replace(/ \+ /g, "\n").replace(/, tunch /g, "\ntunch ") : (r.gold || "-")) + (Math.round(r.F) !== hF ? "\n@ " + Math.round(r.F).toLocaleString("en-IN") : ""), b.settle === "fine" ? g3(r.fine) + "\nfine" : fm(r.goldAmt) + (b.settle ? "\n" + g3(r.fine) + " fine" : ""), r.chain ? "-" : b.mode === "item" ? "in gold" : fm(r.making) /* owner 17/10 15:38: no making rate per g on the printed bill */, dd, ...(PK ? [r.polkiPcs ? r.polkiPcs + " pc\n@ " + Math.round(r.polkiRate).toLocaleString("en-IN") + "\n" + fm(r.polki) : "-"] : []), r.other ? fm(r.other) : "-"];
+      const base = [(r.design ? r.design + " - " : "") + r.label + (r.cat ? "\n" + r.cat : "") + (r.certNo ? "\n" + (r.cert && r.cert !== "TGL" ? r.cert : "Cert.") + " " + r.certNo : ""), /* owner 26/10 18:14: certificate no. on the bill (C-20261026-PARTYDIA) */ (/tunch/.test(r.gold || "") ? r.gold.replace(/ \+ /g, "\n").replace(/, tunch /g, "\ntunch ") : (r.gold || "-")) + (Math.round(r.F) !== hF ? "\n@ " + Math.round(r.F).toLocaleString("en-IN") : ""), b.settle === "fine" ? g3(r.fine) + "\nfine" : fm(r.goldAmt) + (b.settle ? "\n" + g3(r.fine) + " fine" : ""), r.chain ? "-" : b.mode === "item" ? "in gold" : fm(r.making) /* owner 17/10 15:38: no making rate per g on the printed bill */, dd, ...(PK ? [[r.polkiPcs ? "Polki " + r.polkiPcs + " pc\n@ " + Math.round(r.polkiRate).toLocaleString("en-IN") + "\n" + fm(r.polki) : "", r.pdCt ? "Party " + r.pdCt + " ct\n@ " + Math.round(r.pdRate).toLocaleString("en-IN") + "\n" + fm(r.pd) : ""].filter(Boolean).join("\n") || "-"] : []), r.other ? fm(r.other) : "-"];
       row(D ? base.concat([fm(r.amount), r.disc ? fm(r.disc) + (r.discTxt ? "\n(" + r.discTxt + ")" : "") : "-", fm(r.net)]) : base.concat([fm(r.amount)]), false, D || PK ? 10 : 10.5, P ? (pics[r.id] || null) : undefined);
       doc.setDrawColor(225); doc.line(M, y - 3, W - M, y - 3); });
     y += 3; if (y > 240) { doc.addPage(); y = 20; }
@@ -451,7 +459,7 @@
   async function save() {
     const m = $("bmsg"), out = $("bout"); out.hidden = true;
     const body = { no: $("bno").value.trim(), name: $("bname").value.trim(), city: $("bcity").value.trim(), mobile: $("bmob").value.trim().slice(0, 20),
-      date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, title: B.title, nbb: !!B.nbb, ids: B.items.slice(), disc: Object.assign({}, B.disc), rates: JSON.parse(JSON.stringify(B.rates)), frates: Object.assign({}, B.frates), prates: Object.assign({}, B.prates), edit: B.editNo || "" };
+      date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, title: B.title, nbb: !!B.nbb, ids: B.items.slice(), disc: Object.assign({}, B.disc), rates: JSON.parse(JSON.stringify(B.rates)), frates: Object.assign({}, B.frates), prates: Object.assign({}, B.prates), pdrates: Object.assign({}, B.pdrates), edit: B.editNo || "" };
     if (!body.name) { m.textContent = "Enter the customer's name."; return; }
     let dg = body.mobile.replace(/\D/g, ""); if (dg.length === 12 && dg.startsWith("91")) dg = dg.slice(2); // phone copy like "+91 98xxx xxxxx" is fine
     const mobNote = body.mobile && !/^[6-9]\d{9}$/.test(dg) ? ` Note: the mobile has ${dg.replace(/^91/, "").length} digits after +91 (a mobile usually has 10) - saved as typed.` : "";
