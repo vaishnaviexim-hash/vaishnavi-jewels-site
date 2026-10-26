@@ -133,7 +133,7 @@ async function vjWho(request, env) {
   const owners = String(env.OWNER_EMAILS || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
   if (owners.includes(email)) return { email, role: 'admin', name: 'Owner' };
   const row = await env.DB.prepare('SELECT role, name FROM users WHERE email = ?').bind(email).first();
-  if (!row || !['staff', 'sales'].includes(row.role)) return null;
+  if (!row || !['staff', 'sales', 'tagger'].includes(row.role)) return null; // tagger (owner 26/10 18:07, Shyam): New tag + photo, Tag/Bill now, Saved bills - nothing else
   return { email, role: row.role, name: row.name || email };
 }
 
@@ -225,6 +225,7 @@ async function vjSync(request, env, who, ctx) {
   const out = docs.map(r => {
     const data = JSON.parse(r.data);
     if (who.role === 'sales' && (r.path === 'counters/main' || r.path.startsWith('quotes/'))) return null;
+    if (who.role === 'tagger' && r.path.startsWith('quotes/')) return null;
     if (who.role === 'sales' && data && data.order) delete data.order; // C-20261016-ORDERS: customer details never go to the sales login
     if (who.role === 'sales' && data && data.orderCancelled) delete data.orderCancelled;
     return { path: r.path, data, version: r.version };
@@ -262,7 +263,8 @@ async function vjWrite(request, env, who) {
   const cur = row ? JSON.parse(row.data) : null;
   let next = op === 'update' ? Object.assign({}, cur || {}, data) : data;
   if (op === 'update' && !cur) return vjDeny(404, 'not found');
-  if (who.role === 'staff' && cur && path.startsWith('tags/')) {
+  if (who.role === 'tagger' && cur && path.startsWith('tags/') && cur.createdBy !== who.email) return vjDeny(403, 'you can change only the tags you made');
+  if ((who.role === 'staff' || who.role === 'tagger') && cur && path.startsWith('tags/')) {
     for (const k of new Set([...Object.keys(cur), ...Object.keys(next)])) {
       if (!VJ_STAFF_FIELDS.has(k) && JSON.stringify(cur[k]) !== JSON.stringify(next[k])) return vjDeny(403, 'staff cannot change ' + k);
     }
@@ -1691,6 +1693,7 @@ async function vjHandle(request, env, ctx, url) {
   if (!env.DB || !env.PHOTOS) return vjDeny(503, 'not set up');
   const who = await vjWho(request, env);
   if (!who) return p.startsWith('/api/') ? vjDeny(403, 'not allowed') : new Response('Not allowed. Ask Abhinav to add your email.', { status: 403, headers: { 'content-type': 'text/plain', 'x-robots-tag': 'noindex' } });
+  if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these
   if (p === '/api/vj/sync' && request.method === 'GET') return vjSync(request, env, who, ctx);
   if (p === '/api/vj/write' && request.method === 'POST') return vjWrite(request, env, who);
   if (p === '/api/vj/photo' && request.method === 'POST') return vjPhotoUpload(request, env, who);
