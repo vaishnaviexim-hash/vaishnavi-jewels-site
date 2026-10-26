@@ -141,7 +141,7 @@ const VJ_PATH = /^(tags\/[A-Za-z0-9_\-.~]{1,60}|settings\/main|counters\/main)$/
 // What staff may change on a piece that already exists (photo, price code fixed at first print, print queue).
 // owner 26/10/2026 (C-20261026-STAFFEDIT): staff may also use Edit tag (design no., remark, box, gold, diamonds, polki, other, sample metal);
 // every change is still logged old -> new in vj_changes / audit with the person's email. Delete stays owner-only.
-const VJ_STAFF_FIELDS = new Set(['photo', 'photoAt', 'photoBy', 'code', 'priceAtTag', 'gold24gAtTag', 'queue', 'queueAt', 'printedAt', 'designNo', 'remark', 'box', 'other', 'dias', 'polki', 'metal', 'gold', 'editedAt']);
+const VJ_STAFF_FIELDS = new Set(['pdia', 'certNo', 'photo', 'photoAt', 'photoBy', 'code', 'priceAtTag', 'gold24gAtTag', 'queue', 'queueAt', 'printedAt', 'designNo', 'remark', 'box', 'other', 'dias', 'polki', 'metal', 'gold', 'editedAt']);
 
 async function vjAudit(env, who, action, path, detail) {
   try { await env.DB.prepare('INSERT INTO audit (ts, email, action, path, detail) VALUES (?, ?, ?, ?, ?)').bind(Date.now(), who.email, action, path || '', String(detail || '').slice(0, 500)).run(); } catch (e) {}
@@ -294,6 +294,15 @@ async function vjWrite(request, env, who) {
       else if (!Number.isInteger(pcs) || pcs < 1 || pcs > 10000 || !Number.isInteger(rate) || rate < 1 || rate > 100000) return vjDeny(400, 'polki: pieces 0-10000 and rate per piece Rs 1-1,00,000, whole numbers');
       else next.polki = { pcs, rate };
     }
+    if (next.pdia !== undefined) { // C-20261026-PARTYDIA: party (customer's own) diamonds - ct, pcs, setting rate per ct
+      const pd = next.pdia && typeof next.pdia === 'object' && !Array.isArray(next.pdia) ? next.pdia : null;
+      const ct = pd ? Math.round(Number(pd.ct) * 1000) / 1000 : 0, pcs = pd ? Number(pd.pcs || 0) : 0, rate = pd ? Number(pd.rate) : 0;
+      if (next.pdia === null || pd && !(ct > 0)) delete next.pdia;
+      else if (!pd) return vjDeny(400, 'bad party diamond');
+      else if (!(ct <= 1000) || !Number.isInteger(pcs) || pcs < 0 || pcs > 100000 || !Number.isInteger(rate) || rate < 1 || rate > 100000) return vjDeny(400, 'party diamond: ct 0.001-1000, whole pcs, setting rate per ct Rs 1-1,00,000');
+      else next.pdia = { ct, pcs, rate };
+    }
+    if (next.certNo !== undefined) { const c = vjClean(next.certNo, 30).toUpperCase(); if (c) next.certNo = c; else delete next.certNo; } // IGI / GIA certificate no.
     // C-20261017-CHAINTUNCH (owner 17/10/2026 18:16 / 18:19): any gold line can be a chain with its own tunch (fine gold factor, e.g.
     // 0.900 or 0.940; 0.30-1.10, 3 decimals): gold:[{k:'18K',net:8,tunch:0.94}]. A chain line is priced net x tunch x fine rate with
     // no making and no extra wastage; a tag of category Chain has every gold line as a chain line.
@@ -633,11 +642,14 @@ function vjBillCalc(tags, o) {
     // polki (C-20261017-POLKI): pcs x the tag's rate per pc; the rate can be changed on the bill (prates), the tag is not changed
     const pk = t.polki && typeof t.polki === 'object' ? t.polki : null, ppcs = pk ? Math.max(0, Math.round(Number(pk.pcs) || 0)) : 0, ptag = pk ? Math.round(Number(pk.rate) || 0) : 0;
     const px = Number(o.prates && o.prates[t.id]), prate = ppcs ? (px >= 1 && px <= 100000 ? Math.round(px) : ptag) : 0;
+    // party diamond (C-20261026-PARTYDIA, owner 26/10 18:14): the customer's own diamonds - setting charge ct x rate per ct (Rs 3,000 default), rate changeable on the bill (pdrates)
+    const pdo = t.pdia && typeof t.pdia === 'object' ? t.pdia : null, pdCt = pdo ? Math.max(0, Math.round((Number(pdo.ct) || 0) * 1000) / 1000) : 0, pdPcs = pdo ? Math.max(0, Math.round(Number(pdo.pcs) || 0)) : 0, pdTag = pdCt ? (Math.round(Number(pdo.rate)) || 3000) : 0;
+    const pdx = Number(o.pdrates && o.pdrates[t.id]), pdRate = pdCt ? (pdx >= 1 && pdx <= 100000 ? Math.round(pdx) : pdTag) : 0;
     const r = { id: t.id, label: String(t.label || ''), design: String(t.designNo || ''), cat: String(t.catName || ''),
       gold: gl.map(g => g.k + ' ' + g.net.toFixed(3) + ' g' + (g.tn ? ', tunch ' + g.tn.toFixed(3) : '')).join(' + '), chain: gl.length > 0 && !g0, mkWt: Math.round(nc * 1000) / 1000, F: Fr, Fdef: Fo, orderRate: Fo !== F, rateEdited: Fr !== Fo, net: Math.round(net * 1000) / 1000, fine, goldAmt: Math.round(gold),
-      mkRate: 0, making: 0, ct: Math.round(ct * 100) / 100, diaAmt: Math.round(dia), polkiPcs: ppcs, polkiRate: prate, polkiTagRate: ppcs ? ptag : 0, polki: ppcs * prate, other: Math.round(oth), dias: dl };
+      mkRate: 0, making: 0, ct: Math.round(ct * 100) / 100, diaAmt: Math.round(dia), polkiPcs: ppcs, polkiRate: prate, polkiTagRate: ppcs ? ptag : 0, polki: ppcs * prate, pdCt, pdPcs, pdRate, pdTagRate: pdTag, pd: Math.round(pdCt * pdRate), cert: String(t.remark || '').slice(0, 10), certNo: String(t.certNo || '').slice(0, 30), other: Math.round(oth), dias: dl };
     if (g0 && mode !== 'item' && nc > 0) { let mkAmt = Math.max(mk * nc, Number(m.min) || 0); if (mode === 'nett') mkAmt += ng * m.pct / 100; r.making = Math.round(mkAmt); r.mkRate = Math.round(r.making / nc); }
-    r.amount = r.goldAmt + r.making + r.diaAmt + r.polki + r.other;
+    r.amount = r.goldAmt + r.making + r.diaAmt + r.polki + r.pd + r.other;
     const dv = String(o.disc && o.disc[t.id] != null ? o.disc[t.id] : '').trim(), pm = dv.match(/^(\d+(?:\.\d+)?)\s*%$/), dn = Number(dv.replace(/[,\s]/g, ''));
     r.discTxt = pm ? Math.min(100, Number(pm[1])) + '%' : '';
     r.disc = Math.round(Math.min(r.amount, pm ? r.amount * Math.min(100, Number(pm[1])) / 100 : (dn > 0 ? dn : 0)));
@@ -703,6 +715,8 @@ async function vjBill(request, env, who) { // every login may make bills (owner 
   const rates = {}; if (b && b.rates && typeof b.rates === 'object') for (const id of ids) if (Array.isArray(b.rates[id])) rates[id] = b.rates[id].slice(0, 30).map(v => { const n = Number(v); return n > 0 && n <= 5000000 ? Math.round(n) : 0; });
   const prates = {}; if (b && b.prates && typeof b.prates === 'object') for (const id of ids) if (b.prates[id] != null && b.prates[id] !== '') { // polki rate per pc for this bill only (C-20261017-POLKI)
     const n = Number(b.prates[id]); if (!Number.isInteger(n) || n < 1 || n > 100000) return vjDeny(400, 'polki rate per pc must be a whole number Rs 1-1,00,000'); prates[id] = n; }
+  const pdrates = {}; if (b && b.pdrates && typeof b.pdrates === 'object') for (const id of ids) if (b.pdrates[id] != null && b.pdrates[id] !== '') { // party diamond setting rate per ct for this bill only (C-20261026-PARTYDIA)
+    const n = Number(b.pdrates[id]); if (!Number.isInteger(n) || n < 1 || n > 100000) return vjDeny(400, 'party diamond setting rate per ct must be a whole number Rs 1-1,00,000'); pdrates[id] = n; }
   // owner 16/10/2026 20:03 'Bill no should be automatic. Every month starts with number 1': bills are numbered by the server too
   if (!name) return vjDeny(400, 'customer name is required');
   if (b && b.mobile && String(b.mobile).trim() && !mobile) return vjDeny(400, 'mobile number not readable');
@@ -729,7 +743,7 @@ async function vjBill(request, env, who) { // every login may make bills (owner 
   if (title === 'Bill') { const hit = await onBill(); if (hit.size) return vjJson({ error: dupMsg(hit), duplicate: true }, 409); }
   const sRow = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first();
   const s = sRow ? JSON.parse(sRow.data) : {};
-  const calc = vjBillCalc(tags, { F, mode, settle, disc, rates, frates, prates, purity: s.purity, making: s.making, gst: s.gst });
+  const calc = vjBillCalc(tags, { F, mode, settle, disc, rates, frates, prates, pdrates, purity: s.purity, making: s.making, gst: s.gst });
   calc.rows.forEach((r, i) => { const ph = tags[i].photo; if (typeof ph === 'string' && /^[0-9a-f]{32}$/.test(ph)) r.photo = ph; }); // owner 16/10: photo on the bill
   const bill = Object.assign({ no, title, date, name, city, mobile, F, nbb: !!(b && b.nbb === true), by: who.email, byName: who.name, at: new Date().toISOString() }, calc); // nbb: 'No Buy Back No Exchange' stamp (owner 17/10, C-20261017-NBB)
   if (editNo) { // C-20261026-BILLEDIT (owner 26/10/2026 17:32 'i should be able to edit the bill'): owners only; the old version is kept in vj_bill_old
