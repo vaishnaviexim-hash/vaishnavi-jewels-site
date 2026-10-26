@@ -625,7 +625,7 @@ function vjBillCalc(tags, o) {
     fine = Math.round(fine * 1000) / 1000;
     if (settle === 'amount') gold = fine * Fr;
     const ov = o.rates && Array.isArray(o.rates[t.id]) ? o.rates[t.id] : []; // rates edited on the bill (C-20261016-BILLALL); the tag is not changed
-    const dl = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map((d, i) => ({ q: String(d.q || ''), ct: Number(d.ct) || 0, tagRate: Number(d.rate) || 0, rate: Number(ov[i]) > 0 ? Number(ov[i]) : (Number(d.rate) || 0) }));
+    const dl = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map((d, i) => ({ q: String(d.q || ''), shape: String(d.shape || '').slice(0, 20), ct: Number(d.ct) || 0, tagRate: Number(d.rate) || 0, rate: Number(ov[i]) > 0 ? Number(ov[i]) : (Number(d.rate) || 0) }));
     const ct = dl.reduce((a, d) => a + d.ct, 0), dia = dl.reduce((a, d) => a + d.ct * d.rate, 0), oth = Number(t.other && t.other.amt) || 0;
     // polki (C-20261017-POLKI): pcs x the tag's rate per pc; the rate can be changed on the bill (prates), the tag is not changed
     const pk = t.polki && typeof t.polki === 'object' ? t.polki : null, ppcs = pk ? Math.max(0, Math.round(Number(pk.pcs) || 0)) : 0, ptag = pk ? Math.round(Number(pk.rate) || 0) : 0;
