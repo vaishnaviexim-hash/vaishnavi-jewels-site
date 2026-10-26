@@ -108,9 +108,9 @@
       <div class="list"><table class="items" style="min-width:820px"><thead><tr><th>Piece</th><th>Gold</th><th>Gold value</th><th>Making</th><th>Diamonds</th><th id="bpolh" hidden>Polki</th><th>Other</th><th>Amount</th><th>Discount<br><span style="font-weight:400;text-transform:none">Rs or %</span></th><th>Net</th><th></th></tr></thead><tbody id="brows"></tbody></table></div>
       <h2>2 · Customer &amp; bill</h2>
       <p class="hint" id="bcusthint"></p>
-      <div class="row"><label>Name <input id="bname" autocomplete="off" maxlength="60"></label>
-        <label>City <input id="bcity" autocomplete="off" maxlength="40"></label>
-        <label>Mobile No. <input id="bmob" inputmode="tel" autocomplete="off" maxlength="20" placeholder="98xxxxxxxx"></label></div>
+      <div class="row"><label>Mobile No. <input id="bmob" inputmode="tel" autocomplete="off" maxlength="20" placeholder="98xxxxxxxx"></label>
+        <label>Name <input id="bname" autocomplete="off" maxlength="60"></label>
+        <label>City <input id="bcity" autocomplete="off" maxlength="40"></label></div>
       <div class="row"><label>Number <input id="bno" autocomplete="off" maxlength="20" placeholder="bill book number"></label>
         <label>Date <input id="bdate" type="date"></label>
         <label><span id="bFl">Gold Rate (F) per g, 24K</span> <input id="bF" inputmode="decimal" autocomplete="off"><input id="bFtag" readonly tabindex="-1" style="display:none"></label></div>
@@ -161,7 +161,7 @@
   window.VJ_BILL_NOW = id => { if (!$("p-bill")) return; $("bclear").click(); $("bform").hidden = false; const t = tags().find(x => x.id === id);
     document.querySelectorAll('[id^="p-"]').forEach(p => { p.hidden = p.id !== "p-bill"; });
     document.querySelectorAll("nav button").forEach(y => y.setAttribute("aria-selected", "false"));
-    prefill(); numField(); if (t) add(t); loadBook(); window.scrollTo({ top: 0, behavior: "smooth" }); setTimeout(() => { const n = $("bname"); if (n) n.focus(); }, 120); };
+    prefill(); numField(); if (t) add(t); loadBook(); window.scrollTo({ top: 0, behavior: "smooth" }); setTimeout(() => { const n = $("bmob"); if (n) n.focus(); }, 120); }; // owner 26/10 17:51: mobile first, the party's name and city fill in
   // C-20261016-BILLBOOK: estimate numbers are given by the server (E-YYMM-NN, from 01 each month); bill numbers are typed
   function numField() { const e = B.title === "Estimate", n = $("bno"); n.disabled = true; n.value = ""; const d = $("bdate").value || today(); // owner 16/10: bill numbers automatic too
     n.placeholder = "automatic (" + (e ? "E-" : "B-") + d.slice(2, 4) + d.slice(5, 7) + "-01, 02 …)"; }
