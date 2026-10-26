@@ -377,8 +377,8 @@ function renderCheck(){
   const n=document.createElement("p");n.className="hint";n.textContent=pr?`At 24K ${fmt(s.gold24g)}/g${s.goldAt?", updated "+new Date(s.goldAt).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):""}.`+(t.priceAtTag?` Price when tagged: ${fmt(t.priceAtTag)}.`:""):"";card.appendChild(n);
   const acts=document.createElement("div");acts.style.cssText="display:flex;gap:8px;flex-wrap:wrap";
   if(S.role!=="sales"){const rp=document.createElement("button");rp.type="button";rp.className="btn ghost";rp.textContent="Reprint tag";rp.addEventListener("click",async()=>{if(await ensureCode(t))printOrPDF(t)});acts.appendChild(rp);}
-  if(S.owner){const dl=document.createElement("button");dl.type="button";dl.className="btn ghost";dl.style.color="#a12b2b";dl.textContent="Delete tag";
-    dl.addEventListener("click",()=>{const hold=document.createElement("div");acts.replaceWith(hold);deleteBox(t,hold,renderCheck,renderCheck)});acts.appendChild(dl)}
+  /* owner 26/10/2026 (C-20261026-BILLNOW): no Delete tag on Price check; Bill now opens the bill for this piece (the Bill tab is gone) */
+  if(t.kind!=="sample"){const bn=document.createElement("button");bn.type="button";bn.className="btn";bn.textContent="Bill now";bn.addEventListener("click",()=>{if(window.VJ_BILL_NOW)window.VJ_BILL_NOW(t.id);else msg("Billing is still loading - try again in a moment.","warn")});acts.appendChild(bn)}
   /* owners: an order the customer cancelled becomes stock; the old customer stays on the piece as orderCancelled (C-20261016-ORDERSTOCK) */
   if(S.owner&&t.kind==="order"){const ms=document.createElement("button");ms.type="button";ms.className="btn ghost";ms.textContent="Move to stock";
     ms.addEventListener("click",()=>{const hold=document.createElement("div");acts.replaceWith(hold);
