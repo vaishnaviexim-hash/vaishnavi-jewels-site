@@ -139,7 +139,9 @@ async function vjWho(request, env) {
 
 const VJ_PATH = /^(tags\/[A-Za-z0-9_\-.~]{1,60}|settings\/main|counters\/main)$/;
 // What staff may change on a piece that already exists (photo, price code fixed at first print, print queue).
-const VJ_STAFF_FIELDS = new Set(['photo', 'photoAt', 'photoBy', 'code', 'priceAtTag', 'gold24gAtTag', 'queue', 'queueAt', 'printedAt']);
+// owner 26/10/2026 (C-20261026-STAFFEDIT): staff may also use Edit tag (design no., remark, box, gold, diamonds, polki, other, sample metal);
+// every change is still logged old -> new in vj_changes / audit with the person's email. Delete stays owner-only.
+const VJ_STAFF_FIELDS = new Set(['photo', 'photoAt', 'photoBy', 'code', 'priceAtTag', 'gold24gAtTag', 'queue', 'queueAt', 'printedAt', 'designNo', 'remark', 'box', 'other', 'dias', 'polki', 'metal', 'gold', 'editedAt']);
 
 async function vjAudit(env, who, action, path, detail) {
   try { await env.DB.prepare('INSERT INTO audit (ts, email, action, path, detail) VALUES (?, ?, ?, ?, ?)').bind(Date.now(), who.email, action, path || '', String(detail || '').slice(0, 500)).run(); } catch (e) {}
