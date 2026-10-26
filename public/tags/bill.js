@@ -10,7 +10,8 @@
   const MODES = { ws: "W/s", nett: "Nett", g2g: "Gold to Gold", item: "Gold Item" };
   const fineMode = () => B.mode === "g2g" || B.mode === "item";
   const g3 = n => Number(n || 0).toFixed(3) + " g";
-  const tags = () => (window.VJ_TAGS ? window.VJ_TAGS() : []);
+  const tags = () => (window.VJ_TAGS_ALL ? window.VJ_TAGS_ALL() : window.VJ_TAGS ? window.VJ_TAGS() : []); // includes sold pieces so saved bills can be edited (C-20261026-SOLD)
+  const stockTags = () => tags().filter(t => t.status !== "sold");
   const settings = () => (window.VJ_SETTINGS && window.VJ_SETTINGS()) || {};
   const today = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
   const dmy = d => d.split("-").reverse().join("-");
@@ -87,8 +88,8 @@
   function find(q) {
     q = String(q || "").trim().toUpperCase().replace(/\s+/g, ""); if (!q) return [];
     const n = x => String(x || "").toUpperCase().replace(/[^A-Z0-9]/g, ""), nq = n(q);
-    if (/^[A-Z]{3}\d+[A-Z]{3}$/.test(q)) { const c = tags().filter(t => t.code && String(t.code).toUpperCase() === q); if (c.length) return c; } // price code on the tag (C-20261016-BILLCODE)
-    return tags().filter(t => String(t.no) === q && /^\d+$/.test(q) || nq && (n(t.designNo) === nq || n(t.label) === nq)).slice(0, 12);
+    if (/^[A-Z]{3}\d+[A-Z]{3}$/.test(q)) { const c = stockTags().filter(t => t.code && String(t.code).toUpperCase() === q); if (c.length) return c; } // price code on the tag (C-20261016-BILLCODE)
+    return stockTags().filter(t => String(t.no) === q && /^\d+$/.test(q) || nq && (n(t.designNo) === nq || n(t.label) === nq)).slice(0, 12);
   }
   function build() {
     const nav = document.querySelector("nav"); if (!nav || $("t-bill")) return;
