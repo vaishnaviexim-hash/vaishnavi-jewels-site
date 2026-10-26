@@ -656,6 +656,30 @@ function vjBillCalc(tags, o) {
 }
 // VJ_BILL_CALC_END
 
+// owner 26/10/2026 17:38 (C-20261026-SOLD 'why is the product still showing in the stock?'): a piece on a saved Bill (not an Estimate)
+// is marked sold on its tag (status 'sold', sold {no, date, name, at}); the stock pages hide sold pieces. Editing the bill moves pieces
+// in/out; cancelling the bill puts its pieces back to what they were (soldPrev). Nothing is deleted, so Erase still works as before.
+async function vjMarkSold(env, who, ids, info, onlyNo) {
+  let n = 0;
+  for (const id of ids) {
+    if (!/^[A-Za-z0-9_\-.~]{1,60}$/.test(String(id))) continue;
+    const path = 'tags/' + id, t = await env.DB.prepare('SELECT data, version FROM docs WHERE path = ?').bind(path).first(); if (!t) continue;
+    const d = JSON.parse(t.data);
+    if (info) { if (d.status === 'sold' && d.sold && d.sold.no === info.no) continue; if (d.status !== 'sold') d.soldPrev = d.status || 'in_stock'; d.status = 'sold'; d.sold = info; }
+    else { if (d.status !== 'sold' || (onlyNo && !(d.sold && d.sold.no === onlyNo))) continue; d.status = d.soldPrev || 'in_stock'; delete d.sold; delete d.soldPrev; }
+    const r = await env.DB.prepare('UPDATE docs SET data = ?, version = ?, updated_at = ?, updated_by = ? WHERE path = ? AND version = ?').bind(JSON.stringify(d), t.version + 1, Date.now(), who.email, path, t.version).run();
+    if (r.meta && r.meta.changes === 1) { n++; await vjAudit(env, who, 'update', path, info ? 'status sold (bill ' + info.no + ')' : 'status back to ' + d.status + ' (bill ' + (onlyNo || '') + ')'); }
+  }
+  return n;
+}
+let vjSoldDone = false;
+async function vjSoldBackfill(env, who) { // once per worker start: pieces on bills saved before 26/10/2026 17:45 are marked sold too
+  if (vjSoldDone) return; vjSoldDone = true;
+  const all = ((await env.DB.prepare("SELECT data FROM vj_bills WHERE no LIKE 'B-%' ORDER BY ts").all()).results) || [];
+  for (const x of all) { let b; try { b = JSON.parse(x.data); } catch (e) { continue; } if (!b || b.cancelled) continue;
+    await vjMarkSold(env, who, [...new Set((b.rows || []).map(r => String(r.id || '')))], { no: b.no, date: b.date, name: b.name, at: b.at }); }
+}
+
 // Bill tab endpoint (C-20261016-BILLS). The page sends only the customer, number, date, gold rate, mode and the piece ids;
 // the server recomputes every figure from the tags in D1 and the saved settings, keeps the bill in vj_bills (never sent to the
 // sales role), and returns the saved figures, from which the page prints the PDF - so a bill on paper always matches the record.
@@ -720,6 +744,8 @@ async function vjBill(request, env, who) { // every login may make bills (owner 
     await env.DB.batch([env.DB.prepare('INSERT INTO vj_bill_old (no, ts, email, data) VALUES (?, ?, ?, ?)').bind(editNo, Date.now(), who.email, old.data),
       env.DB.prepare('UPDATE vj_bills SET data = ? WHERE no = ?').bind(JSON.stringify(bill), editNo)]);
     await vjAudit(env, who, 'bill-edit', 'bills/' + editNo, `${od.total} -> ${bill.total} | ${name} ${mobile} | ${ids.join(',')}`);
+    if (title === 'Bill') { const oldIds = [...new Set((od.rows || []).map(r => String(r.id || '')))];
+      await vjMarkSold(env, who, oldIds.filter(i => !ids.includes(i)), null, editNo); await vjMarkSold(env, who, ids, { no: editNo, date, name, at: bill.at }); } // C-20261026-SOLD
     return vjJson({ ok: true, bill, edited: true });
   }
   // C-20261016-BILLBOOK / BILLAUTO: bills B-YYMM-NN and estimates E-YYMM-NN are numbered automatically, from 01 every month (by the date)
@@ -739,6 +765,7 @@ async function vjBill(request, env, who) { // every login may make bills (owner 
       return vjJson({ error: dupMsg(new Map([...hit].filter(([, x]) => x.no !== bill.no))), duplicate: true }, 409);
     }
   }
+  if (title === 'Bill') await vjMarkSold(env, who, ids, { no: bill.no, date, name, at: bill.at }); // C-20261026-SOLD: billed pieces leave stock
   await vjAudit(env, who, 'bill', 'bills/' + bill.no, `${title} ${mode}${calc.settle ? '/' + calc.settle : ''} ${name} ${mobile} ${calc.total}${calc.fine ? ' + ' + calc.fine + ' g fine' : ''}${calc.disc ? ' disc ' + calc.disc : ''} | ${ids.join(',')}`);
   return vjJson({ ok: true, bill });
 }
@@ -767,6 +794,7 @@ async function vjBillCancel(request, env, who) { // choice 2 (cancel only) for e
     const res = await env.DB.prepare('UPDATE vj_bills SET data = ? WHERE no = ? AND data = ?').bind(JSON.stringify(bill), no, row.data).run();
     if (!res.meta || res.meta.changes !== 1) return vjJson({ error: 'changed meanwhile, try again' }, 409);
     await vjAudit(env, who, 'bill-cancel', 'bills/' + no, reason + (note ? ' - ' + note : '') + ' | ' + bill.total);
+    await vjMarkSold(env, who, [...new Set((bill.rows || []).map(r => String(r.id || '')))], null, no); // C-20261026-SOLD: a cancelled bill's pieces go back to stock
   }
   let moved = 0;
   if (stock) for (const id of [...new Set((bill.rows || []).map(r => String(r.id || '')))]) {
@@ -908,6 +936,7 @@ async function vjBillBook(url, env, who) { // a sales login sees only the bills 
     const one = row ? JSON.parse(row.data) : null;
     return one && mine(one) ? vjJson({ ok: true, bill: one }) : vjDeny(404, 'not found');
   }
+  if (who.role === 'admin') await vjSoldBackfill(env, who); // C-20261026-SOLD
   const month = String(url.searchParams.get('month') || ''), all = month === 'all';
   if (!all && !/^\d{4}-\d{2}$/.test(month)) return vjDeny(400, 'month as YYYY-MM or all');
   const bills = (((await env.DB.prepare('SELECT data FROM vj_bills ORDER BY ts').all()).results) || []).map(r => JSON.parse(r.data))
