@@ -99,7 +99,7 @@
     const b = document.createElement("button"); b.setAttribute("role", "tab"); b.id = "t-bill"; b.dataset.tab = "bill"; b.textContent = "Bill"; b.setAttribute("aria-selected", "false"); b.textContent = "Saved bills"; // owner 26/10/2026: new bills start from Price check > Bill now; this tab shows the saved bills (17:43 'where did my bills go?')
     const nt = nav.querySelector('[data-tab="new"]'); nav.insertBefore(b, nt ? nt.nextSibling : nav.querySelector('[data-tab="rates"]')); // owner 16/10: New tag, Bill, then the rest
     // owner 26/10/2026 17:48: menu order New tag, Tag, Tagged pieces, Find lost tag, Saved bills, (Ledger), Quote, Gold rate & settings
-    const order = () => { const n = document.querySelector("nav"); if (!n) return; ["new", "check", "list", "find", "bill", "ledger", "quote", "rates"].forEach(k => { const x = n.querySelector('[data-tab="' + k + '"]'); if (x) n.appendChild(x); }); };
+    const order = () => { const n = document.querySelector("nav"); if (!n) return; ["new", "check", "orders", "list", "find", "bill", "ledger", "quote", "rates"].forEach(k => { const x = n.querySelector('[data-tab="' + k + '"]'); if (x) n.appendChild(x); }); };
     order(); setTimeout(order, 1500); setTimeout(order, 5000);
     const sec = document.createElement("section"); sec.id = "p-bill"; sec.className = "card"; sec.hidden = true;
     sec.innerHTML = `<div id="bform">
@@ -165,6 +165,7 @@
     document.querySelectorAll('[id^="p-"]').forEach(p => { p.hidden = p.id !== "p-bill"; });
     document.querySelectorAll("nav button").forEach(y => y.setAttribute("aria-selected", "false"));
     prefill(); numField(); if (t) add(t); loadBook(); window.scrollTo({ top: 0, behavior: "smooth" }); setTimeout(() => { const n = $("bmob"); if (n) n.focus(); }, 120); }; // owner 26/10 17:51: mobile first, the party's name and city fill in
+  window.VJ_BILL_ADD = id => { const t = tags().find(x => x.id === id); if (t) add(t); }; // Orders pending > Bill all (C-20261026-ORDERSDUE)
   // C-20261016-BILLBOOK: estimate numbers are given by the server (E-YYMM-NN, from 01 each month); bill numbers are typed
   function numField() { const e = B.title === "Estimate", n = $("bno"); n.disabled = true; n.value = ""; const d = $("bdate").value || today(); // owner 16/10: bill numbers automatic too
     n.placeholder = "automatic (" + (e ? "E-" : "B-") + d.slice(2, 4) + d.slice(5, 7) + "-01, 02 …)"; }
