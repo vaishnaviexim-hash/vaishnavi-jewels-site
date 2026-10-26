@@ -136,7 +136,7 @@
       <p class="hint" id="bmsg"></p><div class="actions" id="bout" hidden></div>
       </div>
       <h2>Saved bills &amp; estimates</h2>
-      <div class="row" style="align-items:end"><label style="flex:0 1 200px">Month <input id="bmonth" type="month"></label>
+      <div class="row" style="align-items:end"><label style="flex:0 1 200px">Month <input id="bmonth" type="month"></label><label style="flex:0 1 220px">Customer mobile (all bills) <input id="bfmob" inputmode="tel" autocomplete="off" maxlength="14" placeholder="type mobile no."></label>
         <div class="actions" style="margin:0"><button type="button" class="btn ghost" id="bxl">Download summary (Excel)</button><button type="button" class="btn ghost" id="bxlall">All months (Excel)</button></div></div>
       <div class="list"><table class="items" style="min-width:640px"><thead><tr><th>Date</th><th>Number</th><th>Type</th><th>Customer</th><th>Total</th><th>Fine gold</th><th>By</th><th></th></tr></thead><tbody id="bbook"></tbody></table></div>
       <p class="hint" id="bbookmsg"></p>`;
@@ -149,7 +149,7 @@
     document.querySelectorAll("input[name=bmode]").forEach(r => r.addEventListener("change", () => { B.mode = r.value; render(); }));
     document.querySelectorAll("input[name=bset]").forEach(r => r.addEventListener("change", () => { B.settle = r.value; render(); }));
     document.querySelectorAll("input[name=btitle]").forEach(r => r.addEventListener("change", () => { B.title = r.value; numField(); }));
-    $("bmonth").value = today().slice(0, 7); $("bmonth").addEventListener("change", loadBook);
+    $("bmonth").value = today().slice(0, 7); $("bmonth").addEventListener("change", loadBook); { let tm = 0; $("bfmob").addEventListener("input", () => { clearTimeout(tm); tm = setTimeout(loadBook, 350); }); } // owner 26/10 17:58: type a mobile no. and see all that customer's bills
     $("bxl").addEventListener("click", () => xl($("bmonth").value || today().slice(0, 7))); $("bxlall").addEventListener("click", () => xl("all"));
     $("bF").addEventListener("input", render); $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); }); $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
     $("bclear").addEventListener("click", () => { B.editNo = null; { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.nbb = false; $("bnbb").checked = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
@@ -166,8 +166,8 @@
   function numField() { const e = B.title === "Estimate", n = $("bno"); n.disabled = true; n.value = ""; const d = $("bdate").value || today(); // owner 16/10: bill numbers automatic too
     n.placeholder = "automatic (" + (e ? "E-" : "B-") + d.slice(2, 4) + d.slice(5, 7) + "-01, 02 …)"; }
   async function loadBook() {
-    const body = $("bbook"), m = $("bbookmsg"); if (!body) return; const mo = $("bmonth").value || today().slice(0, 7);
-    try { const r = await fetch("/api/vj/bills?month=" + encodeURIComponent(mo), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+    const body = $("bbook"), m = $("bbookmsg"); if (!body) return; const mo = $("bmonth").value || today().slice(0, 7); const fq = String(($("bfmob") || {}).value || "").replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""); const byMob = fq.length >= 4;
+    try { const r = await fetch("/api/vj/bills?month=" + encodeURIComponent(byMob ? "all" : mo), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); if (byMob) j.bills = j.bills.filter(b => String(b.mobile || "").replace(/\D/g, "").includes(fq));
       body.textContent = ""; let tot = 0;
       let nc = 0;
       // owner 16/10: a cancelled bill's line leaves the screen for everyone (still kept, still in the Excel) (C-20261016-HIDECANCELLED, C-20261016-NOSHOWCANCELLED)
@@ -183,7 +183,7 @@
         tr.appendChild(x); body.appendChild(tr); });
       m.textContent = j.bills.length ? `${j.bills.length} in this month${nc ? " (" + nc + " cancelled)" : ""}, total ${fmt(tot)}${nc ? " without the cancelled ones" : ""}.` : "Nothing saved in this month.";
       const live = j.bills.length - nc; // C-20261016-HIDECANCELLED
-      m.textContent = (live ? live + " in this month, total " + fmt(tot) + "." : "Nothing saved in this month.") + (nc ? " " + nc + " cancelled " + (nc === 1 ? "bill" : "bills") + " hidden (kept in the Excel, marked CANCELLED)." : "");
+      m.textContent = byMob ? (live ? live + " bill" + (live === 1 ? "" : "s") + " for mobile " + fq + " (all months), total " + fmt(tot) + "." : "No bills for mobile " + fq + ".") : (live ? live + " in this month, total " + fmt(tot) + "." : "Nothing saved in this month.") + (nc ? " " + nc + " cancelled " + (nc === 1 ? "bill" : "bills") + " hidden (kept in the Excel, marked CANCELLED)." : "");
     } catch (e) { m.textContent = "Could not load the saved bills (" + (e.message || e) + ")."; }
   }
   // owners only (C-20261016-BILL3WAY): 1 erase everything, 2 cancel the bill only (pieces stay - orders stay orders), 3 cancel and move order pieces to stock
