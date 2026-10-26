@@ -54,7 +54,7 @@
       fine = Math.round(fine * 1000) / 1000;
       if (settle === 'amount') gold = fine * Fr;
       const ov = o.rates && Array.isArray(o.rates[t.id]) ? o.rates[t.id] : []; // rates edited on the bill (C-20261016-BILLALL); the tag is not changed
-      const dl = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map((d, i) => ({ q: String(d.q || ''), shape: String(d.shape || '').slice(0, 20), ct: Number(d.ct) || 0, tagRate: Number(d.rate) || 0, rate: Number(ov[i]) > 0 ? Number(ov[i]) : (Number(d.rate) || 0), idx: i }))
+      const dl = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map((d, i) => ({ q: String(d.q || ''), shape: String(d.shape || '').slice(0, 20), ct: Number(d.ct) || 0, tagRate: Number(d.rate) || 0, rate: Number(ov[i]) > 0 ? Number(ov[i]) : Number(ov[i]) === -1 ? 0 : (Number(d.rate) || 0), idx: i })) // -1 = rate typed as 0 on the bill (owner 26/10 18:38: party diamond with no charge)
         .sort((x, y) => { const rk = s => { const v = { round: 0, choki: 1, fancy: 2 }[String(s || '').toLowerCase()]; return v === undefined ? 3 : v; }; return rk(x.shape) - rk(y.shape) || x.idx - y.idx; }); // owner 26/10: Round first, then Choki, then Fancy (C-20261026-DIAORDER)
       const ct = dl.reduce((a, d) => a + d.ct, 0), dia = dl.reduce((a, d) => a + d.ct * d.rate, 0), oth = Number(t.other && t.other.amt) || 0;
       // polki (C-20261017-POLKI): pcs x the tag's rate per pc; the rate can be changed on the bill (prates), the tag is not changed
@@ -280,7 +280,7 @@
       $("bname").value = b.name || ""; $("bcity").value = b.city || ""; $("bmob").value = b.mobile || ""; $("bdate").value = b.date; $("bF").value = b.F;
       b.rows.forEach(x => { if (x.discTxt) B.disc[x.id] = x.discTxt; else if (x.disc > 0) B.disc[x.id] = String(x.disc);
         if (Math.round(x.F) !== Math.round(b.F)) B.frates[x.id] = x.F;
-        const ds = x.dias || []; if (ds.some(d => d.rate !== d.tagRate)) { const a = ds.map(() => 0); ds.forEach((d, k) => { a[d.idx != null ? d.idx : k] = d.rate !== d.tagRate ? d.rate : 0; }); B.rates[x.id] = a; }
+        const ds = x.dias || []; if (ds.some(d => d.rate !== d.tagRate)) { const a = ds.map(() => 0); ds.forEach((d, k) => { a[d.idx != null ? d.idx : k] = d.rate !== d.tagRate ? (d.rate || -1) : 0; }); B.rates[x.id] = a; }
         if (x.polkiPcs && x.polkiRate !== x.polkiTagRate) B.prates[x.id] = x.polkiRate;
         if (x.pdCt && x.pdRate !== x.pdTagRate) B.pdrates[x.id] = x.pdRate; });
       B.editNo = b.no; $("bno").value = b.no; const n = $("beditnote"); n.hidden = false;
@@ -365,8 +365,8 @@
       // diamonds: the rate saved on the tag, editable here for this bill only (C-20261016-BILLALL)
       const dt = document.createElement("td"); dt.className = "num"; if (!r.dias.length) dt.textContent = "—";
       r.dias.forEach((d, k) => { const ln = document.createElement("div"); ln.style.cssText = "white-space:nowrap;margin:2px 0";
-        const ri = document.createElement("input"); ri.className = "brate"; ri.inputMode = "numeric"; ri.autocomplete = "off"; ri.style.cssText = "width:78px;text-align:right;padding:4px 6px"; ri.value = d.rate || ""; ri.title = "Rate per ct (tag: " + (d.tagRate || "-") + ")";
-        ri.addEventListener("input", () => { const a = B.rates[r.id] = (B.rates[r.id] || r.dias.map(() => 0)).slice(); a[d.idx != null ? d.idx : k] = Number(ri.value.replace(/[^0-9.]/g, "")) || 0; totals(); });
+        const ri = document.createElement("input"); ri.className = "brate"; ri.inputMode = "numeric"; ri.autocomplete = "off"; ri.style.cssText = "width:78px;text-align:right;padding:4px 6px"; ri.value = d.rate === 0 && (d.tagRate > 0 || /party/i.test(d.q)) ? "0" : (d.rate || ""); ri.title = "Rate per ct (tag: " + (d.tagRate || "-") + ")";
+        ri.addEventListener("input", () => { const a = B.rates[r.id] = (B.rates[r.id] || r.dias.map(() => 0)).slice(); a[d.idx != null ? d.idx : k] = ri.value.replace(/[^0-9.]/g, "") !== "" && Number(ri.value.replace(/[^0-9.]/g, "")) === 0 ? -1 : Number(ri.value.replace(/[^0-9.]/g, "")) || 0; totals(); });
         ln.append(`${d.shape ? d.shape + " " : ""}${d.q} ${d.ct.toFixed(2)} ct @ `, ri); /* owner 26/10: diamond shape shown (C-20261026-DIASHAPE) */ dt.appendChild(ln); });
       if (r.dias.length) { const dv = document.createElement("div"); dv.dataset.dia = r.id; dv.style.fontWeight = "600"; dv.textContent = "= " + fmt(r.diaAmt); dt.appendChild(dv); }
       tr.appendChild(dt);
