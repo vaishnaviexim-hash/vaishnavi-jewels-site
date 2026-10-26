@@ -613,6 +613,7 @@ function vjBillCalc(tags, o) {
   const m = Object.assign({ base: 650, small: 750, limit: 5, pct: 10, min: 1000 }, o.making || {}), F = Number(o.F) || 0;
   const mode = ['ws', 'nett', 'g2g', 'item'].includes(o.mode) ? o.mode : 'ws', fineMode = mode === 'g2g' || mode === 'item';
   const settle = fineMode ? (o.settle === 'amount' ? 'amount' : 'fine') : '';
+  const g2gN = mode === 'g2g' && o.g2g === 'nett'; // owner 26/10 18:55 (C-20261026-G2GNETT): Gold to Gold on Nett = fine is net x purity (14K 0.60), making Rs 650/g (750 up to 5 g, min 1,000) + 10% wastage in rupees; on W/s = fine with 10% wastage (14K 0.66) + making
   const gstPct = o.gst == null ? 3 : Number(o.gst);
   const rows = tags.map(t => {
     const gl = (t.kind === 'sample' ? [{ k: '14K', net: vjSmpNet(t) }] : (Array.isArray(t.gold) ? t.gold : []))
@@ -631,7 +632,7 @@ function vjBillCalc(tags, o) {
     gl.forEach(g => { net += g.net;
       if (g.tn) { if (fineMode) fine += g.net * g.tn; else gold += g.net * g.tn * Fr; return; }
       nc += g.net;
-      if (fineMode) fine += g.net * (VJ_FINE[mode][g.k] || 0);
+      if (fineMode) { fine += g.net * (g2gN ? (Number(pur[g.k]) || 0) : (VJ_FINE[mode][g.k] || 0)); if (g2gN) ng += g.net * kr(g.k); }
       else { const v = g.net * kr(g.k) * (mode === 'ws' && g.k !== '24K' ? 1.1 : 1); gold += v; ng += v; } });
     fine = Math.round(fine * 1000) / 1000;
     if (settle === 'amount') gold = fine * Fr;
@@ -648,7 +649,7 @@ function vjBillCalc(tags, o) {
     const r = { id: t.id, label: String(t.label || ''), design: String(t.designNo || ''), cat: String(t.catName || ''),
       gold: gl.map(g => g.k + ' ' + g.net.toFixed(3) + ' g' + (g.tn ? ', tunch ' + g.tn.toFixed(3) : '')).join(' + '), chain: gl.length > 0 && !g0, mkWt: Math.round(nc * 1000) / 1000, F: Fr, Fdef: Fo, orderRate: Fo !== F, rateEdited: Fr !== Fo, net: Math.round(net * 1000) / 1000, fine, goldAmt: Math.round(gold),
       mkRate: 0, making: 0, ct: Math.round(ct * 100) / 100, diaAmt: Math.round(dia), polkiPcs: ppcs, polkiRate: prate, polkiTagRate: ppcs ? ptag : 0, polki: ppcs * prate, pdCt, pdPcs, pdRate, pdTagRate: pdTag, pd: Math.round(pdCt * pdRate), cert: String(t.remark || '').slice(0, 10), certNo: String(t.certNo || '').slice(0, 30), other: Math.round(oth), dias: dl };
-    if (g0 && mode !== 'item' && nc > 0) { let mkAmt = Math.max(mk * nc, Number(m.min) || 0); if (mode === 'nett') mkAmt += ng * m.pct / 100; r.making = Math.round(mkAmt); r.mkRate = Math.round(r.making / nc); }
+    if (g0 && mode !== 'item' && nc > 0) { let mkAmt = Math.max(mk * nc, Number(m.min) || 0); if (mode === 'nett' || g2gN) mkAmt += ng * m.pct / 100; r.making = Math.round(mkAmt); r.mkRate = Math.round(r.making / nc); }
     r.amount = r.goldAmt + r.making + r.diaAmt + r.polki + r.pd + r.other;
     const dv = String(o.disc && o.disc[t.id] != null ? o.disc[t.id] : '').trim(), pm = dv.match(/^(\d+(?:\.\d+)?)\s*%$/), dn = Number(dv.replace(/[,\s]/g, ''));
     r.discTxt = pm ? Math.min(100, Number(pm[1])) + '%' : '';
@@ -666,7 +667,7 @@ function vjBillCalc(tags, o) {
     if (mode !== 'item' && r.mkWt > 0) { r.making += roundIn; r.mkRate = Math.round(r.making / r.mkWt); } else r.other += roundIn;
     r.amount += roundIn; r.net += roundIn; sum += roundIn; }
   const fine = Math.round(rows.reduce((a, r) => a + r.fine, 0) * 1000) / 1000;
-  return { mode, settle, rows, fine: settle === 'fine' ? fine : 0, fineIn: fine, sum, disc, after, roundOff: 0, roundIn, sub, gstPct, gst, total: sub + gst };
+  return { mode, settle, g2g: mode === 'g2g' ? (g2gN ? 'nett' : 'ws') : '', rows, fine: settle === 'fine' ? fine : 0, fineIn: fine, sum, disc, after, roundOff: 0, roundIn, sub, gstPct, gst, total: sub + gst };
 }
 // VJ_BILL_CALC_END
 
@@ -743,7 +744,7 @@ async function vjBill(request, env, who) { // every login may make bills (owner 
   if (title === 'Bill') { const hit = await onBill(); if (hit.size) return vjJson({ error: dupMsg(hit), duplicate: true }, 409); }
   const sRow = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first();
   const s = sRow ? JSON.parse(sRow.data) : {};
-  const calc = vjBillCalc(tags, { F, mode, settle, disc, rates, frates, prates, pdrates, purity: s.purity, making: s.making, gst: s.gst });
+  const calc = vjBillCalc(tags, { F, mode, settle, g2g: b && b.g2g === 'nett' ? 'nett' : 'ws', disc, rates, frates, prates, pdrates, purity: s.purity, making: s.making, gst: s.gst });
   calc.rows.forEach((r, i) => { const ph = tags[i].photo; if (typeof ph === 'string' && /^[0-9a-f]{32}$/.test(ph)) r.photo = ph; }); // owner 16/10: photo on the bill
   const bill = Object.assign({ no, title, date, name, city, mobile, F, nbb: !!(b && b.nbb === true), by: who.email, byName: who.name, at: new Date().toISOString() }, calc); // nbb: 'No Buy Back No Exchange' stamp (owner 17/10, C-20261017-NBB)
   if (editNo) { // C-20261026-BILLEDIT (owner 26/10/2026 17:32 'i should be able to edit the bill'): owners only; the old version is kept in vj_bill_old
