@@ -99,7 +99,7 @@
     const order = () => { const n = document.querySelector("nav"); if (!n) return; ["new", "check", "list", "find", "bill", "ledger", "quote", "rates"].forEach(k => { const x = n.querySelector('[data-tab="' + k + '"]'); if (x) n.appendChild(x); }); };
     order(); setTimeout(order, 1500); setTimeout(order, 5000);
     const sec = document.createElement("section"); sec.id = "p-bill"; sec.className = "card"; sec.hidden = true;
-    sec.innerHTML = `
+    sec.innerHTML = `<div id="bform">
       <div class="actions" style="margin:0 0 8px"><button type="button" class="btn ghost" id="bback">&larr; Back to Tag</button></div>
       <h2>1 · Pieces</h2>
       <div class="row" style="align-items:end"><label style="flex:2 1 220px">Code on the tag, tag number or design number <input id="bq" autocomplete="off" placeholder="e.g. abc270xyz, 803 or 1436"></label>
@@ -134,14 +134,15 @@
       <p class="hint" id="beditnote" hidden style="color:#8a5a00;font-weight:600"></p>
       <div class="actions"><button type="button" class="btn" id="bsave">Save bill &amp; make PDF</button><button type="button" class="btn ghost" id="bclear">Clear</button></div>
       <p class="hint" id="bmsg"></p><div class="actions" id="bout" hidden></div>
-      <h2>3 · Saved bills &amp; estimates</h2>
+      </div>
+      <h2>Saved bills &amp; estimates</h2>
       <div class="row" style="align-items:end"><label style="flex:0 1 200px">Month <input id="bmonth" type="month"></label>
         <div class="actions" style="margin:0"><button type="button" class="btn ghost" id="bxl">Download summary (Excel)</button><button type="button" class="btn ghost" id="bxlall">All months (Excel)</button></div></div>
       <div class="list"><table class="items" style="min-width:640px"><thead><tr><th>Date</th><th>Number</th><th>Type</th><th>Customer</th><th>Total</th><th>Fine gold</th><th>By</th><th></th></tr></thead><tbody id="bbook"></tbody></table></div>
       <p class="hint" id="bbookmsg"></p>`;
     $("p-rates").parentNode.insertBefore(sec, $("p-rates"));
     document.querySelectorAll("nav button").forEach(x => x.addEventListener("click", () => {
-      const on = x.dataset.tab === "bill"; sec.hidden = !on; if (on) { document.querySelectorAll('[id^="p-"]').forEach(p => { if (p !== sec) p.hidden = true; }); prefill(); numField(); render(); loadBook(); if (!B.items.length) setTimeout(() => { const s3 = $("bmonth"); if (s3) s3.scrollIntoView({ behavior: "smooth", block: "center" }); }, 120); else setTimeout(() => $("bq").focus(), 50); }
+      const on = x.dataset.tab === "bill"; sec.hidden = !on; if (on) { document.querySelectorAll('[id^="p-"]').forEach(p => { if (p !== sec) p.hidden = true; }); prefill(); numField(); render(); loadBook(); $("bform").hidden = true; window.scrollTo({ top: 0 }); } // owner 26/10 17:49: the Saved bills tab shows only saved bills & estimates
       document.querySelectorAll("nav button").forEach(y => y.setAttribute("aria-selected", y === x ? "true" : "false"));
     }));
     $("badd").addEventListener("click", pick); $("bq").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); pick(); } });
@@ -157,7 +158,7 @@
   }
   // owner 26/10/2026 (C-20261026-BILLNOW): Price check > Bill now opens a fresh bill with that piece; weights come from the tag (not editable),
   // the gold rate and diamond / polki rates can be changed for this bill only; name, mobile and city are asked first.
-  window.VJ_BILL_NOW = id => { if (!$("p-bill")) return; $("bclear").click(); const t = tags().find(x => x.id === id);
+  window.VJ_BILL_NOW = id => { if (!$("p-bill")) return; $("bclear").click(); $("bform").hidden = false; const t = tags().find(x => x.id === id);
     document.querySelectorAll('[id^="p-"]').forEach(p => { p.hidden = p.id !== "p-bill"; });
     document.querySelectorAll("nav button").forEach(y => y.setAttribute("aria-selected", "false"));
     prefill(); numField(); if (t) add(t); loadBook(); window.scrollTo({ top: 0, behavior: "smooth" }); setTimeout(() => { const n = $("bname"); if (n) n.focus(); }, 120); };
@@ -269,7 +270,7 @@
   async function editBill(no, btn) { btn.disabled = true;
     try { const r = await fetch("/api/vj/bill?no=" + encodeURIComponent(no), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
       const b = j.bill, all = tags(); const miss = (b.rows || []).filter(x => !all.some(t => t.id === x.id)); if (miss.length) throw new Error("a piece on it is no longer in stock (" + miss.map(x => x.label).join(", ") + ")");
-      $("bclear").click(); B.items = b.rows.map(x => x.id); B.mode = b.mode || "ws"; B.settle = b.settle || "fine"; B.title = b.title || "Bill"; B.nbb = !!b.nbb; $("bnbb").checked = B.nbb;
+      $("bclear").click(); $("bform").hidden = false; B.items = b.rows.map(x => x.id); B.mode = b.mode || "ws"; B.settle = b.settle || "fine"; B.title = b.title || "Bill"; B.nbb = !!b.nbb; $("bnbb").checked = B.nbb;
       document.querySelectorAll("input[name=bmode]").forEach(x => { x.checked = x.value === B.mode; }); document.querySelectorAll("input[name=bset]").forEach(x => { x.checked = x.value === B.settle; });
       document.querySelectorAll("input[name=btitle]").forEach(x => { x.checked = x.value === B.title; x.disabled = true; });
       $("bname").value = b.name || ""; $("bcity").value = b.city || ""; $("bmob").value = b.mobile || ""; $("bdate").value = b.date; $("bF").value = b.F;
