@@ -53,7 +53,7 @@
       fine = Math.round(fine * 1000) / 1000;
       if (settle === 'amount') gold = fine * Fr;
       const ov = o.rates && Array.isArray(o.rates[t.id]) ? o.rates[t.id] : []; // rates edited on the bill (C-20261016-BILLALL); the tag is not changed
-      const dl = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map((d, i) => ({ q: String(d.q || ''), ct: Number(d.ct) || 0, tagRate: Number(d.rate) || 0, rate: Number(ov[i]) > 0 ? Number(ov[i]) : (Number(d.rate) || 0) }));
+      const dl = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map((d, i) => ({ q: String(d.q || ''), shape: String(d.shape || '').slice(0, 20), ct: Number(d.ct) || 0, tagRate: Number(d.rate) || 0, rate: Number(ov[i]) > 0 ? Number(ov[i]) : (Number(d.rate) || 0) }));
       const ct = dl.reduce((a, d) => a + d.ct, 0), dia = dl.reduce((a, d) => a + d.ct * d.rate, 0), oth = Number(t.other && t.other.amt) || 0;
       // polki (C-20261017-POLKI): pcs x the tag's rate per pc; the rate can be changed on the bill (prates), the tag is not changed
       const pk = t.polki && typeof t.polki === 'object' ? t.polki : null, ppcs = pk ? Math.max(0, Math.round(Number(pk.pcs) || 0)) : 0, ptag = pk ? Math.round(Number(pk.rate) || 0) : 0;
@@ -306,7 +306,7 @@
       r.dias.forEach((d, k) => { const ln = document.createElement("div"); ln.style.cssText = "white-space:nowrap;margin:2px 0";
         const ri = document.createElement("input"); ri.className = "brate"; ri.inputMode = "numeric"; ri.autocomplete = "off"; ri.style.cssText = "width:78px;text-align:right;padding:4px 6px"; ri.value = d.rate || ""; ri.title = "Rate per ct (tag: " + (d.tagRate || "-") + ")";
         ri.addEventListener("input", () => { const a = B.rates[r.id] = (B.rates[r.id] || r.dias.map(() => 0)).slice(); a[k] = Number(ri.value.replace(/[^0-9.]/g, "")) || 0; totals(); });
-        ln.append(`${d.q} ${d.ct.toFixed(2)} ct @ `, ri); dt.appendChild(ln); });
+        ln.append(`${d.shape ? d.shape + " " : ""}${d.q} ${d.ct.toFixed(2)} ct @ `, ri); /* owner 26/10: diamond shape shown (C-20261026-DIASHAPE) */ dt.appendChild(ln); });
       if (r.dias.length) { const dv = document.createElement("div"); dv.dataset.dia = r.id; dv.style.fontWeight = "600"; dv.textContent = "= " + fmt(r.diaAmt); dt.appendChild(dv); }
       tr.appendChild(dt);
       if (hasPol) { // polki pcs x rate per pc; the rate can be changed for this bill only (C-20261017-POLKI)
@@ -379,7 +379,7 @@
       y += Math.max(h * 5, pic !== undefined && P ? 21 : 0) + 2.5; };
     doc.setFillColor(243, 230, 211); doc.rect(M, y - 5, W - 2 * M, 8, "F"); row(cols.map(c => c[0]), true, PK && D ? 9 : undefined); y += 1;
     b.rows.forEach(r => { if (y > 250) { doc.addPage(); y = 20; }
-      const dd = r.ct ? r.ct.toFixed(2) + " ct" + ((r.dias || []).length === 1 ? "\n@ " + Math.round(r.dias[0].rate).toLocaleString("en-IN") : "") + "\n" + fm(r.diaAmt) : "-";
+      const dd = r.ct ? (r.dias || []).filter(d => d.ct > 0).map(d => ((d.shape ? d.shape + " " : "") + d.q).trim() + "\n" + d.ct.toFixed(2) + " ct @ " + Math.round(d.rate).toLocaleString("en-IN")).join("\n") + "\n= " + fm(r.diaAmt) : "-"; // owner 26/10: every diamond line with its shape, quality, ct and rate (C-20261026-DIASHAPE)
       const base = [(r.design ? r.design + " - " : "") + r.label + (r.cat ? "\n" + r.cat : ""), (/tunch/.test(r.gold || "") ? r.gold.replace(/ \+ /g, "\n").replace(/, tunch /g, "\ntunch ") : (r.gold || "-")) + (Math.round(r.F) !== hF ? "\n@ " + Math.round(r.F).toLocaleString("en-IN") : ""), b.settle === "fine" ? g3(r.fine) + "\nfine" : fm(r.goldAmt) + (b.settle ? "\n" + g3(r.fine) + " fine" : ""), r.chain ? "-" : b.mode === "item" ? "in gold" : fm(r.making) /* owner 17/10 15:38: no making rate per g on the printed bill */, dd, ...(PK ? [r.polkiPcs ? r.polkiPcs + " pc\n@ " + Math.round(r.polkiRate).toLocaleString("en-IN") + "\n" + fm(r.polki) : "-"] : []), r.other ? fm(r.other) : "-"];
       row(D ? base.concat([fm(r.amount), r.disc ? fm(r.disc) + (r.discTxt ? "\n(" + r.discTxt + ")" : "") : "-", fm(r.net)]) : base.concat([fm(r.amount)]), false, D || PK ? 10 : 10.5, P ? (pics[r.id] || null) : undefined);
       doc.setDrawColor(225); doc.line(M, y - 3, W - M, y - 3); });
