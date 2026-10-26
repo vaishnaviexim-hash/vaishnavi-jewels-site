@@ -958,12 +958,14 @@ async function vjBillBook(url, env, who, mobQ) { // a sales login sees only the 
   const pieces = []; bills.forEach(b => (b.rows || []).forEach(r => pieces.push([dmy(b.date), b.no, b.title, b.cancelled ? 'CANCELLED' : 'Active', b.name, r.label, r.design || '', r.cat || '', r.gold || '', r.fine || '', r.goldAmt, r.making, r.ct || '', r.diaAmt, r.polkiPcs || '', r.polki || 0, r.other || 0, r.amount, r.disc || 0, r.net == null ? r.amount : r.net])));
   // A4 portrait summary for printing (owner 16/10): 7 columns that fit the page at normal size; full detail on the next sheets
   // owner 17/10 16:04: Amount before GST + GST = Total amount, and the customer's mobile number
-  const pcs = b => (b.rows || []).map(r => r.label + (r.cat ? ' - ' + r.cat : '')).join('\n'); // owner 26/10 17:55: our code no. and the item on the summary
+  // owner 26/10 18:10: our DESIGN no. (e.g. 4626) + the item (Pendant) + karat (14K) - not the tag code (VP14/326)
+  const ITEM = { VP: 'Pendant', VLR: 'Ring', VBR: 'Bracelet', ER: 'Earring', VNS: 'Necklace', NS: 'Necklace', BAN: 'Bangle', VBAN: 'Bangle', MS: 'Mangalsutra', PS: 'Pendant Set', VPS: 'Pendant Set', BRC: 'Bracelet', VCH: 'Chain', MN: 'Mangalsutra' };
+  const pcs = b => (b.rows || []).map(r => { const m = String(r.label || '').toUpperCase().match(/^S?([A-Z]+)(\d{1,2})\//); const item = r.cat || (m && ITEM[m[1]]) || ''; return [r.design || '', item + (m ? ' ' + m[2] + 'K' : '')].map(x => String(x).trim()).filter(Boolean).join(' - '); }).join('\n');
   const short = bills.map(b => [dmy(b.date), b.no, b.title, b.name, pcs(b), vjPhoneTxt(b.mobile), b.city || '', b.sub, b.gst, b.total, b.fine || '']);
   const subT = bills.reduce((a, b) => a + (Number(b.sub) || 0), 0);
   if (short.length) short.push(['', '', '', 'TOTAL (' + short.length + ')', '', '', '', subT, tot[2], tot[3], Math.round(tot[4] * 1000) / 1000 || '']);
   const xlsx = vjXlsx([
-    { name: 'Summary (print)', land: true, head: ['Date', 'Number', 'Type', 'Customer', 'Code no. - Item', 'Mobile', 'City', 'Amount before GST (Rs)', 'GST (Rs)', 'Total amount (Rs)', 'Fine gold (g)'], rows: short, widths: [11, 12, 8, 20, 26, 16, 12, 14, 10, 14, 10], wrap: [3, 4], mark: r => String(r[3]).startsWith('TOTAL') },
+    { name: 'Summary (print)', land: true, head: ['Date', 'Number', 'Type', 'Customer', 'Design no. - Item', 'Mobile', 'City', 'Amount before GST (Rs)', 'GST (Rs)', 'Total amount (Rs)', 'Fine gold (g)'], rows: short, widths: [11, 12, 8, 20, 26, 16, 12, 14, 10, 14, 10], wrap: [3, 4], mark: r => String(r[3]).startsWith('TOTAL') },
     { name: 'Bills and estimates', head, rows, widths: [11, 12, 9, 26, 22, 15, 12, 20, 10, 34, 12, 11, 12, 12, 10, 13, 12, 12], wrap: [3, 9], mark: r => String(r[3]).startsWith('CANCELLED') || String(r[4]).startsWith('TOTAL') },
     { name: 'Pieces', mark: r => r[3] === 'CANCELLED', head: ['Date', 'Number', 'Type', 'Status', 'Customer', 'Tag', 'Design no.', 'Category', 'Gold', 'Fine gold (g)', 'Gold value', 'Making', 'Diamonds (ct)', 'Diamond value', 'Polki (pcs)', 'Polki amount', 'Other', 'Amount', 'Discount', 'Net'], rows: pieces,
       widths: [11, 12, 9, 11, 22, 14, 12, 14, 20, 10, 12, 10, 10, 12, 9, 12, 9, 12, 10, 12] }]);
