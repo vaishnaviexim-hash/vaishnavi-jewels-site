@@ -127,7 +127,7 @@
       <table class="sum"><tr id="bfinerow" hidden><td><b>Fine gold to receive</b></td><td id="bfine"><b>—</b></td></tr><tr><td>Total</td><td id="bsum">—</td></tr><tr id="bdiscrow" hidden><td>Less discount</td><td id="bdisc">—</td></tr><tr hidden><td>Total after discount</td><td id="bsub">—</td></tr>
         <tr><td id="bgstl">GST 3%</td><td id="bgst">—</td></tr><tr class="total"><td>Bill total</td><td id="btotal">—</td></tr></table>
       <p class="hint" id="bnote"></p>
-      <div class="actions"><button type="button" class="btn" id="bsave">Save bill &amp; make PDF</button><button type="button" class="btn ghost" id="bclear">Clear</button></div>
+      <div class="actions"><button type="button" class="btn" id="bsave">Save bill &amp; send on WhatsApp</button><button type="button" class="btn ghost" id="bclear">Clear</button></div>
       <p class="hint" id="bmsg"></p><div class="actions" id="bout" hidden></div>
       <h2>3 · Saved bills &amp; estimates</h2>
       <div class="row" style="align-items:end"><label style="flex:0 1 200px">Month <input id="bmonth" type="month"></label>
@@ -418,8 +418,10 @@
       out.textContent = ""; out.hidden = false;
       const op = document.createElement("a"); op.className = "btn"; op.href = url; op.target = "_blank"; op.rel = "noopener"; op.textContent = "Open PDF (print)";
       const dl = document.createElement("a"); dl.className = "btn ghost"; dl.href = url; dl.download = fname; dl.textContent = "Download";
-      out.append(op, dl); try { dl.click(); } catch (e) {} // owner 26/10: our copy downloads straight away
-      if (/^[6-9]\d{9}$/.test(String(b.mobile || ""))) { const wa = document.createElement("button"); wa.type = "button"; wa.className = "btn ghost"; wa.textContent = "Send on WhatsApp (Aashvi)"; wa.addEventListener("click", () => sendWA(b, blob, wa, m)); out.append(wa); }
+      out.append(op, dl); // owner 26/10 17:30: no automatic download - the bill stays saved here (PDF button below)
+      if (/^[6-9]\d{9}$/.test(String(b.mobile || ""))) { const wa = document.createElement("button"); wa.type = "button"; wa.className = "btn ghost"; wa.textContent = "Send on WhatsApp (Aashvi)"; wa.addEventListener("click", () => sendWA(b, blob, wa, m)); out.append(wa);
+        wa.dataset.sure = "1"; sendWA(b, blob, wa, m); } // owner 26/10 17:30 (C-20261026-BILLWAAUTO): saving sends the bill to the customer's mobile on WhatsApp at once
+      else m.textContent += " No 10-digit mobile, so it was not sent on WhatsApp.";
       const canFile = (() => { try { return !!(navigator.canShare && navigator.canShare({ files: [file] })); } catch (e) { return false; } })();
       if (canFile) { const sh = document.createElement("button"); sh.type = "button"; sh.className = "btn ghost"; sh.textContent = "Share (WhatsApp)";
         sh.onclick = async () => { try { await navigator.share({ files: [file] }); } catch (e) {} }; out.append(sh); }
