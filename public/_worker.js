@@ -928,7 +928,8 @@ async function vjBillPdfHook(url, env, done) {
 }
 
 // Saved bills & estimates (C-20261016-BILLBOOK): month list, one bill for re-printing, or a summary Excel. Owners + staff only.
-async function vjBillBook(url, env, who) { // a sales login sees only the bills it made
+async function vjBillBook(url, env, who, mobQ) { // a sales login sees only the bills it made; mobQ (header, not URL): one party's bills (owner 26/10 18:03)
+  const mq = String(mobQ || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '').slice(0, 12), byMob = mq.length >= 4;
   const mine = b => who.role !== 'sales' || b.by === who.email;
   if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
   if (url.pathname === '/api/vj/bill') {
@@ -940,7 +941,7 @@ async function vjBillBook(url, env, who) { // a sales login sees only the bills 
   const month = String(url.searchParams.get('month') || ''), all = month === 'all';
   if (!all && !/^\d{4}-\d{2}$/.test(month)) return vjDeny(400, 'month as YYYY-MM or all');
   const bills = (((await env.DB.prepare('SELECT data FROM vj_bills ORDER BY ts').all()).results) || []).map(r => JSON.parse(r.data))
-    .filter(b => !b.cancelled && (all || String(b.date || '').startsWith(month)) && mine(b)).sort(/* owner 17/10 16:03: cancelled bills appear nowhere (list, summary, bills, pieces); the record stays only in the database (C-20261017-NOCANCELLED) */ (a, b) => String(a.date).localeCompare(String(b.date)) || String(a.at).localeCompare(String(b.at)));
+    .filter(b => !b.cancelled && (all || String(b.date || '').startsWith(month)) && mine(b) && (!byMob || String(b.mobile || '').replace(/\D/g, '').includes(mq))).sort(/* owner 17/10 16:03: cancelled bills appear nowhere (list, summary, bills, pieces); the record stays only in the database (C-20261017-NOCANCELLED) */ (a, b) => String(a.date).localeCompare(String(b.date)) || String(a.at).localeCompare(String(b.at)));
   const MODE = { ws: 'W/s', nett: 'Nett', g2g: 'Gold to Gold', item: 'Gold Item' };
   const dmy = d => String(d || '').split('-').reverse().join('-');
   const rcs = url.pathname === '/api/vj/bills' ? (await vjLedgerLoad(env)).rcs : []; // C-20261017-LEDGER: paid / balance per bill
@@ -1695,7 +1696,7 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/photosearch' && request.method === 'POST') return vjPhotoSearch(request, env, who);
   if (p === '/api/vj/quote' && request.method === 'POST') return vjSameSite(request, env) ? vjQuote(request, env, who, ctx) : vjDeny(403, 'not allowed'); // JSON from our own page only (C-20261017-QUOTEMODES)
   if (p === '/api/vj/bill' && request.method === 'POST') return vjBill(request, env, who);
-  if ((p === '/api/vj/bills' || p === '/api/vj/bills.xlsx' || p === '/api/vj/bill') && request.method === 'GET') return vjBillBook(url, env, who);
+  if ((p === '/api/vj/bills' || p === '/api/vj/bills.xlsx' || p === '/api/vj/bill') && request.method === 'GET') return vjBillBook(url, env, who, request.headers.get('x-vj-mob'));
   if (p === '/api/vj/bill/cancel' && request.method === 'POST') return vjBillCancel(request, env, who);
   if (p === '/api/vj/bill/send' && request.method === 'POST') return vjBillSend(request, env, who); // C-20261017-BILLWA
   if (p === '/api/vj/bill/sendstatus' && request.method === 'GET') return vjBillSendStatus(url, env);
