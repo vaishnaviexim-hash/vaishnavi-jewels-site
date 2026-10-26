@@ -93,7 +93,7 @@
   }
   function build() {
     const nav = document.querySelector("nav"); if (!nav || $("t-bill")) return;
-    const b = document.createElement("button"); b.setAttribute("role", "tab"); b.id = "t-bill"; b.dataset.tab = "bill"; b.textContent = "Bill"; b.setAttribute("aria-selected", "false"); b.hidden = true; // owner 26/10/2026 (C-20261026-BILLNOW): no Bill tab; bills start from Price check > Bill now
+    const b = document.createElement("button"); b.setAttribute("role", "tab"); b.id = "t-bill"; b.dataset.tab = "bill"; b.textContent = "Bill"; b.setAttribute("aria-selected", "false"); b.textContent = "Saved bills"; // owner 26/10/2026: new bills start from Price check > Bill now; this tab shows the saved bills (17:43 'where did my bills go?')
     const nt = nav.querySelector('[data-tab="new"]'); nav.insertBefore(b, nt ? nt.nextSibling : nav.querySelector('[data-tab="rates"]')); // owner 16/10: New tag, Bill, then the rest
     const sec = document.createElement("section"); sec.id = "p-bill"; sec.className = "card"; sec.hidden = true;
     sec.innerHTML = `
@@ -138,7 +138,7 @@
       <p class="hint" id="bbookmsg"></p>`;
     $("p-rates").parentNode.insertBefore(sec, $("p-rates"));
     document.querySelectorAll("nav button").forEach(x => x.addEventListener("click", () => {
-      const on = x.dataset.tab === "bill"; sec.hidden = !on; if (on) { document.querySelectorAll('[id^="p-"]').forEach(p => { if (p !== sec) p.hidden = true; }); prefill(); numField(); render(); loadBook(); setTimeout(() => $("bq").focus(), 50); }
+      const on = x.dataset.tab === "bill"; sec.hidden = !on; if (on) { document.querySelectorAll('[id^="p-"]').forEach(p => { if (p !== sec) p.hidden = true; }); prefill(); numField(); render(); loadBook(); if (!B.items.length) setTimeout(() => { const s3 = $("bmonth"); if (s3) s3.scrollIntoView({ behavior: "smooth", block: "center" }); }, 120); else setTimeout(() => $("bq").focus(), 50); }
       document.querySelectorAll("nav button").forEach(y => y.setAttribute("aria-selected", y === x ? "true" : "false"));
     }));
     $("badd").addEventListener("click", pick); $("bq").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); pick(); } });
