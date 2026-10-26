@@ -12,7 +12,7 @@
   const OPTS = { gh: "Natural VS GH", ij: "Natural VS IJ", lgd: "Lab-grown" };
   const LGD_RATE = 23000;
   const NON_DIAMOND = /POL|EMR|MOZ|RUBY|PEARL|MOTI|STONE|KUNDAN/i;
-  const PUR = { "24K": 1, "22K": 0.92, "18K": 0.76, "14K": 0.60, "9K": 0.40 };
+  const PUR = { "24K": 1, "22K": 0.92, "18K": 0.76, "14K": 0.60, "9K": 0.385 }; // 9K = 38.5 tunch (owner 26/10 19:00)
   const fmt = n => "Rs " + Math.round(n).toLocaleString("en-IN");
   const up = (n, s) => Math.ceil(Math.round(n * 100) / 100 / s) * s;
   const Q = { kind: "code", items: [], option: "gh", mk: "std", prates: {}, designs: [] }; // mk: "std" = settings making + 10% wastage, "flat" = Rs 1,600/g (owner 14/10)
