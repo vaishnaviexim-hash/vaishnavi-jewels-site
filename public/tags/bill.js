@@ -91,10 +91,11 @@
   }
   function build() {
     const nav = document.querySelector("nav"); if (!nav || $("t-bill")) return;
-    const b = document.createElement("button"); b.setAttribute("role", "tab"); b.id = "t-bill"; b.dataset.tab = "bill"; b.textContent = "Bill"; b.setAttribute("aria-selected", "false");
+    const b = document.createElement("button"); b.setAttribute("role", "tab"); b.id = "t-bill"; b.dataset.tab = "bill"; b.textContent = "Bill"; b.setAttribute("aria-selected", "false"); b.hidden = true; // owner 26/10/2026 (C-20261026-BILLNOW): no Bill tab; bills start from Price check > Bill now
     const nt = nav.querySelector('[data-tab="new"]'); nav.insertBefore(b, nt ? nt.nextSibling : nav.querySelector('[data-tab="rates"]')); // owner 16/10: New tag, Bill, then the rest
     const sec = document.createElement("section"); sec.id = "p-bill"; sec.className = "card"; sec.hidden = true;
     sec.innerHTML = `
+      <div class="actions" style="margin:0 0 8px"><button type="button" class="btn ghost" id="bback">&larr; Back to Price check</button></div>
       <h2>1 · Pieces</h2>
       <div class="row" style="align-items:end"><label style="flex:2 1 220px">Code on the tag, tag number or design number <input id="bq" autocomplete="off" placeholder="e.g. abc270xyz, 803 or 1436"></label>
       <div><button type="button" class="btn" id="badd">Add piece</button></div></div>
@@ -146,7 +147,14 @@
     $("bF").addEventListener("input", render); $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); }); $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
     $("bclear").addEventListener("click", () => { B.items = []; B.nbb = false; $("bnbb").checked = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
     $("bsave").addEventListener("click", save);
+    $("bback").addEventListener("click", () => { const c = document.querySelector('nav button[data-tab="check"]'); if (c) c.click(); });
   }
+  // owner 26/10/2026 (C-20261026-BILLNOW): Price check > Bill now opens a fresh bill with that piece; weights come from the tag (not editable),
+  // the gold rate and diamond / polki rates can be changed for this bill only; name, mobile and city are asked first.
+  window.VJ_BILL_NOW = id => { if (!$("p-bill")) return; $("bclear").click(); const t = tags().find(x => x.id === id);
+    document.querySelectorAll('[id^="p-"]').forEach(p => { p.hidden = p.id !== "p-bill"; });
+    document.querySelectorAll("nav button").forEach(y => y.setAttribute("aria-selected", "false"));
+    prefill(); numField(); if (t) add(t); loadBook(); window.scrollTo({ top: 0, behavior: "smooth" }); setTimeout(() => { const n = $("bname"); if (n) n.focus(); }, 120); };
   // C-20261016-BILLBOOK: estimate numbers are given by the server (E-YYMM-NN, from 01 each month); bill numbers are typed
   function numField() { const e = B.title === "Estimate", n = $("bno"); n.disabled = true; n.value = ""; const d = $("bdate").value || today(); // owner 16/10: bill numbers automatic too
     n.placeholder = "automatic (" + (e ? "E-" : "B-") + d.slice(2, 4) + d.slice(5, 7) + "-01, 02 …)"; }
@@ -409,7 +417,7 @@
       out.textContent = ""; out.hidden = false;
       const op = document.createElement("a"); op.className = "btn"; op.href = url; op.target = "_blank"; op.rel = "noopener"; op.textContent = "Open PDF (print)";
       const dl = document.createElement("a"); dl.className = "btn ghost"; dl.href = url; dl.download = fname; dl.textContent = "Download";
-      out.append(op, dl);
+      out.append(op, dl); try { dl.click(); } catch (e) {} // owner 26/10: our copy downloads straight away
       if (/^[6-9]\d{9}$/.test(String(b.mobile || ""))) { const wa = document.createElement("button"); wa.type = "button"; wa.className = "btn ghost"; wa.textContent = "Send on WhatsApp (Aashvi)"; wa.addEventListener("click", () => sendWA(b, blob, wa, m)); out.append(wa); }
       const canFile = (() => { try { return !!(navigator.canShare && navigator.canShare({ files: [file] })); } catch (e) { return false; } })();
       if (canFile) { const sh = document.createElement("button"); sh.type = "button"; sh.className = "btn ghost"; sh.textContent = "Share (WhatsApp)";
