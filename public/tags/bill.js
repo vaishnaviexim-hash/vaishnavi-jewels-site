@@ -127,7 +127,8 @@
       <table class="sum"><tr id="bfinerow" hidden><td><b>Fine gold to receive</b></td><td id="bfine"><b>—</b></td></tr><tr><td>Total</td><td id="bsum">—</td></tr><tr id="bdiscrow" hidden><td>Less discount</td><td id="bdisc">—</td></tr><tr hidden><td>Total after discount</td><td id="bsub">—</td></tr>
         <tr><td id="bgstl">GST 3%</td><td id="bgst">—</td></tr><tr class="total"><td>Bill total</td><td id="btotal">—</td></tr></table>
       <p class="hint" id="bnote"></p>
-      <div class="actions"><button type="button" class="btn" id="bsave">Save bill &amp; send on WhatsApp</button><button type="button" class="btn ghost" id="bclear">Clear</button></div>
+      <p class="hint" id="beditnote" hidden style="color:#8a5a00;font-weight:600"></p>
+      <div class="actions"><button type="button" class="btn" id="bsave">Save bill &amp; make PDF</button><button type="button" class="btn ghost" id="bclear">Clear</button></div>
       <p class="hint" id="bmsg"></p><div class="actions" id="bout" hidden></div>
       <h2>3 · Saved bills &amp; estimates</h2>
       <div class="row" style="align-items:end"><label style="flex:0 1 200px">Month <input id="bmonth" type="month"></label>
@@ -146,7 +147,7 @@
     $("bmonth").value = today().slice(0, 7); $("bmonth").addEventListener("change", loadBook);
     $("bxl").addEventListener("click", () => xl($("bmonth").value || today().slice(0, 7))); $("bxlall").addEventListener("click", () => xl("all"));
     $("bF").addEventListener("input", render); $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); }); $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
-    $("bclear").addEventListener("click", () => { B.items = []; B.nbb = false; $("bnbb").checked = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
+    $("bclear").addEventListener("click", () => { B.editNo = null; { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.nbb = false; $("bnbb").checked = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
     $("bsave").addEventListener("click", save);
     $("bback").addEventListener("click", () => { const c = document.querySelector('nav button[data-tab="check"]'); if (c) c.click(); });
   }
@@ -169,9 +170,10 @@
         td(dmy(b.date)); td(b.no); const ty = td(b.title); if (b.cancelled) { const s = document.createElement("div"); s.style.cssText = "color:#a12b2b;font-weight:600"; s.textContent = "CANCELLED"; const r = document.createElement("div"); r.className = "hint"; r.textContent = b.cancelled; ty.append(s, r); tr.style.opacity = "0.75"; }
         td(b.name + (b.city ? ", " + b.city : "")); { const tt = td(fmt(b.total), "num"); if (b.received != null) tt.appendChild(Object.assign(document.createElement("div"), { className: "hint", textContent: b.settled ? "Settled" : "Paid " + fmt(b.received) + " · Bal " + fmt(b.balance) })); } /* C-20261017-LEDGER */ td(b.fine ? g3(b.fine) : "—", "num"); td(b.by || "");
         const x = document.createElement("td"); x.style.whiteSpace = "nowrap"; const o = document.createElement("button"); o.type = "button"; o.className = "btn ghost"; o.textContent = "PDF"; o.addEventListener("click", () => reprint(b.no, o)); x.appendChild(o);
-        if (/^[6-9]\d{9}$/.test(String(b.mobile || ""))) { const w = document.createElement("button"); w.type = "button"; w.className = "btn ghost"; w.textContent = "WhatsApp"; w.title = "Send this bill to the customer on WhatsApp (Aashvi)";
-          w.addEventListener("click", async () => { try { if (!w._b) { const r = await fetch("/api/vj/bill?no=" + encodeURIComponent(b.no), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); w._b = j.bill; w._blob = await makePdf(j.bill, B.photos); }
-            await sendWA(w._b, w._blob, w, $("bbookmsg")); if (w.textContent.indexOf("Tap again") === 0) return; if (w.textContent !== "Sent ✓") w.textContent = "WhatsApp"; } catch (e) { $("bbookmsg").textContent = "Could not send " + b.no + " (" + (e.message || e) + ")."; } }); x.appendChild(w); }
+        if (j.canCancel && !b.cancelled && !b.settled) { const ed = document.createElement("button"); ed.type = "button"; ed.className = "btn ghost"; ed.textContent = "Edit"; ed.title = "Change this bill (same number) - owners only"; ed.addEventListener("click", () => editBill(b.no, ed)); x.appendChild(ed); } // C-20261026-BILLEDIT
+        { const w = document.createElement("button"); w.type = "button"; w.className = "btn ghost"; w.textContent = "WhatsApp"; w.title = "Send this bill from your own WhatsApp"; // C-20261026-MYWA
+          w.addEventListener("click", async () => { try { if (!w._b) { w.textContent = "Preparing…"; const r = await fetch("/api/vj/bill?no=" + encodeURIComponent(b.no), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); w._b = j.bill; w._blob = await makePdf(j.bill, B.photos); w.textContent = "Tap to send ✓"; $("bbookmsg").textContent = b.no + " is ready - tap 'Tap to send' to open WhatsApp."; return; }
+            await myWA(w._b, w._blob, $("bbookmsg")); w.textContent = "WhatsApp"; } catch (e) { w.textContent = "WhatsApp"; $("bbookmsg").textContent = "Could not prepare " + b.no + " (" + (e.message || e) + ")."; } }); x.appendChild(w); }
         if (j.canCancel || (j.canCancelOnly && !b.cancelled)) { const c = document.createElement("button"); c.type = "button"; c.className = "btn ghost"; c.style.color = "#a12b2b"; c.textContent = j.canCancel ? "Cancel / Erase" : "Cancel"; c.addEventListener("click", () => actBox(b, x, !!j.canCancel)); x.appendChild(c); }
         tr.appendChild(x); body.appendChild(tr); });
       m.textContent = j.bills.length ? `${j.bills.length} in this month${nc ? " (" + nc + " cancelled)" : ""}, total ${fmt(tot)}${nc ? " without the cancelled ones" : ""}.` : "Nothing saved in this month.";
@@ -258,6 +260,35 @@
       msg.textContent = `${b.title} ${b.no}: Aashvi has not confirmed yet. Check WhatsApp before sending again.`; btn.textContent = "Send on WhatsApp (Aashvi)";
     } catch (e) { msg.textContent = "Not sent on WhatsApp: " + (e.message || e) + "."; btn.textContent = "Send on WhatsApp (Aashvi)"; }
     btn.disabled = false;
+  }
+  // owner 26/10/2026 17:32 (C-20261026-BILLEDIT): open a saved bill in the form; saving updates it under the same number (owners only, the server keeps the old version)
+  async function editBill(no, btn) { btn.disabled = true;
+    try { const r = await fetch("/api/vj/bill?no=" + encodeURIComponent(no), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+      const b = j.bill, all = tags(); const miss = (b.rows || []).filter(x => !all.some(t => t.id === x.id)); if (miss.length) throw new Error("a piece on it is no longer in stock (" + miss.map(x => x.label).join(", ") + ")");
+      $("bclear").click(); B.items = b.rows.map(x => x.id); B.mode = b.mode || "ws"; B.settle = b.settle || "fine"; B.title = b.title || "Bill"; B.nbb = !!b.nbb; $("bnbb").checked = B.nbb;
+      document.querySelectorAll("input[name=bmode]").forEach(x => { x.checked = x.value === B.mode; }); document.querySelectorAll("input[name=bset]").forEach(x => { x.checked = x.value === B.settle; });
+      document.querySelectorAll("input[name=btitle]").forEach(x => { x.checked = x.value === B.title; x.disabled = true; });
+      $("bname").value = b.name || ""; $("bcity").value = b.city || ""; $("bmob").value = b.mobile || ""; $("bdate").value = b.date; $("bF").value = b.F;
+      b.rows.forEach(x => { if (x.discTxt) B.disc[x.id] = x.discTxt; else if (x.disc > 0) B.disc[x.id] = String(x.disc);
+        if (Math.round(x.F) !== Math.round(b.F)) B.frates[x.id] = x.F;
+        const ds = x.dias || []; if (ds.some(d => d.rate !== d.tagRate)) { const a = ds.map(() => 0); ds.forEach((d, k) => { a[d.idx != null ? d.idx : k] = d.rate !== d.tagRate ? d.rate : 0; }); B.rates[x.id] = a; }
+        if (x.polkiPcs && x.polkiRate !== x.polkiTagRate) B.prates[x.id] = x.polkiRate; });
+      B.editNo = b.no; $("bno").value = b.no; const n = $("beditnote"); n.hidden = false;
+      n.textContent = `Editing ${b.title} ${b.no} (${b.name}). Change what you need, then Update - it keeps the same number. Clear = stop editing.`;
+      $("bsave").textContent = "Update bill & make PDF"; render(); $("p-bill").scrollIntoView({ behavior: "smooth", block: "start" });
+    } catch (e) { $("bbookmsg").textContent = "Cannot edit " + no + ": " + (e.message || e) + "."; }
+    btn.disabled = false; }
+  // owner 26/10/2026 17:33 (C-20261026-MYWA): bills go from the owner's OWN WhatsApp, not Aashvi. Phone (or a computer with the WhatsApp
+  // app installed): the share box opens with the PDF - choose WhatsApp, then the customer. Computer without it: the customer's chat opens in
+  // WhatsApp with the message typed, and the PDF is saved to Downloads to drag into the chat.
+  function waText(b) { return `Dear ${b.name}, thank you for choosing Vaishnavi Jewels. Please find your ${b.title.toLowerCase()} ${b.no} for ${fmt(b.total)} attached.\n\nShilpi & Abhinav\nMihir Bhai`; }
+  async function myWA(b, blob, msgEl) {
+    const fname = `${b.title} ${b.no.replace(/[^A-Z0-9\-]/g, "-")} ${String(b.name || "").replace(/[^A-Za-z0-9 .\-]/g, "").trim().slice(0, 40)}.pdf`, file = new File([blob], fname, { type: "application/pdf" });
+    let can = false; try { can = !!(navigator.canShare && navigator.canShare({ files: [file] })); } catch (e) {}
+    if (can) { try { await navigator.share({ files: [file], text: waText(b) }); msgEl.textContent = `${b.title} ${b.no}: choose WhatsApp and the customer in the share box.`; return; } catch (e) { if (e && e.name === "AbortError") return; } }
+    const mob = String(b.mobile || ""); const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = fname; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+    window.open((/^[6-9]\d{9}$/.test(mob) ? "https://wa.me/91" + mob : "https://wa.me/") + "?text=" + encodeURIComponent(waText(b)), "_blank", "noopener");
+    msgEl.textContent = `${b.title} ${b.no}: WhatsApp opened` + (/^[6-9]\d{9}$/.test(mob) ? ` for +91 ${mob}` : "") + ` with the message. The PDF "${fname}" is in Downloads - drag it into the chat. (Install the WhatsApp app for Windows to send the PDF straight from the share box, with no download.)`;
   }
   async function reprint(no, btn) { btn.disabled = true;
     try { const r = await fetch("/api/vj/bill?no=" + encodeURIComponent(no), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
@@ -401,7 +432,7 @@
   async function save() {
     const m = $("bmsg"), out = $("bout"); out.hidden = true;
     const body = { no: $("bno").value.trim(), name: $("bname").value.trim(), city: $("bcity").value.trim(), mobile: $("bmob").value.trim().slice(0, 20),
-      date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, title: B.title, nbb: !!B.nbb, ids: B.items.slice(), disc: Object.assign({}, B.disc), rates: JSON.parse(JSON.stringify(B.rates)), frates: Object.assign({}, B.frates), prates: Object.assign({}, B.prates) };
+      date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, title: B.title, nbb: !!B.nbb, ids: B.items.slice(), disc: Object.assign({}, B.disc), rates: JSON.parse(JSON.stringify(B.rates)), frates: Object.assign({}, B.frates), prates: Object.assign({}, B.prates), edit: B.editNo || "" };
     if (!body.name) { m.textContent = "Enter the customer's name."; return; }
     let dg = body.mobile.replace(/\D/g, ""); if (dg.length === 12 && dg.startsWith("91")) dg = dg.slice(2); // phone copy like "+91 98xxx xxxxx" is fine
     const mobNote = body.mobile && !/^[6-9]\d{9}$/.test(dg) ? ` Note: the mobile has ${dg.replace(/^91/, "").length} digits after +91 (a mobile usually has 10) - saved as typed.` : "";
@@ -419,12 +450,7 @@
       const op = document.createElement("a"); op.className = "btn"; op.href = url; op.target = "_blank"; op.rel = "noopener"; op.textContent = "Open PDF (print)";
       const dl = document.createElement("a"); dl.className = "btn ghost"; dl.href = url; dl.download = fname; dl.textContent = "Download";
       out.append(op, dl); // owner 26/10 17:30: no automatic download - the bill stays saved here (PDF button below)
-      if (/^[6-9]\d{9}$/.test(String(b.mobile || ""))) { const wa = document.createElement("button"); wa.type = "button"; wa.className = "btn ghost"; wa.textContent = "Send on WhatsApp (Aashvi)"; wa.addEventListener("click", () => sendWA(b, blob, wa, m)); out.append(wa);
-        wa.dataset.sure = "1"; sendWA(b, blob, wa, m); } // owner 26/10 17:30 (C-20261026-BILLWAAUTO): saving sends the bill to the customer's mobile on WhatsApp at once
-      else m.textContent += " No 10-digit mobile, so it was not sent on WhatsApp.";
-      const canFile = (() => { try { return !!(navigator.canShare && navigator.canShare({ files: [file] })); } catch (e) { return false; } })();
-      if (canFile && /Android|iPhone|iPad/i.test(navigator.userAgent)) { const sh = document.createElement("button"); // owner 26/10: on the computer the Windows share box is confusing - Aashvi sends instead sh.type = "button"; sh.className = "btn ghost"; sh.textContent = "Share (WhatsApp)";
-        sh.onclick = async () => { try { await navigator.share({ files: [file] }); } catch (e) {} }; out.append(sh); }
+      { const wa = document.createElement("button"); wa.type = "button"; wa.className = "btn"; wa.textContent = "Send on my WhatsApp"; wa.addEventListener("click", () => myWA(b, blob, m)); out.prepend(wa); } // C-20261026-MYWA: from the owner's own WhatsApp, not Aashvi
     } catch (e) { m.textContent = "Not saved: " + (e.message || e) + "."; }
     $("bsave").disabled = false;
   }
