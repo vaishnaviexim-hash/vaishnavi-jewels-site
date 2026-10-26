@@ -21,6 +21,9 @@
     // polki pieces x rate per piece (C-20261017-POLKI); 0 pcs = no polki
     const pk0 = t.polki && t.polki.pcs > 0 ? t.polki : null, fPPcs = inp(pk0 ? pk0.pcs : "", 90, "number"), fPRate = inp(pk0 ? pk0.rate : 300, 110, "number");
     wrap.append(el("div", { className: "row", style: "display:flex;gap:10px;flex-wrap:wrap" }, [row("Polki pcs", fPPcs), row("Polki rate per pc (Rs)", fPRate)]));
+    // party (customer's own) diamonds + certificate no. (C-20261026-PARTYDIA, owner 26/10 18:14)
+    const pd0 = t.pdia && t.pdia.ct > 0 ? t.pdia : null, fPdCt = inp(pd0 ? pd0.ct : "", 90, "number"), fPdPcs = inp(pd0 ? pd0.pcs : "", 80, "number"), fPdRate = inp(pd0 ? pd0.rate : 3000, 110, "number"), fCert = inp(t.certNo || "", 180);
+    wrap.append(el("div", { className: "row", style: "display:flex;gap:10px;flex-wrap:wrap" }, [row("Party diamond ct", fPdCt), row("Party diamond pcs", fPdPcs), row("Setting Rs/ct", fPdRate), row("Certificate no. (IGI etc.)", fCert)]));
     let fMetal = null;
     if (t.kind === "sample") { fMetal = inp((t.metal && t.metal.net) || 0, 110, "number"); wrap.append(row("Sample weight (g, priced as 14K)", fMetal)); }
     // gold lines
@@ -53,10 +56,12 @@
       if (t.cat === "CH" && t.kind !== "sample" && gold.some(g => g.tunch === undefined)) { note.textContent = "Chain: type the tunch on each gold line (e.g. 0.920)."; return; }
       const ppcs = num(fPPcs.value), prate = String(fPRate.value).trim() === "" ? 300 : num(fPRate.value);
       if (!(Number.isInteger(ppcs) && ppcs >= 0 && ppcs <= 10000) || ppcs > 0 && !(Number.isInteger(prate) && prate >= 1 && prate <= 100000)) { note.textContent = "Polki: pieces 0-10,000 and rate per piece Rs 1-1,00,000, whole numbers."; return; }
-      const data = { designNo: fDesign.value.trim().slice(0, 30), remark: fRemark.value.trim().slice(0, 120), box: fBox.value.trim().slice(0, 60), other: Object.assign({}, t.other || {}, { amt: Math.max(0, num(fOther.value)) }), dias, polki: ppcs > 0 ? { pcs: ppcs, rate: prate } : null };
+      const pdct = Math.round(num(fPdCt.value) * 1000) / 1000, pdpcs = Math.round(num(fPdPcs.value) || 0), pdrate = String(fPdRate.value).trim() === "" ? 3000 : num(fPdRate.value);
+      if (pdct > 0 && !(pdct <= 1000 && Number.isInteger(pdrate) && pdrate >= 1 && pdrate <= 100000)) { note.textContent = "Party diamond: carats up to 1,000 and setting rate per ct Rs 1-1,00,000, whole rupees."; return; }
+      const data = { pdia: pdct > 0 ? { ct: pdct, pcs: pdpcs, rate: pdrate } : null, certNo: fCert.value.trim().toUpperCase().slice(0, 30), designNo: fDesign.value.trim().slice(0, 30), remark: fRemark.value.trim().slice(0, 120), box: fBox.value.trim().slice(0, 60), other: Object.assign({}, t.other || {}, { amt: Math.max(0, num(fOther.value)) }), dias, polki: ppcs > 0 ? { pcs: ppcs, rate: prate } : null };
       if (t.kind === "sample") data.metal = Object.assign({}, t.metal || {}, { net: Math.max(0, num(fMetal.value)) }); else data.gold = gold;
       const priceChanged = JSON.stringify([t.gold || [], t.dias || [], (t.other && t.other.amt) || 0, (t.metal && t.metal.net) || 0, pk0 ? [pk0.pcs, pk0.rate] : null])
-        !== JSON.stringify([data.gold || t.gold || [], dias, data.other.amt, (data.metal && data.metal.net) || (t.metal && t.metal.net) || 0, data.polki ? [data.polki.pcs, data.polki.rate] : null]);
+        !== JSON.stringify([data.gold || t.gold || [], dias, data.other.amt, (data.metal && data.metal.net) || (t.metal && t.metal.net) || 0, data.polki ? [data.polki.pcs, data.polki.rate] : null]) || JSON.stringify(pd0 ? [pd0.ct, pd0.rate] : null) !== JSON.stringify(data.pdia ? [data.pdia.ct, data.pdia.rate] : null);
       if (priceChanged && t.code) Object.assign(data, { code: null, priceAtTag: null, gold24gAtTag: null });
       data.editedAt = new Date().toISOString();
       save.disabled = true; note.textContent = "Saving…";
