@@ -636,7 +636,7 @@ function vjBillCalc(tags, o) {
     fine = Math.round(fine * 1000) / 1000;
     if (settle === 'amount') gold = fine * Fr;
     const ov = o.rates && Array.isArray(o.rates[t.id]) ? o.rates[t.id] : []; // rates edited on the bill (C-20261016-BILLALL); the tag is not changed
-    const dl = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map((d, i) => ({ q: String(d.q || ''), shape: String(d.shape || '').slice(0, 20), ct: Number(d.ct) || 0, tagRate: Number(d.rate) || 0, rate: Number(ov[i]) > 0 ? Number(ov[i]) : (Number(d.rate) || 0), idx: i }))
+    const dl = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map((d, i) => ({ q: String(d.q || ''), shape: String(d.shape || '').slice(0, 20), ct: Number(d.ct) || 0, tagRate: Number(d.rate) || 0, rate: Number(ov[i]) > 0 ? Number(ov[i]) : Number(ov[i]) === -1 ? 0 : (Number(d.rate) || 0), idx: i })) // -1 = rate typed as 0 on the bill (owner 26/10 18:38: party diamond with no charge)
         .sort((x, y) => { const rk = s => { const v = { round: 0, choki: 1, fancy: 2 }[String(s || '').toLowerCase()]; return v === undefined ? 3 : v; }; return rk(x.shape) - rk(y.shape) || x.idx - y.idx; }); // owner 26/10: Round first, then Choki, then Fancy (C-20261026-DIAORDER)
     const ct = dl.reduce((a, d) => a + d.ct, 0), dia = dl.reduce((a, d) => a + d.ct * d.rate, 0), oth = Number(t.other && t.other.amt) || 0;
     // polki (C-20261017-POLKI): pcs x the tag's rate per pc; the rate can be changed on the bill (prates), the tag is not changed
@@ -712,7 +712,7 @@ async function vjBill(request, env, who) { // every login may make bills (owner 
   const ids = Array.isArray(b && b.ids) ? [...new Set(b.ids.map(String))].slice(0, 25) : [];
   const disc = {}; if (b && b.disc && typeof b.disc === 'object') for (const id of ids) if (b.disc[id] != null) disc[id] = String(b.disc[id]).slice(0, 12);
   const frates = {}; if (b && b.frates && typeof b.frates === 'object') for (const id of ids) { const n = Math.round(Number(b.frates[id]) * 100) / 100; if (n >= 2000 && n <= 50000) frates[id] = n; }
-  const rates = {}; if (b && b.rates && typeof b.rates === 'object') for (const id of ids) if (Array.isArray(b.rates[id])) rates[id] = b.rates[id].slice(0, 30).map(v => { const n = Number(v); return n > 0 && n <= 5000000 ? Math.round(n) : 0; });
+  const rates = {}; if (b && b.rates && typeof b.rates === 'object') for (const id of ids) if (Array.isArray(b.rates[id])) rates[id] = b.rates[id].slice(0, 30).map(v => { const n = Number(v); return n === -1 ? -1 : n > 0 && n <= 5000000 ? Math.round(n) : 0; });
   const prates = {}; if (b && b.prates && typeof b.prates === 'object') for (const id of ids) if (b.prates[id] != null && b.prates[id] !== '') { // polki rate per pc for this bill only (C-20261017-POLKI)
     const n = Number(b.prates[id]); if (!Number.isInteger(n) || n < 1 || n > 100000) return vjDeny(400, 'polki rate per pc must be a whole number Rs 1-1,00,000'); prates[id] = n; }
   const pdrates = {}; if (b && b.pdrates && typeof b.pdrates === 'object') for (const id of ids) if (b.pdrates[id] != null && b.pdrates[id] !== '') { // party diamond setting rate per ct for this bill only (C-20261026-PARTYDIA)
