@@ -162,10 +162,10 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
       <h2>5 · Polki setting (per piece)</h2>
       <div class="ln p" id="polkiLine"><label>Pcs (from Polki lines)<input type="number" id="polkiPcs" placeholder="0" readonly tabindex="-1"></label><label>Rate per pc (₹)<input type="number" id="polkiRate" min="1" max="100000" step="1" value="300" inputmode="numeric"></label><div class="val" id="polkiVal"></div></div>
 
-      <h2>6 · Party diamond (customer's own diamonds - setting charge only)</h2>
-      <div class="ln p" id="pdLine"><label>Carats<input type="number" id="pdCt" min="0" step="0.01" placeholder="0" inputmode="decimal"></label><label>Pcs<input type="number" id="pdPcs" min="0" step="1" placeholder="0" inputmode="numeric"></label><label>Setting ₹/ct<input type="number" id="pdRate" min="1" max="100000" step="1" value="3000" inputmode="numeric"></label><div class="val" id="pdVal"></div></div>
+      <h2 hidden>Party diamond</h2>
+      <div class="ln p" id="pdLine" hidden><label>Carats<input type="number" id="pdCt" min="0" step="0.01" placeholder="0" inputmode="decimal"></label><label>Pcs<input type="number" id="pdPcs" min="0" step="1" placeholder="0" inputmode="numeric"></label><label>Setting ₹/ct<input type="number" id="pdRate" min="1" max="100000" step="1" value="3000" inputmode="numeric"></label><div class="val" id="pdVal"></div></div>
 
-      <h2>7 · Other charges</h2>
+      <h2>6 · Other charges</h2>
       <div class="row"><label>Colour stones and other charges (₹) <input type="number" id="otherAmt" min="0" step="1" placeholder="0"></label></div>
     </section>
 
@@ -301,9 +301,9 @@ const CATS=[
  {id:"VNP",name:"Nose Pin (VNP)",code:"VNP",s:"SVNP"}
 ];
 const KARATS=["22K","18K","14K","9K"],KNUM={"22K":"22","18K":"18","14K":"14","9K":"9"};
-const SHAPES=["Round","Choki","Fancy","Solitaire","Polki"], /* owner 21/10/2026: Polki stones = a diamond line priced per ct (own rate); the per-piece box below is the Polki SETTING charge */QUALS=["CVD","VS GH","VVS EF","VS HI","VS IJ","Other"];
+const SHAPES=["Round","Choki","Fancy","Solitaire","Polki"], /* owner 21/10/2026: Polki stones = a diamond line priced per ct (own rate); the per-piece box below is the Polki SETTING charge */QUALS=["CVD","VS GH","VVS EF","VS HI","VS IJ","Party diamond","Other"]; /* owner 26/10/2026 18:26: Party diamond (customer's own) = a quality in the list, setting Rs 3,000/ct by default, rate box editable (C-20261026-PARTYDIA) */
 const DEF_RATES={"CVD|Round":23000,"CVD|Choki":23000,"CVD|Fancy":23000,"CVD|Solitaire":23000,"VS GH|Round":46000,"VS GH|Choki":46000,"VS GH|Fancy":85000,"VS HI|Round":40000,"VS HI|Choki":40000,"VS IJ|Round":35000,"VS IJ|Choki":35000};
-function defRate(shape,q){const r=(S.settings&&S.settings.defaultRates)||DEF_RATES;const v=r[q+"|"+shape];return typeof v==="number"&&v>0?v:null}
+function defRate(shape,q){if(q==="Party diamond")return 3000;const r=(S.settings&&S.settings.defaultRates)||DEF_RATES;const v=r[q+"|"+shape];return typeof v==="number"&&v>0?v:null}
 const DEF={gold24g:null,goldAt:null,purity:{"22K":0.92,"18K":0.76,"14K":0.60,"9K":0.40},making:{base:650,small:750,limit:5,pct:10},gst:3,tag:{w:100,h:15,printW:70}};
 const S={sel:new Set(),subs:{},parts:{},db:null,user:null,assets:null,dl:null,me:null,owner:false,canWrite:null,settings:null,counters:{},tags:[],photo:null,busy:false};
 const fmt=n=>"₹"+Math.round(n).toLocaleString("en-IN");
@@ -516,7 +516,7 @@ function nextNo(prefix){let mx=S.counters[prefix]||0;S.tags.forEach(t=>{if(t.pre
 function codeFor(final){const k=Math.max(1,Math.ceil(final/1000));const a="abcdefghijkmnprstuvwxyz",r3=()=>{let o="";const b=new Uint32Array(3);crypto.getRandomValues(b);b.forEach(x=>o+=a[x%a.length]);return o};return r3()+k+r3()}
 
 /* ---------- tag drawing (one layout for preview and PDF, per Brain F-043) ---------- */
-function diaText(d){const sh={Round:"",Choki:"Ch ",Fancy:"F ",Solitaire:"Sol ",Polki:"Pk "}[d.shape]??"";return `${sh}${d.shape==="Polki"&&d.q==="POLKI"?"":d.q+" "}${d.ct.toFixed(2)}(${d.pcs})${d.rate?Math.round(d.rate):""}`}
+function diaText(d){const sh={Round:"",Choki:"Ch ",Fancy:"F ",Solitaire:"Sol ",Polki:"Pk "}[d.shape]??"";return `${sh}${d.shape==="Polki"&&d.q==="POLKI"?"":d.q==="Party diamond"?"PD ":d.q+" "}${d.ct.toFixed(2)}(${d.pcs})${d.rate?Math.round(d.rate):""}`}
 /* rate for a sample's stone line (Onnet code like RVS-SI-GH, BVS.SI.GH, MVS-SI-GH): today's default rate for that shape + colour,
    never below the F-066 minimums. Shown on the tag only; samples are not priced. */
 const MINR={Round:{EF:75000,FG:65000,GH:46000,HI:40000,IJ:35000,JK:33000},Choki:{EF:75000,FG:65000,GH:46000,HI:40000,IJ:40000,JK:40000},Fancy:{EF:95000,FG:90000,GH:85000,HI:85000,IJ:75000,JK:65000}};
@@ -973,7 +973,7 @@ $("ordRep").addEventListener("click",async()=>{const b=$("ordRep");b.disabled=tr
 /* ---------- settings ---------- */
 function renderDefRates(ro){
   const tb=$("defRows");tb.textContent="";const r=(S.settings&&S.settings.defaultRates)||DEF_RATES;
-  QUALS.filter(q=>q!=="Other").forEach(q=>{const tr=document.createElement("tr");const a=document.createElement("td");a.textContent=q;tr.appendChild(a);
+  QUALS.filter(q=>q!=="Other"&&q!=="Party diamond").forEach(q=>{const tr=document.createElement("tr");const a=document.createElement("td");a.textContent=q;tr.appendChild(a);
     SHAPES.forEach(sh=>{const td=document.createElement("td");const i=document.createElement("input");i.type="number";i.min="0";i.step="100";i.dataset.k=q+"|"+sh;i.id="def-"+q.replace(/\W/g,"")+"-"+sh;const v=r[q+"|"+sh];i.value=typeof v==="number"&&v>0?v:"";i.placeholder="—";i.readOnly=ro;td.appendChild(i);tr.appendChild(td)});tb.appendChild(tr)});
 }
 function renderRates(){
