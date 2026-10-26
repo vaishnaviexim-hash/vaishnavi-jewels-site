@@ -353,7 +353,8 @@
     return vjBillCalc(list, { F: F(), mode: B.mode, settle: B.settle, g2g: B.g2g, disc: B.disc, rates: B.rates, frates: B.frates, prates: B.prates, pdrates: B.pdrates, purity: s.purity, making: s.making, gst: s.gst }); }
   function goldCell(r, c) { return c.settle === "fine" ? g3(r.fine) + " fine" : fmt(r.goldAmt) + (c.settle ? " (" + g3(r.fine) + " fine)" : ""); }
   function mkCell(r, c) { return r.chain ? "— (chain)" /* C-20261017-CHAINTUNCH: no making on chain lines */ : c.mode === "item" ? "in gold" : fmt(r.making) + " (" + r.mkRate + "/g" + (r.mkWt > 0 && Math.abs(r.mkWt - r.wt) > 0.0005 ? " on " + r.mkWt.toFixed(3) + " g" : "") + ")"; }
-  function noteText(mode, rows, g2g) { if (mode === "g2g" && g2g === "nett") mode = "g2gn"; // C-20261026-G2GNETT const ch = (rows || []).some(r => /tunch/.test(r.gold || "")); // C-20261017-CHAINTUNCH
+  function noteText(mode, rows, g2g) { if (mode === "g2g" && g2g === "nett") mode = "g2gn"; // C-20261026-G2GNETT
+    const ch = (rows || []).some(r => /tunch/.test(r.gold || "")); // C-20261017-CHAINTUNCH
     return (mode === "g2gn" ? "Fine gold on net weight; 10% wastage charged in the making. " : "") + (mode === "ws" || mode === "g2g" ? "Gold includes 10% wastage" + (ch ? " (chains: gold x tunch, no making)" : "") + ". " : ch ? "Chains: gold x tunch, no making. " : "") + (mode === "item" ? "Making is included in the gold. " : ""); }
   function render() {
     const body = $("brows"); if (!body) return; body.textContent = "";
