@@ -376,7 +376,7 @@ function renderCheck(){
   const pin=priceInput(t);pin.gold.forEach(g=>add(g.k==="Chain"?"Chain":(g.tunch>0?"Chain ":"Gold ")+g.k,g.net.toFixed(3)+" g"+(g.tunch>0?" × tunch "+Number(g.tunch).toFixed(3):"")));pin.dias.forEach(d=>add(`${d.shape} ${d.q}`,`${d.ct.toFixed(2)} ct (${d.pcs})`+(d.rate>0?` @ ${fmt(d.rate)}`:"")));
   if(t.polki&&t.polki.pcs>0)add("Polki setting",`${t.polki.pcs} pc @ ${fmt(t.polki.rate)}`);
   if(t.pdia&&t.pdia.ct>0)add("Party diamond",`${t.pdia.ct} ct (${t.pdia.pcs||0}) setting @ ${fmt(t.pdia.rate)}/ct`);if(t.certNo)add("Certificate no.",(t.remark&&t.remark!=="TGL"?t.remark+" ":"")+t.certNo);
-  if(t.other&&t.other.amt)add("Other charges",fmt(t.other.amt));
+  if(t.other&&t.other.amt)add("Other charges",fmt(t.other.amt));if(t.kind!=="sample"&&(t.dias||[]).some(d=>/CVD|LAB|LGD|^C-/i.test(String(d.q||""))&&d.ct>0&&d.rate>0&&d.rate<20000))add("Sale terms","No buy back · No exchange");
   const pr=price(priceInput(t)),s=st();
   if(t.kind==="sample"&&S.role!=="sales")add("Sample","not for sale - order estimate at 14K below");
   if(!pr)add("Price","gold rate not set","total");
@@ -543,7 +543,7 @@ function tagPrims(t){
   const smp=t.kind==="sample";
   const gl=(t.gold||[]).filter(g=>g.net>0),karats=gl.length?[...new Set(gl.map(g=>g.k==="Chain"?"Chain":KNUM[g.k]+"kt"))].join("+"):(smp?"14kt":"");
   const lab=t.pcode||t.label; /* C-20261019-TAGSNOORDER: new tags print VLR14 / VLR14/MN; older tags keep their label */
-  const L=[{t:t.designNo?t.designNo:lab,b:1,sz:7},{t:t.designNo?"("+lab+")":"",sz:5.4},{t:karats,sz:5.4},{t:smp?"":t.remark,sz:5.2}];
+  const L=[{t:t.designNo?t.designNo:lab,b:1,sz:7},{t:t.designNo?"("+lab+")":"",sz:5.4},{t:karats,sz:5.4},{t:smp?"":(t.remark||"")+((t.dias||[]).some(d=>/CVD|LAB|LGD|^C-/i.test(String(d.q||""))&&d.ct>0&&d.rate>0&&d.rate<20000)?" NBB":""),sz:5.2} /* C-20261026-NBBLAB: lab-grown under Rs 20,000/ct = no buy back / no exchange */];
   if(t.polki&&t.polki.pcs>0)L.push({t:"Polki "+t.polki.pcs+"pc",sz:5.2}); /* C-20261017-POLKI: the 5th row on the left is always free */
   L.forEach((l,i)=>{if(l.t)pr.push({k:"t",x:lx,y:y(i),t:l.t,b:l.b,sz:l.sz,maxW:lw})});
   const net=gl.reduce((a,g)=>a+g.net,0),mw=!gl.length&&t.metal&&t.metal.net?t.metal.net:0;
