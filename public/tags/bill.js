@@ -29,7 +29,7 @@
   function vtags() { return B.designs.map((d, i) => { const tv = String(d.tunch || "").trim(), tn = tv === "" ? 0 : Math.round(num(tv) * 1000) / 1000;
     const dias = d.dias.filter(x => num(x.ct) > 0).map(x => ({ q: x.q, shape: x.shape, pcs: Math.max(0, Math.round(num(x.pcs))), ct: Math.round(num(x.ct) * 1000) / 1000, rate: String(x.rate).trim() === "" ? defRate(x.q, x.shape) : Math.round(num(x.rate)) }));
     const ppcs = Math.max(0, Math.round(num(d.ppcs))), prate = String(d.prate).trim() === "" ? 300 : Math.round(num(d.prate)), other = Math.round(num(d.other));
-    return { id: "new-" + (i + 1), label: String(d.desc || "").trim().slice(0, 60) || "New design", designNo: "", catName: "New design", kind: "design", newDesign: true,
+    return { id: "new-" + (i + 1), label: String(d.desc || "").trim().slice(0, 60) || "New design", designNo: "", catName: "", kind: "design", newDesign: true,
       gold: [{ k: d.k, net: Math.round(num(d.net) * 1000) / 1000, ...(tn ? { tunch: tn } : {}) }], dias, ...(ppcs ? { polki: { pcs: ppcs, rate: prate } } : {}), ...(other ? { other: { amt: other } } : {}) }; }); }
   function designBad(d) { const bad = [], net = num(d.net), tv = String(d.tunch || "").trim(), tn = tv === "" ? 0 : num(tv), ppcs = num(d.ppcs), prate = String(d.prate).trim() === "" ? 300 : num(d.prate), other = num(d.other);
     if (!(net > 0)) bad.push("net gold weight"); if (tv !== "" && !(tn >= 0.3 && tn <= 1.1)) bad.push("chain tunch (0.300-1.100 or empty)");
@@ -46,11 +46,20 @@
     if (B.designs.length) { B.title = "Estimate"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.checked = x.value === "Estimate"; }); numField(); }
     B.designs.forEach((d, i) => {
       const card = el("div"); card.style.cssText = "border:1px dashed #b8963e;border-radius:8px;padding:10px;margin:8px 0;display:flex;flex-direction:column;gap:8px";
+      // owner 27/10 18:05: a code typed here picks the stock piece (the line below is then not needed); blank = a new design typed in
+      const cd = el("input", { value: "", autocomplete: "off", placeholder: "our code / tag no. / design no. - leave blank for a new design" }), cmsg = el("span", { className: "hint" }), cpick = el("div", { className: "row", style: "gap:8px" });
+      const useCode = () => { const v = cd.value.trim(); cpick.textContent = ""; if (!v) { cmsg.textContent = ""; return; } const r = find(v);
+        if (!r.length) { cmsg.textContent = "No piece with that code - fill the new design below."; return; }
+        const take = t => { add(t); B.designs.splice(i, 1); drawDesigns(); render(); };
+        if (r.length === 1) { take(r[0]); return; }
+        cmsg.textContent = "Which one?"; r.forEach(t => { const b = el("button", { type: "button", className: "btn ghost", textContent: (t.designNo ? t.designNo + " · " : "") + t.label }); b.addEventListener("click", () => take(t)); cpick.append(b); }); };
+      cd.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); useCode(); } }); cd.addEventListener("change", useCode);
+      card.append(el("div", { className: "row", style: "align-items:end" }, [fld("Our code (stock piece)", cd, "2 1 260px"), cmsg]), cpick);
       const desc = el("input", { value: d.desc, maxLength: 60, autocomplete: "off", placeholder: "e.g. Bangles, new design" }), k = sel(DKARATS, d.k);
       const net = el("input", { value: d.net, inputMode: "decimal", autocomplete: "off", placeholder: "0.000" }), tu = el("input", { value: d.tunch || "", inputMode: "decimal", autocomplete: "off", placeholder: "chain only, e.g. 0.920" });
       desc.addEventListener("input", () => { d.desc = desc.value; render(); }); k.addEventListener("change", () => { d.k = k.value; render(); }); net.addEventListener("input", () => { d.net = net.value; render(); }); tu.addEventListener("input", () => { d.tunch = tu.value; render(); });
-      const rm = el("button", { type: "button", className: "btn ghost", textContent: "Remove design" }); rm.addEventListener("click", () => { B.designs.splice(i, 1); drawDesigns(); render(); });
-      card.append(el("strong", { textContent: "New design " + (i + 1) + " (no tag)" }), el("div", { className: "row" }, [fld("Description", desc, "2 1 220px"), fld("Karat", k), fld("Net gold (g)", net), fld("Chain tunch", tu)]));
+      const rm = el("button", { type: "button", className: "btn ghost", textContent: "Remove line" }); rm.addEventListener("click", () => { B.designs.splice(i, 1); drawDesigns(); render(); });
+      card.append(el("strong", { textContent: "Line " + (i + 1) + " - new design (no code)" }), el("div", { className: "row" }, [fld("Description", desc, "2 1 220px"), fld("Karat", k), fld("Net gold (g)", net), fld("Chain tunch", tu)]));
       const dbox = el("div", { style: "display:flex;flex-direction:column;gap:6px" });
       d.dias.forEach((x, j) => {
         const q = sel(DQUALS, x.q, o => QC[o] + " · " + o), sh = sel(DSHAPES, x.shape), pc = el("input", { value: x.pcs || "", inputMode: "numeric", autocomplete: "off", placeholder: "0" });
@@ -191,7 +200,7 @@
       <div class="actions" style="margin:0 0 8px"><button type="button" class="btn ghost" id="bback">&larr; Back to Bill</button></div>
       <h2>1 · Pieces</h2>
       <div class="row" style="align-items:end"><label style="flex:2 1 220px">Code on the tag, tag number or design number <input id="bq" autocomplete="off" placeholder="e.g. abc270xyz, 803 or 1436"></label>
-      <div><button type="button" class="btn" id="badd">Add piece</button></div><div><button type="button" class="btn ghost" id="bnewdes">+ New design (no tag, estimate)</button></div></div>
+      <div><button type="button" class="btn" id="badd">Add piece</button></div><div><button type="button" class="btn ghost" id="bnewdes">+ Add line (estimate): our code, or blank = new design</button></div></div>
       <div id="bpick" class="row" style="gap:8px"></div>
       <div id="bdes"></div>
       <div class="list"><table class="items" style="min-width:820px"><thead><tr><th>Piece</th><th>Gold</th><th>Gold value</th><th>Making</th><th>Diamonds</th><th id="bpolh" hidden>Polki / Party dia.</th><th>Other</th><th>Amount</th><th>Discount<br><span style="font-weight:400;text-transform:none">Rs or %</span></th><th>Net</th><th></th></tr></thead><tbody id="brows"></tbody></table></div>
