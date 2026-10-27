@@ -75,7 +75,13 @@
       r.wt = r.net; r.net = r.amount - r.disc;
       return r;
     });
-    let sum = rows.reduce((a, r) => a + r.amount, 0); const disc = rows.reduce((a, r) => a + r.disc, 0), after = sum - disc;
+    let sum = rows.reduce((a, r) => a + r.amount, 0); const disc = rows.reduce((a, r) => a + r.disc, 0);
+    // owner 27/10/2026 12:39 (C-20261027-OGBAL): Gold to Gold where the customer gives fine gold - the old gold received (OG no. + fine g, typed as a plain
+    // plus figure) is set against the fine due; the balance fine x the party's fine gold rate (24K/g, default F) is added in rupees (more gold received = taken off)
+    const fineDue = Math.round(rows.reduce((a, r) => a + r.fine, 0) * 1000) / 1000; let og = null;
+    if (mode === 'g2g' && settle === 'fine' && o.og && Number(o.og.fine) > 0) { const recv = Math.round(Number(o.og.fine) * 1000) / 1000, rt = Number(o.og.rate) >= 2000 && Number(o.og.rate) <= 50000 ? Number(o.og.rate) : F, bal = Math.round((fineDue - recv) * 1000) / 1000, amt = Math.round(bal * rt);
+      og = { no: String(o.og.no || '').slice(0, 20), due: fineDue, recv, bal, rate: rt, amt }; sum += amt; }
+    const after = Math.max(0, sum - disc);
     const sub = Math.ceil(after / 500) * 500, gst = Math.round(sub * gstPct / 100);
     // owner 17/10 15:29 ('i dont want 26093, straight 26500'): the round-up sits inside the biggest piece's making charge (its
     // rate per g is shown for the new making), or in Other for Gold Item / no gold, so every printed figure adds up to the total.
@@ -85,7 +91,7 @@
       if (mode !== 'item' && r.mkWt > 0) { r.making += roundIn; r.mkRate = Math.round(r.making / r.mkWt); } else r.other += roundIn;
       r.amount += roundIn; r.net += roundIn; sum += roundIn; }
     const fine = Math.round(rows.reduce((a, r) => a + r.fine, 0) * 1000) / 1000;
-    return { mode, settle, g2g: mode === 'g2g' ? (g2gN ? 'nett' : 'ws') : '', rows, fine: settle === 'fine' ? fine : 0, fineIn: fine, sum, disc, after, roundOff: 0, roundIn, sub, gstPct, gst, total: sub + gst };
+    return { mode, settle, g2g: mode === 'g2g' ? (g2gN ? 'nett' : 'ws') : '', rows, fine: settle === 'fine' && !og ? fine : 0, fineIn: fine, og, sum, disc, after, roundOff: 0, roundIn, sub, gstPct, gst, total: sub + gst };
   }
   // VJ_BILL_CALC_END
 
@@ -130,13 +136,14 @@
       <div class="seg" role="radiogroup" aria-label="Gold to Gold on" id="bg2g" hidden style="margin-top:8px">
         <label><input type="radio" name="bg2g" value="ws" checked> Gold to Gold on W/s (10% wastage in the fine)</label>
         <label><input type="radio" name="bg2g" value="nett"> Gold to Gold on Nett (wastage in the making)</label></div>
+      <div class="row" id="bog" hidden style="margin-top:8px"><label>OG no. (old gold) <input id="bogno" autocomplete="off" maxlength="20" placeholder="e.g. 245"></label><label>Old gold received, fine g <input id="bogfine" inputmode="decimal" autocomplete="off" maxlength="10" placeholder="e.g. 8.000"></label><label>Party fine gold rate, 24K/g <input id="bograte" inputmode="decimal" autocomplete="off" maxlength="8" placeholder="rate at order time"></label></div>
       <div class="seg" role="radiogroup" aria-label="Title" style="margin-top:8px">
         <label><input type="radio" name="btitle" value="Bill" checked> Bill</label>
         <label><input type="radio" name="btitle" value="Estimate"> Estimate</label></div>
       <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg);margin-top:8px"><input type="checkbox" id="bphoto" checked style="width:auto"> Show piece photos on the bill</label>
       <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg);margin-top:4px"><input type="checkbox" id="bnbb" style="width:auto"> Stamp <b>No Buy Back · No Exchange</b> on this bill</label>
       <div class="row" style="margin-top:8px;align-items:end"><label>Amount before GST (optional) <input id="btarget" inputmode="numeric" autocomplete="off" maxlength="9" placeholder="e.g. 80000" style="max-width:180px"></label><button type="button" class="btn ghost" id="btargetgo">Set discount</button></div><p class="hint" id="btargethint">Type the amount the customer pays before GST (e.g. 80000) - the discount is worked out and spread over the pieces.</p>
-      <table class="sum"><tr id="bfinerow" hidden><td><b>Fine gold to receive</b></td><td id="bfine"><b>—</b></td></tr><tr><td>Total</td><td id="bsum">—</td></tr><tr id="bdiscrow" hidden><td>Less discount</td><td id="bdisc">—</td></tr><tr hidden><td>Total after discount</td><td id="bsub">—</td></tr>
+      <table class="sum"><tr id="bfinerow" hidden><td><b>Fine gold to receive</b></td><td id="bfine"><b>—</b></td></tr><tr id="bogrow" hidden><td id="bogl">Balance fine gold</td><td id="bogamt">—</td></tr><tr><td>Total</td><td id="bsum">—</td></tr><tr id="bdiscrow" hidden><td>Less discount</td><td id="bdisc">—</td></tr><tr hidden><td>Total after discount</td><td id="bsub">—</td></tr>
         <tr><td id="bgstl">GST 3%</td><td id="bgst">—</td></tr><tr class="total"><td>Bill total</td><td id="btotal">—</td></tr></table>
       <p class="hint" id="bnote"></p>
       <p class="hint" id="beditnote" hidden style="color:#8a5a00;font-weight:600"></p>
@@ -160,8 +167,8 @@
     document.querySelectorAll("input[name=btitle]").forEach(r => r.addEventListener("change", () => { B.title = r.value; numField(); }));
     $("bmonth").value = today().slice(0, 7); $("bmonth").addEventListener("change", loadBook); { let tm = 0; $("bfmob").addEventListener("input", () => { clearTimeout(tm); tm = setTimeout(loadBook, 350); }); } // owner 26/10 17:58: type a mobile no. and see all that customer's bills
     $("bxl").addEventListener("click", () => xl($("bmonth").value || today().slice(0, 7))); $("bxlall").addEventListener("click", () => xl("all")); $("bxwa").addEventListener("click", e => partyWA(e.currentTarget));
-    $("bF").addEventListener("input", render); $("btargetgo").addEventListener("click", applyTarget); $("btarget").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applyTarget(); } }); /* owner 27/10 12:21 (C-20261027-BILLTARGET) */ $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); }); $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
-    $("bclear").addEventListener("click", () => { B.editNo = null; { const bt = $("btarget"); if (bt) bt.value = ""; } { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.nbb = false; $("bnbb").checked = false; B.nbbAuto = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; B.pdrates = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
+    $("bF").addEventListener("input", render); $("btargetgo").addEventListener("click", applyTarget); ["bogno", "bogfine", "bograte"].forEach(i => $(i).addEventListener("input", () => totals())); /* C-20261027-OGBAL */ $("btarget").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applyTarget(); } }); /* owner 27/10 12:21 (C-20261027-BILLTARGET) */ $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); }); $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
+    $("bclear").addEventListener("click", () => { B.editNo = null; { const bt = $("btarget"); if (bt) bt.value = ""; ["bogno", "bogfine", "bograte"].forEach(i => { const x = $(i); if (x) x.value = ""; }); } { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.nbb = false; $("bnbb").checked = false; B.nbbAuto = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; B.pdrates = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
     $("bsave").addEventListener("click", save);
     $("bback").addEventListener("click", () => { const c = document.querySelector('nav button[data-tab="check"]'); if (c) c.click(); });
   }
@@ -283,7 +290,7 @@
       $("bclear").click(); $("bform").hidden = false; B.items = b.rows.map(x => x.id); B.mode = b.mode || "ws"; B.settle = b.settle || "fine"; B.g2g = b.g2g === "nett" ? "nett" : "ws"; document.querySelectorAll("input[name=bg2g]").forEach(x => { x.checked = x.value === B.g2g; }); B.title = b.title || "Bill"; B.nbb = !!b.nbb; $("bnbb").checked = B.nbb; B.nbbAuto = true;
       document.querySelectorAll("input[name=bmode]").forEach(x => { x.checked = x.value === B.mode; }); document.querySelectorAll("input[name=bset]").forEach(x => { x.checked = x.value === B.settle; });
       document.querySelectorAll("input[name=btitle]").forEach(x => { x.checked = x.value === B.title; x.disabled = true; });
-      $("bname").value = b.name || ""; $("bcity").value = b.city || ""; $("bmob").value = b.mobile || ""; $("bdate").value = b.date; $("bF").value = b.F;
+      $("bname").value = b.name || ""; $("bcity").value = b.city || ""; $("bmob").value = b.mobile || ""; $("bdate").value = b.date; $("bF").value = b.F; { const g = b.og || null; $("bogno").value = g ? g.no || "" : ""; $("bogfine").value = g ? String(g.recv) : ""; $("bograte").value = g ? String(g.rate) : ""; }
       b.rows.forEach(x => { if (x.discTxt) B.disc[x.id] = x.discTxt; else if (x.disc > 0) B.disc[x.id] = String(x.disc);
         if (Math.round(x.F) !== Math.round(b.F)) B.frates[x.id] = x.F;
         const ds = x.dias || []; if (ds.some(d => d.rate !== d.tagRate)) { const a = ds.map(() => 0); ds.forEach((d, k) => { a[d.idx != null ? d.idx : k] = d.rate !== d.tagRate ? (d.rate || -1) : 0; }); B.rates[x.id] = a; }
@@ -351,7 +358,7 @@
       else if (!$("bmob").value.trim()) h.textContent += " Type the mobile number."; }).catch(() => {}); }
   const F = () => Number(String($("bF").value).replace(/[^0-9.]/g, "")) || 0;
   function calcNow() { const s = settings(), all = tags(); const list = B.items.map(id => all.find(t => t.id === id)).filter(Boolean);
-    return vjBillCalc(list, { F: F(), mode: B.mode, settle: B.settle, g2g: B.g2g, disc: B.disc, rates: B.rates, frates: B.frates, prates: B.prates, pdrates: B.pdrates, purity: s.purity, making: s.making, gst: s.gst }); }
+    return vjBillCalc(list, { F: F(), mode: B.mode, settle: B.settle, g2g: B.g2g, disc: B.disc, rates: B.rates, frates: B.frates, prates: B.prates, pdrates: B.pdrates, og: ogNow(), purity: s.purity, making: s.making, gst: s.gst }); }
   function goldCell(r, c) { return c.settle === "fine" ? g3(r.fine) + " fine" : fmt(r.goldAmt) + (c.settle ? " (" + g3(r.fine) + " fine)" : ""); }
   function mkCell(r, c) { return r.chain ? "— (chain)" /* C-20261017-CHAINTUNCH: no making on chain lines */ : c.mode === "item" ? "in gold" : fmt(r.making) + " (" + r.mkRate + "/g" + (r.mkWt > 0 && Math.abs(r.mkWt - r.wt) > 0.0005 ? " on " + r.mkWt.toFixed(3) + " g" : "") + ")"; }
   function noteText(mode, rows, g2g) { if (mode === "g2g" && g2g === "nett") mode = "g2gn"; // C-20261026-G2GNETT
@@ -400,6 +407,7 @@
   // owner 27/10/2026 12:21 (C-20261027-BILLTARGET): 'discount before amount like 80000 + gst' - type the amount before GST and the
   // discount (total less that amount) is spread over the pieces by their amount, the rest on the biggest piece. Only the per-piece
   // discounts are saved, so the server works the bill out exactly as before.
+  function ogNow() { const f = Number(String($("bogfine").value).replace(/[^0-9.]/g, "")) || 0; return f > 0 ? { no: $("bogno").value.trim().slice(0, 20), fine: Math.round(f * 1000) / 1000, rate: Math.round(Number(String($("bograte").value).replace(/[^0-9.]/g, "")) || 0) } : null; } // C-20261027-OGBAL
   function applyTarget() {
     const h = $("btargethint"), T = Number(String($("btarget").value).replace(/[^0-9]/g, "")) || 0;
     if (!T) { h.textContent = "Type the amount before GST, e.g. 80000."; return; }
@@ -423,7 +431,7 @@
     c.rows.forEach(r => { const n = document.querySelector('[data-net="' + r.id + '"]'); if (n) n.textContent = ok ? fmt(r.net) + (r.discTxt ? " (" + r.discTxt + ")" : "") : "—";
       const dv = document.querySelector('[data-dia="' + r.id + '"]'); if (dv) dv.textContent = "= " + fmt(r.diaAmt); const pv = document.querySelector('[data-pol="' + r.id + '"]'); if (pv) pv.textContent = "= " + fmt(r.polki); const pdv = document.querySelector('[data-pd="' + r.id + '"]'); if (pdv) pdv.textContent = "= " + fmt(r.pd); const am = document.querySelector('[data-amt="' + r.id + '"]'); if (am) am.textContent = ok ? fmt(r.amount) : "—"; });
     $("bdiscrow").hidden = !c.disc; $("bdisc").textContent = "- " + fmt(c.sum - c.sub);
-    $("bsettle").hidden = !fineMode(); $("bsettle").style.display = fineMode() ? "" : "none"; $("bg2g").style.display = B.mode === "g2g" ? "" : "none"; $("bg2g").hidden = B.mode !== "g2g"; /* .seg sets display:flex, which beats [hidden] */ $("bfinerow").hidden = !(c.settle === "fine" && c.rows.length); $("bfine").firstChild.textContent = g3(c.fine);
+    $("bsettle").hidden = !fineMode(); $("bsettle").style.display = fineMode() ? "" : "none"; $("bg2g").style.display = B.mode === "g2g" ? "" : "none"; $("bg2g").hidden = B.mode !== "g2g"; /* .seg sets display:flex, which beats [hidden] */ $("bfinerow").hidden = !(c.settle === "fine" && c.rows.length) || !!c.og; { const on = B.mode === "g2g" && B.settle === "fine"; $("bog").hidden = !on; $("bog").style.display = on ? "" : "none"; $("bogrow").hidden = !c.og; if (c.og) { $("bogl").textContent = `Fine gold ${g3(c.og.due)} - old gold${c.og.no ? " (OG " + c.og.no + ")" : ""} ${g3(c.og.recv)} = balance ${g3(c.og.bal)} @ ${fmt(c.og.rate)}/g`; $("bogamt").textContent = fmt(c.og.amt); } } $("bfine").firstChild.textContent = g3(c.fine);
     $("bmodehint").textContent = { ws: "Gold x karat rate + 10% wastage; making Rs 650/g (750/g up to 5 g), minimum Rs 1,000 a piece.", nett: "Gold x karat rate; making Rs 650/g (750 up to 5 g), minimum Rs 1,000, + 10% wastage on the gold.",
       g2g: B.g2g === "nett" ? "Fine gold = net weight x karat (14K 0.60 / 18K 0.76 / 22K 0.92 / 9K 0.385); making Rs 650/g (750 up to 5 g), minimum Rs 1,000, + 10% wastage on the gold, in rupees." : "Fine gold = weight x 14K 0.66 / 18K 0.836 / 9K 0.4235 / 22K 1.06 (10% wastage in the fine); making Rs 650/g (750 up to 5 g), minimum Rs 1,000, in rupees.", item: "Fine gold = weight x 14K 0.74 / 18K 0.90 / 9K 0.54 / 22K 1.06; making included in the gold." }[B.mode];
     $("bsum").textContent = has ? fmt(c.disc ? c.sum : c.sub) : "—"; $("bsub").textContent = has ? fmt(c.sub) : "—";
@@ -482,7 +490,7 @@
       const sx = M, sy = y - 4, sw = 72, sh = 24; doc.setDrawColor(176, 32, 32); doc.setLineWidth(0.9); doc.roundedRect(sx, sy, sw, sh, 2, 2); doc.setLineWidth(0.3); doc.roundedRect(sx + 1.6, sy + 1.6, sw - 3.2, sh - 3.2, 1.5, 1.5);
       doc.setTextColor(176, 32, 32); doc.setFont("helvetica", "bold"); doc.setFontSize(15); doc.text("NO BUY BACK", sx + sw / 2, sy + 10.2, { align: "center" }); doc.text("NO EXCHANGE", sx + sw / 2, sy + 18.4, { align: "center" });
       doc.setTextColor(20); doc.setLineWidth(0.2); doc.setDrawColor(0); }
-    if (b.settle === "fine") { tot("Fine gold to receive", g3(b.fine), true); y += 2; }
+    if (b.og) { tot("Fine gold due", g3(b.og.due)); tot("Old gold received" + (b.og.no ? " (OG " + b.og.no + ")" : ""), "- " + g3(b.og.recv)); tot(`Balance ${g3(b.og.bal)} @ ${fmt(b.og.rate)}/g`, fmt(b.og.amt), true); y += 2; } else if (b.settle === "fine") { tot("Fine gold to receive", g3(b.fine), true); y += 2; }
     tot("Total", fmt(b.disc ? b.sum : b.sub)); if (b.disc) { tot("Less discount", "- " + fmt(b.sum - b.sub)); tot("Total after discount", fmt(b.sub)); } tot(`GST ${b.gstPct}%`, fmt(b.gst)); doc.setDrawColor(180, 150, 80); doc.line(W - M - 95, y - 4, W - M, y - 4); y += 2; tot(b.title + " total", fmt(b.total), true);
     y += 4; doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(80);
     const notes = [noteText(b.mode, b.rows, b.g2g).trim(), "All diamonds are third-party certified (IGI / EGL / TGL) and all gold is BIS HUID hallmarked.", b.title === "Estimate" ? "This is an estimate. Final figure may vary with the gold price." : "", b.nbb ? "Sold on a no buy back, no exchange basis." : "",
@@ -493,7 +501,7 @@
   async function save() {
     const m = $("bmsg"), out = $("bout"); out.hidden = true;
     const body = { no: $("bno").value.trim(), name: (n => n && !/ji$/i.test(n) ? n + " ji" : n)($("bname").value.trim().slice(0, 57)) /* owner 26/10 18:45: 'ji' added on the bill automatically (Prachi -> Prachi ji) */, city: $("bcity").value.trim(), mobile: $("bmob").value.trim().slice(0, 20),
-      date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, g2g: B.g2g, title: B.title, nbb: !!B.nbb, ids: B.items.slice(), disc: Object.assign({}, B.disc), rates: JSON.parse(JSON.stringify(B.rates)), frates: Object.assign({}, B.frates), prates: Object.assign({}, B.prates), pdrates: Object.assign({}, B.pdrates), edit: B.editNo || "" };
+      date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, g2g: B.g2g, title: B.title, nbb: !!B.nbb, ids: B.items.slice(), disc: Object.assign({}, B.disc), rates: JSON.parse(JSON.stringify(B.rates)), frates: Object.assign({}, B.frates), prates: Object.assign({}, B.prates), pdrates: Object.assign({}, B.pdrates), og: ogNow(), edit: B.editNo || "" };
     if (!body.name) { m.textContent = "Enter the customer's name."; return; }
     let dg = body.mobile.replace(/\D/g, ""); if (dg.length === 12 && dg.startsWith("91")) dg = dg.slice(2); // phone copy like "+91 98xxx xxxxx" is fine
     const mobNote = body.mobile && !/^[6-9]\d{9}$/.test(dg) ? ` Note: the mobile has ${dg.replace(/^91/, "").length} digits after +91 (a mobile usually has 10) - saved as typed.` : "";
