@@ -5,7 +5,9 @@
    Reprint tag prints a fresh code and price. Every save is logged on the server (audit) with the owner's email. */
 (function () {
   "use strict";
-  const KARATS = ["22K", "18K", "14K", "9K"];
+  const KARATS = ["22K", "18K", "14K", "9K"], KNUM = { "22K": "22", "18K": "18", "14K": "14", "9K": "9" };
+  /* owner 27/10/2026 12:12 (C-20261027-EDITCAT): category can be changed in Edit tag - same list as the new-tag form */
+  const CATS = [["VLR", "Ring (VLR)", "SVLR"], ["VER", "Earrings (VER)", "SVER"], ["VBR", "Bracelet (VBR)", "SVBR"], ["VBN", "Bangle (Vban)", "SVBN"], ["VP", "Pendant (VP)", "SVP"], ["VPS", "Pendant Set (VPS)", "SVPS"], ["VNS", "Necklace Set (VNS)", "SNS"], ["VMN", "Mangalsutra (VMan)", "SVMN"], ["CH", "Chain (Ch)", "SCH"], ["VNP", "Nose Pin (VNP)", "SVNP"]].map(([id, name, smp]) => ({ id, name, smp }));
   const el = (tag, props, kids) => { const e = document.createElement(tag); Object.assign(e, props || {}); (kids || []).forEach(k => e.append(k)); return e; };
   const num = v => { const n = parseFloat(String(v).replace(/,/g, "")); return isFinite(n) ? n : 0; };
   const inp = (val, w, type) => el("input", { value: val == null ? "" : String(val), type: type || "text", style: `width:${w || 90}px;min-width:0`, inputMode: type === "number" ? "decimal" : "text" });
@@ -15,6 +17,11 @@
     const old = document.getElementById("vjEdit"); if (old) old.remove();
     const wrap = el("div", { id: "vjEdit", className: "card" }); wrap.style.cssText = "border:2px solid #b8963e;border-radius:var(--r,10px);padding:14px;margin-top:10px;display:flex;flex-direction:column;gap:10px";
     wrap.append(el("h2", { textContent: "Edit " + t.label }));
+    const fCat = el("select", { style: "width:190px" }); CATS.forEach(c => fCat.append(el("option", { value: c.id, textContent: c.name, selected: c.id === t.cat })));
+    if (!CATS.some(c => c.id === t.cat)) fCat.prepend(el("option", { value: t.cat || "", textContent: (t.catName || t.cat || "?") + " (old)", selected: true }));
+    const catNote = el("div", { className: "hint", textContent: "" });
+    fCat.onchange = () => { catNote.textContent = fCat.value !== t.cat ? "New category: the piece gets a new label number in that category when you save. The old QR on the printed tag keeps working; reprint the tag." : ""; };
+    wrap.append(el("div", { className: "row", style: "display:flex;gap:10px;flex-wrap:wrap;align-items:end" }, [el("label", { style: "display:flex;flex-direction:column;gap:4px" }, ["Category", fCat]), catNote]));
     const fDesign = inp(t.designNo, 140), fRemark = inp(t.remark, 220), fOther = inp((t.other && t.other.amt) || 0, 110, "number"), fBox = inp(t.box, 200);
     const row = (label, f) => el("label", { style: "display:flex;flex-direction:column;gap:4px" }, [label, f]);
     wrap.append(el("div", { className: "row", style: "display:flex;gap:10px;flex-wrap:wrap" }, [row("Design no.", fDesign), row("Remark", fRemark), row("Other charges (Rs)", fOther), row("Packet / box", fBox)]));
@@ -62,15 +69,39 @@
       if (t.kind === "sample") data.metal = Object.assign({}, t.metal || {}, { net: Math.max(0, num(fMetal.value)) }); else data.gold = gold;
       const priceChanged = JSON.stringify([t.gold || [], t.dias || [], (t.other && t.other.amt) || 0, (t.metal && t.metal.net) || 0, pk0 ? [pk0.pcs, pk0.rate] : null])
         !== JSON.stringify([data.gold || t.gold || [], dias, data.other.amt, (data.metal && data.metal.net) || (t.metal && t.metal.net) || 0, data.polki ? [data.polki.pcs, data.polki.rate] : null]) || JSON.stringify(pd0 ? [pd0.ct, pd0.rate] : null) !== JSON.stringify(data.pdia ? [data.pdia.ct, data.pdia.rate] : null);
-      if (priceChanged && t.code) Object.assign(data, { code: null, priceAtTag: null, gold24gAtTag: null });
+      // C-20261027-EDITCAT: category and main karat decide the printed code (VBN18) and the label series (VBN18/7)
+      const cat = CATS.find(c => c.id === fCat.value), gl = (data.gold || t.gold || []), g1 = gl.find(g => g.net > 0 && g.k !== "Chain") || gl.find(g => g.k !== "Chain"), gc = gl.find(g => g.k === "Chain" && g.tunch > 0);
+      const mainK = g1 ? g1.k : gc ? (gc.tunch >= 0.88 ? "22K" : gc.tunch >= 0.7 ? "18K" : gc.tunch >= 0.5 ? "14K" : "9K") : "14K";
+      let catChanged = false;
+      if (cat && cat.id !== t.cat) { catChanged = true; Object.assign(data, { cat: cat.id, catName: cat.name.replace(/\s*\(.*\)$/, "") }); }
+      if (cat && (catChanged || t.pcode)) {
+        const kn = t.kind === "sample" ? ((String(t.pcode || "").match(/^[A-Z]+(\d+)/) || [])[1] || "14") : KNUM[mainK];
+        data.pcode = cat.id + kn + (t.kind === "sample" ? "/" + (t.karigar || "") : "");
+        const prefix = t.kind === "sample" ? cat.smp : cat.id + kn;
+        if (prefix !== t.prefix) data.prefix = prefix;
+      }
+      if ((priceChanged || catChanged || (data.pcode && data.pcode !== t.pcode)) && t.code) Object.assign(data, { code: null, priceAtTag: null, gold24gAtTag: null });
       data.editedAt = new Date().toISOString();
       save.disabled = true; note.textContent = "Saving…";
       try {
-        const db = await window.claude.use("db"); await db.doc("tags/" + t.id).update(data);
+        const db = await window.claude.use("db");
+        if (data.prefix) {
+          const cref = db.doc("counters/main"), me = "edit" + Math.random();
+          let lease = await cref.acquire({ holder: me, ttlMs: 8000 });
+          for (let i = 0; i < 5 && !lease.acquired; i++) { await new Promise(r => setTimeout(r, 700 + Math.random() * 500)); lease = await cref.acquire({ holder: me, ttlMs: 8000 }); }
+          if (!lease.acquired) throw { message: "Someone else is saving a tag right now. Try again in a few seconds" };
+          const snap = await cref.get(), last = Object.assign({}, (snap.exists && snap.data().last) || {}), all = window.VJ_TAGS();
+          let no = Math.max(last[data.prefix] || 0, ...all.filter(x => x.prefix === data.prefix).map(x => x.no || 0)) + 1;
+          const used = n => all.some(x => x.label === data.prefix + "/" + n) || false;
+          for (;;) { if (!used(no) && !(await db.doc("tags/" + (data.prefix + "-" + no).replace(/[^A-Za-z0-9_\-.~:@+]/g, "_")).get()).exists) break; no++; }
+          Object.assign(data, { no, label: data.prefix + "/" + no, formerLabels: [...(t.formerLabels || []), t.label] });
+          await db.doc("tags/" + t.id).update(data);
+          last[data.prefix] = Math.max(last[data.prefix] || 0, no); await cref.set({ last });
+        } else await db.doc("tags/" + t.id).update(data);
         Object.assign(t, data);
         wrap.remove();
         const go = document.getElementById("cgo"); if (go) go.click();   // the page shows the piece again with the new details
-        showMsg(`${t.label} saved.` + (priceChanged && data.code === null ? " The price changed - tap Reprint tag to print the new tag (the old tag's code no longer works)." : ""), "ok");
+        showMsg((data.formerLabels ? `Now ${data.label} (was ${data.formerLabels[data.formerLabels.length - 1]}) - ${data.catName || t.catName}.` : `${t.label} saved.`) + (data.code === null ? " The price or printed code changed - tap Reprint tag to print the new tag (the old tag's code no longer works)." : ""), "ok");
       } catch (e) { note.textContent = "Could not save: " + (e.message || e.code || "error") + "."; save.disabled = false; }
     };
     card.after(wrap); wrap.scrollIntoView({ behavior: "smooth", block: "start" });
