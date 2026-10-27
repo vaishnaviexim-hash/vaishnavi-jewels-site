@@ -54,7 +54,12 @@ async function onPost(request, env, ctx) {
   const hasFail = values.some(v => Array.isArray(v.statuses) && v.statuses.some(s => s && s.status === 'failed'));
   if (!hasMsg && !hasFail) return reply('OK', 200); // plain receipt: stop here, costs nothing
   // R-159: gold rate from Abhinav/Mihir saved on the website at once (no Make); the message still goes on to A1
-  try { const g = env.DB ? waGoldFrom(values) : null; if (g) { const p = vjSaveGold(env, g.per10, g.source).catch(() => {}); if (ctx && ctx.waitUntil) ctx.waitUntil(p); else await p; } } catch (e) {}
+  let fbuf = buf, fsig = sigHdr;
+  try { const g = waGoldFrom(values); if (g) {
+    if (env.DB) { const p = vjSaveGold(env, g.per10, g.source).catch(() => {}); if (ctx && ctx.waitUntil) ctx.waitUntil(p); else await p; }
+    // A1 knows 'GOLD RATE <n>': rewrite 'Gold 152266' to that form and sign it again with the app secret (A1 checks the signature)
+    const nb = waGoldNormalize(body); if (nb) { fbuf = enc.encode(nb); fsig = 'sha256=' + await hmacHex(env.META_APP_SECRET, fbuf); }
+  } } catch (e) { fbuf = buf; fsig = sigHdr; }
   // R-159: batched replies only when the owner has set WA_BATCH = 1; urgent team commands and opt-outs go at once
   if (env.WA_BATCH === '1' && env.DB && hasMsg && !hasFail && !waUrgent(values)) {
     try { await waQueue(env, body, values); return reply('OK', 200); } catch (e) { /* queue failed: forward now as before */ }
@@ -63,8 +68,8 @@ async function onPost(request, env, ctx) {
   try {
     const r = await fetch(env.MAKE_A1_HOOK, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-hub-signature-256': sigHdr },
-      body: buf,
+      headers: { 'content-type': 'application/json', 'x-hub-signature-256': fsig },
+      body: fbuf,
       signal: AbortSignal.timeout(9000),
     });
     return reply('OK', r.ok ? 200 : 502); // 502 makes Meta retry later
@@ -107,6 +112,17 @@ function waGoldFrom(values) {
     return { per10: Math.round(n), source: `Sent by ${who} on WhatsApp ${waIst(ts)} IST` };
   }
   return null;
+}
+function waGoldNormalize(body) {
+  let changed = false;
+  for (const e of (body && body.entry) || []) for (const c of (e && e.changes) || []) for (const m of ((c && c.value && c.value.messages) || [])) {
+    if (!m || m.type !== 'text' || !WA_GOLD_FROM[String(m.from || '')]) continue;
+    const t = String((m.text || {}).body || '').trim();
+    if (/^gold ?rate\b/i.test(t)) continue;
+    const g = waGoldFrom([{ messages: [m] }]); if (!g) continue;
+    m.text.body = 'GOLD RATE ' + g.per10; changed = true;
+  }
+  return changed ? waAscii(JSON.stringify(body)) : null;
 }
 function waUrgent(values) {
   for (const { m } of waMsgs(values)) {
