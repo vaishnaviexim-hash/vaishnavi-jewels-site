@@ -277,6 +277,10 @@
     document.querySelectorAll("nav button").forEach(y => y.setAttribute("aria-selected", "false"));
     prefill(); numField(); if (t) add(t); loadBook();  window.scrollTo({ top: 0, behavior: "smooth" }); setTimeout(() => { const n = $("bmob"); if (n) n.focus(); }, 120); }; // owner 26/10 17:51: mobile first, the party's name and city fill in
   window.VJ_BILL_ADD = id => { const t = tags().find(x => x.id === id); if (t) add(t); }; // Orders pending > Bill all (C-20261026-ORDERSDUE)
+  // owner 27/10 17:54 (C-20261027-ESTBILL): "New estimate" on the Bill (price check) tab - a fresh Estimate, stock pieces by code and / or a new design
+  window.VJ_EST_NEW = () => { if (!$("p-bill")) return; $("bclear").click(); $("bform").hidden = false;
+    document.querySelectorAll('[id^="p-"]').forEach(p => { p.hidden = p.id !== "p-bill"; }); document.querySelectorAll("nav button").forEach(y => y.setAttribute("aria-selected", "false"));
+    prefill(); B.title = "Estimate"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.checked = x.value === "Estimate"; }); numField(); loadBook(); window.scrollTo({ top: 0, behavior: "smooth" }); setTimeout(() => { const n = $("bq"); if (n) n.focus(); }, 120); };
   // C-20261016-BILLBOOK: estimate numbers are given by the server (E-YYMM-NN, from 01 each month); bill numbers are typed
   function numField() { const e = B.title === "Estimate", n = $("bno"); n.disabled = true; n.value = ""; const d = $("bdate").value || today(); // owner 16/10: bill numbers automatic too
     n.placeholder = "automatic (" + (e ? "E-" : "B-") + d.slice(2, 4) + d.slice(5, 7) + "-01, 02 …)"; }
