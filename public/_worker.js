@@ -34,7 +34,7 @@ async function onGet(request, env) {
   return reply('Forbidden', 403);
 }
 
-async function onPost(request, env) {
+async function onPost(request, env, ctx) {
   if (!env.META_APP_SECRET || !env.MAKE_A1_HOOK) return reply('Not configured', 503);
   const len = Number(request.headers.get('content-length') || 0);
   if (len > 1000000) return reply('Too large', 413);
@@ -53,6 +53,12 @@ async function onPost(request, env) {
   const hasMsg = values.some(v => Array.isArray(v.messages) && v.messages.length);
   const hasFail = values.some(v => Array.isArray(v.statuses) && v.statuses.some(s => s && s.status === 'failed'));
   if (!hasMsg && !hasFail) return reply('OK', 200); // plain receipt: stop here, costs nothing
+  // R-159: gold rate from Abhinav/Mihir saved on the website at once (no Make); the message still goes on to A1
+  try { const g = env.DB ? waGoldFrom(values) : null; if (g) { const p = vjSaveGold(env, g.per10, g.source).catch(() => {}); if (ctx && ctx.waitUntil) ctx.waitUntil(p); else await p; } } catch (e) {}
+  // R-159: batched replies only when the owner has set WA_BATCH = 1; urgent team commands and opt-outs go at once
+  if (env.WA_BATCH === '1' && env.DB && hasMsg && !hasFail && !waUrgent(values)) {
+    try { await waQueue(env, body, values); return reply('OK', 200); } catch (e) { /* queue failed: forward now as before */ }
+  }
 
   try {
     const r = await fetch(env.MAKE_A1_HOOK, {
@@ -65,6 +71,110 @@ async function onPost(request, env) {
   } catch (e) {
     return reply('Upstream error', 502);
   }
+}
+
+// ---------------------------------------------------------------------------------------------
+// R-159 MAKE-CREDIT SAVING MODE (owner 27/10/2026 18:40-18:44 IST, Brain C-20261027-MAKECUT).
+// (a) Gold rate by WhatsApp: when Abhinav or Mihir send 'Gold 152266' (Gold 999 IMP T+2 sell per 10 g) to Aashvi, the
+//     website saves it straight away (VJ Tags settings, no Make credits). The message still goes on to Make A1, which
+//     replies and fills the Make data store VJ_Gold. A WhatsApp rate wins for its whole day (the NR relay is skipped).
+// (b) Batched customer replies: ONLY when the Cloudflare variable WA_BATCH = '1' (owner switches it on). Real messages are
+//     stored in D1 table wa_inbox and sent to Make A1 in one go at 11:37 / 15:37 / 19:37 IST, when the scheduler calls
+//     POST /hooks/wa-flush with header x-vj-flush-secret = WA_FLUSH_SECRET (encrypted variable). Consecutive texts from the
+//     same customer become one message (one AI reply instead of several). Team commands that need speed (STOP, YES/NO,
+//     GO/SKIP boost replies, button taps, Gold) and customer opt-outs are forwarded at once. Without WA_BATCH everything
+//     works exactly as before. Re-sent messages are signed with META_APP_SECRET, so A1's signature check still passes.
+// (c) We never mark customer messages as read (no blue ticks) and delivery/read receipts never reach Make.
+const WA_GOLD_FROM = { '917567400099': 'Abhinav', '919099763201': 'Mihir' };
+const WA_TEAM = new Set(['917567400099', '919374050969', '919099763201', '917096112443', '918758929959']); // Team_Access 27/10
+const WA_URGENT = /^(stop|stop all|start all|pause posting|resume posting|yes|y|no|n|ok|okay|haan|haan ji|ha|han|ji haan|nahi|nahin|na|cancel|confirm|confirmed|skip|go|go all|go mathura|go braj|test on|test off|gold\b.*|gold rate\b.*)[.!\s]*$/i;
+const WA_OPTOUT = /^(stop|unsubscribe|band karo|mat bhejo|don'?t send|remove me)[.!\s]*$/i;
+const waMsgs = values => { const out = []; for (const v of values) for (const m of (Array.isArray(v.messages) ? v.messages : [])) if (m) out.push({ v, m }); return out; };
+const waText = m => { const t = String(m.type || ''); if (t === 'text') return String((m.text || {}).body || ''); if (t === 'button') return String((m.button || {}).text || '');
+  if (t === 'interactive') { const i = m.interactive || {}; return String(((i.button_reply || i.list_reply || {}).title) || ''); } return String((m[t] || {}).caption || ''); };
+function waIst(ms) { const d = new Date(ms + 5.5 * 3600e3), p = x => String(x).padStart(2, '0');
+  return p(d.getUTCDate()) + '/' + p(d.getUTCMonth() + 1) + '/' + d.getUTCFullYear() + ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()); }
+const waIstDay = ms => new Date(ms + 5.5 * 3600e3).toISOString().slice(0, 10);
+function waGoldFrom(values) {
+  for (const { m } of waMsgs(values)) {
+    const who = WA_GOLD_FROM[String(m.from || '')];
+    if (!who || m.type !== 'text') continue;
+    const k = waText(m).trim().replace(/(\d),(?=\d)/g, '$1').match(/^gold(?:\s*rate)?(?:\s*999)?(?:\s*imp)?(?:\s*t\s*\+\s*2)?\s*[:=-]?\s*(?:rs\.?|₹|inr)?\s*(\d+(?:\.\d+)?)\s*(?:(?:\/|per)?\s*10\s*g\w*)?\s*$/i);
+    if (!k) continue;
+    let n = parseFloat(k[1]); if (n > 0 && n < 40000) n *= 10; // a per-gram figure still works
+    if (!(n >= 50000 && n <= 400000)) continue; // owner's sanity range per 10 g
+    const ts = (Number(m.timestamp) || 0) * 1000 || Date.now();
+    return { per10: Math.round(n), source: `Sent by ${who} on WhatsApp ${waIst(ts)} IST` };
+  }
+  return null;
+}
+function waUrgent(values) {
+  for (const { m } of waMsgs(values)) {
+    const from = String(m.from || ''), t = waText(m).trim();
+    if (WA_TEAM.has(from) && (m.type === 'interactive' || m.type === 'button' || WA_URGENT.test(t))) return true;
+    if (WA_OPTOUT.test(t)) return true;
+  }
+  return false;
+}
+let waTablesOk = false;
+async function waTables(env) {
+  if (waTablesOk) return;
+  await env.DB.batch([
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS wa_inbox (id TEXT PRIMARY KEY, sender TEXT, type TEXT, text TEXT, media_id TEXT, ts INTEGER, received INTEGER, meta TEXT, msg TEXT, contact TEXT, processed INTEGER DEFAULT 0, sent_at INTEGER)'),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS wa_inbox_p ON wa_inbox (processed, ts)'),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_meta (k TEXT PRIMARY KEY, v TEXT)')]);
+  waTablesOk = true;
+}
+async function waQueue(env, body, values) {
+  await waTables(env);
+  const now = Date.now(), stmts = [];
+  const waba = String((((body || {}).entry || [])[0] || {}).id || '');
+  for (const { v, m } of waMsgs(values)) {
+    const id = String(m.id || ''); if (!id) continue;
+    const c = (Array.isArray(v.contacts) ? v.contacts : []).find(x => x && String(x.wa_id) === String(m.from)) || (v.contacts || [])[0] || {};
+    const t = String(m.type || '');
+    stmts.push(env.DB.prepare('INSERT OR IGNORE INTO wa_inbox (id, sender, type, text, media_id, ts, received, meta, msg, contact, processed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)')
+      .bind(id, String(m.from || ''), t, waText(m).slice(0, 4000), String((m[t] && m[t].id) || ''), (Number(m.timestamp) || 0) * 1000 || now, now,
+        JSON.stringify({ waba, metadata: v.metadata || {} }), JSON.stringify(m), JSON.stringify(c)));
+  }
+  if (stmts.length) await env.DB.batch(stmts);
+}
+const waAscii = s => s.replace(/[^\x00-\x7e]/g, ch => '\\u' + ch.charCodeAt(0).toString(16).padStart(4, '0')); // same escaping as Meta
+async function waFlush(request, env) {
+  const sec = request.headers.get('x-vj-flush-secret') || '';
+  if (!env.WA_FLUSH_SECRET || env.WA_FLUSH_SECRET.length < 24 || !safeEq(sec, env.WA_FLUSH_SECRET)) return reply('Forbidden', 403);
+  if (!env.META_APP_SECRET || !env.MAKE_A1_HOOK || !env.DB) return reply('Not configured', 503);
+  await waTables(env);
+  const rows = (await env.DB.prepare('SELECT id, sender, type, ts, meta, msg, contact FROM wa_inbox WHERE processed = 0 ORDER BY ts, received LIMIT 300').all()).results || [];
+  const items = [], lastOf = new Map();
+  for (const r of rows) {
+    let m, meta, c; try { m = JSON.parse(r.msg); meta = JSON.parse(r.meta); c = JSON.parse(r.contact); } catch (e) { items.push({ ids: [r.id], bad: true }); continue; }
+    const prev = lastOf.get(r.sender);
+    if (prev && !prev.bad && !WA_TEAM.has(r.sender) && m.type === 'text' && prev.msg.type === 'text' && !prev.sent && String((m.text || {}).body || '').length + String((prev.msg.text || {}).body || '').length < 3500) {
+      prev.msg.text.body = String(prev.msg.text.body || '') + '\n' + String((m.text || {}).body || ''); // one customer, several texts -> one message
+      prev.msg.timestamp = m.timestamp; prev.ids.push(r.id); continue;
+    }
+    const it = { ids: [r.id], msg: m, meta, contact: c }; items.push(it); lastOf.set(r.sender, it);
+  }
+  let sent = 0, failed = 0; const done = [], MAX = 35;
+  for (const it of items) {
+    if (sent + failed >= MAX) break;
+    if (it.bad) { done.push(...it.ids); continue; }
+    const payload = { object: 'whatsapp_business_account', entry: [{ id: it.meta.waba || '', changes: [{ field: 'messages', value: { messaging_product: 'whatsapp', metadata: it.meta.metadata || {}, contacts: it.contact && it.contact.wa_id ? [it.contact] : [], messages: [it.msg] } }] }] };
+    const bytes = enc.encode(waAscii(JSON.stringify(payload)));
+    try {
+      const r = await fetch(env.MAKE_A1_HOOK, { method: 'POST', headers: { 'content-type': 'application/json', 'x-hub-signature-256': 'sha256=' + await hmacHex(env.META_APP_SECRET, bytes), 'x-vj-batch': '1' }, body: bytes, signal: AbortSignal.timeout(9000) });
+      if (r.ok) { sent++; done.push(...it.ids); } else failed++;
+    } catch (e) { failed++; }
+  }
+  const now = Date.now();
+  for (let i = 0; i < done.length; i += 50) {
+    const part = done.slice(i, i + 50);
+    await env.DB.prepare(`UPDATE wa_inbox SET processed = 1, sent_at = ? WHERE id IN (${part.map(() => '?').join(',')})`).bind(now, ...part).run();
+  }
+  await env.DB.prepare('DELETE FROM wa_inbox WHERE processed = 1 AND sent_at < ?').bind(now - 14 * 86400e3).run();
+  const left = await env.DB.prepare('SELECT count(*) AS n FROM wa_inbox WHERE processed = 0').first();
+  return new Response(JSON.stringify({ ok: true, messages: rows.length, sent, failed, remaining: (left && left.n) || 0, at: waIst(now) }), { headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -194,6 +304,10 @@ async function vjMaybeRefreshGold(env) {
   // 15:30, 17:00 and Fri 20:00 IST. Find the latest task time (looking back up to 3 days, so Sat/Sun/Monday morning still
   // pick up Friday 8 pm).
   if (Date.now() - vjGoldAskedAt < 10 * 60e3) return;
+  // R-159: a gold rate sent on WhatsApp by Abhinav/Mihir wins for its whole day (no Make call at all)
+  const row0 = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first();
+  const s0 = row0 ? JSON.parse(row0.data) : {};
+  if (/^Sent by /.test(String(s0.goldSource || '')) && waIstDay(Date.parse(s0.goldAt || 0) || 0) === waIstDay(Date.now())) return;
   const ist = new Date(Date.now() + 5.5 * 3600e3), m = ist.getUTCHours() * 60 + ist.getUTCMinutes();
   let slotAt = 0;
   for (let back = 0; back <= 3 && !slotAt; back++) {
@@ -207,6 +321,9 @@ async function vjMaybeRefreshGold(env) {
   const goldAt = row ? Date.parse(JSON.parse(row.data).goldAt || 0) || 0 : 0;
   if (goldAt >= slotAt) return;
   vjGoldAskedAt = Date.now();
+  // R-159: ask Make at most ONCE per task time across all website copies (was every 10 min per copy = ~22 Make runs a day)
+  try { await waTables(env); const a = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'gold_asked'").first(); if (a && Number(a.v) >= slotAt) return;
+    await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('gold_asked', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(String(Date.now())).run(); } catch (e) { return; }
   try {
     const r = await fetch(env.VJ_GOLD_HOOK, { signal: AbortSignal.timeout(8000) });
     const j = await r.json();
@@ -2053,9 +2170,10 @@ export default {
     if (p === '/hooks/vj-backup' || p === '/hooks/vj-backupfile') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-backup' ? vjBackup(env) : vjBackupFile(url, env)) : reply('Method not allowed', 405); // C-20261017-TAGSBACKUP
     // gold rate pushed by Make (secret header); outside Cloudflare Access like the WhatsApp hook
     if (p === '/hooks/vj-gold') return (request.method === 'POST' && (url.hostname === VJ_HOST || env.VJ_DEV === '1')) ? vjGoldPush(request, env) : reply('Method not allowed', 405);
+    if (p === '/hooks/wa-flush') return (request.method === 'POST' && url.hostname === VJ_HOST) ? waFlush(request, env) : reply('Method not allowed', 405); // R-159 batch send
     if (url.pathname === '/hooks/whatsapp') {
       if (request.method === 'GET') return onGet(request, env);
-      if (request.method === 'POST') return onPost(request, env);
+      if (request.method === 'POST') return onPost(request, env, ctx);
       return reply('Method not allowed', 405);
     }
     return env.ASSETS.fetch(request);
