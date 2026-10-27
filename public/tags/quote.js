@@ -93,7 +93,7 @@
     return { desc: String(d.desc || "").trim().slice(0, 60), k: d.k, net, tunch, dias, ppcs, prate, other, bad };
   }
   function designPrice(d) { const st = settings(), x = designIn(d, st); if (x.bad.length || !st.g) return 0;
-    return calc([{ k: x.k, net: x.net, tunch: x.tunch }], x.dias.reduce((a, y) => a + y.ct * y.rate, 0), (x.ppcs ? x.ppcs * x.prate : 0) + x.other, st, "std"); }
+    return calc([{ k: x.k, net: x.net, tunch: x.tunch }], x.dias.reduce((a, y) => a + y.ct * y.rate, 0), (x.ppcs ? x.ppcs * x.prate : 0) + x.other, st, Q.mk); }
   const tags = () => (window.VJ_TAGS ? window.VJ_TAGS() : []);
   function find(q) {
     q = String(q || "").trim().toUpperCase().replace(/\s+/g, ""); if (!q) return [];
@@ -128,6 +128,8 @@
         <label><input type="radio" name="qopt" value="gh" checked> Natural VS GH</label>
         <label><input type="radio" name="qopt" value="ij"> Natural VS IJ</label>
         <label><input type="radio" name="qopt" value="lgd"> Lab-grown</label></div>
+      </div>
+      <h2 id="qmph">3 · Making &amp; payment</h2>
       <div class="seg" role="radiogroup" aria-label="Making" style="margin-top:8px">
         <label><input type="radio" name="qmk" value="std" checked> <span id="qmkstd">Making Rs 650/g + 10% wastage on gold</span></label>
         <label><input type="radio" name="qmk" value="flat"> Making Rs 1,600/g</label></div>
@@ -135,8 +137,7 @@
         <label><input type="radio" name="qpay" value="amount" checked> In rupees</label>
         <label><input type="radio" name="qpay" value="g2g"> Gold to Gold W/s</label>
         <label><input type="radio" name="qpay" value="g2gn"> Gold to Gold Nett</label></div>
-      </div>
-      <h2 id="qcusth">3 · Customer</h2>
+      <h2 id="qcusth">4 · Customer</h2>
       <div class="actions" id="qcbox" hidden><button type="button" class="btn ghost" id="qcontact">Pick from phone contacts</button></div>
       <div class="row"><label>Name <input id="qname" autocomplete="off" maxlength="60"></label>
         <label>Mobile (10 digits) <input id="qmob" inputmode="tel" autocomplete="off" maxlength="20" placeholder="98xxxxxxxx"></label>
@@ -187,7 +188,7 @@
   function addItem(t) { if (!Q.items.some(x => x.id === t.id)) Q.items.push(t); $("qq").value = ""; $("qpick").textContent = ""; render(); }
   function kindView() {
     const d = Q.kind === "design"; $("qdesbox").hidden = !d; $("qcodebox").hidden = d; $("qphotol").style.display = d ? "none" : "";
-    $("qcusth").textContent = (d ? "2" : "3") + " · Customer"; $("qmsg").textContent = ""; if ($("qsharebox")) $("qsharebox").hidden = true; render();
+    $("qmph").textContent = (d ? "2" : "3") + " · Making & payment"; $("qcusth").textContent = (d ? "3" : "4") + " · Customer"; // C-20261027-ESTMK: making and payment choices in estimates too $("qmsg").textContent = ""; if ($("qsharebox")) $("qsharebox").hidden = true; render();
   }
   const el = (tag, props, kids) => { const e = document.createElement(tag); Object.assign(e, props || {}); (kids || []).forEach(k => e.append(k)); return e; };
   const fld = (label, input, flex) => { const l = el("label", {}, [label, input]); if (flex) l.style.flex = flex; return l; };
@@ -239,7 +240,7 @@
       if (x.bad.length && (num(d.net) > 0 || d.dias.length || num(d.ppcs) > 0)) miss.push("Design " + (i + 1) + ": check " + x.bad.join(", ")); });
     $("qtotal").textContent = total && st.g ? fmt(total) + fineTxt(ftot) : "—"; Q.total = total; usdShow();
     $("qnote").textContent = !st.g ? "Today's gold rate is not set (Gold rate & settings) - prices cannot be worked out." :
-      (miss.length ? miss.join(". ") + ". " : "") + `At 24K ${fmt(st.g)}/g. ${mkText(st, null, "std", true)}. Estimate only: final price depends on actual weights and the gold rate on the day of billing.`;
+      (miss.length ? miss.join(". ") + ". " : "") + `At 24K ${fmt(st.g)}/g. ${mkText(st, null, Q.mk, true)}. ${payText()} Estimate only: final price depends on actual weights and the gold rate on the day of billing.`;
   }
   function render() {
     if (Q.kind === "design") { prices(); return; }
@@ -348,7 +349,7 @@
     try {
       // the server prices every line again (from the tags or the weights typed) and returns the figures the PDF prints
       const r = await fetch("/api/vj/quote", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-        body: JSON.stringify(design ? { kind: "design", pay: Q.pay, name, mobile: mob, city, items: dIn.map(x => ({ desc: x.desc, k: x.k, net: x.net, ...(x.tunch ? { tunch: x.tunch } : {}), dias: x.dias, ppcs: x.ppcs, prate: x.prate, other: x.other })) }
+        body: JSON.stringify(design ? { kind: "design", pay: Q.pay, mk: Q.mk, name, mobile: mob, city, items: dIn.map(x => ({ desc: x.desc, k: x.k, net: x.net, ...(x.tunch ? { tunch: x.tunch } : {}), dias: x.dias, ppcs: x.ppcs, prate: x.prate, other: x.other })) }
           : { kind: "tags", pay: Q.pay, name, mobile: mob, city, option: OPTS[Q.option], mk: Q.mk, items: items.map(i => ({ id: i.id, ...(Q.prates[i.id] ? { prate: Q.prates[i.id] } : {}) })) }) });
       const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("server " + r.status));
       if (!Array.isArray(j.items) || j.items.length !== (design ? dIn.length : items.length)) throw new Error("unexpected reply from the server");
@@ -356,7 +357,7 @@
       const pItems = design ? dIn.map((x, i) => Object.assign({}, x, { price: j.items[i].price, fine: j.items[i].fine || 0 })) : items.map((t, i) => Object.assign(t, { price: j.items[i].price, fine: j.items[i].fine || 0, polkiQ: j.items[i].polki }));
       const changed = pagePrice !== j.total;
       m.textContent = "Making the PDF…";
-      const blob = await makePdf({ qno: j.qno, design, name, city, option: OPTS[Q.option], items: pItems, total: j.total, fineTotal: j.fineTotal || 0, payNote: payText(), photos: !design && $("qphoto").checked, weights: $("qwt").checked, making: design ? mkText(st, Q.designs, "std", true) : mkText(st, items), usd: Q.usd });
+      const blob = await makePdf({ qno: j.qno, design, name, city, option: OPTS[Q.option], items: pItems, total: j.total, fineTotal: j.fineTotal || 0, payNote: payText(), photos: !design && $("qphoto").checked, weights: $("qwt").checked, making: design ? mkText(st, Q.designs, Q.mk, true) : mkText(st, items), usd: Q.usd });
       const fname = `${name.replace(/[^A-Za-z0-9 .\-]/g, "").trim().slice(0, 40) || "Quote"} ${design ? "Estimate" : { gh: "VSGH", ij: "VSIJ", lgd: "LGD" }[Q.option]}.pdf`, // owner 14/10: file named e.g. "Krishna VSGH.pdf"
         text = `Dear ${name}, thank you for your interest in Vaishnavi Jewels. Please find your ${design ? "estimate" : "quotation"} ${j.qno} attached. Our team will call you shortly.`;
       if (changed) $("qtotal").textContent = fmt(j.total);
