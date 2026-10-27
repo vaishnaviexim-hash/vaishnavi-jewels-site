@@ -677,7 +677,10 @@ function vjBillCalc(tags, o) {
   if (mode === 'g2g' && settle === 'fine' && o.og && Number(o.og.fine) > 0) { const recv = Math.round(Number(o.og.fine) * 1000) / 1000, rt = Number(o.og.rate) >= 2000 && Number(o.og.rate) <= 50000 ? Number(o.og.rate) : F, bal = Math.round((fineDue - recv) * 1000) / 1000, amt = Math.round(bal * rt);
     og = { no: String(o.og.no || '').slice(0, 20), due: fineDue, recv, bal, rate: rt, amt }; sum += amt; }
   const after = Math.max(0, sum - disc);
-  const sub = Math.ceil(after / 500) * 500, gst = Math.round(sub * gstPct / 100);
+  // owner 27/10/2026 13:35 (C-20261027-FINALAMT): a final amount typed for the bill - the discount is set so that total less discount + GST = that
+  // amount exactly (no Rs 500 round-up); the bill prints only 'Final amount', the GST inside it stays in the record for the accountant
+  const fin = Math.round(Number(o.final) || 0), finOk = fin > 0 && Math.abs((fin - after) - after * gstPct / 100) <= 2;
+  const sub = finOk ? after : Math.ceil(after / 500) * 500, gst = finOk ? fin - after : Math.round(sub * gstPct / 100);
   // owner 17/10 15:29 ('i dont want 26093, straight 26500'): the round-up sits inside the biggest piece's making charge (its
   // rate per g is shown for the new making), or in Other for Gold Item / no gold, so every printed figure adds up to the total.
   // A piece that is only chain has no making (C-20261017-CHAINTUNCH): the biggest other piece takes it; a bill of chains only puts it in Other.
@@ -686,7 +689,7 @@ function vjBillCalc(tags, o) {
     if (mode !== 'item' && r.mkWt > 0) { r.making += roundIn; r.mkRate = Math.round(r.making / r.mkWt); } else r.other += roundIn;
     r.amount += roundIn; r.net += roundIn; sum += roundIn; }
   const fine = Math.round(rows.reduce((a, r) => a + r.fine, 0) * 1000) / 1000;
-  return { mode, settle, g2g: mode === 'g2g' ? (g2gN ? 'nett' : 'ws') : '', rows, fine: settle === 'fine' && !og ? fine : 0, fineIn: fine, og, sum, disc, after, roundOff: 0, roundIn, sub, gstPct, gst, total: sub + gst };
+  return { mode, settle, g2g: mode === 'g2g' ? (g2gN ? 'nett' : 'ws') : '', rows, fine: settle === 'fine' && !og ? fine : 0, fineIn: fine, og, sum, disc, after, roundOff: 0, roundIn, sub, gstPct, gst, total: sub + gst, final: finOk ? fin : 0 };
 }
 // VJ_BILL_CALC_END
 
@@ -728,6 +731,7 @@ async function vjBill(request, env, who, ctx) { // every login may make bills (o
   const mobile = vjPhone(b && b.mobile);
   const date = String(b && b.date || ''), F = Math.round(Number(b && b.F) * 100) / 100, mode = ['ws', 'nett', 'g2g', 'item'].includes(b && b.mode) ? b.mode : '';
   const settle = b && b.settle === 'amount' ? 'amount' : 'fine';
+  const final = Math.round(Number(b && b.final) || 0); if (final && !(final >= 1 && final <= 1e8)) return vjDeny(400, 'final amount looks wrong'); // C-20261027-FINALAMT
   const og = b && b.og && typeof b.og === 'object' && Number(b.og.fine) > 0 ? { no: vjClean(b.og.no, 20), fine: Math.round(Number(b.og.fine) * 1000) / 1000, rate: Math.round(Number(b.og.rate) || 0) } : null; // C-20261027-OGBAL
   if (og && !(og.fine <= 2000)) return vjDeny(400, 'old gold received (fine g) looks wrong');
   if (og && og.rate && !(og.rate >= 2000 && og.rate <= 50000)) return vjDeny(400, 'party fine gold rate per g looks wrong');
@@ -766,7 +770,7 @@ async function vjBill(request, env, who, ctx) { // every login may make bills (o
   if (title === 'Bill') { const hit = await onBill(); if (hit.size) return vjJson({ error: dupMsg(hit), duplicate: true }, 409); }
   const sRow = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first();
   const s = sRow ? JSON.parse(sRow.data) : {};
-  const calc = vjBillCalc(tags, { F, mode, settle, g2g: b && b.g2g === 'nett' ? 'nett' : 'ws', disc, rates, frates, prates, pdrates, og, purity: s.purity, making: s.making, gst: s.gst });
+  const calc = vjBillCalc(tags, { F, mode, settle, g2g: b && b.g2g === 'nett' ? 'nett' : 'ws', disc, rates, frates, prates, pdrates, og, final, purity: s.purity, making: s.making, gst: s.gst });
   calc.rows.forEach((r, i) => { const ph = tags[i].photo; if (typeof ph === 'string' && /^[0-9a-f]{32}$/.test(ph)) r.photo = ph; }); // owner 16/10: photo on the bill
   const bill = Object.assign({ no, title, date, name, city, mobile, F, nbb: !!(b && b.nbb === true), by: who.email, byName: who.name, at: new Date().toISOString() }, calc); // nbb: 'No Buy Back No Exchange' stamp (owner 17/10, C-20261017-NBB)
   if (editNo) { // C-20261026-BILLEDIT (owner 26/10/2026 17:32 'i should be able to edit the bill'): owners only; the old version is kept in vj_bill_old
