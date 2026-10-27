@@ -532,6 +532,7 @@
     $("bsave").disabled = false;
   }
   window.vjBillPdf = (b, photos) => makePdf(b, photos); // C-20261017-LEDGER: the Ledger tab prints a settled bill with the same printer
+  /* APPCHAIN v1 - replaced by C-20261027-VCHAIN below (owner 27/10 13:14)
   // owner 27/10/2026 13:06 (C-20261027-APPCHAIN): chains taken ON APPROVAL from vendors (Siddharth and others) are entered at the sale:
   // "+ Approval chain" on the bill - vendor, karat, weight, tunch - makes a chain piece (APCH18/n) and puts it on the bill, billed as
   // weight x tunch x gold rate (the chain rule, no making). Sold approval chains stay listed per vendor ("to pay vendor", grams and fine) so the
@@ -622,6 +623,117 @@
     $("appaid").disabled = false;
   }
   setInterval(apInit, 1000);
+  */
+  // owner 27/10/2026 13:14 (C-20261027-VCHAIN, replaces APPCHAIN v1): chains taken ON APPROVAL from vendors. On the bill, "+ Approval chain":
+  // vendor (required), karat, weight, sale tunch -> a chain piece VCH18/n on the bill, billed as weight x tunch x gold rate (no making).
+  // The purchase side (purchase tunch and 24K rate, default = the sale tunch and the bill's gold rate, both changeable) is kept only on the
+  // piece - never printed on the bill. Owner tab "Chains (vendors)": every vendor chain - vendor, date received, grams, sale / purchase tunch,
+  // purchase rate and amount, which bill it went on - with per-vendor totals; "Entered in Tally - remove" takes the ticked chains off the list.
+  const VC = { on: false, arm: false };
+  const vcNum = v => { const n = parseFloat(String(v || "").replace(/,/g, "")); return isFinite(n) ? n : 0; };
+  const vcR3 = n => Math.round(n * 1000) / 1000;
+  const vcEl = (tag, props, kids) => { const e = Object.assign(document.createElement(tag), props || {}); (kids || []).forEach(k => e.append(k)); return e; };
+  const vcLab = (t, el) => vcEl("label", {}, [t + " ", el]);
+  const vcInp = (id, ph, w, mode) => { const i = vcEl("input", { id, placeholder: ph || "", autocomplete: "off", maxLength: 40 }); if (mode) i.inputMode = mode; if (w) i.style.maxWidth = w + "px"; return i; };
+  const vcOwner = () => /owner/i.test(String(($("who") || {}).textContent || ""));
+  function vcTags() { return tags().filter(t => t && t.approval && t.approval.vendor); }
+  function vcVendors() { const vs = [...new Set(vcTags().map(t => t.approval.vendor))].sort(); const dl = $("vcvl"); if (dl) { dl.textContent = ""; vs.forEach(x => dl.append(vcEl("option", { value: x }))); } return vs; }
+  function vcInit() {
+    if (VC.on || !$("badd") || !$("bpick") || !$("p-rates") || !document.querySelector("nav")) return; VC.on = true;
+    // 1. on the bill
+    const b = vcEl("button", { type: "button", className: "btn ghost", textContent: "+ Approval chain" }); b.style.marginLeft = "8px"; $("badd").after(b);
+    const f = vcEl("div", { id: "vcform" }); f.style.cssText = "display:none;gap:8px;flex-wrap:wrap;align-items:end;border:1px dashed #b8963e;border-radius:8px;padding:10px;margin:8px 0";
+    const v = vcInp("vcv", "e.g. Siddharth", 180); v.setAttribute("list", "vcvl");
+    const k = vcEl("select", { id: "vck" }); ["22K", "18K", "14K", "9K"].forEach(x => k.append(vcEl("option", { value: x, textContent: x, selected: x === "18K" })));
+    f.append(vcLab("Vendor (required)", v), vcEl("datalist", { id: "vcvl" }), vcLab("Karat", k), vcLab("Weight (g)", vcInp("vcw", "3.000", 110, "decimal")), vcLab("Sale tunch", vcInp("vct", "0.760", 100, "decimal")),
+      vcLab("Purchase tunch", vcInp("vcpt", "same", 100, "decimal")), vcLab("Purchase rate 24K/g", vcInp("vcpr", "bill rate", 120, "decimal")), vcLab("Vendor tag / note", vcInp("vcn", "", 150)),
+      vcEl("button", { type: "button", className: "btn", id: "vcgo", textContent: "Add chain to bill", onclick: vcAdd }), vcEl("span", { className: "hint", id: "vcmsg" }),
+      vcEl("div", { className: "hint", textContent: "Purchase tunch and rate stay in VJ Tags only - they are not printed on the bill." }));
+    $("bpick").before(f);
+    b.addEventListener("click", () => { const on = f.style.display === "none"; f.style.display = on ? "flex" : "none"; vcVendors(); if (on) v.focus(); });
+    // 2. owner tab
+    if (!vcOwner()) return;
+    const nav = document.querySelector("nav"), tb = vcEl("button", { id: "t-vchain", textContent: "Chains (vendors)" }); tb.setAttribute("role", "tab"); tb.dataset.tab = "vchain"; tb.setAttribute("aria-selected", "false");
+    const place = () => { const after = nav.querySelector('[data-tab="bill"]'); if (after && after.nextSibling !== tb) after.after(tb); else if (!after && !tb.parentNode) nav.append(tb); };
+    place(); setTimeout(place, 1600); setTimeout(place, 5200);
+    const sec = vcEl("section", { id: "p-vchain", className: "card", hidden: true });
+    const fv = vcEl("select", { id: "vcfv" }), fs = vcEl("input", { type: "checkbox", id: "vcfs" }); fs.style.width = "auto";
+    const fsl = vcEl("label", {}, [fs, " Show removed"]); fsl.style.cssText = "flex-direction:row;align-items:center;gap:6px";
+    const row = vcEl("div", { className: "row" }, [vcLab("Vendor", fv), fsl, vcEl("button", { type: "button", className: "btn ghost", textContent: "Refresh", onclick: () => vcList() })]); row.style.cssText = "align-items:end;gap:8px";
+    const t = vcEl("table", { className: "items" }); t.style.minWidth = "900px";
+    t.innerHTML = "<thead><tr><th></th><th>Chain</th><th>Vendor</th><th>Received</th><th>Gold</th><th>Sale tunch</th><th>Purchase tunch</th><th>Purchase rate 24K/g</th><th>Purchase amount</th><th>Sold on</th><th>Status</th></tr></thead>";
+    t.append(vcEl("tbody", { id: "vcrows" }));
+    sec.append(vcEl("h2", { textContent: "Chains on approval - vendor account" }), vcEl("p", { className: "hint", textContent: "Every chain taken from a vendor. Tally the vendor's bill with the totals below; after the entry in Tally, tick the chains and remove them." }),
+      row, vcEl("div", { className: "list" }, [t]), vcEl("p", { className: "hint", id: "vcsum" }),
+      vcEl("button", { type: "button", className: "btn", id: "vcdone", textContent: "Entered in Tally - remove ticked", onclick: vcDone }), vcEl("span", { className: "hint", id: "vcdmsg" }));
+    $("p-rates").parentNode.insertBefore(sec, $("p-rates"));
+    nav.addEventListener("click", e => { const x = e.target.closest("button"); if (!x || !nav.contains(x)) return; const on = x === tb; sec.hidden = !on;
+      if (on) { document.querySelectorAll('[id^="p-"]').forEach(p => { if (p !== sec) p.hidden = true; }); nav.querySelectorAll("button").forEach(y => y.setAttribute("aria-selected", y === tb ? "true" : "false")); vcList(); window.scrollTo({ top: 0 }); } });
+    [fv, fs].forEach(x => x.addEventListener("change", () => vcList()));
+    setInterval(() => { if (!document.hidden && !sec.hidden && !(document.activeElement && document.activeElement.closest && document.activeElement.closest("#vcrows"))) vcList(true); }, 20000);
+  }
+  async function vcAdd() {
+    const m = $("vcmsg"), v = $("vcv").value.trim().replace(/\s+/g, " ").slice(0, 40), k = $("vck").value, w = vcR3(vcNum($("vcw").value)), tn = vcR3(vcNum($("vct").value)), note = $("vcn").value.trim().slice(0, 30);
+    const pt = String($("vcpt").value).trim() === "" ? tn : vcR3(vcNum($("vcpt").value)), pr = String($("vcpr").value).trim() === "" ? Math.round(F() * 100) / 100 : Math.round(vcNum($("vcpr").value) * 100) / 100;
+    if (!v) { m.textContent = "Type the vendor name - it is needed to know where the chain came from."; return; }
+    if (!(w > 0 && w <= 500)) { m.textContent = "Type the weight in grams (e.g. 3.000)."; return; }
+    if (!(tn >= 0.3 && tn <= 1.1)) { m.textContent = "Sale tunch must be from 0.300 to 1.100 (e.g. 0.760)."; return; }
+    if (!(pt >= 0.3 && pt <= 1.1)) { m.textContent = "Purchase tunch must be from 0.300 to 1.100, or empty (= sale tunch)."; return; }
+    if (!(pr >= 2000 && pr <= 50000)) { m.textContent = "Type the gold rate on the bill first, or a purchase rate 24K/g."; return; }
+    $("vcgo").disabled = true; m.textContent = "Saving…";
+    try {
+      const db = await window.claude.use("db"), kn = ({ "22K": "22", "18K": "18", "14K": "14", "9K": "9" })[k], prefix = "VCH" + kn, cref = db.doc("counters/main"), me = "vc" + Math.random();
+      let lease = await cref.acquire({ holder: me, ttlMs: 8000 });
+      for (let i = 0; i < 5 && !lease.acquired; i++) { await new Promise(r => setTimeout(r, 700 + Math.random() * 500)); lease = await cref.acquire({ holder: me, ttlMs: 8000 }); }
+      if (!lease.acquired) throw { message: "someone else is saving a tag - try again in a few seconds" };
+      const snap = await cref.get(), last = Object.assign({}, (snap.exists && snap.data().last) || {});
+      let no = Math.max(last[prefix] || 0, ...tags().filter(x => x.prefix === prefix).map(x => x.no || 0)) + 1;
+      for (;;) { if (!(await db.doc("tags/" + prefix + "-" + no).get()).exists) break; no++; }
+      const id = prefix + "-" + no, now = new Date().toISOString();
+      await db.doc("tags/" + id).set({ label: prefix + "/" + no, prefix, no, kind: "sale", cat: "CH", catName: "Chain", pcode: "CH" + kn, gold: [{ k, net: w, tunch: tn }], dias: [], other: { amt: 0 },
+        remark: "", designNo: "", status: "in_stock", createdBy: null, createdAt: now, source: "Vendor chain on approval",
+        approval: { vendor: v, at: now, note, pTunch: pt, pRate: pr, settled: false } });
+      last[prefix] = Math.max(last[prefix] || 0, no); await cref.set({ last });
+      m.textContent = "Saved - adding to the bill…"; let t = null; for (let i = 0; i < 40 && !(t = tags().find(x => x.id === id)); i++) await new Promise(r => setTimeout(r, 300));
+      if (t) { if (!B.items.includes(id)) B.items.push(id); render(); m.textContent = `${prefix}/${no} on the bill: ${k} ${w.toFixed(3)} g, tunch ${tn.toFixed(3)} (from ${v}).`; ["vcw", "vct", "vcpt", "vcpr", "vcn"].forEach(i => { $(i).value = ""; }); }
+      else m.textContent = `Saved as ${prefix}/${no}. Type ${prefix}/${no} in the box above and tap Add piece.`;
+      vcVendors(); vcList(true);
+    } catch (e) { m.textContent = "Could not save: " + ((e && (e.message || e.code)) || "error") + "."; }
+    $("vcgo").disabled = false;
+  }
+  async function vcSet(t, ch) { const db = await window.claude.use("db"), a = Object.assign({}, t.approval, ch); await db.doc("tags/" + t.id).update({ approval: a }); t.approval = a; }
+  function vcList(quiet) {
+    const body = $("vcrows"); if (!body) return; const fv = $("vcfv"), cur = fv.value, vs = vcVendors();
+    fv.textContent = ""; fv.append(vcEl("option", { value: "", textContent: "All vendors" })); vs.forEach(x => fv.append(vcEl("option", { value: x, textContent: x, selected: x === cur })));
+    const showOld = $("vcfs").checked, L = vcTags().filter(t => (!cur || t.approval.vendor === cur) && (showOld || !t.approval.settled))
+      .sort((a, b) => String(a.approval.vendor).localeCompare(String(b.approval.vendor)) || String(a.approval.at).localeCompare(String(b.approval.at)));
+    body.textContent = ""; const tot = {};
+    L.forEach(t => { const a = t.approval, g = (t.gold || [])[0] || {}, net = Number(g.net) || 0, tn = Number(g.tunch) || 0, pt = Number(a.pTunch) || tn, pr = Number(a.pRate) || 0, fine = vcR3(net * pt), amt = Math.round(net * pt * pr);
+      const sold = t.status === "sold" && t.sold, done = !!a.settled, tr = document.createElement("tr"), td = x => { const e = document.createElement("td"); if (x instanceof Node) e.append(x); else e.textContent = x; tr.append(e); return e; };
+      const cb = vcEl("input", { type: "checkbox" }); cb.style.width = "auto"; cb.dataset.id = t.id; td(done ? "" : cb);
+      td(t.label + (a.note ? " · " + a.note : "")); td(a.vendor); td(a.at ? dmy(String(a.at).slice(0, 10)) : ""); td(`${g.k || ""} ${net.toFixed(3)} g`); td(tn.toFixed(3));
+      const ip = (val, w, ok, key) => { const i = vcEl("input", { value: String(val), inputMode: "decimal" }); i.style.cssText = `width:${w}px;text-align:right;padding:4px 6px`; i.disabled = done;
+        i.addEventListener("change", async () => { const n = vcNum(i.value); if (!ok(n)) { i.style.borderColor = "#a12b2b"; return; } i.style.borderColor = ""; try { await vcSet(t, { [key]: key === "pTunch" ? vcR3(n) : Math.round(n * 100) / 100 }); vcList(true); } catch (e) { i.style.borderColor = "#a12b2b"; $("vcdmsg").textContent = "Could not save: " + ((e && (e.message || e.code)) || "error"); } }); return i; };
+      td(ip(pt.toFixed(3), 80, n => n >= 0.3 && n <= 1.1, "pTunch")); td(ip(pr || "", 100, n => n >= 2000 && n <= 50000, "pRate"));
+      td(`${fmt(amt)} (fine ${fine.toFixed(3)} g)`);
+      td(sold ? `${t.sold.no || ""} · ${t.sold.date ? dmy(t.sold.date) : ""}${t.sold.name ? " · " + t.sold.name : ""}` : "not billed yet");
+      const st = td(done ? "Removed " + (a.settledAt ? dmy(String(a.settledAt).slice(0, 10)) : "") : sold ? "Sold" : "With us"); if (!done && sold) st.style.fontWeight = "600";
+      if (!done) { const s = tot[a.vendor] = tot[a.vendor] || { n: 0, g: 0, f: 0, a: 0 }; s.n++; s.g += net; s.f += fine; s.a += amt; }
+      body.append(tr); });
+    const ks = Object.keys(tot); $("vcsum").textContent = !L.length ? "No vendor chains." : ks.length ? ks.map(v => `${v}: ${tot[v].n} chain${tot[v].n > 1 ? "s" : ""}, ${tot[v].g.toFixed(3)} g, fine ${tot[v].f.toFixed(3)} g, ${fmt(tot[v].a)}`).join("  |  ") : "All removed.";
+    if (!quiet) { $("vcdmsg").textContent = ""; VC.arm = false; $("vcdone").textContent = "Entered in Tally - remove ticked"; }
+  }
+  async function vcDone() {
+    const ids = [...document.querySelectorAll("#vcrows input[type=checkbox]:checked")].map(x => x.dataset.id), m = $("vcdmsg");
+    if (!ids.length) { m.textContent = "Tick the chains you have entered in Tally."; return; }
+    if (!VC.arm) { VC.arm = true; $("vcdone").textContent = `Confirm: remove ${ids.length} chain${ids.length > 1 ? "s" : ""}`; m.textContent = "Tap again to confirm."; return; }
+    VC.arm = false; $("vcdone").disabled = true; m.textContent = "Saving…";
+    try { const now = new Date().toISOString(); let n = 0; for (const id of ids) { const t = tags().find(x => x.id === id); if (!t) continue; await vcSet(t, { settled: true, settledAt: now }); n++; }
+      vcList(true); m.textContent = `${n} chain${n > 1 ? "s" : ""} removed (tick "Show removed" to see them again).`; $("vcdone").textContent = "Entered in Tally - remove ticked";
+    } catch (e) { m.textContent = "Could not save: " + ((e && (e.message || e.code)) || "error") + "."; }
+    $("vcdone").disabled = false;
+  }
+  setInterval(vcInit, 1000);
   function boot() { if (document.querySelector("nav") && $("p-rates")) { build(); setInterval(() => { const s = $("p-bill"); if (s && !s.hidden && !(document.activeElement && (document.activeElement.classList.contains("bdisc") || document.activeElement.classList.contains("brate")))) render(); }, 20000); } else setTimeout(boot, 300); }
   boot();
 })();
