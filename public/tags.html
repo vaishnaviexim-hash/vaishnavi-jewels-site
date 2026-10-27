@@ -109,7 +109,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
 
   <nav role="tablist">
     <button role="tab" id="t-new" aria-selected="true" data-tab="new">New tag</button>
-    <button role="tab" id="t-check" aria-selected="false" data-tab="check">Tag</button>
+    <button role="tab" id="t-check" aria-selected="false" data-tab="check">Bill</button>
     <button role="tab" id="t-list" aria-selected="false" data-tab="list">Tagged pieces</button>
     <button role="tab" id="t-find" aria-selected="false" data-tab="find">Find lost tag</button>
     <button role="tab" id="t-rates" aria-selected="false" data-tab="rates">Gold rate &amp; settings</button>
@@ -540,14 +540,18 @@ function tagPrims(t){
   const s=st(),{h,printW:p}=s.tag,pad=1,half=p/2,pr=[];
   const q=Math.min(h-2*pad,12.5);pr.push({k:"qr",x:pad,y:(h-q)/2,s:q,text:APP_URL+"#"+tagId(t.label)});
   const lx=pad+q+1.2,lw=half-lx-0.8,rx=half+0.8,rw=p-rx-pad;
-  const n=5,lh=(h-2*pad)/n,y=i=>pad+lh*(i+0.78);
+  const n=5;
+  /* owner 27/10/2026 15:28 (C-20261027-TAGFONT): letters were too small and thin to read - every line is now bold and as large as the
+     tag height allows: each side uses only the rows it needs (4 or 5), font = row height / 1.12. */
+  const rows=(arr,x,maxW)=>{const a=arr.filter(l=>l&&l.t).slice(0,n),m=Math.max(4,a.length),lh=(h-2*pad)/m,fs=lh/0.3528/1.12;
+    a.forEach((l,i)=>pr.push({k:"t",x,y:pad+lh*(i+0.8),t:l.t,b:1,sz:+(fs*(l.big?1.08:1)).toFixed(2),maxW}))};
   /* owner 13/10/2026: a sample's tag must look like any stock tag - no "Silver", no "SAMPLE", no remark (remarks say "sam..."), weight as G.Wt., diamond rates shown */
   const smp=t.kind==="sample";
   const gl=(t.gold||[]).filter(g=>g.net>0),karats=gl.length?[...new Set(gl.map(g=>g.k==="Chain"?"Chain":KNUM[g.k]+"kt"))].join("+"):(smp?"14kt":"");
   const lab=t.pcode||t.label; /* C-20261019-TAGSNOORDER: new tags print VLR14 / VLR14/MN; older tags keep their label */
   const L=[{t:t.designNo?t.designNo:lab,b:1,sz:7},{t:t.designNo?"("+lab+")":"",sz:5.4},{t:karats,sz:5.4},{t:smp?"":(t.remark||"")+((t.dias||[]).some(d=>/CVD|LAB|LGD|^C-/i.test(String(d.q||""))&&d.ct>0&&d.rate>0&&d.rate<20000)?" NBB":""),sz:5.2} /* C-20261026-NBBLAB: lab-grown under Rs 20,000/ct = no buy back / no exchange */];
   if(t.polki&&t.polki.pcs>0)L.push({t:"Polki "+t.polki.pcs+"pc",sz:5.2}); /* C-20261017-POLKI: the 5th row on the left is always free */
-  L.forEach((l,i)=>{if(l.t)pr.push({k:"t",x:lx,y:y(i),t:l.t,b:l.b,sz:l.sz,maxW:lw})});
+  if(L[0])L[0].big=1;rows(L,lx,lw);
   const net=gl.reduce((a,g)=>a+g.net,0),mw=!gl.length&&t.metal&&t.metal.net?t.metal.net:0;
   const R=[{t:"G.Wt. "+(mw||net).toFixed(3),sz:5.6,b:1}];
   const tail=[];if(t.other&&t.other.amt)tail.push({t:"Other "+Math.round(t.other.amt),sz:5});
@@ -555,7 +559,7 @@ function tagPrims(t){
   const room=n-1-tail.length;let dl=t.dias.map(d=>({t:diaText(smp&&!(d.rate>0)?Object.assign({},d,{rate:sampleRate(d)}):d),sz:5}));
   if(dl.length>room){const more=dl.length-(room-1);dl=dl.slice(0,room-1);dl.push({t:"+"+more+" more lines",sz:5})}
   R.push(...dl,...tail);
-  R.slice(0,n).forEach((l,i)=>pr.push({k:"t",x:rx,y:y(i),t:l.t,b:l.b,sz:l.sz,maxW:rw}));
+  rows(R,rx,rw);
   pr.push({k:"fold",x:half});
   return pr;
 }
