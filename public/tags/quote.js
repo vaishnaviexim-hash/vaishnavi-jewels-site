@@ -54,10 +54,11 @@
   function calc(gold, dv, extra, st, mk) {
     calc.fine = 0;
     if (!gold.some(g => g.net > 0) || !st.g) return 0;
-    const g0 = gold.find(g => g.net > 0 && !lineT(g)); let gv = 0, cv = 0, nt = 0;
-    gold.forEach(g => { if (g.net > 0) { const tn = lineT(g); if (tn) cv += g.net * st.g * tn; else { gv += g.net * st.g * (Number(st.pur[g.k]) || 0); nt += g.net; } } });
+    // C-20261027-CHAINMK (owner 27/10 17:30): a chain's tunch only replaces the karat purity; making, wastage, Nett and Gold to Gold rules apply to chains too
+    const g0 = gold.find(g => g.net > 0); let gv = 0, cv = 0, nt = 0;
+    gold.forEach(g => { if (g.net > 0) { const pu = lineT(g) || (Number(st.pur[g.k]) || 0); gv += g.net * st.g * pu; nt += g.net; } });
     if (Q.pay === "g2g" || Q.pay === "g2gn") { // owner 26/10 19:02 (C-20261026-QG2G): Gold to Gold - fine gold apart, rupees = making (+ 10% wastage on Nett) + diamonds + other + GST (same rule as the server)
-      const nf = Q.pay === "g2gn"; let fine = 0; gold.forEach(g => { if (g.net > 0) { const tn = lineT(g); fine += g.net * (tn || (nf ? (Number(st.pur[g.k]) || 0) : (G2G[g.k] || 0))); } });
+      const nf = Q.pay === "g2gn"; let fine = 0; gold.forEach(g => { if (g.net > 0) { const tn = lineT(g); fine += g.net * (nf ? (tn || Number(st.pur[g.k]) || 0) : (tn ? tn * 1.1 : (G2G[g.k] || 0))); } });
       calc.fine = Math.round(fine * 1000) / 1000;
       const mv2 = !g0 ? 0 : mk === "flat" ? FLAT_MK * nt : Math.max((g0.net > st.mk.limit ? st.mk.base : st.mk.small) * nt, Number(st.mk.min) || 0) + (nf ? gv * st.mk.pct / 100 : 0);
       return up(up(mv2 + dv + extra, 100) * (1 + st.gst / 100), 100); }
@@ -112,7 +113,7 @@
         <label><input type="radio" name="qkind" value="design"> Estimate for a new design</label></div>
       <div id="qdesbox" hidden>
       <h2>1 · Designs</h2>
-      <p class="hint">No tag needed: type each design's karat, net gold, diamonds and polki. Diamonds: type Pcs and the weight per piece in carats (0.22 = 22 cents) and the total carats fill in (121 pcs × 0.22 = 26.62 ct). Priced at today's gold rate with the same making rule. For a chain, type its tunch: gold = net × tunch × rate, no making.</p>
+      <p class="hint">No tag needed: type each design's karat, net gold, diamonds and polki. Diamonds: type Pcs and the weight per piece in carats (0.22 = 22 cents) and the total carats fill in (121 pcs × 0.22 = 26.62 ct). Priced at today's gold rate with the same making rule. For a chain, type its tunch: gold = net × tunch × 24K rate; making and wastage as usual.</p>
       <div id="qdlines" style="display:flex;flex-direction:column;gap:12px"></div>
       <div class="actions"><button type="button" class="btn ghost" id="qdadd">+ Add design</button></div>
       </div>
