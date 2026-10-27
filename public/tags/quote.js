@@ -7,7 +7,7 @@
    lines, polki, other charges per design line). The server works every price out again from the tags / weights and today's
    settings; the PDF is printed from the server's figures.
    Owner 27/10/2026 (C-20261027-QCENTS / QUSD): in an estimate a diamond line takes Pcs x Cents/pc and fills the carats itself
-   (10 pcs x 50 cents = 5.00 ct, e.g. bangle goods); a USD rate box (market USD-INR + Rs 1.50, editable, remembered on this device)
+   (owner 27/10 17:27: the per-piece weight is typed in carats, 0.22 = 22 cents: 121 pcs x 0.22 = 26.62 ct, e.g. bangle goods); a USD rate box (market USD-INR + Rs 1.50, editable, remembered on this device)
    shows every price and the total in US$ too and prints them on the PDF. The server is unchanged: it still gets ct and rupees. */
 (function () {
   "use strict";
@@ -112,7 +112,7 @@
         <label><input type="radio" name="qkind" value="design"> Estimate for a new design</label></div>
       <div id="qdesbox" hidden>
       <h2>1 · Designs</h2>
-      <p class="hint">No tag needed: type each design's karat, net gold, diamonds and polki. Diamonds: type Pcs and Cents per piece and the carats fill in (10 pcs × 50 cents = 5.00 ct). Priced at today's gold rate with the same making rule. For a chain, type its tunch: gold = net × tunch × rate, no making.</p>
+      <p class="hint">No tag needed: type each design's karat, net gold, diamonds and polki. Diamonds: type Pcs and the weight per piece in carats (0.22 = 22 cents) and the total carats fill in (121 pcs × 0.22 = 26.62 ct). Priced at today's gold rate with the same making rule. For a chain, type its tunch: gold = net × tunch × rate, no making.</p>
       <div id="qdlines" style="display:flex;flex-direction:column;gap:12px"></div>
       <div class="actions"><button type="button" class="btn ghost" id="qdadd">+ Add design</button></div>
       </div>
@@ -208,9 +208,9 @@
         el("div", { className: "row" }, [fld("Description", desc, "2 1 220px"), fld("Karat", k), fld("Net gold (g)", net), fld("Chain tunch", tu)]));
       const dbox = el("div", { style: "display:flex;flex-direction:column;gap:6px" });
       d.dias.forEach((x, j) => {
-        const q = sel(DQUALS, x.q, o => QC[o] + " · " + o), sh = sel(DSHAPES, x.shape), pc = el("input", { value: x.pcs || "", inputMode: "numeric", autocomplete: "off", placeholder: "0" }), ce = el("input", { value: x.cents || "", inputMode: "decimal", autocomplete: "off", placeholder: "e.g. 50" }), ct = el("input", { value: x.ct, inputMode: "decimal", autocomplete: "off", placeholder: "0.00" });
-        // C-20261027-QCENTS: Pcs x Cents/pc fills the carats (10 x 50 = 5.00 ct); carats typed by hand still work when cents is empty
-        const auto = () => { const p = num(x.pcs), c = num(x.cents); if (p > 0 && c > 0) { x.ct = (Math.round(p * c) / 100).toFixed(2); ct.value = x.ct; } prices(); };
+        const q = sel(DQUALS, x.q, o => QC[o] + " · " + o), sh = sel(DSHAPES, x.shape), pc = el("input", { value: x.pcs || "", inputMode: "numeric", autocomplete: "off", placeholder: "0" }), ce = el("input", { value: x.cents || "", inputMode: "decimal", autocomplete: "off", placeholder: "e.g. 0.22" }), ct = el("input", { value: x.ct, inputMode: "decimal", autocomplete: "off", placeholder: "0.00" });
+        // C-20261027-QCENTS: Pcs x Ct/pc (typed in carats, 0.22 = 22 cents) fills the total carats (121 x 0.22 = 26.62 ct); carats typed by hand still work when Ct/pc is empty
+        const auto = () => { const p = num(x.pcs), c = num(x.cents); if (p > 0 && c > 0) { x.ct = (Math.round(p * c * 100) / 100).toFixed(2); ct.value = x.ct; } prices(); };
         ce.addEventListener("input", () => { x.cents = ce.value; auto(); });
         const rt = el("input", { value: x.rate, inputMode: "numeric", autocomplete: "off" }), xx = el("button", { type: "button", className: "btn ghost", textContent: "✕", ariaLabel: "Remove diamond line" });
         codeKeys(q);
@@ -218,7 +218,7 @@
         q.addEventListener("change", () => { x.q = q.value; fill(); prices(); }); sh.addEventListener("change", () => { x.shape = sh.value; fill(); prices(); });
         ct.addEventListener("input", () => { x.ct = ct.value; x.cents = ""; ce.value = ""; prices(); }); pc.addEventListener("input", () => { x.pcs = pc.value; auto(); }); rt.addEventListener("input", () => { x.rate = rt.value; x.edited = rt.value.trim() !== ""; prices(); });
         xx.addEventListener("click", () => { d.dias.splice(j, 1); drawDesigns(); }); fill();
-        dbox.append(el("div", { className: "row", style: "align-items:end" }, [fld("Shape", sh), fld("Quality", q), fld("Pcs", pc), fld("Cents/pc", ce), fld("D Wt (ct)", ct), fld("Rate ₹/ct", rt), el("div", {}, [xx])] /* same order and labels as the New tag form (owner 17/10): Shape, Quality, Pcs, D Wt, Rate */));
+        dbox.append(el("div", { className: "row", style: "align-items:end" }, [fld("Shape", sh), fld("Quality", q), fld("Pcs", pc), fld("Ct/pc", ce), fld("D Wt (ct)", ct), fld("Rate ₹/ct", rt), el("div", {}, [xx])] /* same order and labels as the New tag form (owner 17/10): Shape, Quality, Pcs, D Wt, Rate */));
       });
       const addD = el("button", { type: "button", className: "btn ghost", textContent: "+ Diamond line" }); addD.addEventListener("click", () => { d.dias.push({ q: "CVD", pcs: "", cents: "", shape: "Round", ct: "", rate: "", edited: false }); drawDesigns(); });
       const pp = el("input", { value: d.ppcs, inputMode: "numeric", autocomplete: "off", placeholder: "0" }), pr = el("input", { value: d.prate, inputMode: "numeric", autocomplete: "off" }), ot = el("input", { value: d.other, inputMode: "numeric", autocomplete: "off", placeholder: "0" });
