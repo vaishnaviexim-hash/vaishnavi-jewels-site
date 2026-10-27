@@ -263,7 +263,7 @@ async function vjWrite(request, env, who, ctx) {
   const cur = row ? JSON.parse(row.data) : null;
   let next = op === 'update' ? Object.assign({}, cur || {}, data) : data;
   if (op === 'update' && !cur) return vjDeny(404, 'not found');
-  if (who.role === 'tagger' && cur && path.startsWith('tags/') && cur.createdBy !== who.email) return vjDeny(403, 'you can change only the tags you made');
+  if (who.role === 'tagger' && cur && path.startsWith('tags/') && cur.createdBy !== who.email && cur.kind !== 'order') return vjDeny(403, 'you can change only the tags you made'); // 27/10 C-20261027-ORDEREDIT: order pieces editable by every login
   if ((who.role === 'staff' || who.role === 'tagger') && cur && path.startsWith('tags/')) {
     for (const k of new Set([...Object.keys(cur), ...Object.keys(next)])) {
       if (!VJ_STAFF_FIELDS.has(k) && JSON.stringify(cur[k]) !== JSON.stringify(next[k])) return vjDeny(403, 'staff cannot change ' + k);
