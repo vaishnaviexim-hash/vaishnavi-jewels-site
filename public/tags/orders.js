@@ -36,13 +36,21 @@
       ts.forEach(t => {
         const g = (t.gold || []).reduce((a, x) => a + (Number(x && x.net) || 0), 0), late = t.order.due && t.order.due < new Date().toISOString().slice(0, 10);
         const bn = el("button", { type: "button", className: "btn ghost", textContent: "Bill now" }); bn.addEventListener("click", () => window.VJ_BILL_NOW && window.VJ_BILL_NOW(t.id));
+        const ed = el("button", { type: "button", className: "btn ghost", textContent: "Edit" }); ed.style.marginLeft = "6px"; ed.addEventListener("click", () => editTag(t)); // owner 27/10/2026 15:28 (C-20261027-ORDEREDIT): Edit for every login
         const due = el("td", { textContent: t.order.due ? dmy(t.order.due) + (late ? " (late)" : "") : "-" }); if (late) due.style.color = "#b3261e";
         body.appendChild(el("tr", {}, [el("td", { textContent: (t.designNo ? t.designNo + " · " : "") + (t.pcode || t.label || "") + (t.catName ? " · " + t.catName : "") }),
           el("td", { className: "num", textContent: g ? g.toFixed(3) + " g" : "-" }), el("td", { className: "num", textContent: t.order.rate ? fmt(t.order.rate) : "-" }), due,
-          el("td", { textContent: dmy(t.createdAt) }), el("td", {}, [bn])]));
+          el("td", { textContent: dmy(t.createdAt) }), el("td", {}, [bn, ed])]));
       });
       tb.appendChild(body); card.appendChild(el("div", { className: "list" }, [tb])); box.appendChild(card);
     });
+  }
+  /* C-20261027-ORDEREDIT: opens the piece on the Bill tab and its Edit tag form (the server still checks who may change what) */
+  function editTag(t) {
+    const tab = $("t-check"); if (tab) tab.click(); const q = $("cq"), go = $("cgo"); if (!q || !go) return;
+    q.value = t.label; go.click(); let n = 0;
+    const tryOpen = () => { const b = document.querySelector("#cres .vjEditBtn"); if (b) { b.click(); return; } if (++n < 20) setTimeout(tryOpen, 250); };
+    setTimeout(tryOpen, 300);
   }
   function show(on) {
     if (!sec) return; sec.hidden = !on; clearInterval(timer);
