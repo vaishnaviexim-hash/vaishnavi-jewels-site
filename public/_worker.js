@@ -554,7 +554,7 @@ async function vjQuote(request, env, who, ctx) {
   if (len > 40000) return vjDeny(413, 'too large');
   let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
   const name = vjClean(b && b.name, 60), city = vjClean(b && b.city, 40), mobile = String(b && b.mobile || '').replace(/\D/g, '');
-  const design = b && b.kind === 'design', mk = !design && b && b.mk === 'flat' ? 'flat' : 'std';
+  const design = b && b.kind === 'design', mk = b && b.mk === 'flat' ? 'flat' : 'std'; // C-20261027-ESTMK: estimates take the making choice too
   const option = design ? 'Estimate - new design' : (VJ_Q_OPT[b && b.option] ? b.option : '');
   const pay = ['g2g', 'g2gn'].includes(b && b.pay) ? b.pay : 'amount'; // C-20261026-QG2G
   const raw = Array.isArray(b && b.items) ? b.items : [];
@@ -578,7 +578,7 @@ async function vjQuote(request, env, who, ctx) {
         if (!q || !shape || !(ct > 0) || !(rate > 0) || isNaN(pcs)) return vjDeny(400, no + ': each diamond line needs quality, shape, ct (up to 200), a rate per ct, and whole pcs');
         dias.push({ q, pcs, shape, ct: Math.round(ct * 1000) / 1000, rate: Math.round(rate) }); }
       const dv = dias.reduce((a, d) => a + d.ct * d.rate, 0);
-      const tunch = Math.round(tn * 1000) / 1000, pq = vjQPay([{ k, net, tunch }], dv, (ppcs ? ppcs * prate : 0) + other, st, 'std', pay), price = pq.price, fine = pq.fine;
+      const tunch = Math.round(tn * 1000) / 1000, pq = vjQPay([{ k, net, tunch }], dv, (ppcs ? ppcs * prate : 0) + other, st, mk, pay), price = pq.price, fine = pq.fine;
       if (!price) return vjDeny(400, no + ': no price');
       items.push({ newDesign: true, desc: vjClean(i.desc, 60) || (tunch ? 'Chain' : 'New design'), k, net: Math.round(net * 1000) / 1000, ...(tunch ? { tunch } : {}), dias, ...(ppcs ? { polki: { pcs: ppcs, rate: prate } } : {}), other, price, fine });
     } else {
