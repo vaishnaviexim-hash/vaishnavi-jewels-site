@@ -149,6 +149,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
         <label>Category <select id="cat"></select></label>
         <label>Design number <input id="designNo" autocomplete="off" placeholder="e.g. 1436" required></label>
         <label>Certificate <select id="remark"><option value="TGL" selected>TGL</option><option value="IGI">IGI</option><option value="GIA">GIA</option><option value="EGL">EGL</option></select></label>
+        <label id="vendorBox" hidden>Vendor (chain on approval) <input id="vendor" autocomplete="off" maxlength="40" list="vendorList" placeholder="e.g. Siddharth - empty = karigar / own"><datalist id="vendorList"></datalist></label>
         <label id="certNoBox" hidden>Certificate no. <input id="certNo" autocomplete="off" maxlength="30" placeholder="e.g. IGI LG612345678"></label>
       </div>
 
@@ -447,7 +448,7 @@ $("ordDel").addEventListener("click",async()=>{const b=$("ordDel"),list=S.tags.f
   for(const t of list){try{await S.db.doc("tags/"+t.id).delete("Wrong entry");ok++}catch(e){bad++}b.textContent=`Deleting… ${ok+bad} of ${list.length}`}
   b.disabled=false;msg(`Order tags deleted: ${ok}`+(bad?`, ${bad} failed (press again)`:"")+".",bad?"warn":"ok");renderList()});
 CATS.forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=c.name;$("cat").appendChild(o)});
-$("cat").addEventListener("change",()=>{const c=$("cat").value==="CH";$("designNo").placeholder=c?"optional - e.g. Sid / Arun / Self":"e.g. 1436";$("designNo").required=!c}); /* C-20261017-CHAINDN */
+$("cat").addEventListener("change",()=>{const c=$("cat").value==="CH";$("vendorBox").hidden=!c;if(c){const dl=$("vendorList");dl.textContent="";[...new Set(S.tags.map(t=>t.approval&&t.approval.vendor).filter(Boolean))].sort().forEach(v=>{const o=document.createElement("option");o.value=v;dl.appendChild(o)})} /* owner 27/10/2026 13:22 (C-20261027-CHAINVENDOR): a chain on approval carries its vendor; no vendor = karigar / own chain */$("designNo").placeholder=c?"optional - e.g. Sid / Arun / Self":"e.g. 1436";$("designNo").required=!c}); /* C-20261017-CHAINDN */
 
 /* ---------- read form ---------- */
 function kind(){return document.querySelector('input[name=kind]:checked').value}
@@ -466,7 +467,8 @@ function readForm(){
     remark:$("remark").value.trim(),designNo:$("designNo").value.trim().toUpperCase(),other:{amt:num($("otherAmt").value)},
     /* owner 26/10/2026 18:14 (C-20261026-PARTYDIA): party (customer's own) diamonds - ct + pcs, setting Rs 3,000/ct by default, editable; certificate no. (IGI etc.) */
     pdia:num($("pdCt").value)>0?{ct:Math.round(num($("pdCt").value)*1000)/1000,pcs:Math.round(num($("pdPcs").value)||0),rate:$("pdRate").value.trim()===""?3000:num($("pdRate").value)}:null,
-    certNo:$("remark").value!=="TGL"?$("certNo").value.trim().toUpperCase().slice(0,30):""};
+    certNo:$("remark").value!=="TGL"?$("certNo").value.trim().toUpperCase().slice(0,30):"",
+    vendor:cat.id==="CH"?$("vendor").value.trim().replace(/\s+/g," ").slice(0,40):""};
 }
 /* ---------- price (Brain F-025 / F-044) ---------- */
 function price(t){
@@ -753,7 +755,8 @@ async function allocateAndSave(t,photoId){
   if(t.kind==="order")body.order=t.order;
   body.pcode=t.pcode;if(t.kind==="sample")body.karigar=t.karigar; /* C-20261019-TAGSNOORDER */
   if(t.polki)body.polki={pcs:t.polki.pcs,rate:t.polki.rate}; /* C-20261017-POLKI */
-  if(t.pdia)body.pdia={ct:t.pdia.ct,pcs:t.pdia.pcs,rate:t.pdia.rate};if(t.certNo)body.certNo=t.certNo; /* C-20261026-PARTYDIA */
+  if(t.pdia)body.pdia={ct:t.pdia.ct,pcs:t.pdia.pcs,rate:t.pdia.rate};if(t.certNo)body.certNo=t.certNo;
+  if(t.vendor){const g0=(t.gold||[]).find(g=>g.net>0)||{};body.approval={vendor:t.vendor,at:body.createdAt,note:"",pTunch:g0.tunch||0,pRate:st().gold24g||0,settled:false}} /* C-20261027-CHAINVENDOR: on-approval chain - purchase tunch/rate default to the sale tunch and today's rate (changeable in Chains (vendors)) */ /* C-20261026-PARTYDIA */
   await S.db.doc("tags/"+t.id).set(body);
   const last=Object.assign({},seeds);last[t.prefix]=Math.max(last[t.prefix]||0,t.no);await cref.set({last});S.counters=last;
   return Object.assign({id:t.id},body);
