@@ -151,7 +151,7 @@
       <p class="hint" id="bmsg"></p><div class="actions" id="bout" hidden></div>
       </div>
       <h2>Saved bills &amp; estimates</h2>
-      <p><button type="button" class="btn" id="bnew">New bill (chain only / no tag)</button> <span class="hint">For a bill with only an approval chain - pieces with a tag start from Tag &gt; Bill now.</span></p>
+      <p class="hint">A new bill starts from Tag &gt; Bill now. A vendor chain is tagged on New tag (Chain + vendor name) and billed like any piece.</p>
       <div class="row" style="align-items:end"><label style="flex:0 1 200px">Month <input id="bmonth" type="month"></label><label style="flex:0 1 220px">Customer name or mobile (all bills) <input id="bfmob" autocomplete="off" maxlength="40" placeholder="type name or mobile no."></label>
         <div class="actions" style="margin:0"><button type="button" class="btn ghost" id="bxl">Download summary (Excel)</button><button type="button" class="btn ghost" id="bxlall">All months (Excel)</button><button type="button" class="btn ghost" id="bxwa" hidden>WhatsApp party bills</button></div></div>
       <div class="list"><table class="items" style="min-width:640px"><thead><tr><th>Date</th><th>Number</th><th>Type</th><th>Customer</th><th>Design · item</th><th>Total</th><th>Fine gold</th><th>By</th><th></th></tr></thead><tbody id="bbook"></tbody></table></div>
@@ -168,7 +168,7 @@
     document.querySelectorAll("input[name=btitle]").forEach(r => r.addEventListener("change", () => { B.title = r.value; numField(); }));
     $("bmonth").value = today().slice(0, 7); $("bmonth").addEventListener("change", loadBook); { let tm = 0; $("bfmob").addEventListener("input", () => { B.fcity = null; clearTimeout(tm); tm = setTimeout(loadBook, 350); }); } // owner 26/10 17:58: type a mobile no. and see all that customer's bills
     $("bxl").addEventListener("click", () => xl($("bmonth").value || today().slice(0, 7))); $("bxlall").addEventListener("click", () => xl("all")); $("bxwa").addEventListener("click", e => partyWA(e.currentTarget));
-    $("bF").addEventListener("input", render); $("btargetgo").addEventListener("click", applyTarget); $("bnew").addEventListener("click", () => window.VJ_BILL_NOW(null)); /* owner 27/10 13:20 (C-20261027-NEWBILL): a bill with only a vendor chain */ ["bogno", "bogfine", "bograte"].forEach(i => $(i).addEventListener("input", () => totals())); /* C-20261027-OGBAL */ $("btarget").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applyTarget(); } }); /* owner 27/10 12:21 (C-20261027-BILLTARGET) */ $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); }); $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
+    $("bF").addEventListener("input", render); $("btargetgo").addEventListener("click", applyTarget);  ["bogno", "bogfine", "bograte"].forEach(i => $(i).addEventListener("input", () => totals())); /* C-20261027-OGBAL */ $("btarget").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applyTarget(); } }); /* owner 27/10 12:21 (C-20261027-BILLTARGET) */ $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); }); $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
     $("bclear").addEventListener("click", () => { B.editNo = null; { const bt = $("btarget"); if (bt) bt.value = ""; ["bogno", "bogfine", "bograte"].forEach(i => { const x = $(i); if (x) x.value = ""; }); } { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.nbb = false; $("bnbb").checked = false; B.nbbAuto = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; B.pdrates = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
     $("bsave").addEventListener("click", save);
     $("bback").addEventListener("click", () => { const c = document.querySelector('nav button[data-tab="check"]'); if (c) c.click(); });
@@ -178,7 +178,7 @@
   window.VJ_BILL_NOW = id => { if (!$("p-bill")) return; $("bclear").click(); $("bform").hidden = false; const t = tags().find(x => x.id === id);
     document.querySelectorAll('[id^="p-"]').forEach(p => { p.hidden = p.id !== "p-bill"; });
     document.querySelectorAll("nav button").forEach(y => y.setAttribute("aria-selected", "false"));
-    prefill(); numField(); if (t) add(t); loadBook(); if (!t) { const vf = $("vcform"); if (vf) { vf.style.display = "flex"; setTimeout(() => { const v = $("vcv"); if (v) v.focus(); }, 150); } } window.scrollTo({ top: 0, behavior: "smooth" }); setTimeout(() => { const n = $("bmob"); if (n) n.focus(); }, 120); }; // owner 26/10 17:51: mobile first, the party's name and city fill in
+    prefill(); numField(); if (t) add(t); loadBook();  window.scrollTo({ top: 0, behavior: "smooth" }); setTimeout(() => { const n = $("bmob"); if (n) n.focus(); }, 120); }; // owner 26/10 17:51: mobile first, the party's name and city fill in
   window.VJ_BILL_ADD = id => { const t = tags().find(x => x.id === id); if (t) add(t); }; // Orders pending > Bill all (C-20261026-ORDERSDUE)
   // C-20261016-BILLBOOK: estimate numbers are given by the server (E-YYMM-NN, from 01 each month); bill numbers are typed
   function numField() { const e = B.title === "Estimate", n = $("bno"); n.disabled = true; n.value = ""; const d = $("bdate").value || today(); // owner 16/10: bill numbers automatic too
@@ -642,7 +642,7 @@
   function vcInit() {
     if (VC.on || !$("badd") || !$("bpick") || !$("p-rates") || !document.querySelector("nav")) return; VC.on = true;
     // 1. on the bill
-    const b = vcEl("button", { type: "button", className: "btn ghost", textContent: "+ Approval chain" }); b.style.marginLeft = "8px"; $("badd").after(b);
+    const b = vcEl("button", { type: "button", className: "btn ghost", textContent: "+ Approval chain" }); b.style.marginLeft = "8px"; b.hidden = true; /* owner 27/10 13:22 (C-20261027-CHAINVENDOR): vendor chains are tagged on New tag (Chain + vendor), then billed like any piece; this form is kept for a chain with no tag */ $("badd").after(b);
     const f = vcEl("div", { id: "vcform" }); f.style.cssText = "display:none;gap:8px;flex-wrap:wrap;align-items:end;border:1px dashed #b8963e;border-radius:8px;padding:10px;margin:8px 0";
     const v = vcInp("vcv", "e.g. Siddharth", 180); v.setAttribute("list", "vcvl");
     const k = vcEl("select", { id: "vck" }); ["22K", "18K", "14K", "9K"].forEach(x => k.append(vcEl("option", { value: x, textContent: x, selected: x === "18K" })));
@@ -664,7 +664,7 @@
     const t = vcEl("table", { className: "items" }); t.style.minWidth = "900px";
     t.innerHTML = "<thead><tr><th></th><th>Chain</th><th>Vendor</th><th>Received</th><th>Gold</th><th>Sale tunch</th><th>Purchase tunch</th><th>Purchase rate 24K/g</th><th>Purchase amount</th><th>Sold on</th><th>Status</th></tr></thead>";
     t.append(vcEl("tbody", { id: "vcrows" }));
-    sec.append(vcEl("h2", { textContent: "Chains on approval - vendor account" }), vcEl("p", { className: "hint", textContent: "Every chain taken from a vendor. Tally the vendor's bill with the totals below; after the entry in Tally, tick the chains and remove them." }),
+    sec.append(vcEl("h2", { textContent: "Chains on approval - vendor account" }), vcEl("p", { className: "hint", textContent: "Every chain tagged with a vendor name (New tag > Chain > Vendor). Chains with no vendor are the karigar's / own and are not listed. Tally the vendor's bill with the totals below; after the entry in Tally, tick the chains and remove them." }),
       row, vcEl("div", { className: "list" }, [t]), vcEl("p", { className: "hint", id: "vcsum" }),
       vcEl("button", { type: "button", className: "btn", id: "vcdone", textContent: "Entered in Tally - remove ticked", onclick: vcDone }), vcEl("span", { className: "hint", id: "vcdmsg" }));
     $("p-rates").parentNode.insertBefore(sec, $("p-rates"));
