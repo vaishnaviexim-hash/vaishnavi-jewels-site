@@ -410,7 +410,7 @@ let lineSeq=0;
 function opt(sel,vals,cur){vals.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=v;sel.appendChild(o)});if(cur)sel.value=cur}
 function addGold(k,net){
   const id=++lineSeq,d=document.createElement("div");d.className="ln g";d.dataset.id=id;
-  d.innerHTML=`<label>Karat<select id="gk${id}"></select></label><label>Net gold wt (g)<input type="number" id="gn${id}" step="0.001" min="0" placeholder="0.000"></label><label>Chain tunch<input type="number" id="gt${id}" step="0.001" min="0.3" max="1.1" placeholder="chain only" inputmode="decimal"></label><div class="val" id="gv${id}"></div><button type="button" class="x" aria-label="Remove gold line">✕</button>`;
+  d.innerHTML=`<label>Karat<select id="gk${id}"></select></label><label>Net gold wt (g)<input type="number" id="gn${id}" step="0.001" min="0" placeholder="0.000"></label><label>Chain tunch<input type="number" id="gt${id}" step="0.0001" min="0.3" max="1.1" placeholder="chain only" inputmode="decimal"></label><div class="val" id="gv${id}"></div><button type="button" class="x" aria-label="Remove gold line">✕</button>`;
   $("goldLines").appendChild(d);opt($("gk"+id),KARATS.concat(["Chain"]),k||"14K"); /* owner 19/10/2026: Karat 'Chain' = tunch line (C-20261019-TAGSNOORDER) */ /* owner 16/10/2026: default 14K */if(net)$("gn"+id).value=net;
   d.querySelector(".x").addEventListener("click",()=>{if($("goldLines").children.length>1){d.remove();update()}});
   update();
@@ -454,7 +454,7 @@ $("cat").addEventListener("change",()=>{const c=$("cat").value==="CH";$("vendorB
 function kind(){return document.querySelector('input[name=kind]:checked').value}
 function readForm(){
   const k=kind(),cat=CATS.find(c=>c.id===$("cat").value)||CATS[0];
-  const gold=[...$("goldLines").children].map(r=>{const i=r.dataset.id,g={k:$("gk"+i).value,net:num($("gn"+i).value)},tv=$("gt"+i).value.trim();if(g.k==="Chain"&&tv!=="")g.tunch=Math.round(num(tv)*1000)/1000;return g}); /* owner 17/10/2026 (C-20261017-CHAINTUNCH): a gold line with a tunch is a chain line */
+  const gold=[...$("goldLines").children].map(r=>{const i=r.dataset.id,g={k:$("gk"+i).value,net:num($("gn"+i).value)},tv=$("gt"+i).value.trim();if(g.k==="Chain"&&tv!=="")g.tunch=Math.round(num(tv)*10000)/10000 /* owner 27/10 13:32 (C-20261027-TUNCH4): 4 decimals - 0.9432 stays 0.9432 */;return g}); /* owner 17/10/2026 (C-20261017-CHAINTUNCH): a gold line with a tunch is a chain line */
   const dias=[...$("diaLines").children].map(r=>{const i=r.dataset.id;const qq=$("dq"+i).value==="Other"?($("dqo"+i).value.trim().toUpperCase()||"OTHER?"):$("dq"+i).value;const sp=num($("dr"+i).value),sh=$("ds"+i).value,def=defRate(sh,qq),z=qq==="Party diamond"&&$("dr"+i).value.trim()!==""&&sp===0; /* owner 26/10 18:38: Party diamond with 0 typed = no setting charge */return {shape:sh,q:qq,ct:num($("dc"+i).value),pcs:Math.round(num($("dp"+i).value)),rate:z?0:(sp>0?sp:(def||0)),special:sp>0||z}}).filter(d=>d.ct>0||d.pcs>0||d.special);
   const g1=gold.find(g=>g.net>0&&g.k!=="Chain")||gold.find(g=>g.k!=="Chain"),gc=gold.find(g=>g.k==="Chain"&&g.tunch>0),tk=x=>x>=0.88?"22K":x>=0.7?"18K":x>=0.5?"14K":"9K";
   const mainK=g1?g1.k:gc?tk(gc.tunch):"14K"; /* a chain-only piece takes its karat from the tunch */
@@ -620,7 +620,7 @@ function update(){
   if(t.kind==="sample"){add("Sample","not priced");$("rateNote").textContent="Samples are never sold, so they carry no price code."}
   else if(!pr){add("Gold rate","not set");$("rateNote").textContent="Set today's 24K gold rate under Gold rate & settings."}
   else{
-    pr.lines.forEach(l=>add(l.tunch?`Chain ${l.k==="Chain"?"":l.k+" "}${l.net.toFixed(3)} g × tunch ${l.tunch.toFixed(3)} × ${fmt(pr.r24)}`:`Gold ${l.k} ${l.net.toFixed(3)} g × ${fmt(l.kr)}/g`,fmt(l.net*l.kr)));
+    pr.lines.forEach(l=>add(l.tunch?`Chain ${l.k==="Chain"?"":l.k+" "}${l.net.toFixed(3)} g × tunch ${l.tunch.toFixed(4).replace(/0$/,"")} × ${fmt(pr.r24)}`:`Gold ${l.k} ${l.net.toFixed(3)} g × ${fmt(l.kr)}/g`,fmt(l.net*l.kr)));
     if(pr.nt>0)add(`Making ${fmt(pr.mk)}/g × ${pr.nt.toFixed(3)} g`,fmt(pr.making));else add("Making","— (chain: none)");
     if(pr.dia)add("Diamonds",fmt(pr.dia));if(pr.pol)add(`Polki setting ${t.polki.pcs} pc × ${fmt(t.polki.rate)}`,fmt(pr.pol));if(pr.pd)add(`Party diamond setting ${t.pdia.ct} ct × ${fmt(t.pdia.rate)}`,fmt(pr.pd));if(pr.oth)add("Other charges",fmt(pr.oth));
     add("Total (rounded up to ₹100)",fmt(pr.sub));add(`GST ${s.gst}%`,fmt(pr.gst));add("Price (rounded up to ₹1,000)",fmt(pr.final),"total");
