@@ -89,7 +89,7 @@
     // owner 17/10 15:29 ('i dont want 26093, straight 26500'): the round-up sits inside the biggest piece's making charge (its
     // rate per g is shown for the new making), or in Other for Gold Item / no gold, so every printed figure adds up to the total.
     // A piece that is only chain has no making (C-20261017-CHAINTUNCH): the biggest other piece takes it; a bill of chains only puts it in Other.
-    const roundIn = sub - after;
+    rows.forEach(r => { r.amt0 = r.amount; }); /* C-20261027-FINALAMT: amount before the round-up, for the discount spread */ const roundIn = sub - after;
     if (roundIn > 0 && rows.length) { const rc = rows.some(x => !x.chain) ? rows.filter(x => !x.chain) : rows, r = rc.reduce((a, x) => x.net > a.net ? x : a, rc[0]);
       if (mode !== 'item' && r.mkWt > 0) { r.making += roundIn; r.mkRate = Math.round(r.making / r.mkWt); } else r.other += roundIn;
       r.amount += roundIn; r.net += roundIn; sum += roundIn; }
@@ -427,12 +427,12 @@
     if (!T) { h.textContent = "Type the final amount, e.g. 152000."; return; }
     if (!B.items.length || F() < 2000) { h.textContent = "Add the pieces and the gold rate first."; return; }
     const keep = B.disc; B.disc = {}; B.final = 0; const c0 = calcNow(); B.disc = keep;
-    const rows = c0.rows.filter(r => r.amount > 0), S = rows.reduce((a, r) => a + r.amount, 0), sub = T - Math.round(T * pct / (100 + pct));
+    const A = r => r.amt0 || r.amount, rows = c0.rows.filter(r => A(r) > 0), S = rows.reduce((a, r) => a + A(r), 0), sub = T - Math.round(T * pct / (100 + pct));
     if (!rows.length) { h.textContent = "Add the pieces first."; return; }
     if (sub > S) { h.textContent = "The pieces come to " + fmt(S) + " before GST - a final amount of " + fmt(T) + " is more than that, so no discount applies."; B.disc = {}; B.final = 0; $("bfinal").value = ""; render(); return; }
     const X = S - sub, nd = {}; let given = 0;
-    rows.forEach(r => { const d = Math.floor(X * r.amount / S); nd[r.id] = d; given += d; });
-    const big = rows.reduce((a, r) => r.amount > a.amount ? r : a, rows[0]); nd[big.id] += X - given;
+    rows.forEach(r => { const d = Math.floor(X * A(r) / S); nd[r.id] = d; given += d; });
+    const big = rows.reduce((a, r) => A(r) > A(a) ? r : a, rows[0]); nd[big.id] += X - given;
     B.disc = {}; Object.keys(nd).forEach(id => { if (nd[id] > 0) B.disc[id] = String(nd[id]); }); B.final = T; $("btarget").value = "";
     render(); const c1 = calcNow();
     h.textContent = c1.final ? "Discount " + fmt(c1.sum - c1.sub) + " - final amount " + fmt(c1.total) + " (GST " + fmt(c1.gst) + " inside it, kept in the record, not printed)." : "Could not set the final amount - check the discounts.";
@@ -442,13 +442,13 @@
     if (!T) { h.textContent = "Type the amount before GST, e.g. 80000."; return; }
     if (!B.items.length || F() < 2000) { h.textContent = "Add the pieces and the gold rate first."; return; }
     const keep = B.disc; B.disc = {}; const c0 = calcNow(); B.disc = keep;
-    const rows = c0.rows.filter(r => r.amount > 0), S = rows.reduce((a, r) => a + r.amount, 0);
+    const A = r => r.amt0 || r.amount, rows = c0.rows.filter(r => A(r) > 0), S = rows.reduce((a, r) => a + A(r), 0);
     if (!rows.length) { h.textContent = "Add the pieces first."; return; }
     if (T >= S) { B.disc = {}; render(); h.textContent = "The total is " + fmt(S) + " - that is not more than " + fmt(T) + ", so no discount."; return; }
     const X = S - T, nd = {}; let given = 0;
-    rows.forEach(r => { const d = Math.floor(X * r.amount / S); nd[r.id] = d; given += d; });
-    const big = rows.reduce((a, r) => r.amount > a.amount ? r : a, rows[0]); nd[big.id] += X - given;
-    B.disc = {}; Object.keys(nd).forEach(id => { if (nd[id] > 0) B.disc[id] = String(nd[id]); });
+    rows.forEach(r => { const d = Math.floor(X * A(r) / S); nd[r.id] = d; given += d; });
+    const big = rows.reduce((a, r) => A(r) > A(a) ? r : a, rows[0]); nd[big.id] += X - given;
+    B.disc = {}; Object.keys(nd).forEach(id => { if (nd[id] > 0) B.disc[id] = String(nd[id]); }); B.final = 0; $("bfinal").value = "";
     render(); const c1 = calcNow();
     h.textContent = "Discount " + fmt(c1.sum - c1.sub) + " - amount before GST " + fmt(c1.sub) + " + GST " + fmt(c1.gst) + " = " + fmt(c1.total) + "." + (c1.sub !== T ? " (Totals round up to Rs 500, so use a figure in 500s.)" : "");
   }
