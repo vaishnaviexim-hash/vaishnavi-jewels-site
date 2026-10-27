@@ -684,7 +684,7 @@ function vjBillCalc(tags, o) {
   // owner 17/10 15:29 ('i dont want 26093, straight 26500'): the round-up sits inside the biggest piece's making charge (its
   // rate per g is shown for the new making), or in Other for Gold Item / no gold, so every printed figure adds up to the total.
   // A piece that is only chain has no making (C-20261017-CHAINTUNCH): the biggest other piece takes it; a bill of chains only puts it in Other.
-  const roundIn = sub - after;
+  rows.forEach(r => { r.amt0 = r.amount; }); /* C-20261027-FINALAMT: amount before the round-up, for the discount spread */ const roundIn = sub - after;
   if (roundIn > 0 && rows.length) { const rc = rows.some(x => !x.chain) ? rows.filter(x => !x.chain) : rows, r = rc.reduce((a, x) => x.net > a.net ? x : a, rc[0]);
     if (mode !== 'item' && r.mkWt > 0) { r.making += roundIn; r.mkRate = Math.round(r.making / r.mkWt); } else r.other += roundIn;
     r.amount += roundIn; r.net += roundIn; sum += roundIn; }
