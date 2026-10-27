@@ -532,6 +532,96 @@
     $("bsave").disabled = false;
   }
   window.vjBillPdf = (b, photos) => makePdf(b, photos); // C-20261017-LEDGER: the Ledger tab prints a settled bill with the same printer
+  // owner 27/10/2026 13:06 (C-20261027-APPCHAIN): chains taken ON APPROVAL from vendors (Siddharth and others) are entered at the sale:
+  // "+ Approval chain" on the bill - vendor, karat, weight, tunch - makes a chain piece (APCH18/n) and puts it on the bill, billed as
+  // weight x tunch x gold rate (the chain rule, no making). Sold approval chains stay listed per vendor ("to pay vendor", grams and fine) so the
+  // vendor's bill can be tallied; once the vendor is paid, tick them and "Mark paid (checkout)" - they leave the list.
+  const AP = { on: false, arm: false };
+  const apNum = v => { const n = parseFloat(String(v || "").replace(/,/g, "")); return isFinite(n) ? n : 0; };
+  const apEsc = s => String(s == null ? "" : s);
+  function apInit() {
+    if (AP.on || !$("badd") || !$("bpick") || !$("bbook")) return; AP.on = true;
+    const b = document.createElement("button"); b.type = "button"; b.className = "btn ghost"; b.textContent = "+ Approval chain"; b.style.marginLeft = "8px"; $("badd").after(b);
+    const f = document.createElement("div"); f.id = "apform"; f.hidden = true; f.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;align-items:end;border:1px dashed #b8963e;border-radius:8px;padding:10px;margin:8px 0";
+    const lab = (t, el) => { const l = document.createElement("label"); l.append(t + " ", el); return l; };
+    const inp = (id, ph, w, mode) => { const i = document.createElement("input"); i.id = id; i.placeholder = ph || ""; i.autocomplete = "off"; i.maxLength = 40; if (mode) i.inputMode = mode; if (w) i.style.maxWidth = w + "px"; return i; };
+    const v = inp("apv", "e.g. Siddharth", 180); v.setAttribute("list", "apvl"); const dl = document.createElement("datalist"); dl.id = "apvl";
+    const k = document.createElement("select"); k.id = "apk"; ["22K", "18K", "14K", "9K"].forEach(x => k.append(Object.assign(document.createElement("option"), { value: x, textContent: x, selected: x === "18K" })));
+    const go = Object.assign(document.createElement("button"), { type: "button", className: "btn", id: "apgo", textContent: "Add chain to bill" }), msg = Object.assign(document.createElement("span"), { className: "hint", id: "apmsg" });
+    f.append(lab("Vendor", v), dl, lab("Karat", k), lab("Weight (g)", inp("apw", "3.000", 110, "decimal")), lab("Tunch", inp("apt", "0.760", 100, "decimal")), lab("Vendor tag / note", inp("apn", "", 160)), go, msg);
+    $("bpick").before(f);
+    b.addEventListener("click", () => { f.hidden = !f.hidden; f.style.display = f.hidden ? "none" : "flex"; apVendors(); if (!f.hidden) v.focus(); }); f.style.display = "none";
+    go.addEventListener("click", apAdd);
+    // vendor list on Saved bills
+    const host = $("bbook").closest("table").parentElement, pn = document.createElement("div"); pn.id = "appanel"; pn.style.marginTop = "18px";
+    const h = Object.assign(document.createElement("h2"), { textContent: "On-approval chains (vendors)" });
+    const fv = document.createElement("select"); fv.id = "apfv"; fv.append(Object.assign(document.createElement("option"), { value: "", textContent: "All vendors" }));
+    const fs = Object.assign(document.createElement("input"), { type: "checkbox", id: "apfs" }); fs.style.width = "auto";
+    const fsl = document.createElement("label"); fsl.style.cssText = "flex-direction:row;align-items:center;gap:6px"; fsl.append(fs, " Show paid");
+    const rf = Object.assign(document.createElement("button"), { type: "button", className: "btn ghost", textContent: "Refresh" });
+    const row = document.createElement("div"); row.className = "row"; row.style.cssText = "align-items:end;gap:8px"; row.append(lab("Vendor", fv), fsl, rf);
+    const tw = document.createElement("div"); tw.className = "list"; const tb = document.createElement("table"); tb.className = "items";
+    tb.innerHTML = "<thead><tr><th></th><th>Chain</th><th>Vendor</th><th>Gold</th><th>Fine</th><th>Sold on</th><th>Status</th></tr></thead>"; const body = document.createElement("tbody"); body.id = "aprows"; tb.append(body); tw.append(tb);
+    const sum = Object.assign(document.createElement("p"), { className: "hint", id: "apsum" }), pay = Object.assign(document.createElement("button"), { type: "button", className: "btn", id: "appaid", textContent: "Mark ticked as paid (checkout)" }), pm = Object.assign(document.createElement("span"), { className: "hint", id: "appmsg" });
+    pm.style.marginLeft = "8px"; pn.append(h, row, tw, sum, pay, pm); host.after(pn);
+    [fv, fs].forEach(x => x.addEventListener("change", apList)); rf.addEventListener("click", apList); pay.addEventListener("click", apPaid);
+    apList(); setInterval(() => { if (!document.hidden && pn.offsetParent) apList(true); }, 20000);
+  }
+  function apTags() { return tags().filter(t => t && t.approval && t.approval.vendor); }
+  function apVendors() { const vs = [...new Set(apTags().map(t => t.approval.vendor))].sort(); const dl = $("apvl"); if (dl) { dl.textContent = ""; vs.forEach(x => dl.append(Object.assign(document.createElement("option"), { value: x }))); } return vs; }
+  async function apAdd() {
+    const m = $("apmsg"), v = $("apv").value.trim().replace(/\s+/g, " ").slice(0, 40), k = $("apk").value, w = Math.round(apNum($("apw").value) * 1000) / 1000, tn = Math.round(apNum($("apt").value) * 1000) / 1000, note = $("apn").value.trim().slice(0, 30);
+    if (!v) { m.textContent = "Type the vendor name."; return; } if (!(w > 0 && w <= 500)) { m.textContent = "Type the weight in grams (e.g. 3.000)."; return; }
+    if (!(tn >= 0.3 && tn <= 1.1)) { m.textContent = "Tunch must be from 0.300 to 1.100 (e.g. 0.760)."; return; }
+    $("apgo").disabled = true; m.textContent = "Saving…";
+    try {
+      const db = await window.claude.use("db"), prefix = "APCH" + ({ "22K": "22", "18K": "18", "14K": "14", "9K": "9" })[k], cref = db.doc("counters/main"), me = "ap" + Math.random();
+      let lease = await cref.acquire({ holder: me, ttlMs: 8000 });
+      for (let i = 0; i < 5 && !lease.acquired; i++) { await new Promise(r => setTimeout(r, 700 + Math.random() * 500)); lease = await cref.acquire({ holder: me, ttlMs: 8000 }); }
+      if (!lease.acquired) throw { message: "someone else is saving a tag - try again in a few seconds" };
+      const snap = await cref.get(), last = Object.assign({}, (snap.exists && snap.data().last) || {});
+      let no = Math.max(last[prefix] || 0, ...tags().filter(x => x.prefix === prefix).map(x => x.no || 0)) + 1;
+      for (;;) { if (!(await db.doc("tags/" + prefix + "-" + no).get()).exists) break; no++; }
+      const id = prefix + "-" + no, now = new Date().toISOString();
+      await db.doc("tags/" + id).set({ label: prefix + "/" + no, prefix, no, kind: "sale", cat: "CH", catName: "Chain", pcode: "CH" + prefix.slice(4), gold: [{ k, net: w, tunch: tn }], dias: [], other: { amt: 0 },
+        remark: ("On approval - " + v).slice(0, 120), designNo: note, status: "in_stock", createdBy: null, createdAt: now, source: "On approval (vendor chain)", approval: { vendor: v, at: now, settled: false } });
+      last[prefix] = Math.max(last[prefix] || 0, no); await cref.set({ last });
+      m.textContent = "Saved - adding to the bill…"; let t = null; for (let i = 0; i < 40 && !(t = tags().find(x => x.id === id)); i++) await new Promise(r => setTimeout(r, 300));
+      if (t) { if (!B.items.includes(id)) B.items.push(id); render(); m.textContent = `${prefix}/${no} on the bill: ${k} ${w.toFixed(3)} g, tunch ${tn.toFixed(3)} (${v}).`; ["apw", "apt", "apn"].forEach(i => { $(i).value = ""; }); }
+      else m.textContent = `Saved as ${prefix}/${no}. Type ${prefix}/${no} in the box above and tap Add piece.`;
+      apVendors(); apList(true);
+    } catch (e) { m.textContent = "Could not save: " + ((e && (e.message || e.code)) || "error") + "."; }
+    $("apgo").disabled = false;
+  }
+  function apList(quiet) {
+    const body = $("aprows"); if (!body) return; const fv = $("apfv"), cur = fv.value, vs = apVendors();
+    fv.textContent = ""; fv.append(Object.assign(document.createElement("option"), { value: "", textContent: "All vendors" })); vs.forEach(x => fv.append(Object.assign(document.createElement("option"), { value: x, textContent: x, selected: x === cur })));
+    const showPaid = $("apfs").checked, L = apTags().filter(t => (!cur || t.approval.vendor === cur) && (showPaid || !t.approval.settled))
+      .sort((a, b) => String(a.approval.vendor).localeCompare(String(b.approval.vendor)) || String(a.approval.at).localeCompare(String(b.approval.at)));
+    body.textContent = ""; const due = {};
+    L.forEach(t => { const g = (t.gold || [])[0] || {}, net = Number(g.net) || 0, tn = Number(g.tunch) || 0, fine = Math.round(net * tn * 1000) / 1000, sold = t.status === "sold" && t.sold, paid = !!t.approval.settled;
+      const tr = document.createElement("tr"), td = x => { const e = document.createElement("td"); e.textContent = x; tr.append(e); return e; };
+      const c = document.createElement("td"); if (sold && !paid) { const cb = Object.assign(document.createElement("input"), { type: "checkbox" }); cb.style.width = "auto"; cb.dataset.id = t.id; c.append(cb); } tr.append(c);
+      td(t.label + (t.designNo ? " · " + t.designNo : "")); td(apEsc(t.approval.vendor)); td(`${g.k || ""} ${net.toFixed(3)} g @ ${tn.toFixed(3)}`); td(fine.toFixed(3) + " g");
+      td(sold ? `${t.sold.no || ""} · ${t.sold.date ? dmy(t.sold.date) : ""}${t.sold.name ? " · " + t.sold.name : ""}` : "not billed yet");
+      const st = td(paid ? "Paid " + (t.approval.settledAt ? dmy(String(t.approval.settledAt).slice(0, 10)) : "") : sold ? "Sold - pay vendor" : "With us (on approval)"); if (sold && !paid) st.style.cssText = "color:#a12b2b;font-weight:600";
+      if (sold && !paid) { const d = due[t.approval.vendor] = due[t.approval.vendor] || { n: 0, g: 0, f: 0 }; d.n++; d.g += net; d.f += fine; }
+      body.append(tr); });
+    const ks = Object.keys(due); $("apsum").textContent = !L.length ? "No on-approval chains." : ks.length ? "To pay vendor: " + ks.map(v => `${v} - ${due[v].n} chain${due[v].n > 1 ? "s" : ""}, ${due[v].g.toFixed(3)} g, fine ${due[v].f.toFixed(3)} g`).join(" | ") : "Nothing sold that is unpaid.";
+    if (!quiet) { $("appmsg").textContent = ""; AP.arm = false; $("appaid").textContent = "Mark ticked as paid (checkout)"; }
+  }
+  async function apPaid() {
+    const ids = [...document.querySelectorAll("#aprows input[type=checkbox]:checked")].map(x => x.dataset.id), m = $("appmsg");
+    if (!ids.length) { m.textContent = "Tick the chains you have paid the vendor for."; return; }
+    if (!AP.arm) { AP.arm = true; $("appaid").textContent = `Confirm: ${ids.length} chain${ids.length > 1 ? "s" : ""} paid`; m.textContent = "Tap again to confirm."; return; }
+    AP.arm = false; $("appaid").disabled = true; m.textContent = "Saving…";
+    try { const db = await window.claude.use("db"), now = new Date().toISOString(); let n = 0;
+      for (const id of ids) { const t = tags().find(x => x.id === id); if (!t) continue; await db.doc("tags/" + id).update({ approval: Object.assign({}, t.approval, { settled: true, settledAt: now }) }); t.approval = Object.assign({}, t.approval, { settled: true, settledAt: now }); n++; }
+      m.textContent = `${n} chain${n > 1 ? "s" : ""} marked paid.`; apList(true); $("appaid").textContent = "Mark ticked as paid (checkout)";
+    } catch (e) { m.textContent = "Could not save: " + ((e && (e.message || e.code)) || "error") + "."; }
+    $("appaid").disabled = false;
+  }
+  setInterval(apInit, 1000);
   function boot() { if (document.querySelector("nav") && $("p-rates")) { build(); setInterval(() => { const s = $("p-bill"); if (s && !s.hidden && !(document.activeElement && (document.activeElement.classList.contains("bdisc") || document.activeElement.classList.contains("brate")))) render(); }, 20000); } else setTimeout(boot, 300); }
   boot();
 })();
