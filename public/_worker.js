@@ -527,17 +527,18 @@ const VJ_Q_G2G = { '9K': 0.4235, '14K': 0.66, '18K': 0.836, '22K': 1.06, '24K': 
 function vjQPay(gold, dv, extra, st, mk, pay) {
   if (pay !== 'g2g' && pay !== 'g2gn') return { price: vjQPrice(gold, dv, extra, st, mk), fine: 0 };
   if (!gold.some(g => g.net > 0) || !st.g) return { price: 0, fine: 0 };
-  const nf = pay === 'g2gn', g0 = gold.find(g => g.net > 0 && !vjLineT(g)); let gv = 0, nt = 0, fine = 0;
-  gold.forEach(g => { if (g.net > 0) { const tn = vjLineT(g); if (tn) fine += g.net * tn; else { gv += g.net * st.g * (Number(st.pur[g.k]) || 0); nt += g.net; fine += g.net * (nf ? (Number(st.pur[g.k]) || 0) : (VJ_Q_G2G[g.k] || 0)); } } });
+  // C-20261027-CHAINMK (owner 27/10 17:30): a chain's tunch only replaces the karat purity; making, wastage, Nett and Gold to Gold rules apply to it like any line (W/s fine = net x tunch x 1.1)
+  const nf = pay === 'g2gn', g0 = gold.find(g => g.net > 0); let gv = 0, nt = 0, fine = 0;
+  gold.forEach(g => { if (g.net > 0) { const tn = vjLineT(g), pu = tn || (Number(st.pur[g.k]) || 0); gv += g.net * st.g * pu; nt += g.net; fine += g.net * (nf ? pu : (tn ? tn * 1.1 : (VJ_Q_G2G[g.k] || 0))); } });
   const mv = !g0 ? 0 : mk === 'flat' ? 1600 * nt : Math.max((g0.net > st.mk.limit ? st.mk.base : st.mk.small) * nt, Number(st.mk.min) || 0) + (nf ? gv * st.mk.pct / 100 : 0);
   return { price: vjQUp(vjQUp(mv + dv + extra, 100) * (1 + st.gst / 100), 100), fine: Math.round(fine * 1000) / 1000 };
 }
 function vjQPrice(gold, dv, extra, st, mk) { // final price incl. GST, or 0 when it cannot be worked out
   if (!gold.some(g => g.net > 0) || !st.g) return 0;
-  // chain lines (C-20261017-CHAINTUNCH): net x tunch x fine rate, no making, no wastage; making and wastage on the other lines only,
-  // the 5 g limit read from the first non-chain line and the Rs 1,000 minimum on the non-chain weight
-  const g0 = gold.find(g => g.net > 0 && !vjLineT(g)); let gv = 0, cv = 0, nt = 0;
-  gold.forEach(g => { if (g.net > 0) { const tn = vjLineT(g); if (tn) cv += g.net * st.g * tn; else { gv += g.net * st.g * (Number(st.pur[g.k]) || 0); nt += g.net; } } });
+  // chain lines (C-20261017-CHAINTUNCH, changed 27/10 C-20261027-CHAINMK): gold = net x tunch x fine rate (tunch instead of the karat purity);
+  // making and 10% wastage apply to every line, chains included (owner: wastage, Nett and Gold to Gold formulae stay)
+  const g0 = gold.find(g => g.net > 0); let gv = 0, cv = 0, nt = 0;
+  gold.forEach(g => { if (g.net > 0) { const pu = vjLineT(g) || (Number(st.pur[g.k]) || 0); gv += g.net * st.g * pu; nt += g.net; } });
   const mv = !g0 ? 0 : mk === 'flat' ? 1600 * nt : Math.max((g0.net > st.mk.limit ? st.mk.base : st.mk.small) * nt, Number(st.mk.min) || 0) + gv * st.mk.pct / 100;
   return vjQUp(vjQUp(gv + cv + mv + dv + extra, 100) * (1 + st.gst / 100), 1000);
 }
