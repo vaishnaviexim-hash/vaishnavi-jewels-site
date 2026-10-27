@@ -759,6 +759,7 @@ async function vjBill(request, env, who, ctx) { // every login may make bills (o
     vtags.push({ id: 'new-' + (n + 1), label: src.desc || (tunch ? 'Chain' : 'New design'), designNo: '', catName: 'New design', kind: 'design', newDesign: true, src,
       gold: [{ k, net: src.net, ...(tunch ? { tunch } : {}) }], dias, ...(ppcs ? { polki: { pcs: ppcs, rate: prate } } : {}), ...(other ? { other: { amt: other } } : {}) }); }
   const option = ['gh', 'ij', 'lgd'].includes(b && b.option) ? b.option : '', usd0 = Math.round(Number(b && b.usd) * 100) / 100, usd = usd0 >= 50 && usd0 <= 200 ? usd0 : 0;
+  const cust = ['mihir', 'shilpi', 'abhinav'].includes(b && b.cust) ? b.cust : ''; // C-20261027-ESTOWNER: whose customer (for the follow-up reminder and the morning report)
   const allIds = ids.concat(vtags.map(t => t.id));
   const disc = {}; if (b && b.disc && typeof b.disc === 'object') for (const id of allIds) if (b.disc[id] != null) disc[id] = String(b.disc[id]).slice(0, 12);
   const frates = {}; if (b && b.frates && typeof b.frates === 'object') for (const id of allIds) { const n = Math.round(Number(b.frates[id]) * 100) / 100; if (n >= 2000 && n <= 50000) frates[id] = n; }
@@ -797,7 +798,7 @@ async function vjBill(request, env, who, ctx) { // every login may make bills (o
   if (option) { const stQ = vjQSt(s); tags.forEach(t => { t.dias = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map(d => Object.assign({}, d, { rate: vjQOptRate(d, option, stQ) })); }); } // diamonds choice (C-20261027-ESTBILL)
   const calc = vjBillCalc(tags, { F, mode, settle, g2g: b && b.g2g === 'nett' ? 'nett' : 'ws', disc, rates, frates, prates, pdrates, og, final, purity: s.purity, making: s.making, gst: s.gst });
   calc.rows.forEach((r, i) => { const ph = tags[i].photo; if (typeof ph === 'string' && /^[0-9a-f]{32}$/.test(ph)) r.photo = ph; if (tags[i].src) r.src = tags[i].src; }); // owner 16/10: photo on the bill; src = the typed design (C-20261027-ESTBILL)
-  const bill = Object.assign({ no, title, date, name, city, mobile, F, nbb: !!(b && b.nbb === true), by: who.email, byName: who.name, at: new Date().toISOString(), ...(option ? { option } : {}), ...(usd ? { usd } : {}) }, calc); // nbb: 'No Buy Back No Exchange' stamp (owner 17/10, C-20261017-NBB)
+  const bill = Object.assign({ no, title, date, name, city, mobile, F, nbb: !!(b && b.nbb === true), by: who.email, byName: who.name, at: new Date().toISOString(), ...(option ? { option } : {}), ...(usd ? { usd } : {}), ...(cust ? { cust } : {}) }, calc); // nbb: 'No Buy Back No Exchange' stamp (owner 17/10, C-20261017-NBB)
   if (editNo) { // C-20261026-BILLEDIT (owner 26/10/2026 17:32 'i should be able to edit the bill'): owners only; the old version is kept in vj_bill_old
     if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji can edit a saved bill');
     const old = await env.DB.prepare('SELECT ts, email, data FROM vj_bills WHERE no = ?').bind(editNo).first();
@@ -1674,7 +1675,9 @@ async function vjDailyReport(env) {
     const B = bills.filter(b => b.title !== 'Estimate'), E = bills.filter(b => b.title === 'Estimate');
     const fg = arr => fineSum(arr) > 0 ? ' + fine gold ' + fineSum(arr).toFixed(3) + ' g' : '';
     const day = ist.toUTCString().slice(0, 11);
-    const text = `VJ Tags - daily report, ${day} (summary)\nNew tags made: ${created.size}${samples ? ' (samples ' + samples + ')' : ''} (order tags not counted)\nOld tags edited: ${edited.size}\nTags deleted: ${gone.size}\nBills made: ${B.length}${B.length ? ', total ' + inr(sum(B)) + fg(B) : ''}\nEstimates made: ${E.length}${E.length ? ', total ' + inr(sum(E)) : ''}`;
+    const custName = { mihir: 'Mihir', shilpi: 'Shilpi ji', abhinav: 'Abhinav' }; // C-20261027-ESTOWNER: every estimate listed with the customer and whose customer it is
+    const eLines = E.map(b => `  ${b.no} - ${b.name || ''}${b.city ? ', ' + b.city : ''}${b.mobile ? ' (' + b.mobile + ')' : ''} - ${inr(Number(b.total) || 0)}${b.usd ? ' / US$ ' + Math.round((Number(b.total) || 0) / b.usd).toLocaleString('en-US') : ''} - ${custName[b.cust] ? custName[b.cust] + "'s customer" : 'customer not marked'}`).join('\n');
+    const text = `VJ Tags - daily report, ${day} (summary)\nNew tags made: ${created.size}${samples ? ' (samples ' + samples + ')' : ''} (order tags not counted)\nOld tags edited: ${edited.size}\nTags deleted: ${gone.size}\nBills made: ${B.length}${B.length ? ', total ' + inr(sum(B)) + fg(B) : ''}\nEstimates made: ${E.length}${E.length ? ', total ' + inr(sum(E)) : ''}${eLines ? '\n' + eLines : ''}`;
     // only a random one-time token leaves the worker; Make 8190722 (hook 3981296) fetches the summary once from /hooks/vj-summary
     const token = [...crypto.getRandomValues(new Uint8Array(16))].map(x => x.toString(16).padStart(2, '0')).join('');
     await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('summary:' + token, JSON.stringify({ text, date: ymd, at: Date.now() })).run();
