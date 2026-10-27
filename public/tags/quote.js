@@ -316,6 +316,7 @@
     }
     y += 4; doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.text("Total (incl. 3% GST)", M, y); doc.text(fmt(q.total), W - M, y, { align: "right" }); if (q.fineTotal) { y += 7; doc.text("Fine gold to give", M, y); doc.text(q.fineTotal.toFixed(3) + " g", W - M, y, { align: "right" }); }
     if (q.usd) { y += 7; doc.setFont("helvetica", "normal"); doc.setFontSize(11); doc.text(`In US dollars (approx., at Rs ${q.usd.toFixed(2)} per US$)`, M, y); doc.text(usdTxt(q.total), W - M, y, { align: "right" }); }
+    if (q.design) { y += 10; doc.setFont("helvetica", "bold"); doc.setFontSize(10.5); doc.setTextColor(20); doc.text("Above are approximate estimates. Actual may vary when the final product is ready.", M, y); } // owner 27/10 17:29: estimate stamp
     y += 10; doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(90);
     doc.text(doc.splitTextToSize((q.payNote ? q.payNote + " " : "") + (q.design ? "Final price depends on actual weights and the gold rate on the day of billing. Estimate at today's gold rate. " : "Approximate prices at today's gold rate, valid today. ") + (q.usd ? "US dollar figures are indicative only; billing is in Indian rupees. " : "") + "All diamonds are third-party certified (IGI / EGL / TGL) and all gold is BIS HUID hallmarked. Made in our own manufacturing unit in Surat. Our representative will confirm the exact price.", W - 2 * M), M, y);
     return doc.output("blob");
