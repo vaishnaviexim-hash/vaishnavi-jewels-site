@@ -358,7 +358,7 @@ async function vjPhotoGet(env, id) {
 }
 
 async function vjPhotoUpload(request, env, who) {
-  if (who.role === 'sales') return vjDeny(403, 'read only');
+  if (who.role === 'sales' && !VJ_KO_EXTRA.includes(who.email)) return vjDeny(403, 'read only'); // office login may add repair / out photos (27/10)
   const type = (request.headers.get('content-type') || '').split(';')[0].trim();
   if (!['image/jpeg', 'image/png', 'image/webp'].includes(type)) return vjDeny(415, 'jpg, png or webp only');
   const buf = await request.arrayBuffer();
@@ -1780,6 +1780,182 @@ async function vjBackupFile(url, env) {
     'content-disposition': 'attachment; filename="VJTags_backup_' + String(s.ymd || '').replace(/[^0-9-]/g, '') + '.json.gz"' } });
 }
 
+// ---------------------------------------------------------------------------------------------
+// Karigar & Out (owner 27/10/2026 11:15 + 11:17, C-20261027-KARIGAROUT).
+// 1. Our own pieces going out: to a karigar (repair, polish...) or to an exhibition. The tag gets  out = {kind, name, why, note, at, by}
+//    while it is away; every send / return is logged in vj_moves (who, when, where). Many pieces at once (scan or RFID burst).
+// 2. Party repairs: a customer's own piece received for repair -> In Surat (with us) -> given to a karigar -> back from karigar
+//    (extra gold +/- g, rupees paid to the karigar) -> returned to the customer. Kept in vj_repairs, never on a stock tag.
+//    Customer charge (owner rule 27/10): what we pay the karigar, rounded UP to the next Rs 500, x 2. Editable on the job.
+// 3. RFID: a tag can carry the EPC of its RFID chip (act 'link'); the reader (Zebra TC22R, DataWedge keyboard output + Enter)
+//    then works in every scan box like a barcode.
+// Roles: owner, staff and tagger (Shyam) can use it; the sales login cannot. Karigar rupees and extra-gold value are shown to the
+// owners only (cost); staff / tagger can type them when the piece comes back.
+// ---------------------------------------------------------------------------------------------
+const VJ_KARIGARS = ['Montu', 'Hiru', 'Badshah', 'Ramesh'];
+const VJ_OUT_WHY = ['Repair', 'Polish', 'Resize', 'Stone setting', 'Rhodium', 'Other'];
+let vjKoOk = false;
+async function vjKoTables(env) {
+  if (vjKoOk) return;
+  await env.DB.batch([
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_moves (ts INTEGER, email TEXT, tag TEXT, act TEXT, kind TEXT, name TEXT, why TEXT, note TEXT, photo TEXT)'),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS vj_moves_ts ON vj_moves (ts)'),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS vj_moves_tag ON vj_moves (tag)'),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_repairs (id TEXT PRIMARY KEY, no INTEGER, data TEXT, status TEXT, version INTEGER, updated_at INTEGER)'),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS vj_repairs_upd ON vj_repairs (updated_at)')]);
+  vjKoOk = true;
+}
+// owner 27/10/2026 11:18: also the Vaishnavi office login (vaishnavioffice@gmail.com, used by Mihir bhai), whatever its role
+const VJ_KO_EXTRA = ['vaishnavioffice@gmail.com'];
+const vjKoCan = who => !!who && (['admin', 'staff', 'tagger'].includes(who.role) || VJ_KO_EXTRA.includes(who.email));
+const vjPhotoId = v => /^[0-9a-f]{32}$/.test(String(v || '')) ? String(v) : '';
+const vjEpc = v => { const s = String(v || '').toUpperCase().replace(/[^0-9A-F]/g, ''); return s.length >= 8 && s.length <= 64 ? s : ''; };
+
+async function vjMove(request, env, who) {
+  if (!vjKoCan(who)) return vjDeny(403, 'not allowed');
+  if (Number(request.headers.get('content-length') || 0) > 60000) return vjDeny(413, 'too large');
+  let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+  await vjKoTables(env);
+  const act = b && b.act, now = Date.now();
+  if (act === 'link') { // RFID chip EPC -> tag (one at a time)
+    const id = String(b.id || ''), epc = vjEpc(b.epc);
+    if (!/^[A-Za-z0-9_\-.~]{1,60}$/.test(id) || !epc) return vjDeny(400, 'tag and RFID number needed');
+    const row = await env.DB.prepare('SELECT data, version FROM docs WHERE path = ?').bind('tags/' + id).first();
+    if (!row) return vjDeny(404, 'tag not found');
+    const other = await env.DB.prepare("SELECT path FROM docs WHERE path LIKE 'tags/%' AND path <> ? AND json_extract(data, '$.epc') = ?").bind('tags/' + id, epc).first();
+    if (other && !b.force) return vjJson({ error: 'epc in use', on: other.path.slice(5) }, 409);
+    const stm = [];
+    if (other) { const od = await env.DB.prepare('SELECT data, version FROM docs WHERE path = ?').bind(other.path).first(); const o = JSON.parse(od.data); delete o.epc;
+      stm.push(env.DB.prepare('UPDATE docs SET data = ?, version = ?, updated_at = ?, updated_by = ? WHERE path = ? AND version = ?').bind(JSON.stringify(o), od.version + 1, now, who.email, other.path, od.version)); }
+    const d = JSON.parse(row.data); d.epc = epc;
+    stm.push(env.DB.prepare('UPDATE docs SET data = ?, version = ?, updated_at = ?, updated_by = ? WHERE path = ? AND version = ?').bind(JSON.stringify(d), row.version + 1, now, who.email, 'tags/' + id, row.version));
+    stm.push(env.DB.prepare('INSERT INTO vj_moves (ts, email, tag, act, kind, name, why, note, photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(now, who.email, id, 'rfid', '', '', '', epc, ''));
+    await env.DB.batch(stm);
+    await vjAudit(env, who, 'rfid-link', 'tags/' + id, epc);
+    return vjJson({ ok: true });
+  }
+  if (act !== 'out' && act !== 'in') return vjDeny(400, 'bad request');
+  const ids = Array.isArray(b.ids) ? [...new Set(b.ids.map(String))].filter(x => /^[A-Za-z0-9_\-.~]{1,60}$/.test(x)) : [];
+  if (!ids.length || ids.length > 400) return vjDeny(400, 'choose 1 to 400 pieces');
+  let out = null;
+  if (act === 'out') {
+    const kind = ['karigar', 'exhibition', 'other'].includes(b.kind) ? b.kind : '';
+    let name = vjClean(b.name, 60);
+    if (kind === 'karigar' && !VJ_KARIGARS.includes(name)) return vjDeny(400, 'choose the karigar');
+    if (!kind || !name) return vjDeny(400, kind === 'exhibition' ? 'type the exhibition name' : 'where is it going?');
+    const why = kind === 'karigar' ? (VJ_OUT_WHY.includes(b.why) ? b.why : 'Repair') : '';
+    out = { kind, name, why, note: vjClean(b.note, 200), at: new Date(now).toISOString(), by: who.email };
+    const ph = vjPhotoId(b.photo); if (ph) out.photo = ph;
+  }
+  const rows = [];
+  for (let i = 0; i < ids.length; i += 80) {
+    const part = ids.slice(i, i + 80);
+    const r = (await env.DB.prepare(`SELECT path, data, version FROM docs WHERE path IN (${part.map(() => '?').join(',')})`).bind(...part.map(x => 'tags/' + x)).all()).results || [];
+    rows.push(...r);
+  }
+  const stm = [], done = [], skipped = [];
+  for (const r of rows) {
+    const d = JSON.parse(r.data), id = r.path.slice(5);
+    if (act === 'out' && d.out) { skipped.push(id + ' (already out with ' + d.out.name + ')'); continue; }
+    if (act === 'in' && !d.out) { skipped.push(id + ' (not out)'); continue; }
+    const was = d.out || {};
+    if (act === 'out') d.out = out; else delete d.out;
+    stm.push(env.DB.prepare('UPDATE docs SET data = ?, version = ?, updated_at = ?, updated_by = ? WHERE path = ? AND version = ?').bind(JSON.stringify(d), r.version + 1, now, who.email, r.path, r.version));
+    const o = act === 'out' ? out : was;
+    stm.push(env.DB.prepare('INSERT INTO vj_moves (ts, email, tag, act, kind, name, why, note, photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(now, who.email, id, act, o.kind || '', o.name || '', o.why || '', act === 'in' ? vjClean(b.note, 200) : (o.note || ''), act === 'out' ? (o.photo || '') : ''));
+    done.push(id);
+  }
+  ids.filter(x => !rows.some(r => r.path === 'tags/' + x)).forEach(x => skipped.push(x + ' (no such tag)'));
+  for (let i = 0; i < stm.length; i += 90) await env.DB.batch(stm.slice(i, i + 90));
+  await vjAudit(env, who, 'move-' + act, 'tags/', done.length + ' pcs' + (out ? ' -> ' + out.kind + ' ' + out.name : ''));
+  return vjJson({ ok: true, done, skipped });
+}
+
+async function vjMovesGet(url, env, who) {
+  if (!vjKoCan(who)) return vjDeny(403, 'not allowed');
+  await vjKoTables(env);
+  const tag = url.searchParams.get('tag'), days = Math.min(400, Math.max(1, Number(url.searchParams.get('days')) || 30));
+  const q = tag && /^[A-Za-z0-9_\-.~]{1,60}$/.test(tag)
+    ? env.DB.prepare('SELECT ts, email, tag, act, kind, name, why, note, photo FROM vj_moves WHERE tag = ? ORDER BY ts DESC LIMIT 200').bind(tag)
+    : env.DB.prepare('SELECT ts, email, tag, act, kind, name, why, note, photo FROM vj_moves WHERE ts > ? ORDER BY ts DESC LIMIT 2000').bind(Date.now() - days * 864e5);
+  return vjJson({ ok: true, moves: (await q.all()).results || [], karigars: VJ_KARIGARS, whys: VJ_OUT_WHY });
+}
+
+// ----- party repairs -----
+const VJ_REP_ST = ['surat', 'karigar', 'ready', 'delivered', 'cancelled'];
+const vjNum = (v, lo, hi, dp) => { const n = Number(v); if (!isFinite(n) || n < lo || n > hi) return null; const f = Math.pow(10, dp); return Math.round(n * f) / f; };
+const vjRepCharge = kTotal => kTotal > 0 ? Math.ceil(kTotal / 500) * 500 * 2 : 0; // owner 27/10: round up to Rs 500, then x 2
+async function vjRepLoad(env, id) { return env.DB.prepare('SELECT id, no, data, status, version FROM vj_repairs WHERE id = ?').bind(id).first(); }
+function vjRepView(r, who) {
+  const d = JSON.parse(r.data); d.id = r.id; d.no = r.no; d.status = r.status; d.version = r.version;
+  if (who.role !== 'admin') { delete d.kAmt; delete d.goldVal; delete d.kTotal; } // cost: owners only
+  return d;
+}
+async function vjRepairsGet(url, env, who) {
+  if (!vjKoCan(who)) return vjDeny(403, 'not allowed');
+  await vjKoTables(env);
+  const since = Date.now() - 120 * 864e5;
+  const rows = (await env.DB.prepare("SELECT id, no, data, status, version FROM vj_repairs WHERE status IN ('surat','karigar','ready') OR updated_at > ? ORDER BY no DESC LIMIT 1500").bind(since).all()).results || [];
+  return vjJson({ ok: true, repairs: rows.map(r => vjRepView(r, who)), karigars: VJ_KARIGARS, whys: VJ_OUT_WHY, role: who.role, owner: who.role === 'admin' });
+}
+async function vjRepair(request, env, who) {
+  if (!vjKoCan(who)) return vjDeny(403, 'not allowed');
+  if (Number(request.headers.get('content-length') || 0) > 20000) return vjDeny(413, 'too large');
+  let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+  await vjKoTables(env);
+  const op = b && b.op, now = Date.now(), iso = new Date(now).toISOString(), by = who.email;
+  const hist = (d, text) => { d.log = (d.log || []).concat([{ at: iso, by, text: vjClean(text, 160) }]).slice(-40); };
+  if (op === 'new') {
+    const name = vjClean(b.party, 60); if (!name) return vjDeny(400, 'party name needed');
+    const item = vjClean(b.item, 60); if (!item) return vjDeny(400, 'what is the piece?');
+    const gross = vjNum(b.gross, 0, 5000, 3); if (gross === null) return vjDeny(400, 'gross weight 0-5000 g');
+    const d = { party: name, mobile: vjPhone(b.mobile), city: vjClean(b.city, 40), item, gross, karat: VJ_Q_KARATS.includes(b.karat) ? b.karat : '',
+      work: vjClean(b.work, 200), photo: vjPhotoId(b.photo), promised: /^\d{4}-\d{2}-\d{2}$/.test(String(b.promised || '')) ? b.promised : '',
+      inAt: iso, inBy: by };
+    hist(d, 'Received from party, in Surat');
+    const last = await env.DB.prepare('SELECT MAX(no) AS m FROM vj_repairs').first();
+    const no = ((last && last.m) || 0) + 1, id = 'R' + no;
+    const res = await env.DB.prepare('INSERT INTO vj_repairs (id, no, data, status, version, updated_at) VALUES (?, ?, ?, ?, 1, ?) ON CONFLICT(id) DO NOTHING').bind(id, no, JSON.stringify(d), 'surat', now).run();
+    if (!res.meta || res.meta.changes !== 1) return vjJson({ error: 'conflict' }, 409);
+    await vjAudit(env, who, 'repair-new', id, name + ' | ' + item + ' | ' + gross + ' g');
+    return vjJson({ ok: true, id, no });
+  }
+  const id = String(b && b.id || ''); if (!/^R\d{1,7}$/.test(id)) return vjDeny(400, 'bad job');
+  const r = await vjRepLoad(env, id); if (!r) return vjDeny(404, 'job not found');
+  if (Number.isInteger(b.version) && b.version !== r.version) return vjJson({ error: 'conflict' }, 409);
+  const d = JSON.parse(r.data); let status = r.status;
+  if (op === 'karigar') {
+    if (!['surat', 'ready'].includes(status)) return vjDeny(400, 'only a piece in Surat can go to a karigar');
+    const k = String(b.karigar || ''); if (!VJ_KARIGARS.includes(k)) return vjDeny(400, 'choose the karigar');
+    d.karigar = k; d.kOutAt = iso; d.kWork = vjClean(b.work, 200) || d.work || ''; status = 'karigar'; hist(d, 'Given to ' + k + (d.kWork ? ': ' + d.kWork : ''));
+  } else if (op === 'back') {
+    if (status !== 'karigar') return vjDeny(400, 'this piece is not with a karigar');
+    const xg = vjNum(b.extraGold || 0, -500, 500, 3), kAmt = vjNum(b.kAmt || 0, 0, 1000000, 0), grossBack = b.grossBack === '' || b.grossBack == null ? null : vjNum(b.grossBack, 0, 5000, 3);
+    if (xg === null || kAmt === null) return vjDeny(400, 'extra gold -500..500 g, karigar amount Rs 0-10,00,000');
+    const xk = VJ_Q_KARATS.includes(b.extraKarat) ? b.extraKarat : (d.karat || '18K');
+    const set = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first(), s = vjQSt(set ? JSON.parse(set.data) : {});
+    const goldVal = Math.round(xg * s.g * (s.pur[xk] || 0));
+    d.extraGold = xg; d.extraKarat = xk; d.kAmt = kAmt; d.goldVal = goldVal; d.kTotal = kAmt + goldVal; d.grossBack = grossBack;
+    d.kBackAt = iso; d.chargeSuggest = vjRepCharge(d.kTotal); if (!d.chargeSet) d.charge = d.chargeSuggest;
+    status = 'ready'; hist(d, 'Back from ' + d.karigar + (xg ? ', gold ' + (xg > 0 ? '+' : '') + xg + ' g ' + xk : '') + (grossBack != null ? ', gross now ' + grossBack + ' g' : ''));
+  } else if (op === 'charge') {
+    const c = vjNum(b.charge, 0, 1000000, 0); if (c === null) return vjDeny(400, 'charge Rs 0-10,00,000');
+    d.charge = c; d.chargeSet = true; hist(d, 'Customer charge set to Rs ' + c);
+  } else if (op === 'deliver') {
+    if (!['ready', 'surat'].includes(status)) return vjDeny(400, 'piece is still with the karigar');
+    const c = b.charge == null || b.charge === '' ? (d.charge || 0) : vjNum(b.charge, 0, 1000000, 0); if (c === null) return vjDeny(400, 'bad charge');
+    d.charge = c; d.outAt = iso; d.outBy = by; d.outNote = vjClean(b.note, 160); status = 'delivered'; hist(d, 'Returned to party, charge Rs ' + c);
+  } else if (op === 'cancel') {
+    if (who.role !== 'admin') return vjDeny(403, 'owner only'); status = 'cancelled'; hist(d, 'Cancelled: ' + vjClean(b.note, 120));
+  } else if (op === 'photo') {
+    const ph = vjPhotoId(b.photo); if (!ph) return vjDeny(400, 'bad photo'); d.photo = ph; hist(d, 'Photo added');
+  } else return vjDeny(400, 'bad request');
+  const res = await env.DB.prepare('UPDATE vj_repairs SET data = ?, status = ?, version = ?, updated_at = ? WHERE id = ? AND version = ?').bind(JSON.stringify(d), status, r.version + 1, now, id, r.version).run();
+  if (!res.meta || res.meta.changes !== 1) return vjJson({ error: 'conflict' }, 409);
+  await vjAudit(env, who, 'repair-' + op, id, status);
+  return vjJson({ ok: true, repair: vjRepView({ id, no: r.no, data: JSON.stringify(d), status, version: r.version + 1 }, who) });
+}
+
 async function vjHandle(request, env, ctx, url) {
   const p = url.pathname;
   const dev = env.VJ_DEV === '1';
@@ -1787,7 +1963,11 @@ async function vjHandle(request, env, ctx, url) {
   if (!env.DB || !env.PHOTOS) return vjDeny(503, 'not set up');
   const who = await vjWho(request, env);
   if (!who) return p.startsWith('/api/') ? vjDeny(403, 'not allowed') : new Response('Not allowed. Ask Abhinav to add your email.', { status: 403, headers: { 'content-type': 'text/plain', 'x-robots-tag': 'noindex' } });
-  if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these
+  if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties', '/api/vj/moves', '/api/vj/repairs'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill', '/api/vj/move', '/api/vj/repair'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these (+ Karigar & Out, 27/10)
+  // C-20261027-KARIGAROUT: stock out / back, RFID link, party repairs (JSON from our own page only)
+  if ((p === '/api/vj/move' || p === '/api/vj/repair') && request.method === 'POST') { if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed'); return p === '/api/vj/move' ? vjMove(request, env, who) : vjRepair(request, env, who); }
+  if (p === '/api/vj/moves' && request.method === 'GET') return vjMovesGet(url, env, who);
+  if (p === '/api/vj/repairs' && request.method === 'GET') return vjRepairsGet(url, env, who);
   if (p === '/api/vj/sync' && request.method === 'GET') return vjSync(request, env, who, ctx);
   if (p === '/api/vj/write' && request.method === 'POST') return vjWrite(request, env, who, ctx);
   if (p === '/api/vj/photo' && request.method === 'POST') return vjPhotoUpload(request, env, who);
