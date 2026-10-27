@@ -6,11 +6,86 @@
   "use strict";
   const $ = id => document.getElementById(id);
   const fmt = n => "Rs " + Math.round(n).toLocaleString("en-IN");
-  const B = { items: [], mode: "ws", settle: "fine", title: "Bill", g2g: "ws", photos: true, nbb: false, disc: {}, rates: {}, frates: {}, prates: {}, pdrates: {} }; // prates: polki rate per pc for this bill (C-20261017-POLKI)
+  const B = { items: [], mode: "ws", settle: "fine", title: "Bill", g2g: "ws", photos: true, nbb: false, disc: {}, rates: {}, frates: {}, prates: {}, pdrates: {}, designs: [], option: "", usd: 0 }; // designs / option / usd: C-20261027-ESTBILL // prates: polki rate per pc for this bill (C-20261017-POLKI)
   const MODES = { ws: "W/s", nett: "Nett", g2g: "Gold to Gold", item: "Gold Item" };
   const fineMode = () => B.mode === "g2g" || B.mode === "item";
   const g3 = n => Number(n || 0).toFixed(3) + " g";
-  const tags = () => (window.VJ_TAGS_ALL ? window.VJ_TAGS_ALL() : window.VJ_TAGS ? window.VJ_TAGS() : []); // includes sold pieces so saved bills can be edited (C-20261026-SOLD)
+  const tags0 = () => (window.VJ_TAGS_ALL ? window.VJ_TAGS_ALL() : window.VJ_TAGS ? window.VJ_TAGS() : []); // includes sold pieces so saved bills can be edited (C-20261026-SOLD)
+  const tags = () => tags0().concat(vtags()); // + the new designs typed on an estimate (C-20261027-ESTBILL)
+  // owner 27/10/2026 17:39 (C-20261027-ESTBILL): an Estimate is made exactly like a Bill (same formulas, modes, PDF) for stock pieces AND for new
+  // designs typed without a tag (karat, net gold, chain tunch, diamond lines as Pcs x Ct/pc = total ct, polki, other). A "Diamonds" choice (as on the
+  // tag / Natural VS GH / Natural VS IJ / Lab-grown Rs 23,000) prices every diamond line from the default rates. A USD rate (market USD-INR + Rs 1.50,
+  // editable, remembered on this device) shows the amounts in US$ and prints them. The server prices everything again from the typed figures.
+  const DKARATS = ["14K", "18K", "22K", "9K", "24K"], DQUALS = ["CVD", "VS IJ", "VS HI", "VS GH", "VVS EF"], DSHAPES = ["Round", "Choki", "Fancy", "Solitaire", "Polki"], QC = { "CVD": "42", "VS IJ": "2", "VS HI": "3", "VS GH": "4", "VVS EF": "5" };
+  const DEF_RATES = { "CVD|Round": 23000, "CVD|Choki": 23000, "CVD|Fancy": 23000, "CVD|Solitaire": 23000, "VS GH|Round": 46000, "VS GH|Choki": 46000, "VS GH|Fancy": 85000, "VS HI|Round": 40000, "VS HI|Choki": 40000, "VS IJ|Round": 35000, "VS IJ|Choki": 35000 };
+  const NON_DIAMOND = /POL|EMR|MOZ|RUBY|PEARL|MOTI|STONE|KUNDAN/i, OPT_NAMES = { gh: "Natural VS GH", ij: "Natural VS IJ", lgd: "Lab-grown" };
+  const num = v => { const n = parseFloat(String(v == null ? "" : v).replace(/,/g, "")); return isFinite(n) ? n : 0; };
+  const defRate = (q, sh) => { const r = settings().defaultRates || DEF_RATES, v = Number(r[q + "|" + sh]) || Number(r[q + "|Round"]); return v > 0 ? v : 0; };
+  // the rate a diamond line gets under the Diamonds choice (same rule as the server's vjQOptRate): polki / coloured stones keep their own rate
+  function optRate(d, opt) { if (!opt || d.shape === "Polki" || NON_DIAMOND.test(String(d.q || "") + " " + String(d.code || ""))) return Number(d.rate) || 0; if (opt === "lgd") return 23000;
+    const q = opt === "gh" ? "VS GH" : "VS IJ", sh = ["Round", "Choki", "Fancy"].includes(d.shape) ? d.shape : "Round"; return defRate(q, sh); }
+  const newDesign = () => ({ desc: "", k: "14K", net: "", tunch: "", dias: [], ppcs: "", prate: "300", other: "" });
+  // a typed design as a piece for vjBillCalc (id new-1, new-2 …); the same shape the server builds, so the preview matches the saved estimate
+  function vtags() { return B.designs.map((d, i) => { const tv = String(d.tunch || "").trim(), tn = tv === "" ? 0 : Math.round(num(tv) * 1000) / 1000;
+    const dias = d.dias.filter(x => num(x.ct) > 0).map(x => ({ q: x.q, shape: x.shape, pcs: Math.max(0, Math.round(num(x.pcs))), ct: Math.round(num(x.ct) * 1000) / 1000, rate: String(x.rate).trim() === "" ? defRate(x.q, x.shape) : Math.round(num(x.rate)) }));
+    const ppcs = Math.max(0, Math.round(num(d.ppcs))), prate = String(d.prate).trim() === "" ? 300 : Math.round(num(d.prate)), other = Math.round(num(d.other));
+    return { id: "new-" + (i + 1), label: String(d.desc || "").trim().slice(0, 60) || "New design", designNo: "", catName: "New design", kind: "design", newDesign: true,
+      gold: [{ k: d.k, net: Math.round(num(d.net) * 1000) / 1000, ...(tn ? { tunch: tn } : {}) }], dias, ...(ppcs ? { polki: { pcs: ppcs, rate: prate } } : {}), ...(other ? { other: { amt: other } } : {}) }; }); }
+  function designBad(d) { const bad = [], net = num(d.net), tv = String(d.tunch || "").trim(), tn = tv === "" ? 0 : num(tv), ppcs = num(d.ppcs), prate = String(d.prate).trim() === "" ? 300 : num(d.prate), other = num(d.other);
+    if (!(net > 0)) bad.push("net gold weight"); if (tv !== "" && !(tn >= 0.3 && tn <= 1.1)) bad.push("chain tunch (0.300-1.100 or empty)");
+    if (d.dias.some(x => num(x.ct) > 0 && !(String(x.rate).trim() === "" ? defRate(x.q, x.shape) : num(x.rate)) && x.shape !== "Polki")) bad.push("a diamond rate per ct");
+    if (!(Number.isInteger(ppcs) && ppcs >= 0 && ppcs <= 10000) || ppcs > 0 && !(Number.isInteger(prate) && prate >= 1 && prate <= 100000)) bad.push("polki pcs and rate per pc"); if (!(Number.isInteger(other) && other >= 0)) bad.push("other charges in whole rupees"); return bad; }
+  const el = (tag, props, kids) => { const e = document.createElement(tag); Object.assign(e, props || {}); (kids || []).forEach(k => e.append(k)); return e; };
+  const fld = (label, input, flex) => { const l = el("label", {}, [label, input]); if (flex) l.style.flex = flex; return l; };
+  const sel = (opts, val, txt) => { const s = el("select"); opts.forEach(o => s.append(el("option", { value: o, textContent: txt ? txt(o) : o, selected: o === val }))); return s; };
+  function codeKeys(q) { const BY = {}; Object.keys(QC).forEach(k => { BY[QC[k]] = k; }); let buf = "", tm = 0; // shop codes on the keyboard: 42 CVD, 2 VS IJ, 3 VS HI, 4 VS GH, 5 VVS EF
+    q.addEventListener("keydown", e => { if (!/^[0-9]$/.test(e.key)) return; e.preventDefault(); const t = Date.now(); buf = (t - tm < 900 ? buf : "") + e.key; tm = t;
+      const v = BY[buf] || (buf.length > 1 ? BY[e.key] : null); if (v && q.value !== v) { q.value = v; q.dispatchEvent(new Event("change", { bubbles: true })); } if (!BY[buf] && BY[e.key]) buf = e.key; }); }
+  function drawDesigns() {
+    const box = $("bdes"); if (!box) return; box.textContent = "";
+    if (B.designs.length) { B.title = "Estimate"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.checked = x.value === "Estimate"; }); numField(); }
+    B.designs.forEach((d, i) => {
+      const card = el("div"); card.style.cssText = "border:1px dashed #b8963e;border-radius:8px;padding:10px;margin:8px 0;display:flex;flex-direction:column;gap:8px";
+      const desc = el("input", { value: d.desc, maxLength: 60, autocomplete: "off", placeholder: "e.g. Bangles, new design" }), k = sel(DKARATS, d.k);
+      const net = el("input", { value: d.net, inputMode: "decimal", autocomplete: "off", placeholder: "0.000" }), tu = el("input", { value: d.tunch || "", inputMode: "decimal", autocomplete: "off", placeholder: "chain only, e.g. 0.920" });
+      desc.addEventListener("input", () => { d.desc = desc.value; render(); }); k.addEventListener("change", () => { d.k = k.value; render(); }); net.addEventListener("input", () => { d.net = net.value; render(); }); tu.addEventListener("input", () => { d.tunch = tu.value; render(); });
+      const rm = el("button", { type: "button", className: "btn ghost", textContent: "Remove design" }); rm.addEventListener("click", () => { B.designs.splice(i, 1); drawDesigns(); render(); });
+      card.append(el("strong", { textContent: "New design " + (i + 1) + " (no tag)" }), el("div", { className: "row" }, [fld("Description", desc, "2 1 220px"), fld("Karat", k), fld("Net gold (g)", net), fld("Chain tunch", tu)]));
+      const dbox = el("div", { style: "display:flex;flex-direction:column;gap:6px" });
+      d.dias.forEach((x, j) => {
+        const q = sel(DQUALS, x.q, o => QC[o] + " · " + o), sh = sel(DSHAPES, x.shape), pc = el("input", { value: x.pcs || "", inputMode: "numeric", autocomplete: "off", placeholder: "0" });
+        const ce = el("input", { value: x.cents || "", inputMode: "decimal", autocomplete: "off", placeholder: "e.g. 0.22" }), ct = el("input", { value: x.ct, inputMode: "decimal", autocomplete: "off", placeholder: "0.00" });
+        const rt = el("input", { value: x.rate, inputMode: "numeric", autocomplete: "off" }), xx = el("button", { type: "button", className: "btn ghost", textContent: "✕", ariaLabel: "Remove diamond line" });
+        codeKeys(q);
+        // Pcs x Ct/pc (typed in carats, 0.22 = 22 cents) fills the total carats: 121 x 0.22 = 26.62 ct (owner 27/10 17:27); carats typed by hand still work
+        const auto = () => { const p = num(x.pcs), c = num(x.cents); if (p > 0 && c > 0) { x.ct = (Math.round(p * c * 100) / 100).toFixed(2); ct.value = x.ct; } render(); };
+        const fill = () => { const def = defRate(x.q, x.shape); rt.placeholder = def ? "default " + def.toLocaleString("en-IN") : "enter rate"; if (!x.edited) { x.rate = def ? String(def) : ""; rt.value = x.rate; } };
+        q.addEventListener("change", () => { x.q = q.value; fill(); render(); }); sh.addEventListener("change", () => { x.shape = sh.value; fill(); render(); });
+        pc.addEventListener("input", () => { x.pcs = pc.value; auto(); }); ce.addEventListener("input", () => { x.cents = ce.value; auto(); });
+        ct.addEventListener("input", () => { x.ct = ct.value; x.cents = ""; ce.value = ""; render(); }); rt.addEventListener("input", () => { x.rate = rt.value; x.edited = rt.value.trim() !== ""; render(); });
+        xx.addEventListener("click", () => { d.dias.splice(j, 1); drawDesigns(); render(); }); fill();
+        dbox.append(el("div", { className: "row", style: "align-items:end" }, [fld("Shape", sh), fld("Quality", q), fld("Pcs", pc), fld("Ct/pc", ce), fld("D Wt (ct)", ct), fld("Rate ₹/ct", rt), el("div", {}, [xx])]));
+      });
+      const addD = el("button", { type: "button", className: "btn ghost", textContent: "+ Diamond line" }); addD.addEventListener("click", () => { d.dias.push({ q: "CVD", pcs: "", cents: "", shape: "Round", ct: "", rate: "", edited: false }); drawDesigns(); render(); });
+      const pp = el("input", { value: d.ppcs, inputMode: "numeric", autocomplete: "off", placeholder: "0" }), pr = el("input", { value: d.prate, inputMode: "numeric", autocomplete: "off" }), ot = el("input", { value: d.other, inputMode: "numeric", autocomplete: "off", placeholder: "0" });
+      pp.addEventListener("input", () => { d.ppcs = pp.value; render(); }); pr.addEventListener("input", () => { d.prate = pr.value; render(); }); ot.addEventListener("input", () => { d.other = ot.value; render(); });
+      card.append(el("strong", { textContent: "Diamonds" }), dbox, el("div", {}, [addD]), el("div", { className: "row", style: "align-items:end" }, [fld("Polki pcs", pp), fld("Polki rate per pc (Rs)", pr), fld("Other charges (Rs)", ot)]), el("div", { className: "actions", style: "margin:0" }, [rm]));
+      box.append(card);
+    });
+  }
+  // USD (C-20261027-ESTBILL): rate = market USD-INR + Rs 1.50 once a day; a rate typed by staff wins for the day (kept on this device)
+  const USD_KEY = "vj_bill_usd", USD_ADD = 1.5;
+  const usdLoad = () => { try { return JSON.parse(localStorage.getItem(USD_KEY) || "null") || null; } catch (e) { return null; } };
+  const usdSave = (rate, manual) => { try { localStorage.setItem(USD_KEY, JSON.stringify({ rate, day: today(), manual: !!manual })); } catch (e) {} };
+  const usdTxt = n => B.usd > 0 && n > 0 ? "US$ " + Math.round(n / B.usd).toLocaleString("en-US") : "";
+  async function usdInit() {
+    const u = usdLoad(), box = $("busd"), info = $("busdinfo"); if (!box) return;
+    if (u && u.rate > 0 && u.manual && u.day === today()) { B.usd = u.rate; box.value = u.rate; info.textContent = "Rate typed today."; return; }
+    if (u && u.rate > 0) { B.usd = u.rate; box.value = u.rate; }
+    try { const r = await fetch("https://api.frankfurter.app/latest?from=USD&to=INR", { cache: "no-store" }); const j = await r.json(); const m = Number(j && j.rates && j.rates.INR); if (!(m > 50 && m < 200)) throw new Error("rate");
+      B.usd = Math.round((m + USD_ADD) * 100) / 100; box.value = B.usd; usdSave(B.usd, false); info.textContent = `Market ${m.toFixed(2)} + Rs ${USD_ADD.toFixed(2)} (${j.date || today()}). Change it if needed.`; render();
+    } catch (e) { info.textContent = B.usd ? "Could not fetch today's market rate - last rate kept." : "Could not fetch the market rate - type it."; }
+  }
   const stockTags = () => tags().filter(t => t.status !== "sold");
   const settings = () => (window.VJ_SETTINGS && window.VJ_SETTINGS()) || {};
   const today = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
@@ -116,8 +191,9 @@
       <div class="actions" style="margin:0 0 8px"><button type="button" class="btn ghost" id="bback">&larr; Back to Bill</button></div>
       <h2>1 · Pieces</h2>
       <div class="row" style="align-items:end"><label style="flex:2 1 220px">Code on the tag, tag number or design number <input id="bq" autocomplete="off" placeholder="e.g. abc270xyz, 803 or 1436"></label>
-      <div><button type="button" class="btn" id="badd">Add piece</button></div></div>
+      <div><button type="button" class="btn" id="badd">Add piece</button></div><div><button type="button" class="btn ghost" id="bnewdes">+ New design (no tag, estimate)</button></div></div>
       <div id="bpick" class="row" style="gap:8px"></div>
+      <div id="bdes"></div>
       <div class="list"><table class="items" style="min-width:820px"><thead><tr><th>Piece</th><th>Gold</th><th>Gold value</th><th>Making</th><th>Diamonds</th><th id="bpolh" hidden>Polki / Party dia.</th><th>Other</th><th>Amount</th><th>Discount<br><span style="font-weight:400;text-transform:none">Rs or %</span></th><th>Net</th><th></th></tr></thead><tbody id="brows"></tbody></table></div>
       <h2>2 · Customer &amp; bill</h2>
       <p class="hint" id="bcusthint"></p>
@@ -143,12 +219,18 @@
       <div class="seg" role="radiogroup" aria-label="Title" style="margin-top:8px">
         <label><input type="radio" name="btitle" value="Bill" checked> Bill</label>
         <label><input type="radio" name="btitle" value="Estimate"> Estimate</label></div>
+      <div class="seg" role="radiogroup" aria-label="Diamonds priced as" style="margin-top:8px">
+        <label><input type="radio" name="bopt" value="" checked> Diamonds as on the tag</label>
+        <label><input type="radio" name="bopt" value="gh"> Natural VS GH</label>
+        <label><input type="radio" name="bopt" value="ij"> Natural VS IJ</label>
+        <label><input type="radio" name="bopt" value="lgd"> Lab-grown (Rs 23,000/ct)</label></div>
       <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg);margin-top:8px"><input type="checkbox" id="bphoto" checked style="width:auto"> Show piece photos on the bill</label>
       <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg);margin-top:4px"><input type="checkbox" id="bnbb" style="width:auto"> Stamp <b>No Buy Back · No Exchange</b> on this bill</label>
       <div class="row" style="margin-top:8px;align-items:end"><label>Final amount - what the customer pays (optional) <input id="bfinal" inputmode="numeric" autocomplete="off" maxlength="9" placeholder="e.g. 152000" style="max-width:180px"></label><button type="button" class="btn ghost" id="bfinalgo">Set final amount</button></div><p class="hint" id="bfinalhint">Type the final figure (e.g. 152000): the discount is worked out so the bill closes at exactly that amount. The bill prints only the final amount.</p>
       <div class="row" style="margin-top:8px;align-items:end"><label>Amount before GST (optional) <input id="btarget" inputmode="numeric" autocomplete="off" maxlength="9" placeholder="e.g. 80000" style="max-width:180px"></label><button type="button" class="btn ghost" id="btargetgo">Set discount</button></div><p class="hint" id="btargethint">Type the amount the customer pays before GST (e.g. 80000) - the discount is worked out and spread over the pieces.</p>
       <table class="sum"><tr id="bfinerow" hidden><td><b>Fine gold to receive</b></td><td id="bfine"><b>—</b></td></tr><tr id="bogrow" hidden><td id="bogl">Balance fine gold</td><td id="bogamt">—</td></tr><tr><td>Total</td><td id="bsum">—</td></tr><tr id="bdiscrow" hidden><td>Less discount</td><td id="bdisc">—</td></tr><tr hidden><td>Total after discount</td><td id="bsub">—</td></tr>
-        <tr><td id="bgstl">GST 3%</td><td id="bgst">—</td></tr><tr class="total"><td>Bill total</td><td id="btotal">—</td></tr></table>
+        <tr><td id="bgstl">GST 3%</td><td id="bgst">—</td></tr><tr class="total"><td>Bill total</td><td id="btotal">—</td></tr><tr><td>In US dollars (approx.)</td><td id="busdtot">—</td></tr></table>
+      <div class="row" style="align-items:end"><label style="max-width:220px">USD rate (Rs per US$) <input id="busd" inputmode="decimal" autocomplete="off" placeholder="e.g. 89.50"></label><span class="hint" id="busdinfo" style="flex:1 1 200px"></span></div>
       <p class="hint" id="bnote"></p>
       <p class="hint" id="beditnote" hidden style="color:#8a5a00;font-weight:600"></p>
       <div class="actions"><button type="button" class="btn" id="bsave">Save bill &amp; make PDF</button><button type="button" class="btn ghost" id="bclear">Clear</button></div>
@@ -156,6 +238,7 @@
       </div>
       <h2>Saved bills &amp; estimates</h2>
       <p class="hint">A new bill starts from Tag &gt; Bill now. A vendor chain is tagged on New tag (Chain + vendor name) and billed like any piece.</p>
+      <div class="actions" style="margin:0 0 8px"><button type="button" class="btn" id="bnewest">New estimate (stock pieces or a new design)</button></div>
       <div class="row" style="align-items:end"><label style="flex:0 1 200px">Month <input id="bmonth" type="month"></label><label style="flex:0 1 220px">Customer name or mobile (all bills) <input id="bfmob" autocomplete="off" maxlength="40" placeholder="type name or mobile no."></label>
         <div class="actions" style="margin:0"><button type="button" class="btn ghost" id="bxl">Download summary (Excel)</button><button type="button" class="btn ghost" id="bxlall">All months (Excel)</button><button type="button" class="btn ghost" id="bxwa" hidden>WhatsApp party bills</button></div></div>
       <div class="list"><table class="items" style="min-width:640px"><thead><tr><th>Date</th><th>Number</th><th>Type</th><th>Customer</th><th>Design · item</th><th>Total</th><th>Fine gold</th><th>By</th><th></th></tr></thead><tbody id="bbook"></tbody></table></div>
@@ -169,11 +252,15 @@
     document.querySelectorAll("input[name=bmode]").forEach(r => r.addEventListener("change", () => { B.mode = r.value; render(); }));
     document.querySelectorAll("input[name=bset]").forEach(r => r.addEventListener("change", () => { B.settle = r.value; render(); }));
     document.querySelectorAll("input[name=bg2g]").forEach(r => r.addEventListener("change", () => { B.g2g = r.value; render(); })); // C-20261026-G2GNETT
-    document.querySelectorAll("input[name=btitle]").forEach(r => r.addEventListener("change", () => { B.title = r.value; numField(); }));
+    document.querySelectorAll("input[name=btitle]").forEach(r => r.addEventListener("change", () => { if (r.value === "Bill" && B.designs.length) { r.checked = false; document.querySelector('input[name=btitle][value=Estimate]').checked = true; $("bmsg").textContent = "A new design (no tag) can only go on an Estimate. Remove the design to make a Bill."; return; } B.title = r.value; numField(); }));
+    document.querySelectorAll("input[name=bopt]").forEach(r => r.addEventListener("change", () => { B.option = r.value; B.rates = {}; render(); })); // C-20261027-ESTBILL: diamonds choice resets the per-line rate edits
+    $("bnewdes").addEventListener("click", () => { B.designs.push(newDesign()); drawDesigns(); render(); $("bmsg").textContent = ""; });
+    $("bnewest").addEventListener("click", () => { $("bclear").click(); $("bform").hidden = false; B.title = "Estimate"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.checked = x.value === "Estimate"; }); numField(); window.scrollTo({ top: 0, behavior: "smooth" }); setTimeout(() => { const n = $("bq"); if (n) n.focus(); }, 120); });
+    $("busd").addEventListener("input", () => { const v = Math.round(num($("busd").value) * 100) / 100; B.usd = v > 50 && v < 200 ? v : 0; if (B.usd) { usdSave(B.usd, true); $("busdinfo").textContent = "Rate typed today."; } render(); }); usdInit();
     $("bmonth").value = today().slice(0, 7); $("bmonth").addEventListener("change", loadBook); { let tm = 0; $("bfmob").addEventListener("input", () => { B.fcity = null; clearTimeout(tm); tm = setTimeout(loadBook, 350); }); } // owner 26/10 17:58: type a mobile no. and see all that customer's bills
     $("bxl").addEventListener("click", () => xl($("bmonth").value || today().slice(0, 7))); $("bxlall").addEventListener("click", () => xl("all")); $("bxwa").addEventListener("click", e => partyWA(e.currentTarget));
     $("bF").addEventListener("input", render); $("btargetgo").addEventListener("click", applyTarget); $("bfinalgo").addEventListener("click", applyFinal); $("bfinal").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applyFinal(); } }); /* C-20261027-FINALAMT */  ["bogno", "bogfine", "bograte"].forEach(i => $(i).addEventListener("input", () => totals())); /* C-20261027-OGBAL */ $("btarget").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applyTarget(); } }); /* owner 27/10 12:21 (C-20261027-BILLTARGET) */ $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); }); $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
-    $("bclear").addEventListener("click", () => { B.editNo = null; B.final = 0; { const bf = $("bfinal"); if (bf) bf.value = ""; } { const bt = $("btarget"); if (bt) bt.value = ""; ["bogno", "bogfine", "bograte"].forEach(i => { const x = $(i); if (x) x.value = ""; }); } { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.nbb = false; $("bnbb").checked = false; B.nbbAuto = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; B.pdrates = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
+    $("bclear").addEventListener("click", () => { B.editNo = null; B.final = 0; { const bf = $("bfinal"); if (bf) bf.value = ""; } { const bt = $("btarget"); if (bt) bt.value = ""; ["bogno", "bogfine", "bograte"].forEach(i => { const x = $(i); if (x) x.value = ""; }); } { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.designs = []; drawDesigns(); B.option = ""; document.querySelectorAll("input[name=bopt]").forEach(x => { x.checked = x.value === ""; }); B.nbb = false; $("bnbb").checked = false; B.nbbAuto = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; B.pdrates = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
     $("bsave").addEventListener("click", save);
     $("bback").addEventListener("click", () => { const c = document.querySelector('nav button[data-tab="check"]'); if (c) c.click(); });
   }
@@ -299,8 +386,10 @@
   // owner 26/10/2026 17:32 (C-20261026-BILLEDIT): open a saved bill in the form; saving updates it under the same number (owners only, the server keeps the old version)
   async function editBill(no, btn) { btn.disabled = true;
     try { const r = await fetch("/api/vj/bill?no=" + encodeURIComponent(no), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
-      const b = j.bill, all = tags(); const miss = (b.rows || []).filter(x => !all.some(t => t.id === x.id)); if (miss.length) throw new Error("a piece on it is no longer in stock (" + miss.map(x => x.label).join(", ") + ")");
-      $("bclear").click(); $("bform").hidden = false; B.items = b.rows.map(x => x.id); B.mode = b.mode || "ws"; B.settle = b.settle || "fine"; B.g2g = b.g2g === "nett" ? "nett" : "ws"; document.querySelectorAll("input[name=bg2g]").forEach(x => { x.checked = x.value === B.g2g; }); B.title = b.title || "Bill"; B.nbb = !!b.nbb; $("bnbb").checked = B.nbb; B.nbbAuto = true;
+      const b = j.bill, all = tags0(); const miss = (b.rows || []).filter(x => !x.src && !all.some(t => t.id === x.id)); if (miss.length) throw new Error("a piece on it is no longer in stock (" + miss.map(x => x.label).join(", ") + ")");
+      $("bclear").click(); $("bform").hidden = false; B.items = b.rows.filter(x => !x.src).map(x => x.id); B.mode = b.mode || "ws";
+      B.designs = b.rows.filter(x => x.src).map(x => ({ desc: x.src.desc || "", k: x.src.k || "14K", net: String(x.src.net || ""), tunch: x.src.tunch ? String(x.src.tunch) : "", dias: (x.src.dias || []).map(d => ({ q: d.q, shape: d.shape, pcs: d.pcs ? String(d.pcs) : "", cents: "", ct: String(d.ct), rate: String(d.rate), edited: true })), ppcs: x.src.ppcs ? String(x.src.ppcs) : "", prate: String(x.src.prate || 300), other: x.src.other ? String(x.src.other) : "" })); drawDesigns();
+      B.option = ["gh", "ij", "lgd"].includes(b.option) ? b.option : ""; document.querySelectorAll("input[name=bopt]").forEach(x => { x.checked = x.value === B.option; }); /* C-20261027-ESTBILL */ B.settle = b.settle || "fine"; B.g2g = b.g2g === "nett" ? "nett" : "ws"; document.querySelectorAll("input[name=bg2g]").forEach(x => { x.checked = x.value === B.g2g; }); B.title = b.title || "Bill"; B.nbb = !!b.nbb; $("bnbb").checked = B.nbb; B.nbbAuto = true;
       document.querySelectorAll("input[name=bmode]").forEach(x => { x.checked = x.value === B.mode; }); document.querySelectorAll("input[name=bset]").forEach(x => { x.checked = x.value === B.settle; });
       document.querySelectorAll("input[name=btitle]").forEach(x => { x.checked = x.value === B.title; x.disabled = true; });
       $("bname").value = b.name || ""; $("bcity").value = b.city || ""; $("bmob").value = b.mobile || ""; $("bdate").value = b.date; $("bF").value = b.F; B.final = Number(b.final) || 0; $("bfinal").value = B.final ? String(B.final) : ""; { const g = b.og || null; $("bogno").value = g ? g.no || "" : ""; $("bogfine").value = g ? String(g.recv) : ""; $("bograte").value = g ? String(g.rate) : ""; }
@@ -370,7 +459,8 @@
       if (mobs.length === 1 && !$("bmob").value.trim()) { $("bmob").value = mobs[0]; if (!$("bcity").value.trim() && m[0].city) $("bcity").value = m[0].city; h.textContent += " Mobile " + mobs[0] + " taken from saved parties."; }
       else if (!$("bmob").value.trim()) h.textContent += " Type the mobile number."; }).catch(() => {}); }
   const F = () => Number(String($("bF").value).replace(/[^0-9.]/g, "")) || 0;
-  function calcNow() { const s = settings(), all = tags(); const list = B.items.map(id => all.find(t => t.id === id)).filter(Boolean);
+  function calcNow() { const s = settings(), all = tags(); const list = B.items.map(id => all.find(t => t.id === id)).filter(Boolean).concat(vtags())
+      .map(t => B.option ? Object.assign({}, t, { dias: (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map(d => Object.assign({}, d, { rate: optRate(d, B.option) })) }) : t); // C-20261027-ESTBILL
     return vjBillCalc(list, { F: F(), mode: B.mode, settle: B.settle, g2g: B.g2g, disc: B.disc, rates: B.rates, frates: B.frates, prates: B.prates, pdrates: B.pdrates, og: ogNow(), final: B.final || 0, purity: s.purity, making: s.making, gst: s.gst }); }
   function goldCell(r, c) { return c.settle === "fine" ? g3(r.fine) + " fine" : fmt(r.goldAmt) + (c.settle ? " (" + g3(r.fine) + " fine)" : ""); }
   function mkCell(r, c) { return r.chain ? "— (chain)" /* C-20261017-CHAINTUNCH: no making on chain lines */ : c.mode === "item" ? "in gold" : fmt(r.making) + " (" + r.mkRate + "/g" + (r.mkWt > 0 && Math.abs(r.mkWt - r.wt) > 0.0005 ? " on " + r.mkWt.toFixed(3) + " g" : "") + ")"; }
@@ -413,7 +503,7 @@
       di.addEventListener("input", () => { B.disc[r.id] = di.value.trim(); totals(); }); dc.appendChild(di); tr.appendChild(dc);
       const nt = document.createElement("td"); nt.className = "num"; nt.dataset.net = r.id; nt.textContent = ok ? fmt(r.net) : "—"; tr.appendChild(nt);
       const x = document.createElement("td"), rm = document.createElement("button"); rm.type = "button"; rm.className = "btn ghost"; rm.textContent = "Remove";
-      rm.addEventListener("click", () => { delete B.disc[r.id]; delete B.rates[r.id]; delete B.frates[r.id]; delete B.prates[r.id]; delete B.pdrates[r.id]; B.items.splice(i, 1); render(); }); x.appendChild(rm); tr.appendChild(x); body.appendChild(tr);
+      rm.addEventListener("click", () => { delete B.disc[r.id]; delete B.rates[r.id]; delete B.frates[r.id]; delete B.prates[r.id]; delete B.pdrates[r.id]; if (/^new-\d+$/.test(r.id)) { B.designs.splice(Number(r.id.slice(4)) - 1, 1); drawDesigns(); } else { const k = B.items.indexOf(r.id); if (k >= 0) B.items.splice(k, 1); } render(); }); x.appendChild(rm); tr.appendChild(x); body.appendChild(tr);
     });
     totals(c);
   }
@@ -458,7 +548,8 @@
       const need = c.rows.some(r => (r.dias || []).some(d => /CVD|LAB|LGD|^C-/i.test(String(d.q || "")) && d.ct > 0 && d.rate > 0 && d.rate < 20000));
       if (need && !B.nbbAuto) { B.nbb = true; $("bnbb").checked = true; B.nbbAuto = true; } else if (!need) B.nbbAuto = false; }
     c.rows.forEach(r => { const n = document.querySelector('[data-net="' + r.id + '"]'); if (n) n.textContent = ok ? fmt(r.net) + (r.discTxt ? " (" + r.discTxt + ")" : "") : "—";
-      const dv = document.querySelector('[data-dia="' + r.id + '"]'); if (dv) dv.textContent = "= " + fmt(r.diaAmt); const pv = document.querySelector('[data-pol="' + r.id + '"]'); if (pv) pv.textContent = "= " + fmt(r.polki); const pdv = document.querySelector('[data-pd="' + r.id + '"]'); if (pdv) pdv.textContent = "= " + fmt(r.pd); const am = document.querySelector('[data-amt="' + r.id + '"]'); if (am) am.textContent = ok ? fmt(r.amount) : "—"; });
+      const dv = document.querySelector('[data-dia="' + r.id + '"]'); if (dv) dv.textContent = "= " + fmt(r.diaAmt); const pv = document.querySelector('[data-pol="' + r.id + '"]'); if (pv) pv.textContent = "= " + fmt(r.polki); const pdv = document.querySelector('[data-pd="' + r.id + '"]'); if (pdv) pdv.textContent = "= " + fmt(r.pd); const am = document.querySelector('[data-amt="' + r.id + '"]'); if (am) am.textContent = ok ? fmt(r.amount) + (usdTxt(r.amount) ? " ≈ " + usdTxt(r.amount) : "") : "—"; });
+    { const u = $("busdtot"); if (u) u.textContent = has && B.usd > 0 ? usdTxt(c.total) + ` (at Rs ${B.usd.toFixed(2)}/$)` : "—"; }
     $("bdiscrow").hidden = !c.disc; $("bdisc").textContent = "- " + fmt(c.sum - c.sub);
     $("bsettle").hidden = !fineMode(); $("bsettle").style.display = fineMode() ? "" : "none"; $("bg2g").style.display = B.mode === "g2g" ? "" : "none"; $("bg2g").hidden = B.mode !== "g2g"; /* .seg sets display:flex, which beats [hidden] */ $("bfinerow").hidden = !(c.settle === "fine" && c.rows.length) || !!c.og; { const on = B.mode === "g2g" && B.settle === "fine"; $("bog").hidden = !on; $("bog").style.display = on ? "" : "none"; $("bogrow").hidden = !c.og; if (c.og) { $("bogl").textContent = `Fine gold ${g3(c.og.due)} - old gold${c.og.no ? " (OG " + c.og.no + ")" : ""} ${g3(c.og.recv)} = balance ${g3(c.og.bal)} @ ${fmt(c.og.rate)}/g`; $("bogamt").textContent = fmt(c.og.amt); } } $("bfine").firstChild.textContent = g3(c.fine);
     $("bmodehint").textContent = { ws: "Gold x karat rate + 10% wastage; making Rs 650/g (750/g up to 5 g), minimum Rs 1,000 a piece.", nett: "Gold x karat rate; making Rs 650/g (750 up to 5 g), minimum Rs 1,000, + 10% wastage on the gold.",
@@ -471,7 +562,8 @@
     $("bFtag").value = allOwn ? (rts.length === 1 ? String(rts[0]) : "as on each piece") : "";
     $("bFl").textContent = allOwn ? "Gold Rate per g, 24K (from the tag)" : c.rows.some(r => r.orderRate || r.rateEdited) ? "Today's gold rate (F) per g, 24K - for pieces without a rate on the tag" : "Gold Rate (F) per g, 24K";
     $("bgstl").textContent = "GST " + c.gstPct + "%"; $("bgst").textContent = has ? fmt(c.gst) : "—"; $("btotal").textContent = has ? fmt(c.total) : "—";
-    $("bnote").textContent = !ok ? "Type the gold rate (F): fine 24K per gram." : noteText(B.mode, c.rows, B.g2g) + "Diamond rates come from the tag; change them here for this bill if needed." + (c.rows.some(r => r.orderRate) ? " Pieces with a gold rate on their tag are billed at that rate; F is used only for pieces without one." : "") + " Each piece's gold rate can be changed in its Gold cell.";
+    { const miss = B.designs.map((d, i) => ({ i, bad: designBad(d) })).filter(x => x.bad.length && (num(B.designs[x.i].net) > 0 || B.designs[x.i].dias.length)); const bm = $("bmsg"); if (bm && (miss.length || /^New design/.test(bm.textContent))) bm.textContent = miss.map(x => "New design " + (x.i + 1) + ": check " + x.bad.join(", ")).join(". "); }
+    $("bnote").textContent = !ok ? "Type the gold rate (F): fine 24K per gram." : (B.option ? "Diamonds priced as " + OPT_NAMES[B.option] + " (default rates). " : "") + noteText(B.mode, c.rows, B.g2g) + "Diamond rates come from the tag; change them here for this bill if needed." + (c.rows.some(r => r.orderRate) ? " Pieces with a gold rate on their tag are billed at that rate; F is used only for pieces without one." : "") + " Each piece's gold rate can be changed in its Gold cell.";
   }
   async function dataUrl(src) { const r = await fetch(src, { credentials: "same-origin" }); if (!r.ok) throw new Error("img"); const b = await r.blob(); return await new Promise((res, rej) => { const f = new FileReader(); f.onload = () => res(f.result); f.onerror = rej; f.readAsDataURL(b); }); }
   // photo for the PDF: drawn onto a small canvas and saved as JPEG, so PNG / WebP photos work too
@@ -511,7 +603,8 @@
     b.rows.forEach(r => { if (y > 250) { doc.addPage(); y = 20; }
       const dd = r.ct ? (r.dias || []).filter(d => d.ct > 0).map(d => ((d.shape ? d.shape + " " : "") + d.q).trim() + "\n" + d.ct.toFixed(2) + " ct @ " + Math.round(d.rate).toLocaleString("en-IN")).join("\n") + "\n= " + fm(r.diaAmt) : "-"; // owner 26/10: every diamond line with its shape, quality, ct and rate (C-20261026-DIASHAPE)
       const base = [(r.design ? r.design + " - " : "") + r.label + (r.cat ? "\n" + r.cat : "") + (r.certNo ? "\n" + (r.cert && r.cert !== "TGL" ? r.cert : "Cert.") + " " + r.certNo : ""), /* owner 26/10 18:14: certificate no. on the bill (C-20261026-PARTYDIA) */ (/tunch/.test(r.gold || "") ? r.gold.replace(/ \+ /g, "\n").replace(/, tunch /g, "\ntunch ") : (r.gold || "-")) + (Math.round(r.F) !== hF ? "\n@ " + Math.round(r.F).toLocaleString("en-IN") : ""), b.settle === "fine" ? g3(r.fine) + "\nfine" : fm(r.goldAmt) + (b.settle ? "\n" + g3(r.fine) + " fine" : ""), r.chain ? "-" : b.mode === "item" ? "in gold" : fm(r.making) /* owner 17/10 15:38: no making rate per g on the printed bill */, dd, ...(PK ? [[r.polkiPcs ? "Polki " + r.polkiPcs + " pc\n@ " + Math.round(r.polkiRate).toLocaleString("en-IN") + "\n" + fm(r.polki) : "", r.pdCt ? "Party " + r.pdCt + " ct\n@ " + Math.round(r.pdRate).toLocaleString("en-IN") + "\n" + fm(r.pd) : ""].filter(Boolean).join("\n") || "-"] : []), r.other ? fm(r.other) : "-"];
-      row(D ? base.concat([fm(r.amount), r.disc ? fm(r.disc) + (r.discTxt ? "\n(" + r.discTxt + ")" : "") : "-", fm(r.net)]) : base.concat([fm(r.amount)]), false, D || PK ? 10 : 10.5, P ? (pics[r.id] || null) : undefined);
+      const amU = fm(r.amount) + (b.usd ? "\nUS$ " + Math.round(r.amount / b.usd).toLocaleString("en-US") : ""); // C-20261027-ESTBILL
+      row(D ? base.concat([amU, r.disc ? fm(r.disc) + (r.discTxt ? "\n(" + r.discTxt + ")" : "") : "-", fm(r.net)]) : base.concat([amU]), false, D || PK ? 10 : 10.5, P ? (pics[r.id] || null) : undefined);
       doc.setDrawColor(225); doc.line(M, y - 3, W - M, y - 3); });
     y += 3; if (y > 240) { doc.addPage(); y = 20; }
     const tot = (l, v, big) => { doc.setFont("helvetica", big ? "bold" : "normal"); doc.setFontSize(big ? 15 : 12); doc.text(l, W - M - 50, y, { align: "right" }); doc.text(v, W - M, y, { align: "right" }); y += big ? 9 : 7; };
@@ -521,8 +614,10 @@
       doc.setTextColor(20); doc.setLineWidth(0.2); doc.setDrawColor(0); }
     if (b.og) { tot("Fine gold due", g3(b.og.due)); tot("Old gold received" + (b.og.no ? " (OG " + b.og.no + ")" : ""), "- " + g3(b.og.recv)); tot(`Balance ${g3(b.og.bal)} @ ${fmt(b.og.rate)}/g`, fmt(b.og.amt), true); y += 2; } else if (b.settle === "fine") { tot("Fine gold to receive", g3(b.fine), true); y += 2; }
     if (b.final) { tot("Total", fmt(b.sum)); if (b.disc) tot("Less discount", "- " + fmt(b.sum - b.total)); } else { tot("Total", fmt(b.disc ? b.sum : b.sub)); if (b.disc) { tot("Less discount", "- " + fmt(b.sum - b.sub)); tot("Total after discount", fmt(b.sub)); } tot(`GST ${b.gstPct}%`, fmt(b.gst)); } /* C-20261027-FINALAMT: a final-amount bill prints Total, Less discount, Final amount only */ doc.setDrawColor(180, 150, 80); doc.line(W - M - 95, y - 4, W - M, y - 4); y += 2; tot(b.final ? "Final amount" : b.title + " total", fmt(b.total), true);
+    if (b.usd) tot(`In US$ (approx., at Rs ${Number(b.usd).toFixed(2)} per US$)`, "US$ " + Math.round(b.total / b.usd).toLocaleString("en-US")); // C-20261027-ESTBILL
+    if (b.title === "Estimate") { y += 2; doc.setFont("helvetica", "bold"); doc.setFontSize(10.5); doc.setTextColor(20); doc.text("Above are approximate estimates. Actual may vary when the final product is ready.", M, y); y += 4; } // owner 27/10 17:29
     y += 4; doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(80);
-    const notes = [noteText(b.mode, b.rows, b.g2g).trim(), "All diamonds are third-party certified (IGI / EGL / TGL) and all gold is BIS HUID hallmarked.", b.title === "Estimate" ? "This is an estimate. Final figure may vary with the gold price." : "", b.nbb ? "Sold on a no buy back, no exchange basis." : "",
+    const notes = [noteText(b.mode, b.rows, b.g2g).trim(), "All diamonds are third-party certified (IGI / EGL / TGL) and all gold is BIS HUID hallmarked.", b.title === "Estimate" && b.usd ? "US dollar figures are indicative only; billing is in Indian rupees." : b.usd ? "US dollar figures are indicative only." : "", b.option ? "Diamonds priced as " + (OPT_NAMES[b.option] || b.option) + "." : "", b.nbb ? "Sold on a no buy back, no exchange basis." : "",
       b.settled ? `Settled: settlement discount ${fmt(b.settled.discount)} given on ${dmy(String(b.settled.at).slice(0, 10))}` + (b.original ? ` (bill total ${fmt(b.original.total)} reduced to ${fmt(b.total)}, the amount received)` : "") + "." + (b.settled.fineWaived ? ` Fine gold waived ${g3(b.settled.fineWaived)}.` : "") : ""].filter(Boolean); // C-20261017-LEDGER
     doc.text(doc.splitTextToSize(notes.join(" "), W - 2 * M), M, y);
     return doc.output("blob");
@@ -530,12 +625,15 @@
   async function save() {
     const m = $("bmsg"), out = $("bout"); out.hidden = true;
     const body = { no: $("bno").value.trim(), name: (n => n && !/ji$/i.test(n) ? n + " ji" : n)($("bname").value.trim().slice(0, 57)) /* owner 26/10 18:45: 'ji' added on the bill automatically (Prachi -> Prachi ji) */, city: $("bcity").value.trim(), mobile: $("bmob").value.trim().slice(0, 20),
-      date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, g2g: B.g2g, title: B.title, nbb: !!B.nbb, ids: B.items.slice(), disc: Object.assign({}, B.disc), rates: JSON.parse(JSON.stringify(B.rates)), frates: Object.assign({}, B.frates), prates: Object.assign({}, B.prates), pdrates: Object.assign({}, B.pdrates), og: ogNow(), final: B.final || 0, edit: B.editNo || "" };
+      date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, g2g: B.g2g, title: B.title, nbb: !!B.nbb, ids: B.items.slice(), disc: Object.assign({}, B.disc), rates: JSON.parse(JSON.stringify(B.rates)), frates: Object.assign({}, B.frates), prates: Object.assign({}, B.prates), pdrates: Object.assign({}, B.pdrates), og: ogNow(), final: B.final || 0, edit: B.editNo || "", option: B.option || "", usd: B.usd || 0,
+      designs: B.designs.map(d => { const v = vtags()[B.designs.indexOf(d)]; return { desc: v.label, k: d.k, net: v.gold[0].net, tunch: v.gold[0].tunch || 0, dias: v.dias, ppcs: v.polki ? v.polki.pcs : 0, prate: v.polki ? v.polki.rate : 300, other: v.other ? v.other.amt : 0 }; }) }; // C-20261027-ESTBILL
     if (!body.name) { m.textContent = "Enter the customer's name."; return; }
     let dg = body.mobile.replace(/\D/g, ""); if (dg.length === 12 && dg.startsWith("91")) dg = dg.slice(2); // phone copy like "+91 98xxx xxxxx" is fine
     const mobNote = body.mobile && !/^[6-9]\d{9}$/.test(dg) ? ` Note: the mobile has ${dg.replace(/^91/, "").length} digits after +91 (a mobile usually has 10) - saved as typed.` : "";
     if (!(body.F >= 2000)) { m.textContent = "Type the gold rate (F) per gram, 24K."; return; }
-    if (!body.ids.length) { m.textContent = "Add at least one piece."; return; }
+    if (!body.ids.length && !body.designs.length) { m.textContent = "Add at least one piece or a new design."; return; }
+    { const bad = B.designs.findIndex(d => designBad(d).length); if (bad >= 0) { m.textContent = "New design " + (bad + 1) + ": check " + designBad(B.designs[bad]).join(", ") + "."; return; } }
+    if (body.designs.length && body.title !== "Estimate") { m.textContent = "A new design (no tag) can only go on an Estimate."; return; }
     $("bsave").disabled = true; m.textContent = "Saving the bill…";
     try {
       const r = await fetch("/api/vj/bill", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
