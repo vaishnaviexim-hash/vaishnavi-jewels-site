@@ -150,7 +150,7 @@ kbd{font-family:var(--f-mono);font-size:13px;background:var(--sunk);border:1px s
       <h2>Steps</h2>
       <ol class="steps">
         <li><b>Print the 20 labels.</b> Open <b>Print labels</b> and download the label PDF (one 100 × 15 mm page per tag, the same roll size as our Ornate tags: 70 mm print area + 30 mm tail on the right). The 70 mm print area folds in half; nothing crosses the fold and nothing prints on the tail. Print at 100% / actual size, no scaling.</li>
-        <li><b>Encode the chips.</b> Write each tag's EPC exactly as listed under <b>Tags</b> or on the A4 vendor sheet: 96-bit, 24 hex characters, EPC bank from word 2, PC word 3000. Example: VJD0001 → <span class="epc">0000000000564A4430303031</span>.
+        <li><b>Encode the chips.</b> Write each tag's EPC exactly as listed under <b>Tags</b> or on the A4 vendor sheet: 96-bit, 24 hex characters, EPC bank from word 2, PC word 3000. Example: A0000001 → <span class="epc">000000004130303030303031</span>.
           <ul class="sub"><li>If you would rather keep your factory EPCs, that is fine: the Scan test links them to the right tag (step 6).</li></ul></li>
         <li><b>Set up DataWedge on the Zebra TC22R.</b> Open DataWedge → create a profile (for example "VJ demo") → Associated apps: <kbd>com.android.chrome</kbd> / <kbd>*</kbd>.
           <ul class="sub">
@@ -262,7 +262,7 @@ const RAW=[
  ["VLR/D03","18K",6.020,5.310,1.01,"D2"],["ER/D03","18K",4.380,3.860,0.80,"D2"],["VP/D03","18K",3.420,3.010,0.50,"D2"],["VBR/D03","18K",13.150,11.590,2.05,"D2"]];
 const asciiHex=s=>[...s].map(c=>c.charCodeAt(0).toString(16).toUpperCase().padStart(2,"0")).join("");
 const epcOf=no=>asciiHex(no).padStart(24,"0");
-const TAGS=RAW.map((r,i)=>{const no="VJD"+String(i+1).padStart(4,"0");return {no,label:r[0],cat:CATN[r[0].split("/")[0]],metal:r[1],gross:r[2],net:r[3],dia:r[4],box:"Box "+r[5],epc:epcOf(no)}});
+const TAGS=RAW.map((r,i)=>{const no="A"+String(i+1).padStart(7,"0"); /* 27/10/2026: printer vendor's numbering A0000001-A0000020 */return {no,label:r[0],cat:CATN[r[0].split("/")[0]],metal:r[1],gross:r[2],net:r[3],dia:r[4],box:"Box "+r[5],epc:epcOf(no)}});
 const BYNO=new Map(TAGS.map(t=>[t.no,t])),BYEPC=new Map(TAGS.map(t=>[t.epc,t.no]));
 
 /* ---------- watermark ---------- */
@@ -301,18 +301,19 @@ const KEEP=[];
 const ZONE={qr:{x:1,y:1.25,s:12.5},text:{x:14.7,w:19.5}},FOLD=PW/2;
 function barBits(text){const o={};JsBarcode(o,text,{format:"CODE128"});return o.encodings.map(e=>e.data).join("")}
 function qrMatrix(text){const q=qrcode(1,"L");q.addData(text);q.make();const n=q.getModuleCount(),m=[];for(let r=0;r<n;r++){const row=[];for(let c=0;c<n;c++)row.push(q.isDark(r,c));m.push(row)}return m}
+/* 27/10/2026 (C-20261027-TAGFONT): bigger, all-bold text so the thermal print is easy to read */
 function labelPrims(t){
   const P=[],lx=15.6,lw=FOLD-lx-0.8,rx=FOLD+0.8,rw=PW-rx-1,y=i=>1+2.6*(i+0.78);
   P.push({k:"qr",x:2.54,y:2.166,s:10.668,m:qrMatrix(t.no)});
-  P.push({k:"t",x:lx,y:y(0),t:t.no,sz:7,b:1,maxW:lw});
-  P.push({k:"t",x:lx,y:y(1),t:t.label,sz:5.6,maxW:lw});
-  P.push({k:"t",x:lx,y:y(2),t:t.metal,sz:5.6,b:1,maxW:lw});
-  P.push({k:"t",x:lx,y:y(3),t:t.cat,sz:5.2,maxW:lw});
+  P.push({k:"t",x:lx,y:y(0),t:t.no,sz:7.6,b:1,maxW:lw});
+  P.push({k:"t",x:lx,y:y(1),t:t.label,sz:6.4,b:1,maxW:lw});
+  P.push({k:"t",x:lx,y:y(2),t:t.metal,sz:6.4,b:1,maxW:lw});
+  P.push({k:"t",x:lx,y:y(3),t:t.cat,sz:6.2,b:1,maxW:lw});
   P.push({k:"t",x:lx,y:y(4),t:"DEMO",sz:4.2,c:"wm2",maxW:lw});
-  P.push({k:"t",x:rx,y:y(0),t:"G.Wt. "+t.gross.toFixed(3),sz:5.8,b:1,maxW:rw});
-  P.push({k:"t",x:rx,y:y(1),t:"N.Wt. "+t.net.toFixed(3),sz:5.6,maxW:rw});
-  P.push({k:"t",x:rx,y:y(2),t:"Dia "+t.dia.toFixed(2)+" ct",sz:5.6,maxW:rw});
-  P.push({k:"t",x:rx,y:y(3),t:t.box,sz:5.4,maxW:rw});
+  P.push({k:"t",x:rx,y:y(0),t:"G.Wt. "+t.gross.toFixed(3),sz:6.6,b:1,maxW:rw});
+  P.push({k:"t",x:rx,y:y(1),t:"N.Wt. "+t.net.toFixed(3),sz:6.6,b:1,maxW:rw});
+  P.push({k:"t",x:rx,y:y(2),t:"Dia "+t.dia.toFixed(2)+" ct",sz:6.6,b:1,maxW:rw});
+  P.push({k:"t",x:rx,y:y(3),t:t.box,sz:6.6,b:1,maxW:rw});
   return P;
 }
 let measureCtx=null;
@@ -386,7 +387,7 @@ function sheetPDF(){
   for(let y=30;y<320;y+=48)for(let x=-40;x<210;x+=120)doc.text(WM,x,y,{angle:30});
   doc.setTextColor(0,0,0);doc.setFont("helvetica","bold");doc.setFontSize(15);doc.text("VJ Inventory - RFID jewellery tags (VENDOR DEMO)",14,17);
   doc.setFont("helvetica","normal");doc.setFontSize(9.5);
-  ["Dummy data for a tag test. No prices, not real stock.","QR payload = tag number exactly, e.g. VJD0001. (No 1D barcode: the 26 mm flap is too small for one.)","RFID: write the EPC exactly as shown - 96-bit, 24 hex characters, EPC bank from word 2, PC 3000.","EPC = tag number in ASCII hex, padded with zeros in front."].forEach((l,i)=>doc.text(l,14,23.5+i*4.4));
+  ["Dummy data for a tag test. No prices, not real stock.","QR payload = tag number exactly, e.g. A0000001. (No 1D barcode: the 26 mm flap is too small for one.)","RFID: write the EPC exactly as shown - 96-bit, 24 hex characters, EPC bank from word 2, PC 3000.","EPC = tag number in ASCII hex, padded with zeros in front."].forEach((l,i)=>doc.text(l,14,23.5+i*4.4));
   const cols=[[14,"#"],[22,"Tag no. = QR"],[56,"Label"],[80,"EPC to encode (hex)"],[146,"Item"],[176,"Metal"],[192,"Box"]];
   let y=45;doc.setFont("helvetica","bold");doc.setFontSize(9);cols.forEach(([x,h])=>doc.text(h,x,y));doc.setDrawColor(150);doc.line(14,y+2,198,y+2);
   TAGS.forEach((t,i)=>{y+=7.8;doc.setFont("helvetica","normal");doc.setFontSize(10);doc.text(String(i+1),14,y);
@@ -418,7 +419,7 @@ function sheetPDF_old(){
   for(let y=30;y<320;y+=48)for(let x=-40;x<210;x+=120)doc.text(WM,x,y,{angle:30});
   doc.setTextColor(0,0,0);doc.setFont("helvetica","bold");doc.setFontSize(15);doc.text("VJ Inventory - RFID test tags (VENDOR DEMO)",14,17);
   doc.setFont("helvetica","normal");doc.setFontSize(9.5);
-  ["Dummy data for a tag test. No prices, not real stock.","Barcode (Code 128) and QR payload = tag number exactly, e.g. VJD0001.","RFID: write the EPC exactly as shown - 96-bit, 24 hex characters, EPC bank from word 2, PC 3000.","EPC = tag number in ASCII hex, padded with zeros in front."].forEach((l,i)=>doc.text(l,14,23.5+i*4.4));
+  ["Dummy data for a tag test. No prices, not real stock.","Barcode (Code 128) and QR payload = tag number exactly, e.g. A0000001.","RFID: write the EPC exactly as shown - 96-bit, 24 hex characters, EPC bank from word 2, PC 3000.","EPC = tag number in ASCII hex, padded with zeros in front."].forEach((l,i)=>doc.text(l,14,23.5+i*4.4));
   const cols=[[14,"#"],[22,"Tag no. = barcode/QR"],[64,"Label"],[86,"EPC to encode (hex)"],[150,"Item"],[178,"Metal"],[192,"Box"]];
   let y=45;doc.setFont("helvetica","bold");doc.setFontSize(9);cols.forEach(([x,h])=>doc.text(h,x,y));doc.setDrawColor(150);doc.line(14,y+2,198,y+2);
   TAGS.forEach((t,i)=>{y+=7.8;doc.setFont("helvetica","normal");doc.setFontSize(10);doc.text(String(i+1),14,y);
@@ -466,8 +467,8 @@ window.__vj={labelsPDF,sheetPDF,TAGS};
 const PAIR_MS=20000;
 const S={run:null,events:[],links:{},dismiss:{},pending:[],mode:"qr",sound:true,typing:false};
 function newRun(){return new Date().toISOString().replace(/[-:]/g,"").slice(0,15)+"-"+Math.random().toString(36).slice(2,6)}
-function load(){try{const j=JSON.parse(localStorage.getItem("vjdemo.v1")||"null");if(j&&j.run){S.run=j.run;S.events=j.events||[];S.links=j.links||{};S.pending=j.pending||[];S.mode=j.mode||"qr";S.sound=j.sound!==false;S.dismiss=j.dismiss||{}}}catch(e){}if(!S.run)S.run=newRun()}
-function persist(){try{localStorage.setItem("vjdemo.v1",JSON.stringify({run:S.run,events:S.events.slice(-2000),links:S.links,pending:S.pending,mode:S.mode,sound:S.sound,dismiss:S.dismiss}))}catch(e){}}
+function load(){try{const j=JSON.parse(localStorage.getItem("vjdemo.v2")||"null");if(j&&j.run){S.run=j.run;S.events=j.events||[];S.links=j.links||{};S.pending=j.pending||[];S.mode=j.mode||"qr";S.sound=j.sound!==false;S.dismiss=j.dismiss||{}}}catch(e){}if(!S.run)S.run=newRun()}
+function persist(){try{localStorage.setItem("vjdemo.v2",JSON.stringify({run:S.run,events:S.events.slice(-2000),links:S.links,pending:S.pending,mode:S.mode,sound:S.sound,dismiss:S.dismiss}))}catch(e){}}
 load();
 document.querySelector(`input[name=mode][value="${S.mode}"]`).checked=true;
 document.querySelectorAll("input[name=mode]").forEach(r=>r.addEventListener("change",()=>{S.mode=r.value;persist();focusScan()}));
@@ -480,7 +481,7 @@ function parse(raw){
   if(s.includes("#"))s=s.slice(s.lastIndexOf("#")+1);
   s=s.replace(/^(EPC|RFID|TAG|UII|BARCODE|QR|DATA)\s*[:=]?\s*/i,"");
   const u=s.toUpperCase();const compact=u.replace(/[\s:\-_.]/g,"");
-  const code=compact.match(/^VJD\d{4}$/)||(!/^[0-9A-F]+$/.test(compact)&&compact.match(/VJD\d{4}/));
+  const code=compact.match(/^A\d{7}$/)||(!/^[0-9A-F]+$/.test(compact)&&compact.match(/A\d{7}/));
   if(code)return {kind:"code",value:code[0],sym,tag:BYNO.has(code[0])?code[0]:null};
   if(/^[0-9A-F]{16,64}$/.test(compact)){
     const cands=[compact];if(compact.length>24){cands.push(compact.slice(-24),compact.slice(4,28),compact.slice(0,24))}
@@ -602,7 +603,7 @@ function submitInput(){clearTimeout(idleT);const v=inp.value;inp.value="";if(v.t
 inp.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key==="Tab"){if(inp.value.trim()||e.key==="Enter"){e.preventDefault();submitInput()}}});
 inp.addEventListener("input",()=>{clearTimeout(idleT);const c=inp.value.trim().toUpperCase().replace(/\s/g,"");
   /* readers set up without an Enter suffix: submit a complete value after a short pause */
-  if(/^(\]..)?VJD\d{4}$/.test(c)||/^[0-9A-F]{24}$/.test(c))idleT=setTimeout(submitInput,450)});
+  if(/^(\]..)?A\d{7}$/.test(c)||/^[0-9A-F]{24}$/.test(c))idleT=setTimeout(submitInput,450)});
 inp.addEventListener("paste",e=>{const t=(e.clipboardData||window.clipboardData).getData("text");if(/[\r\n]/.test(t)){e.preventDefault();handleScan(inp.value+t,"pasted");inp.value=""}});
 inp.addEventListener("focus",()=>{$("focusDot").classList.add("on");$("focusTxt").textContent="Ready for the next scan"});
 inp.addEventListener("blur",()=>{$("focusDot").classList.remove("on");$("focusTxt").textContent="Tap here to scan";setTimeout(focusScan,250)});
