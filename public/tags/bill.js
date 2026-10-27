@@ -198,13 +198,7 @@
     const sec = document.createElement("section"); sec.id = "p-bill"; sec.className = "card"; sec.hidden = true;
     sec.innerHTML = `<div id="bform">
       <div class="actions" style="margin:0 0 8px"><button type="button" class="btn ghost" id="bback">&larr; Back to Bill</button></div>
-      <h2>1 · Pieces</h2>
-      <div class="row" style="align-items:end"><label style="flex:2 1 220px">Code on the tag, tag number or design number <input id="bq" autocomplete="off" placeholder="e.g. abc270xyz, 803 or 1436"></label>
-      <div><button type="button" class="btn" id="badd">Add piece</button></div><div><button type="button" class="btn ghost" id="bnewdes">+ Add line (estimate): our code, or blank = new design</button></div></div>
-      <div id="bpick" class="row" style="gap:8px"></div>
-      <div id="bdes"></div>
-      <div class="list"><table class="items" style="min-width:820px"><thead><tr><th>Piece</th><th>Gold</th><th>Gold value</th><th>Making</th><th>Diamonds</th><th id="bpolh" hidden>Polki / Party dia.</th><th>Other</th><th>Amount</th><th>Discount<br><span style="font-weight:400;text-transform:none">Rs or %</span></th><th>Net</th><th></th></tr></thead><tbody id="brows"></tbody></table></div>
-      <h2>2 · Customer &amp; bill</h2>
+      <h2>1 · Customer &amp; bill</h2>
       <p class="hint" id="bcusthint"></p>
       <div class="row"><label>Mobile No. <input id="bmob" inputmode="tel" autocomplete="off" maxlength="20" placeholder="98xxxxxxxx"></label>
         <label>Name <input id="bname" autocomplete="off" maxlength="60"></label>
@@ -238,10 +232,15 @@
         <label><input type="radio" name="bopt" value="gh"> Natural VS GH</label>
         <label><input type="radio" name="bopt" value="ij"> Natural VS IJ</label>
         <label><input type="radio" name="bopt" value="lgd"> Lab-grown (Rs 23,000/ct)</label></div>
+      <h2>2 · Pieces</h2>
+      <div class="row" style="align-items:end"><label style="flex:2 1 220px">Code on the tag, tag number or design number <input id="bq" autocomplete="off" placeholder="e.g. abc270xyz, 803 or 1436"></label>
+      <div><button type="button" class="btn" id="badd">Add piece</button></div><div><button type="button" class="btn ghost" id="bnewdes">+ Add line (estimate): our code, or blank = new design</button></div></div>
+      <div id="bpick" class="row" style="gap:8px"></div>
+      <div id="bdes"></div>
+      <div class="list"><table class="items" style="min-width:820px"><thead><tr><th>Piece</th><th>Gold</th><th>Gold value</th><th>Making</th><th>Diamonds</th><th id="bpolh" hidden>Polki / Party dia.</th><th>Other</th><th>Amount</th><th>Discount<br><span style="font-weight:400;text-transform:none">Rs or %</span></th><th>Net</th><th></th></tr></thead><tbody id="brows"></tbody></table></div>
       <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg);margin-top:8px"><input type="checkbox" id="bphoto" checked style="width:auto"> Show piece photos on the bill</label>
       <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg);margin-top:4px"><input type="checkbox" id="bnbb" style="width:auto"> Stamp <b>No Buy Back · No Exchange</b> on this bill</label>
       <div class="row" style="margin-top:8px;align-items:end"><label>Final amount - what the customer pays (optional) <input id="bfinal" inputmode="numeric" autocomplete="off" maxlength="9" placeholder="e.g. 152000" style="max-width:180px"></label><button type="button" class="btn ghost" id="bfinalgo">Set final amount</button></div><p class="hint" id="bfinalhint">Type the final figure (e.g. 152000): the discount is worked out so the bill closes at exactly that amount. The bill prints only the final amount.</p>
-      <div class="row" style="margin-top:8px;align-items:end"><label>Amount before GST (optional) <input id="btarget" inputmode="numeric" autocomplete="off" maxlength="9" placeholder="e.g. 80000" style="max-width:180px"></label><button type="button" class="btn ghost" id="btargetgo">Set discount</button></div><p class="hint" id="btargethint">Type the amount the customer pays before GST (e.g. 80000) - the discount is worked out and spread over the pieces.</p>
       <table class="sum"><tr id="bfinerow" hidden><td><b>Fine gold to receive</b></td><td id="bfine"><b>—</b></td></tr><tr id="bogrow" hidden><td id="bogl">Balance fine gold</td><td id="bogamt">—</td></tr><tr><td>Total</td><td id="bsum">—</td></tr><tr id="bdiscrow" hidden><td>Less discount</td><td id="bdisc">—</td></tr><tr hidden><td>Total after discount</td><td id="bsub">—</td></tr>
         <tr><td id="bgstl">GST 3%</td><td id="bgst">—</td></tr><tr class="total"><td>Bill total</td><td id="btotal">—</td></tr><tr><td>In US dollars (approx.)</td><td id="busdtot">—</td></tr></table>
       <div class="row" style="align-items:end"><label style="max-width:220px">USD rate (Rs per US$) <input id="busd" inputmode="decimal" autocomplete="off" placeholder="e.g. 89.50"></label><span class="hint" id="busdinfo" style="flex:1 1 200px"></span></div>
@@ -274,7 +273,7 @@
     $("busd").addEventListener("input", () => { const v = Math.round(num($("busd").value) * 100) / 100; B.usd = v > 50 && v < 200 ? v : 0; if (B.usd) { usdSave(B.usd, true); $("busdinfo").textContent = "Rate typed today."; } render(); }); usdInit();
     $("bmonth").value = today().slice(0, 7); $("bmonth").addEventListener("change", loadBook); { let tm = 0; $("bfmob").addEventListener("input", () => { B.fcity = null; clearTimeout(tm); tm = setTimeout(loadBook, 350); }); } // owner 26/10 17:58: type a mobile no. and see all that customer's bills
     $("bxl").addEventListener("click", () => xl($("bmonth").value || today().slice(0, 7))); $("bxlall").addEventListener("click", () => xl("all")); $("bxwa").addEventListener("click", e => partyWA(e.currentTarget));
-    $("bF").addEventListener("input", render); $("btargetgo").addEventListener("click", applyTarget); $("bfinalgo").addEventListener("click", applyFinal); $("bfinal").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applyFinal(); } }); /* C-20261027-FINALAMT */  ["bogno", "bogfine", "bograte"].forEach(i => $(i).addEventListener("input", () => totals())); /* C-20261027-OGBAL */ $("btarget").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applyTarget(); } }); /* owner 27/10 12:21 (C-20261027-BILLTARGET) */ $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); }); $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
+    $("bF").addEventListener("input", render); /* owner 27/10 18:08: "Amount before GST" box removed - only the final amount is typed */ $("bfinalgo").addEventListener("click", applyFinal); $("bfinal").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applyFinal(); } }); /* C-20261027-FINALAMT */  ["bogno", "bogfine", "bograte"].forEach(i => $(i).addEventListener("input", () => totals())); /* C-20261027-OGBAL */  /* owner 27/10 12:21 (C-20261027-BILLTARGET) */ $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); }); $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
     $("bclear").addEventListener("click", () => { B.editNo = null; B.final = 0; { const bf = $("bfinal"); if (bf) bf.value = ""; } { const bt = $("btarget"); if (bt) bt.value = ""; ["bogno", "bogfine", "bograte"].forEach(i => { const x = $(i); if (x) x.value = ""; }); } { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.designs = []; drawDesigns(); B.option = ""; document.querySelectorAll("input[name=bopt]").forEach(x => { x.checked = x.value === ""; }); B.cust = ""; document.querySelectorAll("input[name=bcust]").forEach(x => { x.checked = x.value === ""; }); B.nbb = false; $("bnbb").checked = false; B.nbbAuto = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; B.pdrates = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
     $("bsave").addEventListener("click", save);
     $("bback").addEventListener("click", () => { const c = document.querySelector('nav button[data-tab="check"]'); if (c) c.click(); });
@@ -542,7 +541,7 @@
     const X = S - sub, nd = {}; let given = 0;
     rows.forEach(r => { const d = Math.floor(X * A(r) / S); nd[r.id] = d; given += d; });
     const big = rows.reduce((a, r) => A(r) > A(a) ? r : a, rows[0]); nd[big.id] += X - given;
-    B.disc = {}; Object.keys(nd).forEach(id => { if (nd[id] > 0) B.disc[id] = String(nd[id]); }); B.final = T; $("btarget").value = "";
+    B.disc = {}; Object.keys(nd).forEach(id => { if (nd[id] > 0) B.disc[id] = String(nd[id]); }); B.final = T; { const bt = $("btarget"); if (bt) bt.value = ""; }
     render(); const c1 = calcNow();
     h.textContent = c1.final ? "Discount " + fmt(c1.sum - c1.sub) + " - final amount " + fmt(c1.total) + " (GST " + fmt(c1.gst) + " inside it, kept in the record, not printed)." : "Could not set the final amount - check the discounts.";
   }
@@ -564,7 +563,7 @@
   function totals(c) {
     c = c || calcNow(); const ok = F() >= 2000, has = c.rows.length && ok;
     { // owner 26/10 18:52 (C-20261026-NBBLAB): a lab-grown (CVD) diamond under Rs 20,000/ct is sold no buy back / no exchange - the stamp is ticked by default (can be unticked)
-      const need = c.rows.some(r => (r.dias || []).some(d => /CVD|LAB|LGD|^C-/i.test(String(d.q || "")) && d.ct > 0 && d.rate > 0 && d.rate < 20000));
+      const need = c.rows.some(r => (r.dias || []).some(d => (/CVD|LAB|LGD|^C-/i.test(String(d.q || "")) || /solitaire/i.test(String(d.shape || ""))) && d.ct > 0 && d.rate > 0 && d.rate < 20000)); // owner 27/10 18:08: CVD or solitaire under Rs 20,000/ct = no buy back, no exchange
       if (need && !B.nbbAuto) { B.nbb = true; $("bnbb").checked = true; B.nbbAuto = true; } else if (!need) B.nbbAuto = false; }
     c.rows.forEach(r => { const n = document.querySelector('[data-net="' + r.id + '"]'); if (n) n.textContent = ok ? fmt(r.net) + (r.discTxt ? " (" + r.discTxt + ")" : "") : "—";
       const dv = document.querySelector('[data-dia="' + r.id + '"]'); if (dv) dv.textContent = "= " + fmt(r.diaAmt); const pv = document.querySelector('[data-pol="' + r.id + '"]'); if (pv) pv.textContent = "= " + fmt(r.polki); const pdv = document.querySelector('[data-pd="' + r.id + '"]'); if (pdv) pdv.textContent = "= " + fmt(r.pd); const am = document.querySelector('[data-amt="' + r.id + '"]'); if (am) am.textContent = ok ? fmt(r.amount) + (usdTxt(r.amount) ? " ≈ " + usdTxt(r.amount) : "") : "—"; });
