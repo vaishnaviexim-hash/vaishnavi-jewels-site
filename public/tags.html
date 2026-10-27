@@ -192,7 +192,9 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
     <div class="row" style="align-items:end">
       <label style="flex:2 1 220px">Code on the tag, tag number or design number <input id="cq" autocomplete="off" placeholder="e.g. abc270xyz, 809 or design 1436" inputmode="text"></label>
       <div><button type="button" class="btn" id="cgo">Check price</button></div>
+      <div><button type="button" class="btn ghost" id="cest" onclick="window.VJ_EST_NEW&&window.VJ_EST_NEW()">New estimate</button></div>
     </div>
+    <p class="hint">Estimate: tap New estimate - add stock pieces by code and / or a new design without a tag; same formulas and PDF as a bill, in rupees and US$.</p>
     <p class="hint">Or scan the QR code on the tag with your phone camera. It opens this page on the piece (only for people with access).</p>
     <div id="cres"></div>
   </section>
@@ -284,7 +286,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="/tags/shim.js?v=20261027ze"></script>
+<script src="/tags/shim.js?v=20261027zf"></script>
 <script>
 (function(){
 "use strict";
@@ -448,7 +450,7 @@ $("ordDel").addEventListener("click",async()=>{const b=$("ordDel"),list=S.tags.f
   for(const t of list){try{await S.db.doc("tags/"+t.id).delete("Wrong entry");ok++}catch(e){bad++}b.textContent=`Deleting… ${ok+bad} of ${list.length}`}
   b.disabled=false;msg(`Order tags deleted: ${ok}`+(bad?`, ${bad} failed (press again)`:"")+".",bad?"warn":"ok");renderList()});
 CATS.forEach(c=>{const o=document.createElement("option");o.value=c.id;o.textContent=c.name;$("cat").appendChild(o)});
-$("cat").addEventListener("change",()=>{const c=$("cat").value==="CH";$("vendorBox").hidden=!c;if(c){const dl=$("vendorList");dl.textContent="";[...new Set(S.tags.map(t=>t.approval&&t.approval.vendor).filter(Boolean))].sort().forEach(v=>{const o=document.createElement("option");o.value=v;dl.appendChild(o)})} /* owner 27/10/2026 13:22 (C-20261027-CHAINVENDOR): a chain on approval carries its vendor; no vendor = karigar / own chain */$("designNo").placeholder=c?"optional - e.g. Sid / Arun / Self":"e.g. 1436";$("designNo").required=!c}); /* C-20261017-CHAINDN */
+$("cat").addEventListener("change",()=>{const c=$("cat").value==="CH";$("vendorBox").hidden=!c;if(c){const dl=$("vendorList");dl.textContent="";[...new Set(["SID","ARUN"].concat(S.tags.map(t=>t.approval&&t.approval.vendor).filter(Boolean)))].sort().forEach(v=>{const o=document.createElement("option");o.value=v;dl.appendChild(o)})} /* owner 27/10 17:54: vendor codes SID (Siddharth) and ARUN always offered; type the code so the Chains (vendors) list groups them */ /* owner 27/10/2026 13:22 (C-20261027-CHAINVENDOR): a chain on approval carries its vendor; no vendor = karigar / own chain */$("designNo").placeholder=c?"optional - e.g. Sid / Arun / Self":"e.g. 1436";$("designNo").required=!c}); /* C-20261017-CHAINDN */
 
 /* ---------- read form ---------- */
 function kind(){return document.querySelector('input[name=kind]:checked').value}
