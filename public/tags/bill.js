@@ -135,6 +135,7 @@
         <label><input type="radio" name="btitle" value="Estimate"> Estimate</label></div>
       <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg);margin-top:8px"><input type="checkbox" id="bphoto" checked style="width:auto"> Show piece photos on the bill</label>
       <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg);margin-top:4px"><input type="checkbox" id="bnbb" style="width:auto"> Stamp <b>No Buy Back · No Exchange</b> on this bill</label>
+      <div class="row" style="margin-top:8px;align-items:end"><label>Amount before GST (optional) <input id="btarget" inputmode="numeric" autocomplete="off" maxlength="9" placeholder="e.g. 80000" style="max-width:180px"></label><button type="button" class="btn ghost" id="btargetgo">Set discount</button></div><p class="hint" id="btargethint">Type the amount the customer pays before GST (e.g. 80000) - the discount is worked out and spread over the pieces.</p>
       <table class="sum"><tr id="bfinerow" hidden><td><b>Fine gold to receive</b></td><td id="bfine"><b>—</b></td></tr><tr><td>Total</td><td id="bsum">—</td></tr><tr id="bdiscrow" hidden><td>Less discount</td><td id="bdisc">—</td></tr><tr hidden><td>Total after discount</td><td id="bsub">—</td></tr>
         <tr><td id="bgstl">GST 3%</td><td id="bgst">—</td></tr><tr class="total"><td>Bill total</td><td id="btotal">—</td></tr></table>
       <p class="hint" id="bnote"></p>
@@ -159,8 +160,8 @@
     document.querySelectorAll("input[name=btitle]").forEach(r => r.addEventListener("change", () => { B.title = r.value; numField(); }));
     $("bmonth").value = today().slice(0, 7); $("bmonth").addEventListener("change", loadBook); { let tm = 0; $("bfmob").addEventListener("input", () => { clearTimeout(tm); tm = setTimeout(loadBook, 350); }); } // owner 26/10 17:58: type a mobile no. and see all that customer's bills
     $("bxl").addEventListener("click", () => xl($("bmonth").value || today().slice(0, 7))); $("bxlall").addEventListener("click", () => xl("all")); $("bxwa").addEventListener("click", e => partyWA(e.currentTarget));
-    $("bF").addEventListener("input", render); $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); }); $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
-    $("bclear").addEventListener("click", () => { B.editNo = null; { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.nbb = false; $("bnbb").checked = false; B.nbbAuto = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; B.pdrates = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
+    $("bF").addEventListener("input", render); $("btargetgo").addEventListener("click", applyTarget); $("btarget").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applyTarget(); } }); /* owner 27/10 12:21 (C-20261027-BILLTARGET) */ $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); }); $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
+    $("bclear").addEventListener("click", () => { B.editNo = null; { const bt = $("btarget"); if (bt) bt.value = ""; } { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.nbb = false; $("bnbb").checked = false; B.nbbAuto = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; B.pdrates = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
     $("bsave").addEventListener("click", save);
     $("bback").addEventListener("click", () => { const c = document.querySelector('nav button[data-tab="check"]'); if (c) c.click(); });
   }
@@ -395,6 +396,24 @@
       rm.addEventListener("click", () => { delete B.disc[r.id]; delete B.rates[r.id]; delete B.frates[r.id]; delete B.prates[r.id]; delete B.pdrates[r.id]; B.items.splice(i, 1); render(); }); x.appendChild(rm); tr.appendChild(x); body.appendChild(tr);
     });
     totals(c);
+  }
+  // owner 27/10/2026 12:21 (C-20261027-BILLTARGET): 'discount before amount like 80000 + gst' - type the amount before GST and the
+  // discount (total less that amount) is spread over the pieces by their amount, the rest on the biggest piece. Only the per-piece
+  // discounts are saved, so the server works the bill out exactly as before.
+  function applyTarget() {
+    const h = $("btargethint"), T = Number(String($("btarget").value).replace(/[^0-9]/g, "")) || 0;
+    if (!T) { h.textContent = "Type the amount before GST, e.g. 80000."; return; }
+    if (!B.items.length || F() < 2000) { h.textContent = "Add the pieces and the gold rate first."; return; }
+    const keep = B.disc; B.disc = {}; const c0 = calcNow(); B.disc = keep;
+    const rows = c0.rows.filter(r => r.amount > 0), S = rows.reduce((a, r) => a + r.amount, 0);
+    if (!rows.length) { h.textContent = "Add the pieces first."; return; }
+    if (T >= S) { B.disc = {}; render(); h.textContent = "The total is " + fmt(S) + " - that is not more than " + fmt(T) + ", so no discount."; return; }
+    const X = S - T, nd = {}; let given = 0;
+    rows.forEach(r => { const d = Math.floor(X * r.amount / S); nd[r.id] = d; given += d; });
+    const big = rows.reduce((a, r) => r.amount > a.amount ? r : a, rows[0]); nd[big.id] += X - given;
+    B.disc = {}; Object.keys(nd).forEach(id => { if (nd[id] > 0) B.disc[id] = String(nd[id]); });
+    render(); const c1 = calcNow();
+    h.textContent = "Discount " + fmt(c1.sum - c1.sub) + " - amount before GST " + fmt(c1.sub) + " + GST " + fmt(c1.gst) + " = " + fmt(c1.total) + "." + (c1.sub !== T ? " (Totals round up to Rs 500, so use a figure in 500s.)" : "");
   }
   function totals(c) {
     c = c || calcNow(); const ok = F() >= 2000, has = c.rows.length && ok;
