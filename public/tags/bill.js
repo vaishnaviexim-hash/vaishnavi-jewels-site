@@ -249,7 +249,7 @@
       <div class="actions"><button type="button" class="btn" id="bsave">Save bill &amp; make PDF</button><button type="button" class="btn ghost" id="bclear">Clear</button></div>
       <p class="hint" id="bmsg"></p><div class="actions" id="bout" hidden></div>
       </div>
-      <h2>Saved bills &amp; estimates</h2>
+      <h2>Saved bills</h2>
       <p class="hint">A new bill starts from Tag &gt; Bill now. A vendor chain is tagged on New tag (Chain + vendor name) and billed like any piece.</p>
       <div class="actions" style="margin:0 0 8px"><button type="button" class="btn" id="bnewest">New estimate (stock pieces or a new design)</button></div>
       <div class="row" style="align-items:end"><label style="flex:0 1 200px">Month <input id="bmonth" type="month"></label><label style="flex:0 1 220px">Customer name or mobile (all bills) <input id="bfmob" autocomplete="off" maxlength="40" placeholder="type name or mobile no."></label>
@@ -291,7 +291,8 @@
     prefill(); B.title = "Estimate"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.checked = x.value === "Estimate"; }); numField(); loadBook(); window.scrollTo({ top: 0, behavior: "smooth" }); setTimeout(() => { const n = $("bq"); if (n) n.focus(); }, 120); };
   // C-20261016-BILLBOOK: estimate numbers are given by the server (E-YYMM-NN, from 01 each month); bill numbers are typed
   function numField() { const e = B.title === "Estimate", n = $("bno"); n.disabled = true; n.value = ""; const d = $("bdate").value || today(); // owner 16/10: bill numbers automatic too
-    n.placeholder = "automatic (" + (e ? "E-" : "B-") + d.slice(2, 4) + d.slice(5, 7) + "-01, 02 …)"; }
+    n.placeholder = "automatic (" + (e ? "E-" : "B-") + d.slice(2, 4) + d.slice(5, 7) + "-01, 02 …)";
+    { const sv = $("bsave"); if (sv && !B.editNo) sv.textContent = e ? "Make estimate PDF (not saved as a bill)" : "Save bill & make PDF"; } } // C-20261028-ESTNOTBILL
   // owner 27/10/2026 12:48 (C-20261027-BILLNAME): Saved bills - type a name (e.g. Prachi) and every Prachi's bills show, with one button per party
   // (name · city · mobile, bill count) to narrow to that party; a party with a mobile then works exactly like typing the mobile (Excel, WhatsApp).
   function partyPick(list) { let w = $("bfpick"); if (!w) { w = document.createElement("div"); w.id = "bfpick"; w.className = "row"; w.style.cssText = "gap:8px;flex-wrap:wrap;margin:6px 0"; $("bfmob").closest(".row").after(w); } w.textContent = "";
@@ -300,7 +301,32 @@
     w.appendChild(Object.assign(document.createElement("span"), { className: "hint", textContent: ps.size > 1 ? ps.size + " parties - tap one:" : "Party:" }));
     ps.forEach(p => { const b = document.createElement("button"); b.type = "button"; b.className = "btn ghost"; b.textContent = p.name + (p.city ? " · " + p.city : "") + (p.mob ? " · " + p.mob : "") + " (" + p.n + (p.n === 1 ? " bill)" : " bills)");
       b.addEventListener("click", () => { if (p.mob) { $("bfmob").value = p.mob; B.fcity = null; } else { $("bfmob").value = p.name; B.fcity = String(p.city).toLowerCase(); } loadBook(); }); w.appendChild(b); }); }
-  async function loadBook() {
+  // owner 28/10/2026 19:53 (C-20261028-ESTNOTBILL): estimates are not bills - only name, number and whose customer are kept, for the follow-up
+  async function loadEst() {
+    let pn = $("estpanel"); const host = $("bbookmsg"); if (!host) return;
+    if (!pn) { pn = document.createElement("div"); pn.id = "estpanel"; pn.style.marginTop = "18px";
+      pn.innerHTML = `<h2>Estimates sent - follow-ups</h2><p class="hint">Estimates are not saved as bills. Only the customer's name and number are kept here; the person whose customer it is gets a WhatsApp reminder 2 days after the estimate (and once more 3 days later) until it is marked below.</p>
+        <div class="row" style="align-items:end;gap:8px"><label style="flex:0 1 200px">Show <select id="estst"><option value="open">To follow up</option><option value="done">Followed up</option><option value="all">All</option></select></label></div>
+        <div class="list"><table class="items" style="min-width:640px"><thead><tr><th>Date</th><th>Number</th><th>Customer</th><th>Mobile</th><th>Amount</th><th>Whose customer</th><th>Reminder</th><th></th></tr></thead><tbody id="estrows"></tbody></table></div><p class="hint" id="estmsg"></p>`;
+      host.after(pn); $("estst").addEventListener("change", loadEst); }
+    const body = $("estrows"), m = $("estmsg");
+    try { const r = await fetch("/api/vj/estimates?status=" + encodeURIComponent($("estst").value), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+      body.textContent = "";
+      j.estimates.forEach(e => { const tr = document.createElement("tr"); const td = x => { const c = document.createElement("td"); c.textContent = x; tr.appendChild(c); return c; };
+        td(dmy(e.date)); td(e.no); { const c = td(e.name + (e.city ? ", " + e.city : "")); if (e.items) { const h = document.createElement("div"); h.className = "hint"; h.textContent = e.items; c.appendChild(h); } }
+        td(e.mobile || ""); td(fmt(e.total)); td(e.custName || "-");
+        td(e.status === "open" ? (e.reminders ? e.reminders + " sent" : "on " + dmy(e.due)) : ({ won: "Bought", lost: "Not buying", done: "Followed up" })[e.status] + (e.doneByName ? " (" + e.doneByName + ")" : "") + (e.note ? " - " + e.note : ""));
+        const x = document.createElement("td"); x.style.whiteSpace = "nowrap";
+        const btn = (label, st) => { const b = document.createElement("button"); b.type = "button"; b.className = "btn ghost"; b.textContent = label; b.addEventListener("click", async () => {
+          const note = st === "open" ? "" : (prompt("Note (optional) for " + e.no + " - " + e.name, "") || "").slice(0, 120); b.disabled = true;
+          try { const r = await fetch("/api/vj/estimate/done", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ no: e.no, status: st, note }) }); const k = await r.json().catch(() => ({})); if (!r.ok) throw new Error(k.error || r.status); loadEst(); }
+          catch (er) { b.disabled = false; m.textContent = "Not changed: " + (er.message || er); } }); x.appendChild(b); };
+        if (e.status === "open") { btn("Bought", "won"); btn("Not buying", "lost"); btn("Followed up", "done"); } else btn("Re-open", "open");
+        tr.appendChild(x); body.appendChild(tr); });
+      m.textContent = j.estimates.length ? j.estimates.length + " shown. " + j.open + " still to follow up." : ($("estst").value === "open" ? "Nothing to follow up." : "None.");
+    } catch (e) { m.textContent = "Could not load the estimates (" + (e.message || e) + ")."; }
+  }
+  async function loadBook() { loadEst();
     const body = $("bbook"), m = $("bbookmsg"); if (!body) return; const mo = $("bmonth").value || today().slice(0, 7); const fraw = String(($("bfmob") || {}).value || "").trim(), fq = /[a-z]/i.test(fraw) ? "" : fraw.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""), byMob = fq.length >= 4, fnm = !byMob && /[a-z]/i.test(fraw) && fraw.replace(/\s/g, "").length >= 2 ? fraw.toLowerCase().replace(/\s*ji$/, "").replace(/\s+/g, " ") : ""; /* owner 27/10 12:48 (C-20261027-BILLNAME): name or mobile */
     try { const r = await fetch("/api/vj/bills?month=" + encodeURIComponent(byMob || fnm ? "all" : mo), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); if (byMob) j.bills = j.bills.filter(b => String(b.mobile || "").replace(/\D/g, "").includes(fq)); if (fnm) { j.bills = j.bills.filter(b => String(b.name || "").toLowerCase().replace(/\s+/g, " ").includes(fnm)); if (B.fcity != null) j.bills = j.bills.filter(b => String(b.city || "").toLowerCase() === B.fcity); } partyPick(fnm ? j.bills : []); { const pb = byMob ? j.bills.find(b => !b.cancelled) : null; B.party = pb ? { name: pb.name, city: pb.city, mobile: pb.mobile } : null; $("bxwa").hidden = !pb; $("bxl").textContent = pb ? "Download party bills (Excel)" : "Download summary (Excel)"; $("bxlall").hidden = !!pb; }
       body.textContent = ""; let tot = 0, ft = 0; // ft: fine gold to receive (Gold to Gold / Gold Item bills) - kept apart from the rupees (owner 26/10 18:54)
@@ -653,14 +679,15 @@
     { const bad = B.designs.findIndex(d => designBad(d).length); if (bad >= 0) { m.textContent = "New design " + (bad + 1) + ": check " + designBad(B.designs[bad]).join(", ") + "."; return; } }
     if (body.designs.length && body.title !== "Estimate") { m.textContent = "A new design (no tag) can only go on an Estimate."; return; }
     if (body.title === "Estimate" && !body.cust) { m.textContent = "Choose whose customer this is (Mihir / Shilpi ji / Abhinav) - the follow-up reminder goes to them."; return; } // C-20261027-ESTOWNER
-    $("bsave").disabled = true; m.textContent = "Saving the bill…";
+    $("bsave").disabled = true; m.textContent = body.title === "Estimate" ? "Making the estimate…" : "Saving the bill…";
     try {
       const r = await fetch("/api/vj/bill", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("server " + r.status));
       const b = j.bill; m.textContent = "Making the PDF…";
       const blob = await makePdf(b, B.photos), fname = `${b.title} ${b.no.replace(/[^A-Z0-9\-]/g, "-")} ${b.name.replace(/[^A-Za-z0-9 .\-]/g, "").trim().slice(0, 40)}.pdf`;
       const file = new File([blob], fname, { type: "application/pdf" }), url = URL.createObjectURL(file);
-      loadBook(); m.textContent = `${b.title} ${b.no} saved: ${fmt(b.total)}${b.fine ? " + " + g3(b.fine) + " fine gold" : ""}.` + mobNote;
+      loadBook(); m.textContent = j.estimate ? `Estimate ${b.no} made: ${fmt(b.total)}. It is NOT saved as a bill - download or send the PDF now (no copy is kept). Only the name and number are kept for the follow-up: ${({ mihir: "Mihir", shilpi: "Shilpi ji", abhinav: "Abhinav" })[b.cust] || "the owner"} gets a WhatsApp reminder in 2 days.` + mobNote
+        : `${b.title} ${b.no} saved: ${fmt(b.total)}${b.fine ? " + " + g3(b.fine) + " fine gold" : ""}.` + mobNote; // C-20261028-ESTNOTBILL
       out.textContent = ""; out.hidden = false;
       const op = document.createElement("a"); op.className = "btn"; op.href = url; op.target = "_blank"; op.rel = "noopener"; op.textContent = "Open PDF (print)";
       const dl = document.createElement("a"); dl.className = "btn ghost"; dl.href = url; dl.download = fname; dl.textContent = "Download";
