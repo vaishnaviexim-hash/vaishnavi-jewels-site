@@ -29,6 +29,8 @@ export const business = {
   payment: 'NEFT, UPI and cash (no EMI)',
   showroomSize: '2,500 sq ft',
   designs: '3,000+',
+  // Starting price of our diamond jewellery, owner 28 Oct 2026.
+  priceFrom: '₹25,000',
   sameAs: [
     'https://instagram.com/vaishnavijewels.surat',
     'https://pinterest.com/vaishnavijewels01',
@@ -105,6 +107,7 @@ export function storeSchema(imageUrl) {
       validFrom: '2026-11-08',
       validThrough: '2026-11-15',
     }],
+    priceRange: 'From ₹25,000',
     areaServed: { '@type': 'Country', name: 'India' },
     paymentAccepted: 'NEFT, UPI, Cash',
     currenciesAccepted: 'INR',
