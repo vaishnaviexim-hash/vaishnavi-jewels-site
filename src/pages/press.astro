@@ -1,0 +1,48 @@
+---
+// Press kit page (owner 28/10/2026): facts, story and photos for journalists. Quotes are added only after Shilpi Agarwal approves them.
+import InfoPage from '../layouts/InfoPage.astro';
+import { business as b } from '../data/business.js';
+const facts = [
+  ['Business', `${b.name} (${b.legalName}), certified diamond jeweller and manufacturer`],
+  ['Founded', `${b.foundedText}, by ${b.founder}`],
+  ['Showroom', `${b.showroomSize} at ${b.addressText}`],
+  ['Designs', `${b.designs} designs in certified natural diamonds, lab-grown diamonds and Polki`],
+  ['Prices', `Diamond jewellery from ${b.priceFrom}`],
+  ['Checkable diamonds', 'Every solitaire is laser-inscribed with its IGI, EGL or TGL grading-report number, which the buyer can verify online before paying'],
+  ['Hallmark', 'BIS HUID hallmarked gold, verifiable in the BIS Care app'],
+  ['Manufacturing', 'Our own manufacturing unit in Surat; any design made to the buyer\'s choice'],
+  ['Buying from afar', 'Video-call selection and insured delivery across India; exhibitions for buyers in Mathura and the Braj region'],
+  ['Hours', b.hoursShort],
+  ['Media contact', `Abhinav Agrawal, ${b.email}`],
+];
+const photos = [
+  ['https://res.cloudinary.com/rknejib2/image/upload/c_pad,ar_4:5,w_1080,b_auto/vj/15VxbQlqWIf_bSLvOFEoRZS4AwgX8PbTt.jpg', 'Green stone and diamond necklace in yellow gold, Vaishnavi Jewels Surat'],
+  ['https://res.cloudinary.com/rknejib2/image/upload/c_fill,ar_9:16,w_1080,g_auto/b_rgb:120A0D,e_gradient_fade:40,y_-0.3/l_vj:brand:logo_original_for_dark_bg,e_trim,w_320/fl_layer_apply,g_south,y_330/f_jpg,q_auto/v1792911952/vj/story/1Y35cTlBNDJlcDr77gcllA8j-T_QaUbCs_20261026_1650.jpg', 'Rose gold diamond rani haar, Vaishnavi Jewels Surat'],
+  ['https://res.cloudinary.com/rknejib2/image/upload/c_fill,ar_9:16,w_1080,g_auto/b_rgb:120A0D,e_gradient_fade:40,y_-0.3/l_vj:brand:logo_original_for_dark_bg,e_trim,w_320/fl_layer_apply,g_south,y_330/f_jpg,q_auto/v1792886739/vj/story/1UguxIR1p-8lhubhOedqsvTqzIDTHhSvZ_20261026_0730.jpg', 'Heart and pear diamond pendant, Vaishnavi Jewels Surat'],
+];
+---
+<InfoPage
+  title="Press | Vaishnavi Jewels, Certified Diamond Jeweller in Surat since 2005"
+  description="Press kit for Vaishnavi Jewels, Surat: key facts, our story and photos. Certified, checkable diamonds made in our own unit since 2005."
+  path="/press"
+  eyebrow="PRESS"
+  heading="Press kit: Vaishnavi Jewels, Surat"
+  intro="Facts, our story and photos for journalists. Every solitaire we sell carries a report number the buyer can check online."
+>
+  <h2>Our story</h2>
+  <p>Vaishnavi Jewels was founded in Surat on {b.foundedText} by {b.founder}. From the start, the idea was simple: the buyer should not have to rely on trust alone. Every solitaire we sell is laser-inscribed with the number of its grading report from IGI, EGL or TGL, so the buyer can look up the same stone online before paying, and every gold piece carries a BIS HUID hallmark.</p>
+  <p>Our jewellery is made in our own manufacturing unit in Surat, the diamond city, so any of our {b.designs} designs can be changed in size, stones or style. Buyers in other cities and abroad choose pieces with us over a video call and receive them by insured delivery anywhere in India.</p>
+
+  <h2>Key facts</h2>
+  <dl>
+    {facts.map(([k, v]) => (<><dt>{k}</dt><dd>{v}</dd></>))}
+  </dl>
+
+  <h2>Photos</h2>
+  <p>Free to use with the credit "Vaishnavi Jewels, Surat". For high-resolution files or other pieces, email {b.email}.</p>
+  <ul style="list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+    {photos.map(([src, alt]) => (
+      <li><a href={src} target="_blank" rel="noopener"><img src={src} alt={alt} loading="lazy" decoding="async" style="width: 100%; height: auto; display: block;" /></a></li>
+    ))}
+  </ul>
+</InfoPage>
