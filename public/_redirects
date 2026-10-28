@@ -9,6 +9,9 @@
 /contact-us   /visit-us   301
 /privacy-policy  /privacy  301
 /blog/f/lab-grown-vs-natural-diamonds-which-one-is-right-for-you /lab-grown-diamond-jewellery  301
+# Short links for the owner (Flow video stories, 28/10/2026)
+/v/kc     https://res.cloudinary.com/rknejib2/video/upload/v1793099100/vj/flowstory/flow_20261029_1.mp4  302
+/v/bride  https://res.cloudinary.com/rknejib2/video/upload/v1793176501/vj/flowstory/flow_20261030_1.mp4  302
 # Any other old blog address -> new blog
 /blog/f     /blog  301
 /blog/f/*   /blog  301
