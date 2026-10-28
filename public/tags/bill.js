@@ -109,6 +109,14 @@
   // For Gold to Gold / Gold Item, settle 'fine' = customer gives the fine gold; 'amount' = fine x F is charged in rupees.
   // Diamonds = ct x the tag's rate, polki = pcs x rate per pc, plus other charges. Discount (C-20261016-BILLDISC) per piece, rupees or 'n%' of that piece's
   // rupee amount, never more than it. Rupee total less discount, rounded UP to Rs 500 (owner 17 Oct 2026; the rounding is never printed - the Total shown is the rounded figure, and with a discount the printed discount is reduced so the arithmetic holds); GST to the nearest rupee.
+  // owner 28/10/2026 20:25 (C-20261028-SIGHRATE) 'universal rule': a diamond line with NO rate on its tag takes the default rate of its quality:
+  // VS SI GH codes (RVS-SI-GH, BVS.SI.GH, MVS-SI-GH, PSIGH, PVSGH, MSIGH ...) = VS GH: Round 46,000, Choki (baguette) 46,000, Fancy (marquise, pear ...) 85,000/ct;
+  // CVD codes = the CVD rate. Polki / stones / solitaires (SOL...) are never filled in. Rates come from Gold rate & settings (default table below).
+  const VJ_AUTO_DEF = { 'CVD|Round': 23000, 'CVD|Choki': 23000, 'CVD|Fancy': 23000, 'VS GH|Round': 46000, 'VS GH|Choki': 46000, 'VS GH|Fancy': 85000 };
+  function vjAutoRate(d, R) { const q = String(d && d.q || '') + ' ' + String(d && d.code || ''), s0 = String(d && d.shape || '').toLowerCase(), sh = s0 === 'choki' ? 'Choki' : s0 === 'round' ? 'Round' : s0 === 'fancy' ? 'Fancy' : '';
+    if (!sh || /POL|EMR|MOZ|RUBY|PEARL|MOTI|STONE|KUNDAN/i.test(q) || /^\s*SOL/i.test(String(d && d.q || ''))) return 0;
+    const fam = /CVD|LGD/i.test(q) ? 'CVD' : (/GH/i.test(q) && /SI|VS/i.test(q)) ? 'VS GH' : ''; if (!fam) return 0;
+    const T = R && typeof R === 'object' ? R : {}; return Number(T[fam + '|' + sh]) || VJ_AUTO_DEF[fam + '|' + sh] || 0; }
   const VJ_FINE = { g2g: { '9K': 0.4235, '14K': 0.66, '18K': 0.836, '22K': 1.06, '24K': 1 }, item: { '9K': 0.54, '14K': 0.74, '18K': 0.90, '22K': 1.06, '24K': 1 } };
   function vjBillCalc(tags, o) {
     const pur = Object.assign({ '24K': 1, '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.385 }, o.purity || {}); // 9K = 38.5 tunch (owner 26/10 19:00)
@@ -139,7 +147,7 @@
       fine = Math.round(fine * 1000) / 1000;
       if (settle === 'amount') gold = fine * Fr;
       const ov = o.rates && Array.isArray(o.rates[t.id]) ? o.rates[t.id] : []; // rates edited on the bill (C-20261016-BILLALL); the tag is not changed
-      const dl = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map((d, i) => ({ q: String(d.q || ''), shape: String(d.shape || '').slice(0, 20), ct: Number(d.ct) || 0, tagRate: Number(d.rate) || 0, rate: Number(ov[i]) > 0 ? Number(ov[i]) : Number(ov[i]) === -1 ? 0 : (Number(d.rate) || 0), idx: i })) // -1 = rate typed as 0 on the bill (owner 26/10 18:38: party diamond with no charge)
+      const dl = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map((d, i) => ({ q: String(d.q || ''), shape: String(d.shape || '').slice(0, 20), ct: Number(d.ct) || 0, tagRate: Number(d.rate) || 0, rate: Number(ov[i]) > 0 ? Number(ov[i]) : Number(ov[i]) === -1 ? 0 : (Number(d.rate) || vjAutoRate(d, o.defRates)), auto: !(Number(ov[i]) !== 0 || Number(d.rate) > 0) && vjAutoRate(d, o.defRates) > 0, idx: i })) // -1 = rate typed as 0 on the bill (owner 26/10 18:38: party diamond with no charge)
         .sort((x, y) => { const rk = s => { const v = { round: 0, choki: 1, fancy: 2 }[String(s || '').toLowerCase()]; return v === undefined ? 3 : v; }; return rk(x.shape) - rk(y.shape) || x.idx - y.idx; }); // owner 26/10: Round first, then Choki, then Fancy (C-20261026-DIAORDER)
       const ct = dl.reduce((a, d) => a + d.ct, 0), dia = dl.reduce((a, d) => a + d.ct * d.rate, 0), oth = Number(t.other && t.other.amt) || 0;
       // polki (C-20261017-POLKI): pcs x the tag's rate per pc; the rate can be changed on the bill (prates), the tag is not changed
@@ -505,7 +513,7 @@
   const F = () => Number(String($("bF").value).replace(/[^0-9.]/g, "")) || 0;
   function calcNow() { const s = settings(), all = tags(); const list = B.items.map(id => all.find(t => t.id === id)).filter(Boolean).concat(vtags())
       .map(t => B.option ? Object.assign({}, t, { dias: (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map(d => Object.assign({}, d, { rate: optRate(d, B.option) })) }) : t); // C-20261027-ESTBILL
-    return vjBillCalc(list, { F: F(), mode: B.mode, settle: B.settle, g2g: B.g2g, disc: B.disc, rates: B.rates, frates: B.frates, prates: B.prates, pdrates: B.pdrates, og: ogNow(), final: B.final || 0, purity: s.purity, making: s.making, gst: s.gst }); }
+    return vjBillCalc(list, { F: F(), mode: B.mode, settle: B.settle, g2g: B.g2g, disc: B.disc, rates: B.rates, frates: B.frates, prates: B.prates, pdrates: B.pdrates, og: ogNow(), final: B.final || 0, purity: s.purity, making: s.making, gst: s.gst, defRates: s.defaultRates }); }
   function goldCell(r, c) { return c.settle === "fine" ? g3(r.fine) + " fine" : fmt(r.goldAmt) + (c.settle ? " (" + g3(r.fine) + " fine)" : ""); }
   function mkCell(r, c) { return r.chain ? "— (chain)" /* C-20261017-CHAINTUNCH: no making on chain lines */ : c.mode === "item" ? "in gold" : fmt(r.making) + " (" + r.mkRate + "/g" + (r.mkWt > 0 && Math.abs(r.mkWt - r.wt) > 0.0005 ? " on " + r.mkWt.toFixed(3) + " g" : "") + ")"; }
   function noteText(mode, rows, g2g) { if (mode === "g2g" && g2g === "nett") mode = "g2gn"; // C-20261026-G2GNETT
