@@ -1,0 +1,136 @@
+---
+// Book a visit (owner 28/10/2026, idea from charujewels.com/booknow). v1: no server, no cost.
+// The visitor picks visit type, day and a 30-minute slot; the request opens as a WhatsApp message
+// to our number, where Aashvi and the team confirm it. Slots follow our real hours (see business.js).
+import InfoPage from '../layouts/InfoPage.astro';
+import { business as b } from '../data/business.js';
+const faqs: [string, string][] = [
+  ['How do I book a visit to the Vaishnavi Jewels showroom?', 'Choose a showroom visit or a video call, pick a day and a 30-minute time, add your name and what you are looking for, and press "Send on WhatsApp". Our team confirms your time on WhatsApp.'],
+  ['Can I book a video call if I live outside Surat or abroad?', 'Yes. Choose "Video call" and we will show you pieces live, share certificates before anything is sent, and deliver by insured courier anywhere in India.'],
+  ['Is there any charge for booking?', 'No. Booking a showroom visit or a video call is free and you are under no obligation to buy.'],
+];
+---
+<InfoPage
+  title="Book a Showroom Visit or Video Call | Vaishnavi Jewels, Parle Point, Surat"
+  description="Book a free 30-minute showroom visit or video call with Vaishnavi Jewels, Rajhans Ornate Mall, Parle Point, Surat. Certified diamond jewellery from Rs 25,000."
+  path="/book-a-visit"
+  eyebrow="BOOK A VISIT"
+  heading="Book a showroom visit or video call"
+  intro="Pick a time that suits you. We keep the pieces you want to see ready, so your visit is unhurried."
+  faqs={faqs}
+>
+  <form id="vj-book" class="vj-book" novalidate>
+    <fieldset>
+      <legend>1. How would you like to meet?</legend>
+      <label class="opt"><input type="radio" name="type" value="Showroom visit" checked /> Showroom visit at Parle Point</label>
+      <label class="opt"><input type="radio" name="type" value="Video call" /> Video call (outside Surat or abroad)</label>
+    </fieldset>
+
+    <fieldset>
+      <legend>2. Choose a day</legend>
+      <div id="vj-days" class="chips" role="radiogroup" aria-label="Day"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>3. Choose a time (30 minutes)</legend>
+      <div id="vj-slots" class="chips" role="radiogroup" aria-label="Time"><p class="hint">Choose a day first.</p></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>4. Your details</legend>
+      <label>Your name *<input type="text" name="name" required autocomplete="name" maxlength="60" /></label>
+      <label>Looking for
+        <select name="interest">
+          <option>Bridal jewellery</option>
+          <option>Solitaire ring</option>
+          <option>Diamond necklace</option>
+          <option>Diamond earrings</option>
+          <option>Mangalsutra</option>
+          <option>Polki jewellery</option>
+          <option>Lab-grown diamond jewellery</option>
+          <option>Custom design</option>
+          <option>Just browsing</option>
+        </select>
+      </label>
+      <label>Budget (optional)
+        <select name="budget">
+          <option value="">Prefer not to say</option>
+          <option>Rs 25,000 - 50,000</option>
+          <option>Rs 50,000 - 1 lakh</option>
+          <option>Rs 1 - 3 lakh</option>
+          <option>Rs 3 - 10 lakh</option>
+          <option>Above Rs 10 lakh</option>
+        </select>
+      </label>
+      <label>Anything we should prepare? (optional)<textarea name="note" rows="3" maxlength="300"></textarea></label>
+    </fieldset>
+
+    <p id="vj-err" class="err" role="alert" hidden></p>
+    <button type="submit" class="btn btn-solid">Send on WhatsApp</button>
+    <p class="hint">Your request opens in WhatsApp to {b.whatsappDisplay}. Our team confirms your time there. Free, and no obligation to buy.</p>
+  </form>
+
+  <script is:inline define:vars={{ wa: b.whatsappE164 }}>
+    (function () {
+      // Our hours (business.js, R-065/F-017/F-020): Mon-Sat 11:00-20:00; Sundays open until 7 Nov 2026; closed 8-15 Nov 2026.
+      var SUNDAY_OPEN_UNTIL = '2026-11-07', CLOSED = [['2026-11-08', '2026-11-15']];
+      var OPEN = 11 * 60, LAST = 19 * 60 + 30, DAYS_AHEAD = 14;
+      var form = document.getElementById('vj-book'), daysEl = document.getElementById('vj-days'), slotsEl = document.getElementById('vj-slots');
+      var err = document.getElementById('vj-err'), day = null, slot = null;
+      function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+      function open(d) {
+        var k = iso(d);
+        for (var i = 0; i < CLOSED.length; i++) if (k >= CLOSED[i][0] && k <= CLOSED[i][1]) return false;
+        return d.getDay() !== 0 || k <= SUNDAY_OPEN_UNTIL;
+      }
+      function nowIST() { var n = new Date(); return new Date(n.getTime() + (n.getTimezoneOffset() + 330) * 60000); }
+      function label(d) { return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }); }
+      function hm(m) { var h = Math.floor(m / 60), mm = m % 60, ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return h + ':' + String(mm).padStart(2, '0') + ' ' + ap; }
+      function chip(text, on) { var b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = text; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', 'false'); b.onclick = on; return b; }
+      function pick(group, el) { group.querySelectorAll('.chip').forEach(function (c) { c.setAttribute('aria-checked', 'false'); }); el.setAttribute('aria-checked', 'true'); }
+      function showSlots(d) {
+        slotsEl.innerHTML = ''; slot = null;
+        var now = nowIST(), today = iso(d) === iso(now), min = today ? now.getHours() * 60 + now.getMinutes() + 60 : 0, n = 0;
+        for (var m = OPEN; m <= LAST; m += 30) {
+          if (m < min) continue;
+          (function (m) { var c = chip(hm(m), function () { slot = hm(m); pick(slotsEl, c); }); slotsEl.appendChild(c); n++; })(m);
+        }
+        if (!n) slotsEl.innerHTML = '<p class="hint">No times left today. Please choose another day.</p>';
+      }
+      var base = nowIST(); base.setHours(0, 0, 0, 0);
+      for (var i = 0; i < DAYS_AHEAD; i++) {
+        var d = new Date(base); d.setDate(base.getDate() + i);
+        if (!open(d)) continue;
+        if (i === 0 && nowIST().getHours() * 60 + nowIST().getMinutes() + 60 > LAST) continue;
+        (function (d) { var c = chip(label(d), function () { day = d; pick(daysEl, c); showSlots(d); }); daysEl.appendChild(c); })(d);
+      }
+      form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var f = new FormData(form), name = String(f.get('name') || '').trim();
+        var miss = !day ? 'Please choose a day.' : !slot ? 'Please choose a time.' : !name ? 'Please add your name.' : '';
+        if (miss) { err.textContent = miss; err.hidden = false; return; }
+        err.hidden = true;
+        var lines = ['Hi Vaishnavi Jewels, I would like to book a ' + f.get('type').toLowerCase() + '.',
+          'Day: ' + label(day) + ', ' + slot, 'Name: ' + name, 'Looking for: ' + f.get('interest')];
+        if (f.get('budget')) lines.push('Budget: ' + f.get('budget'));
+        var note = String(f.get('note') || '').trim(); if (note) lines.push('Note: ' + note);
+        lines.push('(Booked on vaishnavijewels.com)');
+        window.location.href = 'https://wa.me/' + wa.replace('+', '') + '?text=' + encodeURIComponent(lines.join('\n'));
+      });
+    })();
+  </script>
+
+  <style is:global>
+    .vj-book { display: grid; gap: 22px; max-width: 640px; }
+    .vj-book fieldset { border: 1px solid rgba(58, 15, 26, 0.15); padding: 16px 18px; margin: 0; }
+    .vj-book legend { font-weight: 600; padding: 0 6px; }
+    .vj-book label { display: grid; gap: 6px; margin-top: 10px; }
+    .vj-book label.opt { display: flex; gap: 10px; align-items: center; }
+    .vj-book input[type=text], .vj-book select, .vj-book textarea { font: inherit; padding: 10px 12px; border: 1px solid rgba(58, 15, 26, 0.25); background: #fff; width: 100%; box-sizing: border-box; }
+    .vj-book .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .vj-book .chip { font: inherit; font-size: 15px; padding: 8px 14px; border: 1px solid var(--color-gold); background: transparent; cursor: pointer; }
+    .vj-book .chip[aria-checked=true] { background: var(--color-gold); color: #fff; }
+    .vj-book .hint { font-size: 14px; color: var(--color-ink-soft); margin: 4px 0 0; }
+    .vj-book .err { color: #9b1c1c; margin: 0; }
+  </style>
+</InfoPage>
