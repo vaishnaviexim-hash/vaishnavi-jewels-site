@@ -1162,7 +1162,7 @@ async function vjEstAll(env) { // follow-up records + a one-time copy of the old
   await vjEstT(env); if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
   const have = new Map((((await env.DB.prepare('SELECT no, data FROM vj_estimates').all()).results) || []).map(r => { try { return [r.no, JSON.parse(r.data)]; } catch (e) { return [r.no, null]; } }).filter(x => x[1]));
   const old = ((((await env.DB.prepare("SELECT ts, email, data FROM vj_bills WHERE no LIKE 'E-%'").all()).results) || []).map(r => { try { return [r, JSON.parse(r.data)]; } catch (e) { return null; } })).filter(x => x && x[1] && !x[1].cancelled && !have.has(x[1].no));
-  for (const [r, b] of old) { const rec = Object.assign(vjEstRec(b), { legacy: true }); if (vjAddDays(b.date, 5) < new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10)) rec.due = ''; // older than 5 days: listed, no automatic reminder await env.DB.prepare('INSERT INTO vj_estimates (no, ts, email, data) VALUES (?, ?, ?, ?) ON CONFLICT(no) DO NOTHING').bind(b.no, r.ts || Date.now(), r.email || '', JSON.stringify(rec)).run(); have.set(b.no, rec); }
+  for (const [r, b] of old) { const rec = Object.assign(vjEstRec(b), { legacy: true }); if (vjAddDays(b.date, 5) < new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10)) rec.due = ''; /* older than 5 days: listed, no automatic reminder */ await env.DB.prepare('INSERT INTO vj_estimates (no, ts, email, data) VALUES (?, ?, ?, ?) ON CONFLICT(no) DO NOTHING').bind(b.no, r.ts || Date.now(), r.email || '', JSON.stringify(rec)).run(); have.set(b.no, rec); }
   return have;
 }
 async function vjEstList(url, env, who) {
