@@ -756,11 +756,11 @@ async function vjQuote(request, env, who, ctx) {
 // rupee amount, never more than it. Rupee total less discount, rounded UP to Rs 1,000; GST to the nearest rupee.
 // owner 28/10/2026 20:25 (C-20261028-SIGHRATE) 'universal rule': a diamond line with NO rate on its tag takes the default rate of its quality:
 // VS SI GH codes (RVS-SI-GH, BVS.SI.GH, MVS-SI-GH, PSIGH, PVSGH, MSIGH ...) = VS GH: Round 46,000, Choki (baguette) 46,000, Fancy (marquise, pear ...) 85,000/ct;
-// CVD codes = the CVD rate. Polki / stones / solitaires (SOL...) are never filled in. Rates come from Gold rate & settings (default table below).
+// CVD codes, all solitaires (SOL...) and C-VVS-VS-EF / C-B-VS-EF (lab-grown, owner 28/10 20:51) = the CVD rate. Polki / stones are never filled in. Rates come from Gold rate & settings (default table below).
 const VJ_AUTO_DEF = { 'CVD|Round': 23000, 'CVD|Choki': 23000, 'CVD|Fancy': 23000, 'VS GH|Round': 46000, 'VS GH|Choki': 46000, 'VS GH|Fancy': 85000 };
 function vjAutoRate(d, R) { const q = String(d && d.q || '') + ' ' + String(d && d.code || ''), s0 = String(d && d.shape || '').toLowerCase(), sh = s0 === 'choki' ? 'Choki' : s0 === 'round' ? 'Round' : s0 === 'fancy' ? 'Fancy' : '';
-  if (!sh || /POL|EMR|MOZ|RUBY|PEARL|MOTI|STONE|KUNDAN/i.test(q) || /^\s*SOL/i.test(String(d && d.q || ''))) return 0;
-  const fam = /CVD|LGD/i.test(q) ? 'CVD' : (/GH/i.test(q) && /SI|VS/i.test(q)) ? 'VS GH' : ''; if (!fam) return 0;
+  if (!sh || /POL|EMR|MOZ|RUBY|PEARL|MOTI|STONE|KUNDAN/i.test(q) ) return 0; /* owner 28/10 20:51: solitaires are lab-grown - CVD rate */
+  const fam = /CVD|LGD/i.test(q) || /^\s*(SOL|C-)/i.test(String(d && d.q || '')) ? 'CVD' : (/GH/i.test(q) && /SI|VS/i.test(q)) ? 'VS GH' : ''; if (!fam) return 0;
   const T = R && typeof R === 'object' ? R : {}; return Number(T[fam + '|' + sh]) || VJ_AUTO_DEF[fam + '|' + sh] || 0; }
 const VJ_FINE = { g2g: { '9K': 0.4235, '14K': 0.66, '18K': 0.836, '22K': 1.06, '24K': 1 }, item: { '9K': 0.54, '14K': 0.74, '18K': 0.90, '22K': 1.06, '24K': 1 } };
 function vjBillCalc(tags, o) {
