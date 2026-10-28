@@ -61,6 +61,7 @@ const trust = [
               {path === '/visit-us'
                 ? <a class="btn btn-outline" href={business.mapsUrl} target="_blank" rel="noopener">Get directions</a>
                 : <a class="btn btn-outline" href="/visit-us">Visit the showroom</a>}
+              {path !== '/book-a-visit' && <a class="btn btn-outline" href="/book-a-visit">Book a visit</a>}
             </div>
             <p style="margin-top: 16px; font-size: 15px; letter-spacing: 0.04em; color: var(--color-ink-soft);">Diamond jewellery from {business.priceFrom}</p>
           </div>
