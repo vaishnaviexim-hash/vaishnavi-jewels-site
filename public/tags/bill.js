@@ -315,7 +315,7 @@
       j.estimates.forEach(e => { const tr = document.createElement("tr"); const td = x => { const c = document.createElement("td"); c.textContent = x; tr.appendChild(c); return c; };
         td(dmy(e.date)); td(e.no); { const c = td(e.name + (e.city ? ", " + e.city : "")); if (e.items) { const h = document.createElement("div"); h.className = "hint"; h.textContent = e.items; c.appendChild(h); } }
         td(e.mobile || ""); td(fmt(e.total)); td(e.custName || "-");
-        td(e.status === "open" ? (e.reminders ? e.reminders + " sent" : "on " + dmy(e.due)) : ({ won: "Bought", lost: "Not buying", done: "Followed up" })[e.status] + (e.doneByName ? " (" + e.doneByName + ")" : "") + (e.note ? " - " + e.note : ""));
+        td(e.status === "open" ? (e.reminders ? e.reminders + " sent" : e.due ? "on " + dmy(e.due) : "-") : ({ won: "Bought", lost: "Not buying", done: "Followed up" })[e.status] + (e.doneByName ? " (" + e.doneByName + ")" : "") + (e.note ? " - " + e.note : ""));
         const x = document.createElement("td"); x.style.whiteSpace = "nowrap";
         const btn = (label, st) => { const b = document.createElement("button"); b.type = "button"; b.className = "btn ghost"; b.textContent = label; b.addEventListener("click", async () => {
           const note = st === "open" ? "" : (prompt("Note (optional) for " + e.no + " - " + e.name, "") || "").slice(0, 120); b.disabled = true;
