@@ -754,6 +754,14 @@ async function vjQuote(request, env, who, ctx) {
 // For Gold to Gold / Gold Item, settle 'fine' = customer gives the fine gold; 'amount' = fine x F is charged in rupees.
 // Diamonds = ct x the tag's rate, polki = pcs x rate per pc, plus other charges. Discount (C-20261016-BILLDISC) per piece, rupees or 'n%' of that piece's
 // rupee amount, never more than it. Rupee total less discount, rounded UP to Rs 1,000; GST to the nearest rupee.
+// owner 28/10/2026 20:25 (C-20261028-SIGHRATE) 'universal rule': a diamond line with NO rate on its tag takes the default rate of its quality:
+// VS SI GH codes (RVS-SI-GH, BVS.SI.GH, MVS-SI-GH, PSIGH, PVSGH, MSIGH ...) = VS GH: Round 46,000, Choki (baguette) 46,000, Fancy (marquise, pear ...) 85,000/ct;
+// CVD codes = the CVD rate. Polki / stones / solitaires (SOL...) are never filled in. Rates come from Gold rate & settings (default table below).
+const VJ_AUTO_DEF = { 'CVD|Round': 23000, 'CVD|Choki': 23000, 'CVD|Fancy': 23000, 'VS GH|Round': 46000, 'VS GH|Choki': 46000, 'VS GH|Fancy': 85000 };
+function vjAutoRate(d, R) { const q = String(d && d.q || '') + ' ' + String(d && d.code || ''), s0 = String(d && d.shape || '').toLowerCase(), sh = s0 === 'choki' ? 'Choki' : s0 === 'round' ? 'Round' : s0 === 'fancy' ? 'Fancy' : '';
+  if (!sh || /POL|EMR|MOZ|RUBY|PEARL|MOTI|STONE|KUNDAN/i.test(q) || /^\s*SOL/i.test(String(d && d.q || ''))) return 0;
+  const fam = /CVD|LGD/i.test(q) ? 'CVD' : (/GH/i.test(q) && /SI|VS/i.test(q)) ? 'VS GH' : ''; if (!fam) return 0;
+  const T = R && typeof R === 'object' ? R : {}; return Number(T[fam + '|' + sh]) || VJ_AUTO_DEF[fam + '|' + sh] || 0; }
 const VJ_FINE = { g2g: { '9K': 0.4235, '14K': 0.66, '18K': 0.836, '22K': 1.06, '24K': 1 }, item: { '9K': 0.54, '14K': 0.74, '18K': 0.90, '22K': 1.06, '24K': 1 } };
 function vjBillCalc(tags, o) {
   const pur = Object.assign({ '24K': 1, '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.385 }, o.purity || {}); // 9K = 38.5 tunch (owner 26/10 19:00)
@@ -784,7 +792,7 @@ function vjBillCalc(tags, o) {
     fine = Math.round(fine * 1000) / 1000;
     if (settle === 'amount') gold = fine * Fr;
     const ov = o.rates && Array.isArray(o.rates[t.id]) ? o.rates[t.id] : []; // rates edited on the bill (C-20261016-BILLALL); the tag is not changed
-    const dl = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map((d, i) => ({ q: String(d.q || ''), shape: String(d.shape || '').slice(0, 20), ct: Number(d.ct) || 0, tagRate: Number(d.rate) || 0, rate: Number(ov[i]) > 0 ? Number(ov[i]) : Number(ov[i]) === -1 ? 0 : (Number(d.rate) || 0), idx: i })) // -1 = rate typed as 0 on the bill (owner 26/10 18:38: party diamond with no charge)
+    const dl = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map((d, i) => ({ q: String(d.q || ''), shape: String(d.shape || '').slice(0, 20), ct: Number(d.ct) || 0, tagRate: Number(d.rate) || 0, rate: Number(ov[i]) > 0 ? Number(ov[i]) : Number(ov[i]) === -1 ? 0 : (Number(d.rate) || vjAutoRate(d, o.defRates)), auto: !(Number(ov[i]) !== 0 || Number(d.rate) > 0) && vjAutoRate(d, o.defRates) > 0, idx: i })) // -1 = rate typed as 0 on the bill (owner 26/10 18:38: party diamond with no charge)
         .sort((x, y) => { const rk = s => { const v = { round: 0, choki: 1, fancy: 2 }[String(s || '').toLowerCase()]; return v === undefined ? 3 : v; }; return rk(x.shape) - rk(y.shape) || x.idx - y.idx; }); // owner 26/10: Round first, then Choki, then Fancy (C-20261026-DIAORDER)
     const ct = dl.reduce((a, d) => a + d.ct, 0), dia = dl.reduce((a, d) => a + d.ct * d.rate, 0), oth = Number(t.other && t.other.amt) || 0;
     // polki (C-20261017-POLKI): pcs x the tag's rate per pc; the rate can be changed on the bill (prates), the tag is not changed
@@ -929,7 +937,9 @@ async function vjBill(request, env, who, ctx) { // every login may make bills (o
   const s = sRow ? JSON.parse(sRow.data) : {};
   vtags.forEach(t => tags.push(t)); // C-20261027-ESTBILL: the typed designs are priced like tags
   if (option) { const stQ = vjQSt(s); tags.forEach(t => { t.dias = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map(d => Object.assign({}, d, { rate: vjQOptRate(d, option, stQ) })); }); } // diamonds choice (C-20261027-ESTBILL)
-  const calc = vjBillCalc(tags, { F, mode, settle, g2g: b && b.g2g === 'nett' ? 'nett' : 'ws', disc, rates, frates, prates, pdrates, og, final, purity: s.purity, making: s.making, gst: s.gst });
+  const calc = vjBillCalc(tags, { F, mode, settle, g2g: b && b.g2g === 'nett' ? 'nett' : 'ws', disc, rates, frates, prates, pdrates, og, final, purity: s.purity, making: s.making, gst: s.gst, defRates: s.defaultRates || VJ_DEF_RATES });
+  { const miss = []; calc.rows.forEach(r => (r.dias || []).forEach(d => { if (d.ct > 0 && !(d.rate > 0) && !(Number(rates[r.id] && rates[r.id][d.idx]) === -1) && !VJ_Q_NONDIA.test(d.q)) miss.push((r.design ? r.design + ' ' : '') + (r.label || r.id) + ' (' + d.shape + ' ' + d.q + ', ' + d.ct + ' ct)'); }));
+    if (miss.length) return vjDeny(400, 'diamond rate missing on ' + miss.slice(0, 6).join('; ') + (miss.length > 6 ? ' and ' + (miss.length - 6) + ' more' : '') + ' - type the rate per ct on the bill (or 0 for a party diamond)'); } // C-20261028-SIGHRATE: never Rs 0 diamonds by mistake
   calc.rows.forEach((r, i) => { const ph = tags[i].photo; if (typeof ph === 'string' && /^[0-9a-f]{32}$/.test(ph)) r.photo = ph; if (tags[i].src) r.src = tags[i].src; }); // owner 16/10: photo on the bill; src = the typed design (C-20261027-ESTBILL)
   const bill = Object.assign({ no, title, date, name, city, mobile, F, nbb: !!(b && b.nbb === true), by: who.email, byName: who.name, at: new Date().toISOString(), ...(option ? { option } : {}), ...(usd ? { usd } : {}), ...(cust ? { cust } : {}) }, calc); // nbb: 'No Buy Back No Exchange' stamp (owner 17/10, C-20261017-NBB)
   if (editNo) { // C-20261026-BILLEDIT (owner 26/10/2026 17:32 'i should be able to edit the bill'): owners only; the old version is kept in vj_bill_old
