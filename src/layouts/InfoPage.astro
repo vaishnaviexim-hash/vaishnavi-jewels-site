@@ -58,7 +58,9 @@ const trust = [
             <p class="lead">{intro}</p>
             <div class="hero-cta">
               <a class="btn btn-solid" href={business.whatsapp} target="_blank" rel="noopener">Ask on WhatsApp</a>
-              <a class="btn btn-outline" href="/visit-us">Visit the showroom</a>
+              {path === '/visit-us'
+                ? <a class="btn btn-outline" href={business.mapsUrl} target="_blank" rel="noopener">Get directions</a>
+                : <a class="btn btn-outline" href="/visit-us">Visit the showroom</a>}
             </div>
           </div>
           {hero && (
