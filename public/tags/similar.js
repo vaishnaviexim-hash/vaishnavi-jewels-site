@@ -56,8 +56,58 @@
   }
   async function pool(jobs, onDone) { const out = []; let i = 0; const w = async () => { while (i < jobs.length) { const k = i++; out[k] = await jobs[k](); onDone(); } }; await Promise.all(Array.from({ length: Math.min(PARALLEL, jobs.length) }, w)); return out; }
 
+  // C-20261029-SIMPDF (owner 29/10 12:06): tick pieces -> one PDF for the owner, or a ready Estimate for the customer
+  let picked = new Set(), lastRows = [];
+  const pickedTags = () => { const all = tagsNow(); return lastRows.map(r => all.find(x => x.id === r.m.id)).filter(t => t && picked.has(t.id)); };
+  async function thumb(photo, px) {
+    try { const im = await loadImg("/_blob/" + photo); const k = Math.min(1, px / Math.max(im.width, im.height)); const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(im.width * k)); c.height = Math.max(1, Math.round(im.height * k)); const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height);
+      return { d: c.toDataURL("image/jpeg", 0.85), w: c.width, h: c.height }; } catch (e) { return null; }
+  }
+  async function makePdf(msg) {
+    const list = pickedTags(); if (!list.length) { msg.textContent = "Tick at least one piece first."; return; }
+    if (!window.jspdf) { msg.textContent = "PDF maker did not load - reload the page and try again."; return; }
+    msg.textContent = "Making the PDF...";
+    const { jsPDF } = window.jspdf, doc = new jsPDF({ unit: "mm", format: "a4" }), M = 14, W = 210 - 2 * M; let y = 18;
+    const d = new Date(), dd = String(d.getDate()).padStart(2, "0") + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + d.getFullYear();
+    doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.text("Similar designs from our stock", M, y); doc.setFont("helvetica", "normal"); doc.setFontSize(11); doc.text(dd, 210 - M, y, { align: "right" }); y += 8;
+    if (partyPhoto) { const im = await loadImg("data:image/jpeg;base64," + partyPhoto).catch(() => null); if (im) { const s = 45 / Math.max(im.width, im.height), w = im.width * s, h = im.height * s; doc.setFontSize(11); doc.text("Party's design:", M, y + 4); doc.addImage("data:image/jpeg;base64," + partyPhoto, "JPEG", M + 32, y, w, h); y += h + 8; } }
+    for (const t of list) {
+      if (y > 250) { doc.addPage(); y = 18; }
+      const r = lastRows.find(z => z.m.id === t.id), p = priceOf(t), pic = t.photo ? await thumb(t.photo, 500) : null;
+      if (pic) { const s = 40 / Math.max(pic.w, pic.h); doc.addImage(pic.d, "JPEG", M + (40 - pic.w * s) / 2, y + (40 - pic.h * s) / 2, pic.w * s, pic.h * s); }
+      const x0 = M + 46; doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text((t.designNo ? t.designNo + "  " : "") + t.label, x0, y + 6);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(11);
+      const lines = [(t.catName || "") + "   G.Wt. " + wtOf(t).toFixed(3) + " g" + (p ? "   Today about Rs " + Math.round(p).toLocaleString("en-IN") : ""),
+        (t.dias || []).map(z => `${z.q} ${(z.ct || 0).toFixed(2)} ct (${z.pcs} pcs)`).join(", ") || "No diamonds",
+        r ? Math.round(r.m.confidence) + "% similar" + (r.m.why ? " - " + r.m.why : "") : ""].filter(Boolean);
+      let yy = y + 13; lines.forEach(L => { doc.splitTextToSize(L, W - 46).forEach(s => { doc.text(s, x0, yy); yy += 5.5; }); });
+      y = Math.max(y + 44, yy + 2); doc.setDrawColor(220); doc.line(M, y - 2, 210 - M, y - 2); y += 3;
+    }
+    doc.setFontSize(9); doc.setTextColor(120); doc.text("Prices are approximate at today's gold rate.", M, 290);
+    doc.save("Similar designs " + dd + ".pdf"); msg.textContent = "PDF downloaded (" + list.length + " piece" + (list.length === 1 ? "" : "s") + ").";
+  }
+  function makeEstimate(msg) {
+    const list = pickedTags(); if (!list.length) { msg.textContent = "Tick at least one piece first."; return; }
+    if (!window.VJ_EST_NEW || !window.VJ_BILL_ADD) { msg.textContent = "Estimate screen is not ready - reload the page and try again."; return; }
+    window.VJ_EST_NEW(); list.forEach(t => window.VJ_BILL_ADD(t.id));
+  }
+  function toolbar(box) {
+    const bar = document.createElement("div"); bar.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;align-items:center;position:sticky;bottom:0;background:var(--bg,#fff);padding:8px 0";
+    const all = document.createElement("button"); all.type = "button"; all.className = "btn ghost"; all.textContent = "Select all";
+    const pdf = document.createElement("button"); pdf.type = "button"; pdf.className = "btn"; pdf.textContent = "Download PDF (ticked)";
+    const est = document.createElement("button"); est.type = "button"; est.className = "btn"; est.textContent = "Make estimate for customer (ticked)";
+    const msg = document.createElement("span"); msg.className = "hint";
+    all.addEventListener("click", () => { const on = picked.size < lastRows.length; picked = new Set(on ? lastRows.map(r => r.m.id) : []); box.querySelectorAll("input[data-sim]").forEach(c => { c.checked = on; }); all.textContent = on ? "Clear all" : "Select all"; });
+    pdf.addEventListener("click", async () => { pdf.disabled = true; try { await makePdf(msg); } catch (e) { msg.textContent = "Could not make the PDF (" + (e.message || e) + ")."; } pdf.disabled = false; });
+    est.addEventListener("click", () => makeEstimate(msg));
+    bar.append(all, pdf, est, msg); box.appendChild(bar);
+  }
+
   function card(t, m) {
     const c = document.createElement("div"); c.style.cssText = "display:flex;gap:12px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);border-radius:var(--r);padding:10px";
+    const ck = document.createElement("input"); ck.type = "checkbox"; ck.dataset.sim = "1"; ck.style.cssText = "width:24px;height:24px"; ck.checked = picked.has(t.id); ck.setAttribute("aria-label", "Select " + t.label);
+    ck.addEventListener("change", () => { if (ck.checked) picked.add(t.id); else picked.delete(t.id); }); c.appendChild(ck);
     if (t.photo) { const im = document.createElement("img"); im.alt = ""; im.loading = "lazy"; im.src = "/_blob/" + t.photo; im.style.cssText = "width:110px;height:110px;object-fit:cover;border-radius:6px"; c.appendChild(im); }
     const info = document.createElement("div"); info.style.cssText = "flex:1 1 220px;min-width:0";
     const l = document.createElement("div"); l.className = "labelno"; l.textContent = (t.designNo ? t.designNo + " · " : "") + t.label; info.appendChild(l);
@@ -92,7 +142,9 @@
       const best = [...new Map(found.sort((a, b) => b.confidence - a.confidence).map(m => [m.id, m])).values()].slice(0, 10);
       bar.remove();
       head.textContent = best.length ? `Most similar pieces in our stock, out of ${c.length} checked:` : `No piece among the ${c.length} checked looks similar enough. Try Any category, a wider range, or a clearer photo of the design.`;
-      const all = tagsNow(); best.forEach(m => { const t = all.find(x => x.id === m.id); if (t) box.appendChild(card(t, m)); });
+      const all = tagsNow(); picked = new Set(); lastRows = [];
+      best.forEach(m => { const t = all.find(x => x.id === m.id); if (t) { lastRows.push({ m }); box.appendChild(card(t, m)); } });
+      if (lastRows.length) toolbar(box);
     } catch (e) {
       bar.remove();
       head.textContent = e.status === 429 ? (e.message || "Too many searches just now - wait a minute and try again.") : e.status === 402 ? "The Claude API credit is used up - tell Abhinav." : "Similar search did not work this time (" + (e.message || "error") + "). Check the internet and try again.";
