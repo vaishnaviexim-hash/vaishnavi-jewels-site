@@ -124,8 +124,8 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
       <div class="photo">
         <div class="thumb" id="thumb">No photo yet</div>
         <label>Photo of the piece
-          <input type="file" id="photo" accept="image/*" capture="environment">
-          <span class="hint">Take it on the tray, in good light. Or skip it here: scan the printed tag's QR with your phone and tap <b>Add photo</b>.</span>
+          <input type="file" id="photo" accept="image/*"> <!-- owner 29/10/2026 13:02 (C-20261029-PHOTOGAL): no forced camera - the phone offers Camera OR Photo library / Gallery -->
+          <span class="hint">Tap to take a photo or choose one from the gallery. Take it on the tray, in good light. Or skip it here: scan the printed tag's QR with your phone and tap <b>Add photo</b>.</span>
         </label>
       </div>
 
@@ -676,7 +676,7 @@ function deleteBox(t,holder,done,cancel){
 function photoButton(t,after){
   if(!S.db||!S.assets)return null;
   const lab=document.createElement("label");lab.className="btn";lab.style.cssText="display:inline-flex;align-items:center;gap:6px;cursor:pointer";
-  const inp=document.createElement("input");inp.type="file";inp.accept="image/*";inp.setAttribute("capture","environment");inp.hidden=true;
+  const inp=document.createElement("input");inp.type="file";inp.accept="image/*";inp.hidden=true; /* C-20261029-PHOTOGAL: camera or gallery */
   lab.append(t.photo?"Replace photo":"Add photo",inp);
   inp.addEventListener("change",async()=>{const f=inp.files&&inp.files[0];if(!f)return;
     msg(`Saving the photo of ${t.label}…`,"ok");
