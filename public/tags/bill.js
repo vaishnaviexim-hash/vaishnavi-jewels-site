@@ -6,7 +6,7 @@
   "use strict";
   const $ = id => document.getElementById(id);
   const fmt = n => "Rs " + Math.round(n).toLocaleString("en-IN");
-  const B = { items: [], mode: "ws", settle: "fine", title: "Bill", g2g: "ws", photos: true, nbb: false, disc: {}, rates: {}, frates: {}, prates: {}, pdrates: {}, designs: [], option: "", usd: 0 }; // designs / option / usd: C-20261027-ESTBILL // prates: polki rate per pc for this bill (C-20261017-POLKI)
+  const B = { items: [], mode: "ws", settle: "fine", title: "Bill", g2g: "ws", photos: true, nbb: false, disc: {}, rates: {}, frates: {}, prates: {}, pdrates: {}, mkamt: {}, designs: [], option: "", usd: 0 }; // designs / option / usd: C-20261027-ESTBILL // prates: polki rate per pc for this bill (C-20261017-POLKI)
   const MODES = { ws: "W/s", nett: "Nett", g2g: "Gold to Gold", item: "Gold Item" };
   const fineMode = () => B.mode === "g2g" || B.mode === "item";
   const g3 = n => Number(n || 0).toFixed(3) + " g";
@@ -22,7 +22,7 @@
   const num = v => { const n = parseFloat(String(v == null ? "" : v).replace(/,/g, "")); return isFinite(n) ? n : 0; };
   const defRate = (q, sh) => { const r = settings().defaultRates || DEF_RATES, v = Number(r[q + "|" + sh]) || Number(r[q + "|Round"]); return v > 0 ? v : 0; };
   // the rate a diamond line gets under the Diamonds choice (same rule as the server's vjQOptRate): polki / coloured stones keep their own rate
-  function optRate(d, opt) { if (!opt || d.shape === "Polki" || NON_DIAMOND.test(String(d.q || "") + " " + String(d.code || ""))) return Number(d.rate) || 0; if (opt === "lgd") return 23000;
+  function optRate(d, opt) { if (!opt || d.shape === "Polki" || /party/i.test(String(d.q || "")) || NON_DIAMOND.test(String(d.q || "") + " " + String(d.code || ""))) return Number(d.rate) || 0; if (opt === "lgd") return 23000;
     if (opt === "fg") { const s3 = ["Round", "Choki", "Fancy"].includes(d.shape) ? d.shape : "Round", r3 = (settings().defaultRates || {})["VVS FG|" + s3]; return Number(r3) > 0 ? Number(r3) : (s3 === "Fancy" ? 95000 : 65000); } // owner 29/10 (C-20261029-VVSFG): natural VVS FG round / choki (baguette) 65,000, fancy 95,000 per ct
     const q = opt === "gh" ? "VS GH" : "VS IJ", sh = ["Round", "Choki", "Fancy"].includes(d.shape) ? d.shape : "Round"; return defRate(q, sh); }
   const newDesign = () => ({ desc: "", k: "14K", net: "", tunch: "", dias: [], ppcs: "", prate: "300", other: "" });
@@ -165,6 +165,7 @@
         gold: gl.map(g => g.k + ' ' + g.net.toFixed(3) + ' g' + (g.tn ? ', tunch ' + g.tn.toFixed(3) : '')).join(' + '), chain: gl.length > 0 && !g0, mkWt: Math.round(nc * 1000) / 1000, F: Fr, Fdef: Fo, orderRate: Fo !== F, rateEdited: Fr !== Fo, net: Math.round(net * 1000) / 1000, fine, goldAmt: Math.round(gold),
         mkRate: 0, making: 0, ct: Math.round(ct * 100) / 100, diaAmt: Math.round(dia), polkiPcs: ppcs, polkiRate: prate, polkiTagRate: ppcs ? ptag : 0, polki: ppcs * prate, pdCt, pdPcs, pdRate, pdTagRate: pdTag, pd: Math.round(pdCt * pdRate), cert: String(t.remark || '').slice(0, 10), certNo: String(t.certNo || '').slice(0, 30), other: Math.round(oth), dias: dl };
       if (g0 && mode !== 'item' && nc > 0) { let mkAmt = Math.max(mk * nc, Number(m.min) || 0); if (mode === 'nett' || g2gN) mkAmt += ng * m.pct / 100; r.making = Math.round(mkAmt); r.mkRate = Math.round(r.making / nc); }
+      { const mkx = o.mkamt && o.mkamt[t.id]; if (mkx != null && mkx !== '' && Number(mkx) >= 0 && mode !== 'item' && nc > 0) { r.making = Math.round(Number(mkx)); r.mkRate = Math.round(r.making / nc); r.mkFrozen = true; } } // C-20261029-BILLFROZEN (owner 29/10 13:27): a saved bill opened for Edit keeps its billed making; only a hand edit changes it
       r.amount = r.goldAmt + r.making + r.diaAmt + r.polki + r.pd + r.other;
       const dv = String(o.disc && o.disc[t.id] != null ? o.disc[t.id] : '').trim(), pm = dv.match(/^(\d+(?:\.\d+)?)\s*%$/), dn = Number(dv.replace(/[,\s]/g, ''));
       r.discTxt = pm ? Math.min(100, Number(pm[1])) + '%' : '';
@@ -281,7 +282,7 @@
     document.querySelectorAll("input[name=bset]").forEach(r => r.addEventListener("change", () => { B.settle = r.value; render(); }));
     document.querySelectorAll("input[name=bg2g]").forEach(r => r.addEventListener("change", () => { B.g2g = r.value; render(); })); // C-20261026-G2GNETT
     document.querySelectorAll("input[name=btitle]").forEach(r => r.addEventListener("change", () => { if (r.value === "Bill" && B.designs.length) { r.checked = false; document.querySelector('input[name=btitle][value=Estimate]').checked = true; $("bmsg").textContent = "A new design (no tag) can only go on an Estimate. Remove the design to make a Bill."; return; } B.title = r.value; numField(); }));
-    document.querySelectorAll("input[name=bopt]").forEach(r => r.addEventListener("change", () => { B.option = r.value; B.rates = {}; render(); })); // C-20261027-ESTBILL: diamonds choice resets the per-line rate edits
+    document.querySelectorAll("input[name=bopt]").forEach(r => r.addEventListener("change", () => { B.option = r.value; if (!B.editNo) B.rates = {}; render(); })); /* C-20261029-BILLFROZEN: on Edit the billed diamond rates stay */ // C-20261027-ESTBILL: diamonds choice resets the per-line rate edits
     document.querySelectorAll("input[name=bcust]").forEach(r => r.addEventListener("change", () => { B.cust = r.value; })); // C-20261027-ESTOWNER: whose customer (Mihir / Shilpi ji / Abhinav) - for the follow-up reminder and the morning report, not printed
     $("bnewdes").addEventListener("click", () => { B.designs.push(newDesign()); drawDesigns(); render(); $("bmsg").textContent = ""; });
     $("bnewest").addEventListener("click", () => { $("bclear").click(); $("bform").hidden = false; B.title = "Estimate"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.checked = x.value === "Estimate"; }); numField(); window.scrollTo({ top: 0, behavior: "smooth" }); setTimeout(() => { const n = $("bq"); if (n) n.focus(); }, 120); });
@@ -289,7 +290,7 @@
     $("bmonth").value = today().slice(0, 7); bShotInit(); $("bmonth").addEventListener("change", loadBook); { let tm = 0; $("bfmob").addEventListener("input", () => { B.fcity = null; clearTimeout(tm); tm = setTimeout(loadBook, 350); }); } // owner 26/10 17:58: type a mobile no. and see all that customer's bills
     $("bxl").addEventListener("click", () => xl($("bmonth").value || today().slice(0, 7))); $("bxlall").addEventListener("click", () => xl("all")); $("bxwa").addEventListener("click", e => partyWA(e.currentTarget));
     $("bF").addEventListener("input", render); /* owner 27/10 18:08: "Amount before GST" box removed - only the final amount is typed */ $("bfinalgo").addEventListener("click", applyFinal); $("bfinal").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applyFinal(); } }); /* C-20261027-FINALAMT */  ["bogno", "bogfine", "bograte"].forEach(i => $(i).addEventListener("input", () => totals())); /* C-20261027-OGBAL */  /* owner 27/10 12:21 (C-20261027-BILLTARGET) */ $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); }); $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
-    $("bclear").addEventListener("click", () => { B.editNo = null; B.final = 0; { const bf = $("bfinal"); if (bf) bf.value = ""; } { const bt = $("btarget"); if (bt) bt.value = ""; ["bogno", "bogfine", "bograte"].forEach(i => { const x = $(i); if (x) x.value = ""; }); } { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.designs = []; drawDesigns(); B.option = ""; document.querySelectorAll("input[name=bopt]").forEach(x => { x.checked = x.value === ""; }); B.cust = ""; document.querySelectorAll("input[name=bcust]").forEach(x => { x.checked = x.value === ""; }); B.nbb = false; $("bnbb").checked = false; B.nbbAuto = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; B.pdrates = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
+    $("bclear").addEventListener("click", () => { B.editNo = null; B.final = 0; { const bf = $("bfinal"); if (bf) bf.value = ""; } { const bt = $("btarget"); if (bt) bt.value = ""; ["bogno", "bogfine", "bograte"].forEach(i => { const x = $(i); if (x) x.value = ""; }); } { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.designs = []; drawDesigns(); B.option = ""; document.querySelectorAll("input[name=bopt]").forEach(x => { x.checked = x.value === ""; }); B.cust = ""; document.querySelectorAll("input[name=bcust]").forEach(x => { x.checked = x.value === ""; }); B.nbb = false; $("bnbb").checked = false; B.nbbAuto = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; B.pdrates = {}; B.mkamt = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
     $("bsave").addEventListener("click", save);
     $("bback").addEventListener("click", () => { const c = document.querySelector('nav button[data-tab="check"]'); if (c) c.click(); });
   }
@@ -486,10 +487,13 @@
       document.querySelectorAll("input[name=btitle]").forEach(x => { x.checked = x.value === B.title; x.disabled = true; });
       $("bname").value = b.name || ""; $("bcity").value = b.city || ""; $("bmob").value = b.mobile || ""; $("bdate").value = b.date; $("bF").value = b.F; B.final = Number(b.final) || 0; $("bfinal").value = B.final ? String(B.final) : ""; { const g = b.og || null; $("bogno").value = g ? g.no || "" : ""; $("bogfine").value = g ? String(g.recv) : ""; $("bograte").value = g ? String(g.rate) : ""; }
       b.rows.forEach(x => { if (x.discTxt) B.disc[x.id] = x.discTxt; else if (x.disc > 0) B.disc[x.id] = String(x.disc);
-        if (Math.round(x.F) !== Math.round(b.F)) B.frates[x.id] = x.F;
-        const ds = x.dias || []; if (ds.some(d => d.rate !== d.tagRate)) { const a = ds.map(() => 0); ds.forEach((d, k) => { a[d.idx != null ? d.idx : k] = d.rate !== d.tagRate ? (d.rate || -1) : 0; }); B.rates[x.id] = a; }
-        if (x.polkiPcs && x.polkiRate !== x.polkiTagRate) B.prates[x.id] = x.polkiRate;
-        if (x.pdCt && x.pdRate !== x.pdTagRate) B.pdrates[x.id] = x.pdRate; });
+        // C-20261029-BILLFROZEN (owner 29/10 13:27): every billed rate is kept as billed - gold rate, each diamond line (0 stays 0), polki, party diamond, making
+        if (Number(x.F) >= 2000) B.frates[x.id] = x.F;
+        const ds = x.dias || []; if (ds.length) { const a = []; ds.forEach((d, k) => { a[d.idx != null ? d.idx : k] = Number(d.rate) > 0 ? Number(d.rate) : -1; }); for (let k = 0; k < a.length; k++) if (a[k] == null) a[k] = 0; B.rates[x.id] = a; }
+        if (x.polkiPcs && x.polkiRate >= 1) B.prates[x.id] = x.polkiRate;
+        if (x.pdCt && x.pdRate >= 1) B.pdrates[x.id] = x.pdRate;
+        if (Number(x.making) > 0) B.mkamt[x.id] = Math.max(0, Number(x.making) - (x.amt0 != null ? (Number(x.amount) || 0) - (Number(x.amt0) || 0) : 0)); });
+        if (b.roundIn > 0 && !(b.rows || []).some(x => x.amt0 != null)) { const rc = b.rows.filter(x => !x.chain && B.mkamt[x.id] != null), r0 = rc.reduce((a, x) => (!a || x.net > a.net) ? x : a, null); if (r0) B.mkamt[r0.id] = Math.max(0, B.mkamt[r0.id] - b.roundIn); } // bills before 27/10: the Rs 500 round-up sat in the biggest piece's making
       B.editNo = b.no; $("bno").value = b.no; const n = $("beditnote"); n.hidden = false;
       n.textContent = `Editing ${b.title} ${b.no} (${b.name}). Change what you need, then Update - it keeps the same number. Clear = stop editing.`;
       $("bsave").textContent = "Update bill & make PDF"; render(); $("p-bill").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -581,7 +585,7 @@
   const F = () => Number(String($("bF").value).replace(/[^0-9.]/g, "")) || 0;
   function calcNow() { const s = settings(), all = tags(); const list = B.items.map(id => all.find(t => t.id === id)).filter(Boolean).concat(vtags())
       .map(t => B.option ? Object.assign({}, t, { dias: (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map(d => Object.assign({}, d, { rate: optRate(d, B.option) })) }) : t); // C-20261027-ESTBILL
-    return vjBillCalc(list, { F: F(), mode: B.mode, settle: B.settle, g2g: B.g2g, disc: B.disc, rates: B.rates, frates: B.frates, prates: B.prates, pdrates: B.pdrates, og: ogNow(), final: B.final || 0, purity: s.purity, making: s.making, gst: s.gst, defRates: s.defaultRates }); }
+    return vjBillCalc(list, { F: F(), mode: B.mode, settle: B.settle, g2g: B.g2g, disc: B.disc, rates: B.rates, frates: B.frates, prates: B.prates, pdrates: B.pdrates, mkamt: B.mkamt, og: ogNow(), final: B.final || 0, purity: s.purity, making: s.making, gst: s.gst, defRates: s.defaultRates }); }
   function goldCell(r, c) { return c.settle === "fine" ? g3(r.fine) + " fine" : fmt(r.goldAmt) + (c.settle ? " (" + g3(r.fine) + " fine)" : ""); }
   function mkCell(r, c) { return r.chain ? "— (chain)" /* C-20261017-CHAINTUNCH: no making on chain lines */ : c.mode === "item" ? "in gold" : fmt(r.making) + " (" + r.mkRate + "/g" + (r.mkWt > 0 && Math.abs(r.mkWt - r.wt) > 0.0005 ? " on " + r.mkWt.toFixed(3) + " g" : "") + ")"; }
   function noteText(mode, rows, g2g) { if (mode === "g2g" && g2g === "nett") mode = "g2gn"; // C-20261026-G2GNETT
@@ -755,7 +759,7 @@
   async function save() {
     const m = $("bmsg"), out = $("bout"); out.hidden = true;
     const body = { no: $("bno").value.trim(), name: (n => n && !/ji$/i.test(n) ? n + " ji" : n)($("bname").value.trim().slice(0, 57)) /* owner 26/10 18:45: 'ji' added on the bill automatically (Prachi -> Prachi ji) */, city: $("bcity").value.trim(), mobile: $("bmob").value.trim().slice(0, 20),
-      date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, g2g: B.g2g, title: B.title, nbb: !!B.nbb, ids: B.items.slice(), disc: Object.assign({}, B.disc), rates: JSON.parse(JSON.stringify(B.rates)), frates: Object.assign({}, B.frates), prates: Object.assign({}, B.prates), pdrates: Object.assign({}, B.pdrates), og: ogNow(), final: B.final || 0, edit: B.editNo || "", option: B.option || "", usd: B.usd || 0, cust: B.cust || "",
+      date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, g2g: B.g2g, title: B.title, nbb: !!B.nbb, ids: B.items.slice(), disc: Object.assign({}, B.disc), rates: JSON.parse(JSON.stringify(B.rates)), frates: Object.assign({}, B.frates), prates: Object.assign({}, B.prates), pdrates: Object.assign({}, B.pdrates), mkamt: Object.assign({}, B.mkamt), og: ogNow(), final: B.final || 0, edit: B.editNo || "", option: B.option || "", usd: B.usd || 0, cust: B.cust || "",
       designs: B.designs.map(d => { const v = vtags()[B.designs.indexOf(d)]; return { desc: v.label, k: d.k, net: v.gold[0].net, tunch: v.gold[0].tunch || 0, dias: v.dias, ppcs: v.polki ? v.polki.pcs : 0, prate: v.polki ? v.polki.rate : 300, other: v.other ? v.other.amt : 0 }; }) }; // C-20261027-ESTBILL
     if (!body.name) { m.textContent = "Enter the customer's name."; return; }
     let dg = body.mobile.replace(/\D/g, ""); if (dg.length === 12 && dg.startsWith("91")) dg = dg.slice(2); // phone copy like "+91 98xxx xxxxx" is fine
