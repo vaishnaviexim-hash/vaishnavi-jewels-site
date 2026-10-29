@@ -514,6 +514,28 @@ async function vjBlob(id, env) {
   return new Response(o.body, { headers: { 'content-type': /^image\/(jpeg|png|webp)$/.test(o.type || '') ? o.type : 'image/jpeg', 'cache-control': 'private, max-age=86400', 'x-robots-tag': 'noindex', 'x-content-type-options': 'nosniff' } });
 }
 
+// Box numbers (owner 29/10/2026, C-20261029-BOXNO): which box each design sits in. The owner keeps per-category box sheets in
+// Drive (folder 'box numbers'); they are flattened into VJ_Marketing_Engine Box_Map!A1 as "CAT:box=design,design;box=...|CAT:...".
+// The website asks the existing gold relay (VJ_GOLD_HOOK + ?want=boxes, same secret URL) at most every 6 hours and keeps a copy in
+// vj_meta; the owner can force a fresh copy with ?fresh=1. Every login may read it (no prices, no cost).
+async function vjBoxes(url, env, who) {
+  await waTables(env);
+  const row = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'boxmap'").first();
+  let c = null; try { c = row ? JSON.parse(row.v) : null; } catch (e) {}
+  const fresh = url.searchParams.get('fresh') === '1' && who.role === 'admin';
+  if ((!c || fresh || Date.now() - c.at > 6 * 3600e3) && env.VJ_GOLD_HOOK && /^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_GOLD_HOOK)) {
+    try {
+      const r = await fetch(env.VJ_GOLD_HOOK + '?want=boxes', { signal: AbortSignal.timeout(10000) });
+      const t = (await r.text()).trim();
+      if (r.ok && t.length < 300000 && /^[A-Z]{2,4}:\d+=/.test(t)) {
+        c = { at: Date.now(), s: t };
+        await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('boxmap', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(c)).run();
+      } else if (c) { c.at = Date.now() - 5 * 3600e3; await env.DB.prepare("UPDATE vj_meta SET v = ? WHERE k = 'boxmap'").bind(JSON.stringify(c)).run(); }
+    } catch (e) {}
+  }
+  return vjJson({ ok: !!c, at: c ? c.at : 0, map: c ? c.s : '' });
+}
+
 // Make pushes the gold rate here 3 times a day if the website cannot reach the NR feed itself.
 async function vjGoldPush(request, env) {
   const sec = request.headers.get('x-vj-gold-secret') || '';
@@ -2290,12 +2312,13 @@ async function vjHandle(request, env, ctx, url) {
   if (!env.DB || !env.PHOTOS) return vjDeny(503, 'not set up');
   const who = await vjWho(request, env);
   if (!who) return p.startsWith('/api/') ? vjDeny(403, 'not allowed') : new Response('Not allowed. Ask Abhinav to add your email.', { status: 403, headers: { 'content-type': 'text/plain', 'x-robots-tag': 'noindex' } });
-  if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties', '/api/vj/moves', '/api/vj/repairs', '/api/vj/estimates'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill', '/api/vj/move', '/api/vj/repair', '/api/vj/estimate/done', '/api/vj/contactshot', '/api/vj/photosearch'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these (+ Karigar & Out, 27/10)
+  if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties', '/api/vj/moves', '/api/vj/repairs', '/api/vj/estimates', '/api/vj/boxes'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill', '/api/vj/move', '/api/vj/repair', '/api/vj/estimate/done', '/api/vj/contactshot', '/api/vj/photosearch'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these (+ Karigar & Out, 27/10)
   // C-20261027-KARIGAROUT: stock out / back, RFID link, party repairs (JSON from our own page only)
   if ((p === '/api/vj/move' || p === '/api/vj/repair') && request.method === 'POST') { if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed'); return p === '/api/vj/move' ? vjMove(request, env, who) : vjRepair(request, env, who); }
   if (p === '/api/vj/moves' && request.method === 'GET') return vjMovesGet(url, env, who);
   if (p === '/api/vj/repairs' && request.method === 'GET') return vjRepairsGet(url, env, who);
   if (p === '/api/vj/sync' && request.method === 'GET') return vjSync(request, env, who, ctx);
+  if (p === '/api/vj/boxes' && request.method === 'GET') return vjBoxes(url, env, who); // C-20261029-BOXNO
   if (p === '/api/vj/write' && request.method === 'POST') return vjWrite(request, env, who, ctx);
   if (p === '/api/vj/photo' && request.method === 'POST') return vjPhotoUpload(request, env, who);
   if (p === '/api/vj/import' && request.method === 'POST') return vjImport(request, env, who);
