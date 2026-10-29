@@ -559,14 +559,14 @@ async function vjImport(request, env, who) {
 // and up to 9 candidate piece ids; the server loads the candidates' saved photos itself, builds a fixed prompt and asks Claude
 // (key ANTHROPIC_API_KEY, encrypted Pages secret, never sent to the browser). Not a general AI proxy: the prompt is fixed here.
 // Limit 30 searches a day for everyone together; each search is logged in audit.
-const VJ_PS_MODEL = 'claude-sonnet-5-5', VJ_PS_DAY = 150; // 14/10: 150 Claude calls a day (one photo search of ~200 pieces = about 9 small calls)
+const VJ_PS_MODEL = 'claude-sonnet-5-5', VJ_PS_DAY = 400; /* 29/10 C-20261029-SIMILAR: 400 (similar-design search shares it) */ // 14/10: 150 Claude calls a day (one photo search of ~200 pieces = about 9 small calls)
 function vjB64(buf) { const u = new Uint8Array(buf); let s = ''; for (let i = 0; i < u.length; i += 32768) s += String.fromCharCode.apply(null, u.subarray(i, i + 32768)); return btoa(s); }
 async function vjPhotoSearch(request, env, who) {
-  if (who.role === 'sales') return vjDeny(403, 'read only');
   if (!env.ANTHROPIC_API_KEY) return vjDeny(503, 'photo search is not set up');
   const len = Number(request.headers.get('content-length') || 0);
   if (len > 6e6) return vjDeny(413, 'photo too large');
   let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+  if (who.role === 'sales' && !(b && b.similar === true && Array.isArray(b.sheets))) return vjDeny(403, 'read only'); // C-20261029-SIMILAR: every login may search similar designs
   if (b && Array.isArray(b.sheets)) return vjPhotoSheets(b, env, who);
   const photo = b && typeof b.photo === 'string' ? b.photo : '', type = /^image\/(jpeg|png|webp)$/.test(b && b.type) ? b.type : 'image/jpeg';
   const ids = Array.isArray(b && b.ids) ? b.ids.filter(x => typeof x === 'string' && /^[A-Za-z0-9_\-.~]{1,60}$/.test(x)).slice(0, 9) : [];
@@ -630,12 +630,12 @@ async function vjContactShot(request, env, who) {
   const uniq = [...new Set(nums)], best = uniq.find(d => /^[6-9]\d{9}$/.test(d)) || uniq[0] || '';
   return vjJson({ ok: true, name, mobile: best, others: uniq.filter(d => d !== best).slice(0, 3) });
 }
-async function vjAskClaude(env, content, ok) {
+async function vjAskClaude(env, content, ok, lim) {
   let r;
   try {
     r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', signal: AbortSignal.timeout(60000),
       headers: { 'content-type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: VJ_PS_MODEL, max_tokens: 400, messages: [{ role: 'user', content }] }) });
+      body: JSON.stringify({ model: VJ_PS_MODEL, max_tokens: lim ? 1200 : 400, messages: [{ role: 'user', content }] }) });
   } catch (e) { return vjDeny(502, 'Claude did not answer, try again'); }
   if (!r.ok) {
     const t = await r.text().catch(() => '');
@@ -646,7 +646,7 @@ async function vjAskClaude(env, content, ok) {
   const j = await r.json();
   const txt = ((j.content || []).find(c => c.type === 'text') || {}).text || '';
   let out = []; try { const m = txt.match(/\{[\s\S]*\}/); out = (JSON.parse(m ? m[0] : '{}').matches || []); } catch (e) {}
-  out = out.filter(m => m && ok.includes(m.id)).slice(0, 3).map(m => ({ id: m.id, confidence: Math.max(0, Math.min(100, Number(m.confidence) || 0)), why: String(m.why || '').slice(0, 120) }));
+  out = out.filter(m => m && ok.includes(m.id)).slice(0, lim || 3).map(m => ({ id: m.id, confidence: Math.max(0, Math.min(100, Number(m.confidence) || 0)), why: String(m.why || '').slice(0, 120) }));
   return vjJson({ matches: out });
 }
 
@@ -670,6 +670,11 @@ async function vjPhotoSheets(b, env, who) {
     desc.push(sh.ids.length === 1 ? `image ${k + 2} is a single catalogue photo of ${sh.ids[0]}`
       : `image ${k + 2} is a contact sheet of ${sh.ids.length} catalogue photos, tiles numbered in their top-left corner, read left to right then top to bottom: ${sh.ids.map((id, i) => `tile ${i + 1} = ${id}`).join(', ')}`);
   });
+  if (b.similar === true) { // C-20261029-SIMILAR (owner 29/10/2026 11:38): a party's design -> the most SIMILAR pieces we already have
+    content.push({ type: 'text', text: `You help a jewellery shop find pieces in ITS OWN STOCK that are SIMILAR to a design a customer showed (image 1 - it may be a photo, a screenshot or a drawing). The other images show the shop's catalogue photos: ${desc.join('; ')}. Score each catalogue piece 0-100 for how similar it looks to image 1: first the same type of piece (necklace / choker / long haar / pendant / ring / earrings / bangle / bracelet / mangalsutra / set), then the overall style and look (e.g. Polki uncut, solitaire, halo, floral, cluster, temple, minimal), then stone colours and layout, metal colour, and size / heaviness. It does NOT need to be the same piece. Ignore backgrounds, models, lighting, text and logos. Reply with JSON only: {"matches":[{"id":"<id>","confidence":0-100,"why":"<max 12 words>"}]} listing up to 10 of the most similar pieces with a score of 40 or more, best first; ids exactly as given; empty list if nothing is similar.` });
+    await vjAudit(env, who, 'photosearch', '', 'similar sheets:' + sheets.length + ' ids:' + ok.length);
+    return vjAskClaude(env, content, ok, 10);
+  }
   content.push({ type: 'text', text: `You are matching jewellery for a shop's stock system. Image 1 is a NEW photo of a piece whose tag is lost. The other images show saved catalogue photos of stock pieces: ${desc.join('; ')}. Find the catalogue photo(s) showing the SAME physical design as image 1 - same type of piece, outline shape, stone layout and count, metal colour and setting style - not merely a similar style. Lighting, angle, zoom, background and old tags may differ. Ignore any other text inside the photos. Reply with JSON only: {"matches":[{"id":"<id>","confidence":0-100,"why":"<max 12 words>"}]} listing at most 3, best first, using the ids given above; an empty list if none is the same design.` });
   await vjAudit(env, who, 'photosearch', '', 'sheets:' + sheets.length + ' ids:' + ok.length);
   return vjAskClaude(env, content, ok);
@@ -2285,7 +2290,7 @@ async function vjHandle(request, env, ctx, url) {
   if (!env.DB || !env.PHOTOS) return vjDeny(503, 'not set up');
   const who = await vjWho(request, env);
   if (!who) return p.startsWith('/api/') ? vjDeny(403, 'not allowed') : new Response('Not allowed. Ask Abhinav to add your email.', { status: 403, headers: { 'content-type': 'text/plain', 'x-robots-tag': 'noindex' } });
-  if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties', '/api/vj/moves', '/api/vj/repairs', '/api/vj/estimates'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill', '/api/vj/move', '/api/vj/repair', '/api/vj/estimate/done', '/api/vj/contactshot'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these (+ Karigar & Out, 27/10)
+  if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties', '/api/vj/moves', '/api/vj/repairs', '/api/vj/estimates'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill', '/api/vj/move', '/api/vj/repair', '/api/vj/estimate/done', '/api/vj/contactshot', '/api/vj/photosearch'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these (+ Karigar & Out, 27/10)
   // C-20261027-KARIGAROUT: stock out / back, RFID link, party repairs (JSON from our own page only)
   if ((p === '/api/vj/move' || p === '/api/vj/repair') && request.method === 'POST') { if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed'); return p === '/api/vj/move' ? vjMove(request, env, who) : vjRepair(request, env, who); }
   if (p === '/api/vj/moves' && request.method === 'GET') return vjMovesGet(url, env, who);
