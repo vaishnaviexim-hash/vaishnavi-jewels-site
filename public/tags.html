@@ -225,6 +225,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
     <div class="row" style="align-items:end">
       <label style="flex:2 1 220px">Search <input id="q" placeholder="Label, design no. (e.g. 1122), category, remark"></label>
       <label style="flex:1 1 140px">Show <select id="fkind"><option value="">All</option><option value="sale">Stock</option><option value="sample">Samples</option><option value="nophoto">Photo pending</option><option value="dup">Possible double tags</option></select></label>
+      <label style="flex:1 1 150px">Category <select id="flcat"><option value="">All categories</option></select></label>
       <div><button type="button" class="btn ghost" id="ordRep" hidden>Orders report (Excel)</button> <button type="button" class="btn ghost" id="ordDel" hidden style="color:#a12b2b">Delete all order tags</button></div>
     </div>
     <div class="row" style="align-items:center;gap:8px;margin:10px 0">
@@ -838,6 +839,9 @@ $("reset").addEventListener("click",()=>resetForm(false));
 async function renderList(){
   const body=$("rows");body.textContent="";$("ordRep").hidden=true;{const od=$("ordDel"),n=S.tags.filter(t=>t.kind==="order").length;od.hidden=!S.owner||!n;od.textContent="Delete all order tags ("+n+")"} /* C-20261019-TAGSNOORDER */
   const q=$("q").value.trim().toLowerCase(),fk=$("fkind").value;
+  /* owner 29/10/2026 12:51 (C-20261029-LISTCAT): Category filter (e.g. Chain), with how many pieces each category has */
+  const fc=$("flcat");{const v=fc.value,cnt={};S.tags.forEach(t=>{cnt[t.cat]=(cnt[t.cat]||0)+1});fc.textContent="";[["","All categories ("+S.tags.length+")"]].concat(CATS.map(c=>[c.id,c.name.replace(/\s*\(.*\)$/,"")+" ("+(cnt[c.id]||0)+")"])).forEach(([k,l])=>{const o=document.createElement("option");o.value=k;o.textContent=l;fc.appendChild(o)});fc.value=v}
+  const fcat=fc.value;
   const qq=q.replace(/\s+/g,"");
   /* owner 17/10/2026 17:34 (C-20261017-DOUBLETAG): same design number + same total gold weight = possible double tag, highlighted in red */
   const dkey=t=>{const dn=String(t.designNo||"").trim().toUpperCase();const w=(t.gold||[]).reduce((a,g)=>a+(Number(g&&g.net)||0),0)||(t.metal&&Number(t.metal.net))||0;return dn&&w>0&&!(t.cat==="CH"&&!/\d/.test(dn))?dn+"|"+w.toFixed(3):""};
@@ -845,7 +849,7 @@ async function renderList(){
   const DUPT=new Map();S.tags.forEach(t=>{const k=dkey(t);if(k)DUPT.set(k,(DUPT.get(k)||[]).concat(t))});
   const dupOf=t=>{const g=DUPT.get(dkey(t))||[];return g.length>1&&(!t.notDouble||g.some(x=>x!==t&&!x.notDouble))?g.map(x=>x.label):[]};
   const isAbhinav=S.owner&&S.me&&S.me!=="vaishnavijewels@gmail.com";
-  const all=S.tags.filter(t=>(!fk||(fk==='nophoto'?!t.photo:fk==='dup'?dupOf(t).length>1:t.kind===fk))&&(!q||[t.label,t.catName,t.remark,t.designNo,t.order&&t.order.name,t.order&&t.order.mobile].join(" ").toLowerCase().includes(q)||(qq&&String(t.designNo||"")===qq)||(qq&&String(t.label).toLowerCase().replace("/","")===qq.replace("/",""))));
+  const all=S.tags.filter(t=>(!fcat||t.cat===fcat)&&(!fk||(fk==='nophoto'?!t.photo:fk==='dup'?dupOf(t).length>1:t.kind===fk))&&(!q||[t.label,t.catName,t.remark,t.designNo,t.order&&t.order.name,t.order&&t.order.mobile].join(" ").toLowerCase().includes(q)||(qq&&String(t.designNo||"")===qq)||(qq&&String(t.label).toLowerCase().replace("/","")===qq.replace("/",""))));
   /* exact design number or label first */
   /* exact match first; then (owner 17/10 17:45) possible double tags first, each group together */
   const ex=t=>(String(t.designNo)===qq||String(t.label).toLowerCase()===q)?1:0,dp=t=>dupOf(t).length>1?1:0;
@@ -994,7 +998,7 @@ async function findByPhoto(){
 }
 $("fpgo").addEventListener("click",findByPhoto);
 $("fgo").addEventListener("click",findLost);$("fwt").addEventListener("keydown",e=>{if(e.key==="Enter")findLost()});
-$("q").addEventListener("input",renderList);$("fkind").addEventListener("change",renderList);
+$("q").addEventListener("input",renderList);$("fkind").addEventListener("change",renderList);$("flcat").addEventListener("change",renderList);
 /* orders report (C-20261016-ORDERS): the server builds the Excel; owners and staff only */
 $("ordRep").addEventListener("click",async()=>{const b=$("ordRep");b.disabled=true;
   try{const r=await fetch("/api/vj/orders",{credentials:"same-origin"});if(!r.ok)throw new Error(r.status===403?"not allowed":"server "+r.status);
