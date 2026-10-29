@@ -875,7 +875,7 @@ async function renderList(){
   /* exact match first; then (owner 17/10 17:45) possible double tags first, each group together */
   const ex=t=>(String(t.designNo)===qq||String(t.label).toLowerCase()===q)?1:0,dp=t=>dupOf(t).length>1?1:0;
   all.sort((a,b)=>(ex(b)-ex(a))||(dp(b)-dp(a))||(dp(a)&&dp(b)?(dkey(a).localeCompare(dkey(b))||String(a.label).localeCompare(String(b.label))):0));
-  const items=all.slice(0,300);
+  const items=all.slice(0,300);S.shown=new Set(items.map(t=>t.id)); /* C-20261029-DELSAFE */
   $("listEmpty").hidden=items.length>0;
   $("listMore").textContent=all.length>items.length?`Showing ${items.length} of ${all.length}. Type a label, design number or category to narrow.`:`${all.length} piece${all.length===1?"":"s"}`;
   updSel();
@@ -916,13 +916,14 @@ $("printQ").addEventListener("click",async()=>{
   y.addEventListener("click",async()=>{let f=0;for(const t of list){try{await S.db.doc("tags/"+t.id).update({queue:false,printedAt:new Date().toISOString()})}catch(e){f++}}msg(f?`Cleared, except ${f} that could not be updated. Press again.`:`Queue cleared (${list.length} tags).`,f?"warn":"ok")});
   done.appendChild(y);$("msg").appendChild(done);
 });
-function updSel(){updQ();const n=S.sel.size;$("printSel").disabled=!n;$("printSel").textContent=n?`Print selected (${n})`:"Print selected";const d=$("delSel");if(d){d.hidden=S.role!=="admin";d.disabled=!n;d.textContent=n?`Delete selected (${n})`:"Delete selected"}} /* C-20261029-BULKDEL */
+function updSel(){updQ();const n=S.sel.size;$("printSel").disabled=!n;$("printSel").textContent=n?`Print selected (${n})`:"Print selected";const d=$("delSel");if(d){const m=[...S.sel].filter(id=>S.shown&&S.shown.has(id)).length;d.hidden=S.role!=="admin";d.disabled=!m;d.textContent=m?`Delete selected (${m})`:"Delete selected"}} /* C-20261029-BULKDEL */
 $("selClear").addEventListener("click",()=>{S.sel.clear();renderList()});
 /* owner 29/10/2026 12:50 (C-20261029-BULKDEL): tick several tags in Tagged pieces -> "Delete selected" -> one reason for all -> each is
    deleted the same way as the single Delete (owners only - the server refuses anyone else; a full copy of every deleted tag is kept). */
-$("delSel").addEventListener("click",()=>{const ids=[...S.sel];if(!ids.length)return;const h=$("delSelBox");h.textContent="";
+$("delSel").addEventListener("click",()=>{const ids=[...S.sel].filter(id=>S.shown&&S.shown.has(id)); /* 29/10 C-20261029-DELSAFE: only ticked pieces that are on screen now */if(!ids.length)return;const h=$("delSelBox");h.textContent="";
   const box=document.createElement("div");box.className="confirm";box.style.cssText="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0";
   const q=document.createElement("b");q.textContent=`Delete ${ids.length} tag${ids.length>1?"s":""}?`;
+  const nm=document.createElement("div");nm.style.cssText="flex:1 1 100%;font-size:14px;color:#b3261e";nm.textContent="These will be deleted: "+ids.map(id=>{const t=S.tags.find(x=>x.id===id);return t?(t.designNo?t.designNo+" · ":"")+t.label+(t.kind==="order"?" (ORDER"+(t.order&&t.order.name?" - "+t.order.name:"")+")":""):id}).join(", ");
   const sel=document.createElement("select");sel.setAttribute("aria-label","Reason for deleting");
   [["","Choose a reason…"]].concat(DEL_REASONS.map(r=>[r,r])).forEach(([v,l])=>{const o=document.createElement("option");o.value=v;o.textContent=l;sel.appendChild(o)});
   const y=document.createElement("button");y.type="button";y.className="btn danger";y.textContent=`Delete ${ids.length}`;y.disabled=true;
@@ -933,7 +934,7 @@ $("delSel").addEventListener("click",()=>{const ids=[...S.sel];if(!ids.length)re
       try{await S.db.doc("tags/"+id).delete(sel.value);ok++;S.tags=S.tags.filter(x=>x.id!==id);Object.values(S.parts).forEach(a=>{const i=a.findIndex(x=>x.id===id);if(i>=0)a.splice(i,1)});S.sel.delete(id)}
       catch(e){bad++;if(e&&/owner only|403/.test(String(e.code||e.message))){stop=true;break}}}
     h.textContent="";msg(stop?"Only Abhinav or Shilpiji can delete a tag.":`Deleted ${ok} tag${ok===1?"":"s"} (${sel.value}). A copy of each is kept in the records.`+(bad?` ${bad} could not be deleted - they are still ticked, try again.`:""),stop||bad?"bad":"ok");renderList()});
-  box.append(q,sel,y,n);h.appendChild(box);box.scrollIntoView({behavior:"smooth",block:"center"})});
+  box.append(q,sel,y,n,nm);h.appendChild(box);box.scrollIntoView({behavior:"smooth",block:"center"})});
 $("selShown").addEventListener("click",()=>{$("rows").querySelectorAll("input[type=checkbox]").forEach(c=>{c.checked=true;c.dispatchEvent(new Event("change"))})});
 $("printSel").addEventListener("click",async()=>{
   const list=S.tags.filter(t=>S.sel.has(t.id)).sort((a,b)=>a.label.localeCompare(b.label,"en",{numeric:true}));if(!list.length)return;
