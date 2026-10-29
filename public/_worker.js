@@ -715,7 +715,7 @@ const vjClean = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f<>]/
 // estimate of a new design, from the weights typed) and today's saved settings; prices sent by the page are never used.
 // Same rule as the Quote tab: gold x karat rate, making Rs 650/g (750 when the first gold line is up to 5 g), minimum Rs 1,000,
 // + 10% wastage on gold (or flat Rs 1,600/g), diamonds, polki pcs x rate, other; rounded up to Rs 100, + GST, up to Rs 1,000.
-const VJ_Q_OPT = { 'Natural VS GH': 'gh', 'Natural VS IJ': 'ij', 'Lab-grown': 'lgd' };
+const VJ_Q_OPT = { 'Natural VS GH': 'gh', 'Natural VS IJ': 'ij', 'Natural VVS FG': 'fg', 'Lab-grown': 'lgd' };
 const VJ_Q_NONDIA = /POL|EMR|MOZ|RUBY|PEARL|MOTI|STONE|KUNDAN/i;
 const VJ_Q_KARATS = ['14K', '18K', '22K', '9K', '24K'], VJ_Q_QUALS = ['CVD', 'VS IJ', 'VS HI', 'VS GH', 'VVS EF'], VJ_Q_SHAPES = ['Round', 'Choki', 'Fancy', 'Solitaire', 'Polki'];
 const VJ_DEF_RATES = { 'CVD|Round': 23000, 'CVD|Choki': 23000, 'CVD|Fancy': 23000, 'CVD|Solitaire': 23000, 'VS GH|Round': 46000, 'VS GH|Choki': 46000, 'VS GH|Fancy': 85000, 'VS HI|Round': 40000, 'VS HI|Choki': 40000, 'VS IJ|Round': 35000, 'VS IJ|Choki': 35000 };
@@ -744,6 +744,7 @@ function vjQPrice(gold, dv, extra, st, mk) { // final price incl. GST, or 0 when
   return vjQUp(vjQUp(gv + cv + mv + dv + extra, 100) * (1 + st.gst / 100), 1000);
 }
 const vjQOptRate = (d, opt, st) => { if (d.shape === 'Polki' || VJ_Q_NONDIA.test(String(d.q || '') + ' ' + String(d.code || ''))) return Number(d.rate) || 0; if (opt === 'lgd') return 23000;
+  if (opt === 'fg') { const s3 = ['Round', 'Choki', 'Fancy'].includes(d.shape) ? d.shape : 'Round'; return Number(st.rates['VVS FG|' + s3]) || (s3 === 'Fancy' ? 95000 : 65000); } // owner 29/10 (C-20261029-VVSFG)
   const q = opt === 'gh' ? 'VS GH' : 'VS IJ', sh = ['Round', 'Choki', 'Fancy'].includes(d.shape) ? d.shape : 'Round'; return Number(st.rates[q + '|' + sh]) || Number(st.rates[q + '|Round']) || 0; };
 const vjQNum = (v, lo, hi, int) => { if (v === '' || v == null) return null; const n = Number(v); return isFinite(n) && n >= lo && n <= hi && (!int || Number.isInteger(n)) ? n : NaN; };
 const vjSmpNet = t => Number(t && t.metal && t.metal.net) || (Array.isArray(t && t.gold) ? t.gold.reduce((a, g) => a + (Number(g && g.net) || 0), 0) : 0); // sample weight: old Onnet samples in metal.net, new-tag samples in gold lines (C-20261019-SAMPLEWT)
@@ -971,7 +972,7 @@ async function vjBill(request, env, who, ctx) { // every login may make bills (o
     const tunch = isNaN(tn) ? 0 : Math.round(tn * 1000) / 1000, src = { desc: vjClean(i.desc, 60), k, net: Math.round(net * 1000) / 1000, tunch, dias, ppcs, prate, other };
     vtags.push({ id: 'new-' + (n + 1), label: src.desc || (tunch ? 'Chain' : 'New design'), designNo: '', catName: 'New design', kind: 'design', newDesign: true, src,
       gold: [{ k, net: src.net, ...(tunch ? { tunch } : {}) }], dias, ...(ppcs ? { polki: { pcs: ppcs, rate: prate } } : {}), ...(other ? { other: { amt: other } } : {}) }); }
-  const option = ['gh', 'ij', 'lgd'].includes(b && b.option) ? b.option : '', usd0 = Math.round(Number(b && b.usd) * 100) / 100, usd = usd0 >= 50 && usd0 <= 200 ? usd0 : 0;
+  const option = ['gh', 'ij', 'fg', 'lgd'].includes(b && b.option) ? b.option : '', usd0 = Math.round(Number(b && b.usd) * 100) / 100, usd = usd0 >= 50 && usd0 <= 200 ? usd0 : 0;
   const cust = ['mihir', 'shilpi', 'abhinav'].includes(b && b.cust) ? b.cust : ''; // C-20261027-ESTOWNER: whose customer (for the follow-up reminder and the morning report)
   const allIds = ids.concat(vtags.map(t => t.id));
   const disc = {}; if (b && b.disc && typeof b.disc === 'object') for (const id of allIds) if (b.disc[id] != null) disc[id] = String(b.disc[id]).slice(0, 12);
