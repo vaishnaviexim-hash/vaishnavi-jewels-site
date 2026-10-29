@@ -507,6 +507,19 @@
     const who = ({ mihir: "Mihir", shilpi: "Shilpi ji", abhinav: "Abhinav" })[b.cust] || "the owner";
     const share = async () => { try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text: waText(b) }); return "ok"; } return "no"; } catch (e) { return e && e.name === "AbortError" ? "ok" : "retry"; } };
     out.textContent = ""; out.hidden = true;
+    // C-20261029-ESTTEAM (owner 29/10 15:03): on a computer the PDF goes straight from Aashvi to whose customer it is; the share box only if that fails
+    if (!/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "") && B.cust_ok !== false) {
+      try { m.textContent = `Estimate ${b.no}: sending to ${who} on WhatsApp (Aashvi)…`;
+        const pdf = await new Promise((res, rej) => { const f = new FileReader(); f.onload = () => res(String(f.result).split(",")[1] || ""); f.onerror = rej; f.readAsDataURL(blob); });
+        const r0 = await fetch("/api/vj/bill/send", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ no: b.no, pdf, team: true }) });
+        const j0 = await r0.json().catch(() => ({})); if (!r0.ok) throw new Error(j0.error || ("server " + r0.status));
+        for (let i = 0; i < 30; i++) { await new Promise(z => setTimeout(z, 3000));
+          const s = await (await fetch("/api/vj/bill/sendstatus?t=" + j0.token, { credentials: "same-origin" })).json().catch(() => ({}));
+          if (s.status === "sent") { m.textContent = `Estimate ${b.no} (${fmt(b.total)}) sent on WhatsApp to ${j0.to} ✓ - forward it to the customer from there. ${who} gets the follow-up reminder in 2 days.`; return; }
+          if (s.status === "failed" || s.status === "expired") throw new Error(s.error || "Aashvi could not send it"); }
+        m.textContent = `Estimate ${b.no}: Aashvi has not confirmed yet - check ${j0.to}'s WhatsApp before sending again.`; return;
+      } catch (e) { m.textContent = `Could not send ${b.no} by Aashvi (${e.message || e}) - use the share box instead.`; }
+    }
     const r = await share();
     if (r === "ok") { m.textContent = `Estimate ${b.no} (${fmt(b.total)}): choose WhatsApp and the customer. ${who} gets the follow-up reminder in 2 days.`; return; }
     if (r === "no") { await myWA(b, blob, m); return; } // computer without a share box: WhatsApp Web + the PDF file
