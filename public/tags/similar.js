@@ -76,7 +76,7 @@
       if (y > 250) { doc.addPage(); y = 18; }
       const r = lastRows.find(z => z.m.id === t.id), p = priceOf(t), pic = t.photo ? await thumb(t.photo, 500) : null;
       if (pic) { const s = 40 / Math.max(pic.w, pic.h); doc.addImage(pic.d, "JPEG", M + (40 - pic.w * s) / 2, y + (40 - pic.h * s) / 2, pic.w * s, pic.h * s); }
-      const x0 = M + 46; doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text((t.designNo ? t.designNo + "  " : "") + t.label, x0, y + 6);
+      const x0 = M + 46; doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text((t.designNo ? t.designNo + "  " : "") + t.label + (window.VJ_BOX && window.VJ_BOX(t) ? "   " + window.VJ_BOX(t) : ""), x0, y + 6); /* C-20261029-BOXNO */
       doc.setFont("helvetica", "normal"); doc.setFontSize(11);
       const lines = [(t.catName || "") + "   G.Wt. " + wtOf(t).toFixed(3) + " g" + (p ? "   Today about Rs " + Math.round(p).toLocaleString("en-IN") : ""),
         (t.dias || []).map(z => `${z.q} ${(z.ct || 0).toFixed(2)} ct (${z.pcs} pcs)`).join(", ") || "No diamonds",
@@ -111,6 +111,7 @@
     if (t.photo) { const im = document.createElement("img"); im.alt = ""; im.loading = "lazy"; im.src = "/_blob/" + t.photo; im.style.cssText = "width:110px;height:110px;object-fit:cover;border-radius:6px"; c.appendChild(im); }
     const info = document.createElement("div"); info.style.cssText = "flex:1 1 220px;min-width:0";
     const l = document.createElement("div"); l.className = "labelno"; l.textContent = (t.designNo ? t.designNo + " · " : "") + t.label; info.appendChild(l);
+    const bx = window.VJ_BOX ? window.VJ_BOX(t) : ""; if (bx) { const b = document.createElement("div"); b.style.cssText = "font-weight:700;color:#8a5a00"; b.textContent = "📦 " + bx; info.appendChild(b); } /* C-20261029-BOXNO */
     const s = document.createElement("div"); s.style.fontWeight = "600"; s.textContent = Math.round(m.confidence) + "% similar" + (m.why ? " · " + m.why : ""); info.appendChild(s);
     const p = priceOf(t), w = document.createElement("div"); w.textContent = (t.catName || "") + " · G.Wt. " + wtOf(t).toFixed(3) + " g" + (p ? " · today about " + inr(p) : ""); info.appendChild(w);
     const di = document.createElement("div"); di.className = "hint"; di.textContent = (t.dias || []).map(z => `${z.q} ${(z.ct || 0).toFixed(2)} ct (${z.pcs} pcs)`).join(", ") || "no diamonds"; info.appendChild(di);
