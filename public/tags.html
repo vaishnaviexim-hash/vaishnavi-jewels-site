@@ -287,6 +287,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="/tags/shim.js?v=20261028ed"></script>
+<script src="/tags/similar.js?v=20261029a" defer></script>
 <script>
 (function(){
 "use strict";
@@ -335,7 +336,7 @@ async function runImport(){
 }
 function applyRole(){
   const r=S.role||"staff";
-  const hide=r==="admin"?[]:r==="staff"?["rates"]:r==="tagger"?["list","find","rates"]:["new","list","find","rates"]; /* tagger (Shyam, owner 26/10 18:07): New tag, Tag, Saved bills only */
+  const hide=r==="admin"?[]:r==="staff"?["rates"]:r==="tagger"?["list","rates"]:["new","list","rates"] /* 29/10 C-20261029-SIMILAR: Find lost tag (with Similar designs) for every login */; /* tagger (Shyam, owner 26/10 18:07): New tag, Tag, Saved bills only */
   if(String(S.me||"").toLowerCase()!=="vaishnaviexim@gmail.com"&&!hide.includes("list"))hide.push("list"); /* owner 26/10/2026 17:48: Tagged pieces only for Abhinav (vaishnaviexim) */
   hide.forEach(k=>{const b=document.querySelector('nav button[data-tab="'+k+'"]');if(b)b.hidden=true});
   if(r==="sales")showTab("check");
@@ -473,6 +474,7 @@ function readForm(){
     vendor:cat.id==="CH"?$("vendor").value.trim().replace(/\s+/g," ").slice(0,40):""};
 }
 /* ---------- price (Brain F-025 / F-044) ---------- */
+window.VJ_PRICE=t=>{try{const p=price(t);return p&&p.final}catch(e){return 0}}; /* C-20261029-SIMILAR */
 function price(t){
   const s=st(),r24=t.kind==="order"&&t.order&&t.order.rate>=2000&&t.order.rate<=50000?t.order.rate:s.gold24g;if(!r24)return null; /* an order uses the rate typed for it */
   /* Bills workbook, Nett mode: one making rate per piece, taken from the FIRST gold line
