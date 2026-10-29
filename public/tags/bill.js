@@ -212,6 +212,7 @@
       <div class="actions" style="margin:0 0 8px"><button type="button" class="btn ghost" id="bback">&larr; Back to Bill</button></div>
       <h2>1 · Customer &amp; bill</h2>
       <p class="hint" id="bcusthint"></p>
+      <div class="row" style="align-items:center"><button type="button" class="btn ghost" id="bshot">&#128247; Contact screenshot &rarr; fill name &amp; mobile</button><input type="file" id="bshotf" accept="image/*" hidden><span class="hint" id="bshotmsg">or paste a screenshot here (Ctrl+V)</span></div>
       <div class="row"><label>Mobile No. <input id="bmob" inputmode="tel" autocomplete="off" maxlength="20" placeholder="98xxxxxxxx"></label>
         <label>Name <input id="bname" autocomplete="off" maxlength="60"></label>
         <label>City <input id="bcity" autocomplete="off" maxlength="40"></label></div>
@@ -283,7 +284,7 @@
     $("bnewdes").addEventListener("click", () => { B.designs.push(newDesign()); drawDesigns(); render(); $("bmsg").textContent = ""; });
     $("bnewest").addEventListener("click", () => { $("bclear").click(); $("bform").hidden = false; B.title = "Estimate"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.checked = x.value === "Estimate"; }); numField(); window.scrollTo({ top: 0, behavior: "smooth" }); setTimeout(() => { const n = $("bq"); if (n) n.focus(); }, 120); });
     $("busd").addEventListener("input", () => { const v = Math.round(num($("busd").value) * 100) / 100; B.usd = v > 50 && v < 200 ? v : 0; if (B.usd) { usdSave(B.usd, true); $("busdinfo").textContent = "Rate typed today."; } render(); }); usdInit();
-    $("bmonth").value = today().slice(0, 7); $("bmonth").addEventListener("change", loadBook); { let tm = 0; $("bfmob").addEventListener("input", () => { B.fcity = null; clearTimeout(tm); tm = setTimeout(loadBook, 350); }); } // owner 26/10 17:58: type a mobile no. and see all that customer's bills
+    $("bmonth").value = today().slice(0, 7); bShotInit(); $("bmonth").addEventListener("change", loadBook); { let tm = 0; $("bfmob").addEventListener("input", () => { B.fcity = null; clearTimeout(tm); tm = setTimeout(loadBook, 350); }); } // owner 26/10 17:58: type a mobile no. and see all that customer's bills
     $("bxl").addEventListener("click", () => xl($("bmonth").value || today().slice(0, 7))); $("bxlall").addEventListener("click", () => xl("all")); $("bxwa").addEventListener("click", e => partyWA(e.currentTarget));
     $("bF").addEventListener("input", render); /* owner 27/10 18:08: "Amount before GST" box removed - only the final amount is typed */ $("bfinalgo").addEventListener("click", applyFinal); $("bfinal").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applyFinal(); } }); /* C-20261027-FINALAMT */  ["bogno", "bogfine", "bograte"].forEach(i => $(i).addEventListener("input", () => totals())); /* C-20261027-OGBAL */  /* owner 27/10 12:21 (C-20261027-BILLTARGET) */ $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); }); $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
     $("bclear").addEventListener("click", () => { B.editNo = null; B.final = 0; { const bf = $("bfinal"); if (bf) bf.value = ""; } { const bt = $("btarget"); if (bt) bt.value = ""; ["bogno", "bogfine", "bograte"].forEach(i => { const x = $(i); if (x) x.value = ""; }); } { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.designs = []; drawDesigns(); B.option = ""; document.querySelectorAll("input[name=bopt]").forEach(x => { x.checked = x.value === ""; }); B.cust = ""; document.querySelectorAll("input[name=bcust]").forEach(x => { x.checked = x.value === ""; }); B.nbb = false; $("bnbb").checked = false; B.nbbAuto = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; B.pdrates = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
@@ -302,6 +303,30 @@
     document.querySelectorAll('[id^="p-"]').forEach(p => { p.hidden = p.id !== "p-bill"; }); document.querySelectorAll("nav button").forEach(y => y.setAttribute("aria-selected", "false"));
     prefill(); B.title = "Estimate"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.checked = x.value === "Estimate"; }); numField(); loadBook(); window.scrollTo({ top: 0, behavior: "smooth" }); setTimeout(() => { const n = $("bq"); if (n) n.focus(); }, 120); };
   // C-20261016-BILLBOOK: estimate numbers are given by the server (E-YYMM-NN, from 01 each month); bill numbers are typed
+  // C-20261029-CONTACTSHOT (owner 29/10/2026 11:26): choose or paste a screenshot of a saved phone contact -> name and mobile are filled
+  // (the server asks Claude to read only the name and number; the screenshot is not kept). Typing a name / mobile still works as before.
+  function bShotInit() {
+    const btn = $("bshot"), fi = $("bshotf"), msg = $("bshotmsg"), form = $("bform"); if (!btn || !fi || !msg || btn.dataset.ok) return; btn.dataset.ok = "1";
+    const shrink = f => new Promise((res, rej) => { const u = URL.createObjectURL(f), im = new Image(); im.onload = () => { const k = Math.min(1, 1400 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.max(1, Math.round(im.width * k)); c.height = Math.max(1, Math.round(im.height * k)); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); res(c.toDataURL("image/jpeg", 0.85).split(",")[1]); }; im.onerror = () => { URL.revokeObjectURL(u); rej(new Error("not an image")); }; im.src = u; });
+    const read = async f => {
+      if (!f || !/^image\//.test(f.type || "")) { msg.textContent = "Please choose a screenshot (an image)."; return; }
+      btn.disabled = true; msg.textContent = "Reading the screenshot...";
+      try {
+        const photo = await shrink(f);
+        const r = await fetch("/api/vj/contactshot", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ photo, type: "image/jpeg" }) });
+        const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status);
+        if (!j.name && !j.mobile) { msg.textContent = "Could not read a name or number in this screenshot - please type them."; return; }
+        if (j.mobile) { const m = $("bmob"); m.value = j.mobile; m.dispatchEvent(new Event("input", { bubbles: true })); m.dispatchEvent(new Event("change", { bubbles: true })); }
+        if (j.name && !$("bname").value.trim()) $("bname").value = j.name;
+        setTimeout(() => { if (j.name && !$("bname").value.trim()) $("bname").value = j.name; }, 1500);
+        msg.textContent = "From screenshot: " + (j.name || "(no name)") + ", " + (j.mobile || "(no number)") + (j.others && j.others.length ? " - other numbers: " + j.others.join(", ") : "") + ". Please check before saving.";
+      } catch (e) { msg.textContent = "Could not read the screenshot (" + (e.message || e) + "). Please type the name and mobile."; }
+      finally { btn.disabled = false; fi.value = ""; }
+    };
+    btn.addEventListener("click", () => fi.click());
+    fi.addEventListener("change", () => read(fi.files && fi.files[0]));
+    if (form) form.addEventListener("paste", e => { const it = [...((e.clipboardData && e.clipboardData.items) || [])].find(x => /^image\//.test(x.type)); if (it) { e.preventDefault(); read(it.getAsFile()); } });
+  }
   function numField() { const e = B.title === "Estimate", n = $("bno"); n.disabled = true; n.value = ""; const d = $("bdate").value || today(); // owner 16/10: bill numbers automatic too
     n.placeholder = "automatic (" + (e ? "E-" : "B-") + d.slice(2, 4) + d.slice(5, 7) + "-01, 02 …)";
     { const sv = $("bsave"); if (sv && !B.editNo) sv.textContent = e ? "Make estimate PDF (not saved as a bill)" : "Save bill & make PDF"; } } // C-20261028-ESTNOTBILL
