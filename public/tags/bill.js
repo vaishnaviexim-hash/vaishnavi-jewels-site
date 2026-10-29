@@ -688,7 +688,7 @@
     const rts = [...new Set((b.rows || []).map(r => Math.round(r.F || b.F)))], hF = rts.length === 1 ? rts[0] : b.F; // owner 17/10: the rate shown is the one the pieces were billed at (tag rate)
     doc.text(`Gold Rate (F): ${fmt(hF)} per g (24K)`, M, y); doc.text(`Gold Calculation: ${MODES[b.mode] || b.mode}${b.settle === "fine" ? " (fine gold)" : b.settle === "amount" ? " (in rupees)" : ""}`, M + 90, y);
     if (rts.length > 1) { y += 5.5; doc.setFontSize(10); doc.text("Other gold rates are shown under each piece.", M, y); doc.setFontSize(12); } y += 9;
-    const pics = {}; if (photos) for (const r of b.rows) if (r.photo) pics[r.id] = await thumb(r.photo);
+    const pics = {}; if (photos) for (const r of b.rows) { const ph = r.photo || ((tags0().find(t => t.id === r.id) || {}).photo); if (ph) pics[r.id] = await thumb(ph); } // C-20261029-SOLDPHOTO: a photo added after billing also prints
     const P = Object.values(pics).some(Boolean) ? 22 : 0; // photo column (mm) only when a piece has a photo
     const D = (b.disc || 0) > 0; // owner 16/10: own Discount and Net columns when a piece has a discount (amounts then without 'Rs', said once above)
     const cols = D ? (P ? [["Piece", 37, "l"], ["Gold", 19, "l"], ["Gold value", 17, "r"], ["Making", 16, "r"], ["Diamonds", 26, "r"], ["Other", 12, "r"], ["Amount", 17, "r"], ["Discount", 19, "r"], ["Net", 19, "r"]]
