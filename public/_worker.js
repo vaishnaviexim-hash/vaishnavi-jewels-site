@@ -1149,6 +1149,32 @@ async function vjBillSend(request, env, who) {
   if (!isQ && !/^[BER]-\d{4}-\d{2,4}$/.test(no)) return vjDeny(400, 'bad bill number'); // R = receipt (C-20261017-LEDGER)
   if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
   const isR = no[0] === 'R'; if (isR) await vjRcT(env); // C-20261017-LEDGER: a receipt slip goes the same way (from vj_receipts)
+  // C-20261029-ESTTEAM (owner 29/10 15:03): from a computer, an Estimate PDF goes from Aashvi to the person whose customer it is
+  // (Mihir / Shilpi ji / Abhinav, chosen on the estimate), never to a number typed on the page; the PDF is handed out once and deleted.
+  const team = !!(b && b.team === true);
+  if (who.role === 'tagger' && !team) return vjDeny(403, 'not allowed');
+  if (team) {
+    if (!/^E-\d{4}-\d{2,4}$/.test(no)) return vjDeny(400, 'only an estimate goes to the team');
+    await vjEstT(env); const er = await env.DB.prepare('SELECT data FROM vj_estimates WHERE no = ?').bind(no).first(); if (!er) return vjDeny(404, 'not found');
+    const est = JSON.parse(er.data), tg = VJ_EST_TO[est.cust]; if (!tg) return vjJson({ error: 'choose whose customer this is first' }, 400);
+    if ((who.role === 'sales' || who.role === 'tagger') && est.by !== who.email) return vjDeny(404, 'not found');
+    let bytes; try { const s = String(b.pdf || ''); if (s.length > 7e6) throw new Error('big'); bytes = Uint8Array.from(atob(s), c => c.charCodeAt(0)); } catch (e) { return vjDeny(400, 'bad PDF'); }
+    if (bytes.length < 500 || bytes.length > 5e6 || String.fromCharCode(...bytes.subarray(0, 5)) !== '%PDF-') return vjDeny(400, 'bad PDF');
+    await vjMetaT(env);
+    const day = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10), ck = 'billsend-count:' + no + ':' + day;
+    const cnt = Number(((await env.DB.prepare('SELECT v FROM vj_meta WHERE k = ?').bind(ck).first()) || {}).v || 0);
+    if (cnt >= 5) return vjJson({ error: 'this estimate was already sent 5 times today' }, 429);
+    const token = [...crypto.getRandomValues(new Uint8Array(16))].map(x => x.toString(16).padStart(2, '0')).join('');
+    await vjPhotoPut(env, 'billpdf-' + token, bytes, 'application/pdf', { no });
+    await env.DB.batch([
+      env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('billsend:' + token, JSON.stringify({ no, status: 'queued', at: Date.now(), by: who.email, team: est.cust })),
+      env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = CAST(CAST(v AS INTEGER) + 1 AS TEXT)').bind(ck, '1')]);
+    let ok = false;
+    try { const r = await fetch(env.VJ_QUOTE_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000), body: JSON.stringify({ kind: 'bill-pdf', token }) }); ok = r.ok; } catch (e) {}
+    await vjAudit(env, who, 'estimate-whatsapp', 'estimates/' + no, (ok ? 'queued' : 'hook failed') + ' to ' + tg[1]);
+    if (!ok) { try { await env.PHOTOS.delete('billpdf-' + token); } catch (e) {} return vjJson({ error: 'could not reach Aashvi, try again' }, 502); }
+    return vjJson({ ok: true, token, to: tg[1] });
+  }
   const row = await vjSendRow(env, no, isR);
   if (!row) return vjDeny(404, 'not found');
   const bill = vjSendDoc(no, row);
@@ -1314,6 +1340,16 @@ async function vjBillPdfHook(url, env, done) {
     const u = await env.DB.prepare('UPDATE vj_meta SET v = ? WHERE k = ? AND v = ?').bind(JSON.stringify(Object.assign({}, s, { status: 'fetched', fetchedAt: Date.now() })), 'billsend:' + t, r.v).run();
     if (!u.meta || u.meta.changes !== 1) return reply('gone', 410);
     const isR = /^R-/.test(s.no); if (isR) await vjRcT(env); // C-20261017-LEDGER: receipts
+    if (s.team) { // C-20261029-ESTTEAM: estimate PDF to whose customer it is (number from VJ_EST_TO only)
+      const tg = VJ_EST_TO[s.team]; await vjEstT(env); const er = await env.DB.prepare('SELECT data FROM vj_estimates WHERE no = ?').bind(s.no).first();
+      const f = await vjPhotoGet(env, 'billpdf-' + t); if (!tg || !er || !f) return reply('gone', 410);
+      const est = JSON.parse(er.data), buf = await new Response(f.body).arrayBuffer();
+      const clean = v => String(v || '').replace(/[\x00-\x1f"\\<>{}]/g, ' ').replace(/\s+/g, ' ').trim();
+      const cn = clean(est.name).slice(0, 60) || 'Customer', date = String(est.date || '').split('-').reverse().join('-'), total = 'Rs ' + Number(est.total || 0).toLocaleString('en-IN');
+      const params = [tg[1], 'Estimate for ' + cn + (est.city ? ', ' + clean(est.city).slice(0, 40) : ''), s.no, date, total].map(v => clean(v).slice(0, 200));
+      return new Response(JSON.stringify({ to: tg[0], name: tg[1], title: 'Estimate', no: s.no, date, total, fileName: ('Estimate ' + s.no + ' ' + cn.replace(/[^A-Za-z0-9 .\-]/g, '')).trim().slice(0, 80) + '.pdf', template: 'vj_bill_pdf_v1', params, pdf: vjB64(buf) }),
+        { status: 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' } });
+    }
     const row = await vjSendRow(env, s.no, isR), bill = row ? vjSendDoc(s.no, row) : null;
     const f = await vjPhotoGet(env, 'billpdf-' + t);
     if (!bill || bill.cancelled || bill.reversed || !f || !/^[6-9]\d{9}$/.test(String(bill.mobile || ''))) return reply('gone', 410);
@@ -2313,7 +2349,7 @@ async function vjHandle(request, env, ctx, url) {
   if (!env.DB || !env.PHOTOS) return vjDeny(503, 'not set up');
   const who = await vjWho(request, env);
   if (!who) return p.startsWith('/api/') ? vjDeny(403, 'not allowed') : new Response('Not allowed. Ask Abhinav to add your email.', { status: 403, headers: { 'content-type': 'text/plain', 'x-robots-tag': 'noindex' } });
-  if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties', '/api/vj/moves', '/api/vj/repairs', '/api/vj/estimates', '/api/vj/boxes'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill', '/api/vj/move', '/api/vj/repair', '/api/vj/estimate/done', '/api/vj/contactshot', '/api/vj/photosearch'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these (+ Karigar & Out, 27/10)
+  if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties', '/api/vj/moves', '/api/vj/repairs', '/api/vj/estimates', '/api/vj/boxes', '/api/vj/bill/sendstatus'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill', '/api/vj/move', '/api/vj/repair', '/api/vj/estimate/done', '/api/vj/contactshot', '/api/vj/bill/send', '/api/vj/photosearch'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these (+ Karigar & Out, 27/10)
   // C-20261027-KARIGAROUT: stock out / back, RFID link, party repairs (JSON from our own page only)
   if ((p === '/api/vj/move' || p === '/api/vj/repair') && request.method === 'POST') { if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed'); return p === '/api/vj/move' ? vjMove(request, env, who) : vjRepair(request, env, who); }
   if (p === '/api/vj/moves' && request.method === 'GET') return vjMovesGet(url, env, who);
