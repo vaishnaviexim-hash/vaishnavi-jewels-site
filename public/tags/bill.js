@@ -666,6 +666,15 @@
   async function thumb(id) { try { const u = await dataUrl("/_blob/" + id), im = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = u; });
     const s = 360 / Math.max(im.width, im.height), c = document.createElement("canvas"); c.width = Math.round(im.width * Math.min(1, s)); c.height = Math.round(im.height * Math.min(1, s));
     const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height); return { d: c.toDataURL("image/jpeg", 0.85), w: c.width, h: c.height }; } catch (e) { return null; } }
+  // owner 29/10/2026 12:46 (C-20261029-DIACODE): diamonds print as ONE short code line, then ct @ rate below, on bills and estimates:
+  // N = natural / LG = lab-grown (CVD); R = round, C = choki, F = fancy, S = solitaire, P = polki; then quality and colour (VS-SI GH).
+  function diaCode(d, b) {
+    const q0 = String(d.q || "").trim(), lab = (b && b.option === "lgd") || /cvd|lab|lgd|\blg\b/i.test(q0), party = /party/i.test(q0);
+    const sh = ({ round: "R", choki: "C", fancy: "F", solitaire: "S", polki: "P" })[String(d.shape || "").trim().toLowerCase()] || (d.shape ? String(d.shape).trim().slice(0, 1).toUpperCase() : "");
+    let q = q0.replace(/\b(cvd|lgd|lab[- ]?grown|lab)\b/ig, "").replace(/\s+/g, " ").trim().replace(/^[- ]+|[- ]+$/g, "");
+    q = q.replace(/^(.*?)[- ]([D-N]{1,2})$/i, "$1 $2");
+    return [party ? "Party" : lab ? "LG" : "N", sh, party ? "" : q].filter(Boolean).join(" ");
+  }
   async function makePdf(b, photos) {
     const { jsPDF } = window.jspdf, doc = new jsPDF({ unit: "mm", format: "a4" });
     const W = 210, M = 14; let y = 14;
@@ -682,10 +691,10 @@
     const pics = {}; if (photos) for (const r of b.rows) if (r.photo) pics[r.id] = await thumb(r.photo);
     const P = Object.values(pics).some(Boolean) ? 22 : 0; // photo column (mm) only when a piece has a photo
     const D = (b.disc || 0) > 0; // owner 16/10: own Discount and Net columns when a piece has a discount (amounts then without 'Rs', said once above)
-    const cols = D ? (P ? [["Piece", 42, "l"], ["Gold", 19, "l"], ["Gold value", 17, "r"], ["Making", 16, "r"], ["Diamonds", 20, "r"], ["Other", 13, "r"], ["Amount", 17, "r"], ["Discount", 19, "r"], ["Net", 19, "r"]]
-        : [["Piece", 30, "l"], ["Gold", 21, "l"], ["Gold value", 19, "r"], ["Making", 18, "r"], ["Diamonds", 21, "r"], ["Other", 12, "r"], ["Amount", 19, "r"], ["Discount", 21, "r"], ["Net", 21, "r"]])
-      : P ? [["Piece", 60, "l"], ["Gold", 23, "l"], ["Gold value", 21, "r"], ["Making", 20, "r"], ["Diamonds", 21, "r"], ["Other", 15, "r"], ["Amount", 22, "r"]] // 182 mm = page width less margins
-      : [["Piece", 42, "l"], ["Gold", 25, "l"], ["Gold value", 23, "r"], ["Making", 22, "r"], ["Diamonds", 24, "r"], ["Other", 20, "r"], ["Amount", 26, "r"]];
+    const cols = D ? (P ? [["Piece", 37, "l"], ["Gold", 19, "l"], ["Gold value", 17, "r"], ["Making", 16, "r"], ["Diamonds", 26, "r"], ["Other", 12, "r"], ["Amount", 17, "r"], ["Discount", 19, "r"], ["Net", 19, "r"]]
+        : [["Piece", 26, "l"], ["Gold", 20, "l"], ["Gold value", 19, "r"], ["Making", 18, "r"], ["Diamonds", 26, "r"], ["Other", 11, "r"], ["Amount", 19, "r"], ["Discount", 21, "r"], ["Net", 22, "r"]])
+      : P ? [["Piece", 54, "l"], ["Gold", 23, "l"], ["Gold value", 21, "r"], ["Making", 20, "r"], ["Diamonds", 28, "r"], ["Other", 14, "r"], ["Amount", 22, "r"]] // 182 mm = page width less margins; Diamonds wider so the code stays on one line (C-20261029-DIACODE)
+      : [["Piece", 38, "l"], ["Gold", 25, "l"], ["Gold value", 23, "r"], ["Making", 22, "r"], ["Diamonds", 29, "r"], ["Other", 19, "r"], ["Amount", 26, "r"]];
     const PK = (b.rows || []).some(r => Number(r.polkiPcs) > 0 || Number(r.pdCt) > 0); // owner 17/10: a Polki column only when a piece has polki (C-20261017-POLKI)
     if (PK) { const sc = (182 - 18) / 182; cols.forEach(c => { c[1] = Math.round(c[1] * sc * 10) / 10; }); cols.splice(cols.findIndex(c => c[0] === "Diamonds") + 1, 0, [(b.rows || []).some(r => Number(r.pdCt) > 0) ? ((b.rows || []).some(r => Number(r.polkiPcs) > 0) ? "Polki/Party" : "Party dia.") : "Polki", 18, "r"]); }
     const fm = D ? (n => Math.round(n).toLocaleString("en-IN")) : fmt;
@@ -697,7 +706,7 @@
       y += Math.max(h * 5, pic !== undefined && P ? 21 : 0) + 2.5; };
     doc.setFillColor(243, 230, 211); doc.rect(M, y - 5, W - 2 * M, 8, "F"); row(cols.map(c => c[0]), true, PK && D ? 9 : undefined); y += 1;
     b.rows.forEach(r => { if (y > 250) { doc.addPage(); y = 20; }
-      const dd = r.ct ? (r.dias || []).filter(d => d.ct > 0).map(d => ((d.shape ? d.shape + " " : "") + d.q).trim() + "\n" + d.ct.toFixed(2) + " ct @ " + Math.round(d.rate).toLocaleString("en-IN")).join("\n") + "\n= " + fm(r.diaAmt) : "-"; // owner 26/10: every diamond line with its shape, quality, ct and rate (C-20261026-DIASHAPE)
+      const dd = r.ct ? (r.dias || []).filter(d => d.ct > 0).map(d => diaCode(d, b) + "\n" + d.ct.toFixed(2) + " ct @ " + Math.round(d.rate).toLocaleString("en-IN")).join("\n") + "\n= " + fm(r.diaAmt) : "-"; /* C-20261029-DIACODE */ // owner 26/10: every diamond line with its shape, quality, ct and rate (C-20261026-DIASHAPE)
       const base = [(r.design ? r.design + " - " : "") + r.label + (r.cat ? "\n" + r.cat : "") + (r.certNo ? "\n" + (r.cert && r.cert !== "TGL" ? r.cert : "Cert.") + " " + r.certNo : ""), /* owner 26/10 18:14: certificate no. on the bill (C-20261026-PARTYDIA) */ (/tunch/.test(r.gold || "") ? r.gold.replace(/ \+ /g, "\n").replace(/, tunch /g, "\ntunch ") : (r.gold || "-")) + (Math.round(r.F) !== hF ? "\n@ " + Math.round(r.F).toLocaleString("en-IN") : ""), b.settle === "fine" ? g3(r.fine) + "\nfine" : fm(r.goldAmt) + (b.settle ? "\n" + g3(r.fine) + " fine" : ""), r.chain ? "-" : b.mode === "item" ? "in gold" : fm(r.making) /* owner 17/10 15:38: no making rate per g on the printed bill */, dd, ...(PK ? [[r.polkiPcs ? "Polki " + r.polkiPcs + " pc\n@ " + Math.round(r.polkiRate).toLocaleString("en-IN") + "\n" + fm(r.polki) : "", r.pdCt ? "Party " + r.pdCt + " ct\n@ " + Math.round(r.pdRate).toLocaleString("en-IN") + "\n" + fm(r.pd) : ""].filter(Boolean).join("\n") || "-"] : []), r.other ? fm(r.other) : "-"];
       const amU = fm(r.amount) + (b.usd ? "\nUS$ " + Math.round(r.amount / b.usd).toLocaleString("en-US") : ""); // C-20261027-ESTBILL
       row(D ? base.concat([amU, r.disc ? fm(r.disc) + (r.discTxt ? "\n(" + r.discTxt + ")" : "") : "-", fm(r.net)]) : base.concat([amU]), false, D || PK ? 10 : 10.5, P ? (pics[r.id] || null) : undefined);
@@ -713,7 +722,7 @@
     if (b.usd) tot(`In US$ (approx., at Rs ${Number(b.usd).toFixed(2)} per US$)`, "US$ " + Math.round(b.total / b.usd).toLocaleString("en-US")); // C-20261027-ESTBILL
     if (b.title === "Estimate") { y += 2; doc.setFont("helvetica", "bold"); doc.setFontSize(10.5); doc.setTextColor(20); doc.text("Above are approximate estimates. Actual may vary when the final product is ready.", M, y); y += 4; } // owner 27/10 17:29
     y += 4; doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(80);
-    const notes = [noteText(b.mode, b.rows, b.g2g).trim(), "All diamonds are third-party certified (IGI / EGL / TGL) and all gold is BIS HUID hallmarked.", b.title === "Estimate" && b.usd ? "US dollar figures are indicative only; billing is in Indian rupees." : b.usd ? "US dollar figures are indicative only." : "", b.option ? "Diamonds priced as " + (OPT_NAMES[b.option] || b.option) + "." : "", b.nbb ? "Sold on a no buy back, no exchange basis." : "",
+    const notes = [noteText(b.mode, b.rows, b.g2g).trim(), "All diamonds are third-party certified (IGI / EGL / TGL) and all gold is BIS HUID hallmarked.", (b.rows || []).some(r => r.ct) ? "Diamond code: N = natural, LG = lab-grown; R = round, C = choki, F = fancy, S = solitaire, P = polki; then quality and colour (e.g. N R VS-SI GH)." : "", b.title === "Estimate" && b.usd ? "US dollar figures are indicative only; billing is in Indian rupees." : b.usd ? "US dollar figures are indicative only." : "", b.option ? "Diamonds priced as " + (OPT_NAMES[b.option] || b.option) + "." : "", b.nbb ? "Sold on a no buy back, no exchange basis." : "",
       b.settled ? `Settled: settlement discount ${fmt(b.settled.discount)} given on ${dmy(String(b.settled.at).slice(0, 10))}` + (b.original ? ` (bill total ${fmt(b.original.total)} reduced to ${fmt(b.total)}, the amount received)` : "") + "." + (b.settled.fineWaived ? ` Fine gold waived ${g3(b.settled.fineWaived)}.` : "") : ""].filter(Boolean); // C-20261017-LEDGER
     doc.text(doc.splitTextToSize(notes.join(" "), W - 2 * M), M, y);
     return doc.output("blob");
