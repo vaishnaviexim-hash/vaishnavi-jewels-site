@@ -743,7 +743,7 @@ function vjQPrice(gold, dv, extra, st, mk) { // final price incl. GST, or 0 when
   const mv = !g0 ? 0 : mk === 'flat' ? 1600 * nt : Math.max((g0.net > st.mk.limit ? st.mk.base : st.mk.small) * nt, Number(st.mk.min) || 0) + gv * st.mk.pct / 100;
   return vjQUp(vjQUp(gv + cv + mv + dv + extra, 100) * (1 + st.gst / 100), 1000);
 }
-const vjQOptRate = (d, opt, st) => { if (d.shape === 'Polki' || VJ_Q_NONDIA.test(String(d.q || '') + ' ' + String(d.code || ''))) return Number(d.rate) || 0; if (opt === 'lgd') return 23000;
+const vjQOptRate = (d, opt, st) => { if (d.shape === 'Polki' || /party/i.test(String(d.q || '')) || VJ_Q_NONDIA.test(String(d.q || '') + ' ' + String(d.code || ''))) return Number(d.rate) || 0; if (opt === 'lgd') return 23000;
   if (opt === 'fg') { const s3 = ['Round', 'Choki', 'Fancy'].includes(d.shape) ? d.shape : 'Round'; return Number(st.rates['VVS FG|' + s3]) || (s3 === 'Fancy' ? 95000 : 65000); } // owner 29/10 (C-20261029-VVSFG)
   const q = opt === 'gh' ? 'VS GH' : 'VS IJ', sh = ['Round', 'Choki', 'Fancy'].includes(d.shape) ? d.shape : 'Round'; return Number(st.rates[q + '|' + sh]) || Number(st.rates[q + '|Round']) || 0; };
 const vjQNum = (v, lo, hi, int) => { if (v === '' || v == null) return null; const n = Number(v); return isFinite(n) && n >= lo && n <= hi && (!int || Number.isInteger(n)) ? n : NaN; };
@@ -878,6 +878,7 @@ function vjBillCalc(tags, o) {
       gold: gl.map(g => g.k + ' ' + g.net.toFixed(3) + ' g' + (g.tn ? ', tunch ' + g.tn.toFixed(3) : '')).join(' + '), chain: gl.length > 0 && !g0, mkWt: Math.round(nc * 1000) / 1000, F: Fr, Fdef: Fo, orderRate: Fo !== F, rateEdited: Fr !== Fo, net: Math.round(net * 1000) / 1000, fine, goldAmt: Math.round(gold),
       mkRate: 0, making: 0, ct: Math.round(ct * 100) / 100, diaAmt: Math.round(dia), polkiPcs: ppcs, polkiRate: prate, polkiTagRate: ppcs ? ptag : 0, polki: ppcs * prate, pdCt, pdPcs, pdRate, pdTagRate: pdTag, pd: Math.round(pdCt * pdRate), cert: String(t.remark || '').slice(0, 10), certNo: String(t.certNo || '').slice(0, 30), other: Math.round(oth), dias: dl };
     if (g0 && mode !== 'item' && nc > 0) { let mkAmt = Math.max(mk * nc, Number(m.min) || 0); if (mode === 'nett' || g2gN) mkAmt += ng * m.pct / 100; r.making = Math.round(mkAmt); r.mkRate = Math.round(r.making / nc); }
+      { const mkx = o.mkamt && o.mkamt[t.id]; if (mkx != null && mkx !== '' && Number(mkx) >= 0 && mode !== 'item' && nc > 0) { r.making = Math.round(Number(mkx)); r.mkRate = Math.round(r.making / nc); r.mkFrozen = true; } } // C-20261029-BILLFROZEN (owner 29/10 13:27): a saved bill opened for Edit keeps its billed making; only a hand edit changes it
     r.amount = r.goldAmt + r.making + r.diaAmt + r.polki + r.pd + r.other;
     const dv = String(o.disc && o.disc[t.id] != null ? o.disc[t.id] : '').trim(), pm = dv.match(/^(\d+(?:\.\d+)?)\s*%$/), dn = Number(dv.replace(/[,\s]/g, ''));
     r.discTxt = pm ? Math.min(100, Number(pm[1])) + '%' : '';
@@ -982,6 +983,8 @@ async function vjBill(request, env, who, ctx) { // every login may make bills (o
     const n = Number(b.prates[id]); if (!Number.isInteger(n) || n < 1 || n > 100000) return vjDeny(400, 'polki rate per pc must be a whole number Rs 1-1,00,000'); prates[id] = n; }
   const pdrates = {}; if (b && b.pdrates && typeof b.pdrates === 'object') for (const id of allIds) if (b.pdrates[id] != null && b.pdrates[id] !== '') { // party diamond setting rate per ct for this bill only (C-20261026-PARTYDIA)
     const n = Number(b.pdrates[id]); if (!Number.isInteger(n) || n < 1 || n > 100000) return vjDeny(400, 'party diamond setting rate per ct must be a whole number Rs 1-1,00,000'); pdrates[id] = n; }
+  const mkamt = {}; if (b && b.edit && b.mkamt && typeof b.mkamt === 'object') for (const id of allIds) if (b.mkamt[id] != null && b.mkamt[id] !== '') { // C-20261029-BILLFROZEN: billed making kept on Edit (edits only)
+    const n = Number(b.mkamt[id]); if (!(n >= 0 && n <= 10000000)) return vjDeny(400, 'making must be Rs 0-1,00,00,000'); mkamt[id] = Math.round(n); }
   // owner 16/10/2026 20:03 'Bill no should be automatic. Every month starts with number 1': bills are numbered by the server too
   if (!name) return vjDeny(400, 'customer name is required');
   if (b && b.mobile && String(b.mobile).trim() && !mobile) return vjDeny(400, 'mobile number not readable');
@@ -1010,7 +1013,7 @@ async function vjBill(request, env, who, ctx) { // every login may make bills (o
   const s = sRow ? JSON.parse(sRow.data) : {};
   vtags.forEach(t => tags.push(t)); // C-20261027-ESTBILL: the typed designs are priced like tags
   if (option) { const stQ = vjQSt(s); tags.forEach(t => { t.dias = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map(d => Object.assign({}, d, { rate: vjQOptRate(d, option, stQ) })); }); } // diamonds choice (C-20261027-ESTBILL)
-  const calc = vjBillCalc(tags, { F, mode, settle, g2g: b && b.g2g === 'nett' ? 'nett' : 'ws', disc, rates, frates, prates, pdrates, og, final, purity: s.purity, making: s.making, gst: s.gst, defRates: s.defaultRates || VJ_DEF_RATES });
+  const calc = vjBillCalc(tags, { F, mode, settle, g2g: b && b.g2g === 'nett' ? 'nett' : 'ws', disc, rates, frates, prates, pdrates, mkamt, og, final, purity: s.purity, making: s.making, gst: s.gst, defRates: s.defaultRates || VJ_DEF_RATES });
   { const miss = []; calc.rows.forEach(r => (r.dias || []).forEach(d => { if (d.ct > 0 && !(d.rate > 0) && !(Number(rates[r.id] && rates[r.id][d.idx]) === -1) && !VJ_Q_NONDIA.test(d.q)) miss.push((r.design ? r.design + ' ' : '') + (r.label || r.id) + ' (' + d.shape + ' ' + d.q + ', ' + d.ct + ' ct)'); }));
     if (miss.length) return vjDeny(400, 'diamond rate missing on ' + miss.slice(0, 6).join('; ') + (miss.length > 6 ? ' and ' + (miss.length - 6) + ' more' : '') + ' - type the rate per ct on the bill (or 0 for a party diamond)'); } // C-20261028-SIGHRATE: never Rs 0 diamonds by mistake
   calc.rows.forEach((r, i) => { const ph = tags[i].photo; if (typeof ph === 'string' && /^[0-9a-f]{32}$/.test(ph)) r.photo = ph; if (tags[i].src) r.src = tags[i].src; }); // owner 16/10: photo on the bill; src = the typed design (C-20261027-ESTBILL)
