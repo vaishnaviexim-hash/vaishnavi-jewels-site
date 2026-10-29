@@ -232,8 +232,10 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
       <button type="button" class="btn" id="printSel" disabled>Print selected</button>
       <button type="button" class="btn ghost" id="selShown">Select all shown</button>
       <button type="button" class="btn ghost" id="selClear">Clear</button>
+      <button type="button" class="btn danger" id="delSel" hidden disabled>Delete selected</button>
       <span class="hint" id="listMore"></span>
     </div>
+    <div id="delSelBox"></div>
     <div id="importBox" class="banner warn" hidden></div>
     <div class="list"><table class="items"><thead><tr><th></th><th></th><th>Design · label</th><th>Category</th><th>Gold (net g)</th><th>Diamonds</th><th>Price when tagged</th><th>Price today</th><th>Added</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
     <div class="empty" id="listEmpty">No pieces tagged here yet. Tag the first one under <b>New tag</b>. The Onnet stock will be imported into this list in the next step.</div>
@@ -889,8 +891,24 @@ $("printQ").addEventListener("click",async()=>{
   y.addEventListener("click",async()=>{let f=0;for(const t of list){try{await S.db.doc("tags/"+t.id).update({queue:false,printedAt:new Date().toISOString()})}catch(e){f++}}msg(f?`Cleared, except ${f} that could not be updated. Press again.`:`Queue cleared (${list.length} tags).`,f?"warn":"ok")});
   done.appendChild(y);$("msg").appendChild(done);
 });
-function updSel(){updQ();const n=S.sel.size;$("printSel").disabled=!n;$("printSel").textContent=n?`Print selected (${n})`:"Print selected";}
+function updSel(){updQ();const n=S.sel.size;$("printSel").disabled=!n;$("printSel").textContent=n?`Print selected (${n})`:"Print selected";const d=$("delSel");if(d){d.hidden=S.role!=="admin";d.disabled=!n;d.textContent=n?`Delete selected (${n})`:"Delete selected"}} /* C-20261029-BULKDEL */
 $("selClear").addEventListener("click",()=>{S.sel.clear();renderList()});
+/* owner 29/10/2026 12:50 (C-20261029-BULKDEL): tick several tags in Tagged pieces -> "Delete selected" -> one reason for all -> each is
+   deleted the same way as the single Delete (owners only - the server refuses anyone else; a full copy of every deleted tag is kept). */
+$("delSel").addEventListener("click",()=>{const ids=[...S.sel];if(!ids.length)return;const h=$("delSelBox");h.textContent="";
+  const box=document.createElement("div");box.className="confirm";box.style.cssText="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0";
+  const q=document.createElement("b");q.textContent=`Delete ${ids.length} tag${ids.length>1?"s":""}?`;
+  const sel=document.createElement("select");sel.setAttribute("aria-label","Reason for deleting");
+  [["","Choose a reason…"]].concat(DEL_REASONS.map(r=>[r,r])).forEach(([v,l])=>{const o=document.createElement("option");o.value=v;o.textContent=l;sel.appendChild(o)});
+  const y=document.createElement("button");y.type="button";y.className="btn danger";y.textContent=`Delete ${ids.length}`;y.disabled=true;
+  const n=document.createElement("button");n.type="button";n.className="btn ghost";n.textContent="Keep";
+  sel.addEventListener("change",()=>{y.disabled=!sel.value});n.addEventListener("click",()=>{h.textContent=""});
+  y.addEventListener("click",async()=>{if(!sel.value)return;y.disabled=n.disabled=sel.disabled=true;let ok=0,bad=0,stop=false;
+    for(const id of ids){if(!S.tags.some(x=>x.id===id))continue;q.textContent=`Deleting ${ok+bad+1} of ${ids.length}…`;
+      try{await S.db.doc("tags/"+id).delete(sel.value);ok++;S.tags=S.tags.filter(x=>x.id!==id);Object.values(S.parts).forEach(a=>{const i=a.findIndex(x=>x.id===id);if(i>=0)a.splice(i,1)});S.sel.delete(id)}
+      catch(e){bad++;if(e&&/owner only|403/.test(String(e.code||e.message))){stop=true;break}}}
+    h.textContent="";msg(stop?"Only Abhinav or Shilpiji can delete a tag.":`Deleted ${ok} tag${ok===1?"":"s"} (${sel.value}). A copy of each is kept in the records.`+(bad?` ${bad} could not be deleted - they are still ticked, try again.`:""),stop||bad?"bad":"ok");renderList()});
+  box.append(q,sel,y,n);h.appendChild(box);box.scrollIntoView({behavior:"smooth",block:"center"})});
 $("selShown").addEventListener("click",()=>{$("rows").querySelectorAll("input[type=checkbox]").forEach(c=>{c.checked=true;c.dispatchEvent(new Event("change"))})});
 $("printSel").addEventListener("click",async()=>{
   const list=S.tags.filter(t=>S.sel.has(t.id)).sort((a,b)=>a.label.localeCompare(b.label,"en",{numeric:true}));if(!list.length)return;
