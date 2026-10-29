@@ -715,7 +715,7 @@
     if (!body.ids.length && !body.designs.length) { m.textContent = "Add at least one piece or a new design."; return; }
     { const bad = B.designs.findIndex(d => designBad(d).length); if (bad >= 0) { m.textContent = "New design " + (bad + 1) + ": check " + designBad(B.designs[bad]).join(", ") + "."; return; } }
     if (body.designs.length && body.title !== "Estimate") { m.textContent = "A new design (no tag) can only go on an Estimate."; return; }
-    if (body.title === "Estimate" && !body.cust) { m.textContent = "Choose whose customer this is (Mihir / Shilpi ji / Abhinav) - the follow-up reminder goes to them."; return; } // C-20261027-ESTOWNER
+    if (body.title === "Estimate" && !body.cust) { m.textContent = "Choose whose customer this is (Mihir / Shilpi ji / Abhinav) - the follow-up reminder goes to them."; const r0 = document.querySelector("input[name=bcust][value=mihir]"), gr = r0 && r0.closest("div"); if (gr) { gr.scrollIntoView({ behavior: "smooth", block: "center" }); gr.style.outline = "3px solid #b3261e"; gr.style.borderRadius = "8px"; setTimeout(() => { gr.style.outline = ""; }, 6000); } return; } // C-20261027-ESTOWNER; 29/10 12:38 owner missed the message - jump to the choice
     $("bsave").disabled = true; m.textContent = body.title === "Estimate" ? "Making the estimate…" : "Saving the bill…";
     try {
       const r = await fetch("/api/vj/bill", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
