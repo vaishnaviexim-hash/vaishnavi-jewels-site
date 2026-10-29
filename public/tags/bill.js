@@ -18,11 +18,12 @@
   // editable, remembered on this device) shows the amounts in US$ and prints them. The server prices everything again from the typed figures.
   const DKARATS = ["14K", "18K", "22K", "9K", "24K"], DQUALS = ["CVD", "VS IJ", "VS HI", "VS GH", "VVS EF"], DSHAPES = ["Round", "Choki", "Fancy", "Solitaire", "Polki"], QC = { "CVD": "42", "VS IJ": "2", "VS HI": "3", "VS GH": "4", "VVS EF": "5" };
   const DEF_RATES = { "CVD|Round": 23000, "CVD|Choki": 23000, "CVD|Fancy": 23000, "CVD|Solitaire": 23000, "VS GH|Round": 46000, "VS GH|Choki": 46000, "VS GH|Fancy": 85000, "VS HI|Round": 40000, "VS HI|Choki": 40000, "VS IJ|Round": 35000, "VS IJ|Choki": 35000 };
-  const NON_DIAMOND = /POL|EMR|MOZ|RUBY|PEARL|MOTI|STONE|KUNDAN/i, OPT_NAMES = { gh: "Natural VS GH", ij: "Natural VS IJ", lgd: "Lab-grown" };
+  const NON_DIAMOND = /POL|EMR|MOZ|RUBY|PEARL|MOTI|STONE|KUNDAN/i, OPT_NAMES = { gh: "Natural VS GH", ij: "Natural VS IJ", fg: "Natural VVS FG", lgd: "Lab-grown" };
   const num = v => { const n = parseFloat(String(v == null ? "" : v).replace(/,/g, "")); return isFinite(n) ? n : 0; };
   const defRate = (q, sh) => { const r = settings().defaultRates || DEF_RATES, v = Number(r[q + "|" + sh]) || Number(r[q + "|Round"]); return v > 0 ? v : 0; };
   // the rate a diamond line gets under the Diamonds choice (same rule as the server's vjQOptRate): polki / coloured stones keep their own rate
   function optRate(d, opt) { if (!opt || d.shape === "Polki" || NON_DIAMOND.test(String(d.q || "") + " " + String(d.code || ""))) return Number(d.rate) || 0; if (opt === "lgd") return 23000;
+    if (opt === "fg") { const s3 = ["Round", "Choki", "Fancy"].includes(d.shape) ? d.shape : "Round", r3 = (settings().defaultRates || {})["VVS FG|" + s3]; return Number(r3) > 0 ? Number(r3) : (s3 === "Fancy" ? 95000 : 65000); } // owner 29/10 (C-20261029-VVSFG): natural VVS FG round / choki (baguette) 65,000, fancy 95,000 per ct
     const q = opt === "gh" ? "VS GH" : "VS IJ", sh = ["Round", "Choki", "Fancy"].includes(d.shape) ? d.shape : "Round"; return defRate(q, sh); }
   const newDesign = () => ({ desc: "", k: "14K", net: "", tunch: "", dias: [], ppcs: "", prate: "300", other: "" });
   // a typed design as a piece for vjBillCalc (id new-1, new-2 …); the same shape the server builds, so the preview matches the saved estimate
@@ -244,6 +245,7 @@
         <label><input type="radio" name="bopt" value="" checked> Diamonds as on the tag</label>
         <label><input type="radio" name="bopt" value="gh"> Natural VS GH</label>
         <label><input type="radio" name="bopt" value="ij"> Natural VS IJ</label>
+        <label><input type="radio" name="bopt" value="fg"> Natural VVS FG (Rs 65,000/ct, fancy 95,000)</label>
         <label><input type="radio" name="bopt" value="lgd"> Lab-grown (Rs 23,000/ct)</label></div>
       <h2>2 · Pieces</h2>
       <div class="row" style="align-items:end"><label style="flex:2 1 220px">Code on the tag, tag number or design number <input id="bq" autocomplete="off" placeholder="e.g. abc270xyz, 803 or 1436"></label>
@@ -479,7 +481,7 @@
       const b = j.bill, all = tags0(); const miss = (b.rows || []).filter(x => !x.src && !all.some(t => t.id === x.id)); if (miss.length) throw new Error("a piece on it is no longer in stock (" + miss.map(x => x.label).join(", ") + ")");
       $("bclear").click(); $("bform").hidden = false; B.items = b.rows.filter(x => !x.src).map(x => x.id); B.mode = b.mode || "ws";
       B.designs = b.rows.filter(x => x.src).map(x => ({ desc: x.src.desc || "", k: x.src.k || "14K", net: String(x.src.net || ""), tunch: x.src.tunch ? String(x.src.tunch) : "", dias: (x.src.dias || []).map(d => ({ q: d.q, shape: d.shape, pcs: d.pcs ? String(d.pcs) : "", cents: "", ct: String(d.ct), rate: String(d.rate), edited: true })), ppcs: x.src.ppcs ? String(x.src.ppcs) : "", prate: String(x.src.prate || 300), other: x.src.other ? String(x.src.other) : "" })); drawDesigns();
-      B.option = ["gh", "ij", "lgd"].includes(b.option) ? b.option : ""; document.querySelectorAll("input[name=bopt]").forEach(x => { x.checked = x.value === B.option; }); /* C-20261027-ESTBILL */ B.cust = ["mihir", "shilpi", "abhinav"].includes(b.cust) ? b.cust : ""; document.querySelectorAll("input[name=bcust]").forEach(x => { x.checked = x.value === B.cust; }); B.settle = b.settle || "fine"; B.g2g = b.g2g === "nett" ? "nett" : "ws"; document.querySelectorAll("input[name=bg2g]").forEach(x => { x.checked = x.value === B.g2g; }); B.title = b.title || "Bill"; B.nbb = !!b.nbb; $("bnbb").checked = B.nbb; B.nbbAuto = true;
+      B.option = ["gh", "ij", "fg", "lgd"].includes(b.option) ? b.option : ""; document.querySelectorAll("input[name=bopt]").forEach(x => { x.checked = x.value === B.option; }); /* C-20261027-ESTBILL */ B.cust = ["mihir", "shilpi", "abhinav"].includes(b.cust) ? b.cust : ""; document.querySelectorAll("input[name=bcust]").forEach(x => { x.checked = x.value === B.cust; }); B.settle = b.settle || "fine"; B.g2g = b.g2g === "nett" ? "nett" : "ws"; document.querySelectorAll("input[name=bg2g]").forEach(x => { x.checked = x.value === B.g2g; }); B.title = b.title || "Bill"; B.nbb = !!b.nbb; $("bnbb").checked = B.nbb; B.nbbAuto = true;
       document.querySelectorAll("input[name=bmode]").forEach(x => { x.checked = x.value === B.mode; }); document.querySelectorAll("input[name=bset]").forEach(x => { x.checked = x.value === B.settle; });
       document.querySelectorAll("input[name=btitle]").forEach(x => { x.checked = x.value === B.title; x.disabled = true; });
       $("bname").value = b.name || ""; $("bcity").value = b.city || ""; $("bmob").value = b.mobile || ""; $("bdate").value = b.date; $("bF").value = b.F; B.final = Number(b.final) || 0; $("bfinal").value = B.final ? String(B.final) : ""; { const g = b.og || null; $("bogno").value = g ? g.no || "" : ""; $("bogfine").value = g ? String(g.recv) : ""; $("bograte").value = g ? String(g.rate) : ""; }
@@ -682,6 +684,7 @@
     const sh = ({ round: "R", choki: "C", fancy: "F", solitaire: "S", polki: "P" })[String(d.shape || "").trim().toLowerCase()] || (d.shape ? String(d.shape).trim().slice(0, 1).toUpperCase() : "");
     let q = q0.replace(/\b(cvd|lgd|lab[- ]?grown|lab)\b/ig, "").replace(/\s+/g, " ").trim().replace(/^[- ]+|[- ]+$/g, "");
     q = q.replace(/^(.*?)[- ]([D-N]{1,2})$/i, "$1 $2");
+    if (!party && b && ({ gh: 1, ij: 1, fg: 1 })[b.option] && d.shape !== "Polki" && !NON_DIAMOND.test(q0 + " " + String(d.code || ""))) return ["N", sh, ({ gh: "VS GH", ij: "VS IJ", fg: "VVS FG" })[b.option]].filter(Boolean).join(" "); // diamonds choice decides the quality shown
     return [party ? "Party" : lab ? "LG" : "N", sh, party ? "" : q].filter(Boolean).join(" ");
   }
   async function makePdf(b, photos) {
