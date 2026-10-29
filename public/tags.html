@@ -287,7 +287,8 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="/tags/shim.js?v=20261028ed"></script>
-<script src="/tags/similar.js?v=20261029a" defer></script>
+<script src="/tags/boxes.js?v=20261029a" defer></script>
+<script src="/tags/similar.js?v=20261029b" defer></script>
 <script>
 (function(){
 "use strict";
@@ -375,7 +376,7 @@ function renderCheck(){
   else{const ph=document.createElement("div");ph.className="hint";ph.style.cssText="width:112px;height:112px;display:flex;align-items:center;justify-content:center;text-align:center;border:1px dashed var(--line);border-radius:6px";ph.textContent="Photo pending";pcol.appendChild(ph)}
   const pb=photoButton(t,renderCheck);if(pb){pb.style.justifyContent="center";pb.style.padding="6px 8px";if(t.photo)pb.classList.add("ghost");pcol.appendChild(pb)}
   top.appendChild(pcol);
-  const h=document.createElement("div");const l=document.createElement("div");l.className="labelno";l.textContent=(t.designNo?t.designNo+" · ":"")+t.label;const c=document.createElement("div");c.className="hint";c.textContent=S.role==="sales"?(t.catName||""):(t.catName||"")+(t.remark?" · "+t.remark:"")+(t.kind==="sample"?" · sample":"")+(t.kind==="order"?" · order"+(t.order&&t.order.name?" for "+t.order.name:"")+(t.order&&t.order.due?", delivery "+t.order.due.split("-").reverse().join("-"):""):"");h.append(l,c);top.appendChild(h);card.appendChild(top);
+  const h=document.createElement("div");const l=document.createElement("div");l.className="labelno";l.textContent=(t.designNo?t.designNo+" · ":"")+t.label;const c=document.createElement("div");c.className="hint";c.textContent=S.role==="sales"?(t.catName||""):(t.catName||"")+(t.remark?" · "+t.remark:"")+(t.kind==="sample"?" · sample":"")+(t.kind==="order"?" · order"+(t.order&&t.order.name?" for "+t.order.name:"")+(t.order&&t.order.due?", delivery "+t.order.due.split("-").reverse().join("-"):""):"");h.append(l,c);{const bx=window.VJ_BOX?window.VJ_BOX(t):"";if(bx){const b=document.createElement("div");b.style.cssText="font-weight:700;color:#8a5a00;font-size:16px";b.textContent="📦 "+bx;h.appendChild(b)}} /* C-20261029-BOXNO */top.appendChild(h);card.appendChild(top);
   const tb=document.createElement("table");tb.className="sum";const add=(a,b,cl)=>{const tr=document.createElement("tr");if(cl)tr.className=cl;const x=document.createElement("td"),y=document.createElement("td");x.textContent=a;y.textContent=b;tr.append(x,y);tb.appendChild(tr)};
   const pin=priceInput(t);pin.gold.forEach(g=>add(g.k==="Chain"?"Chain":(g.tunch>0?"Chain ":"Gold ")+g.k,g.net.toFixed(3)+" g"+(g.tunch>0?" × tunch "+Number(g.tunch).toFixed(3):"")));pin.dias.forEach(d=>add(`${d.shape} ${d.q}`,`${d.ct.toFixed(2)} ct (${d.pcs})`+(d.rate>0?` @ ${fmt(d.rate)}`:"")));
   if(t.polki&&t.polki.pcs>0)add("Polki setting",`${t.polki.pcs} pc @ ${fmt(t.polki.rate)}`);
