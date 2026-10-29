@@ -589,6 +589,47 @@ async function vjPhotoSearch(request, env, who) {
   await vjAudit(env, who, 'photosearch', '', ok.join(','));
   return vjAskClaude(env, content, ok);
 }
+// C-20261029-CONTACTSHOT (owner 29/10/2026 11:26): on a Bill or an Estimate, staff may drop a screenshot of a contact saved on a phone instead of
+// typing the name and mobile. Fixed prompt, Claude reads only the name and the number(s). The screenshot is never stored (not in R2, not in the
+// DB, not in the audit - the audit keeps only the time and who). Typing a name / mobile and the saved-party fill keep working as before.
+const VJ_CS_DAY = 200;
+async function vjContactShot(request, env, who) {
+  if (who.role === 'sales') return vjDeny(403, 'read only');
+  if (!env.ANTHROPIC_API_KEY) return vjDeny(503, 'screenshot reading is not set up');
+  if (Number(request.headers.get('content-length') || 0) > 3e6) return vjDeny(413, 'screenshot too large');
+  let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+  const photo = b && typeof b.photo === 'string' ? b.photo : '', type = /^image\/(jpeg|png|webp)$/.test(b && b.type) ? b.type : 'image/jpeg';
+  if (!photo || photo.length > 2.8e6 || !/^[A-Za-z0-9+/=]+$/.test(photo)) return vjDeny(400, 'bad request');
+  const since = Date.now() - 24 * 3600e3;
+  const used = await env.DB.prepare("SELECT count(*) AS n FROM audit WHERE action = 'contactshot' AND ts > ?").bind(since).first();
+  if (used && used.n >= VJ_CS_DAY) return vjDeny(429, 'daily limit reached (' + VJ_CS_DAY + ' screenshots in 24 hours)');
+  await vjAudit(env, who, 'contactshot', '', '');
+  const prompt = 'This image is a screenshot of ONE person\'s contact from a phone (contact card, call log, or WhatsApp chat / profile header) sent by a jewellery shop to fill a bill. '
+    + 'Read ONLY the contact\'s display name and the phone number(s) shown for that contact, exactly as written. Never guess or invent a name or a digit; if something is not clearly readable, leave it out. '
+    + 'If the name starts with a short filing code used in the shop\'s phone (for example "C Srt", "C Amd", "J Amd", "CP", "Fr", "Rl", "Dr", "Dia"), drop that code and keep only the person\'s name. '
+    + 'Ignore the phone\'s own status bar, the time, the battery, other chats, buttons and any other text. '
+    + 'Answer with JSON only, no other text: {"name": "...", "mobiles": ["..."]} - mobiles as digits only, with the country code if it is shown.';
+  let r;
+  try {
+    r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', signal: AbortSignal.timeout(45000),
+      headers: { 'content-type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: VJ_PS_MODEL, max_tokens: 200, messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: type, data: photo } }, { type: 'text', text: prompt }] }] }) });
+  } catch (e) { return vjDeny(502, 'Claude did not answer, try again'); }
+  if (!r.ok) {
+    const t = await r.text().catch(() => '');
+    if (r.status === 400 && /credit|balance/i.test(t)) return vjDeny(402, 'Claude API credit is used up for this month');
+    if (r.status === 429) return vjDeny(429, 'Claude is busy, wait a minute');
+    return vjDeny(502, 'Claude error ' + r.status);
+  }
+  const j = await r.json();
+  const txt = ((j.content || []).find(c => c.type === 'text') || {}).text || '';
+  let o = {}; try { const m = txt.match(/\{[\s\S]*\}/); o = JSON.parse(m ? m[0] : '{}') || {}; } catch (e) {}
+  const name = String(o.name || '').replace(/[^\p{L}\p{M}\s.'-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 57);
+  const nums = (Array.isArray(o.mobiles) ? o.mobiles : []).map(x => String(x || '').replace(/\D/g, '')).filter(d => d.length >= 8 && d.length <= 15)
+    .map(d => (d.length === 12 && d.startsWith('91')) ? d.slice(2) : (d.length === 11 && d.startsWith('0')) ? d.slice(1) : d);
+  const uniq = [...new Set(nums)], best = uniq.find(d => /^[6-9]\d{9}$/.test(d)) || uniq[0] || '';
+  return vjJson({ ok: true, name, mobile: best, others: uniq.filter(d => d !== best).slice(0, 3) });
+}
 async function vjAskClaude(env, content, ok) {
   let r;
   try {
@@ -2244,7 +2285,7 @@ async function vjHandle(request, env, ctx, url) {
   if (!env.DB || !env.PHOTOS) return vjDeny(503, 'not set up');
   const who = await vjWho(request, env);
   if (!who) return p.startsWith('/api/') ? vjDeny(403, 'not allowed') : new Response('Not allowed. Ask Abhinav to add your email.', { status: 403, headers: { 'content-type': 'text/plain', 'x-robots-tag': 'noindex' } });
-  if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties', '/api/vj/moves', '/api/vj/repairs', '/api/vj/estimates'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill', '/api/vj/move', '/api/vj/repair', '/api/vj/estimate/done'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these (+ Karigar & Out, 27/10)
+  if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties', '/api/vj/moves', '/api/vj/repairs', '/api/vj/estimates'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill', '/api/vj/move', '/api/vj/repair', '/api/vj/estimate/done', '/api/vj/contactshot'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these (+ Karigar & Out, 27/10)
   // C-20261027-KARIGAROUT: stock out / back, RFID link, party repairs (JSON from our own page only)
   if ((p === '/api/vj/move' || p === '/api/vj/repair') && request.method === 'POST') { if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed'); return p === '/api/vj/move' ? vjMove(request, env, who) : vjRepair(request, env, who); }
   if (p === '/api/vj/moves' && request.method === 'GET') return vjMovesGet(url, env, who);
@@ -2254,6 +2295,7 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/photo' && request.method === 'POST') return vjPhotoUpload(request, env, who);
   if (p === '/api/vj/import' && request.method === 'POST') return vjImport(request, env, who);
   if (p === '/api/vj/photosearch' && request.method === 'POST') return vjPhotoSearch(request, env, who);
+  if (p === '/api/vj/contactshot' && request.method === 'POST') return vjSameSite(request, env) ? vjContactShot(request, env, who) : vjDeny(403, 'not allowed'); // C-20261029-CONTACTSHOT
   if (p === '/api/vj/quote' && request.method === 'POST') return vjSameSite(request, env) ? vjQuote(request, env, who, ctx) : vjDeny(403, 'not allowed'); // JSON from our own page only (C-20261017-QUOTEMODES)
   if (p === '/api/vj/bill' && request.method === 'POST') return vjBill(request, env, who, ctx);
   if ((p === '/api/vj/bills' || p === '/api/vj/bills.xlsx' || p === '/api/vj/bill') && request.method === 'GET') return vjBillBook(url, env, who, request.headers.get('x-vj-mob'));
