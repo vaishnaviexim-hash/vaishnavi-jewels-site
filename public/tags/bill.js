@@ -729,6 +729,7 @@
       const op = document.createElement("a"); op.className = "btn"; op.href = url; op.target = "_blank"; op.rel = "noopener"; op.textContent = "Open PDF (print)";
       const dl = document.createElement("a"); dl.className = "btn ghost"; dl.href = url; dl.download = fname; dl.textContent = "Download";
       out.append(op, dl); // owner 26/10 17:30: no automatic download - the bill stays saved here (PDF button below)
+      if (j.estimate) { try { dl.click(); m.textContent = "PDF downloaded. " + m.textContent; } catch (e) {} } // owner 29/10 12:43: an estimate is not kept, so its PDF downloads at once (buttons stay as a backup)
       { const wa = document.createElement("button"); wa.type = "button"; wa.className = "btn"; wa.textContent = "Send on my WhatsApp"; wa.addEventListener("click", () => myWA(b, blob, m)); out.prepend(wa); } // C-20261026-MYWA: from the owner's own WhatsApp, not Aashvi
     } catch (e) { m.textContent = "Not saved: " + (e.message || e) + "."; }
     $("bsave").disabled = false;
