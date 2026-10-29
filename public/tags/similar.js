@@ -58,6 +58,7 @@
 
   // C-20261029-SIMPDF (owner 29/10 12:06): tick pieces -> one PDF for the owner, or a ready Estimate for the customer
   let picked = new Set(), lastRows = [];
+  let fromEst = false; // C-20261029-SIMEST: search opened from an open Bill / Estimate -> ticked pieces go into that same one
   const pickedTags = () => { const all = tagsNow(); return lastRows.map(r => all.find(x => x.id === r.m.id)).filter(t => t && picked.has(t.id)); };
   async function thumb(photo, px) {
     try { const im = await loadImg("/_blob/" + photo); const k = Math.min(1, px / Math.max(im.width, im.height)); const c = document.createElement("canvas");
@@ -90,13 +91,19 @@
   function makeEstimate(msg) {
     const list = pickedTags(); if (!list.length) { msg.textContent = "Tick at least one piece first."; return; }
     if (!window.VJ_EST_NEW || !window.VJ_BILL_ADD) { msg.textContent = "Estimate screen is not ready - reload the page and try again."; return; }
+    const bf = g("bform");
+    if (fromEst && bf && !bf.hidden) { // back to the estimate / bill that was open, keep everything already on it
+      document.querySelectorAll('[id^="p-"]').forEach(p => { p.hidden = p.id !== "p-bill"; }); document.querySelectorAll("nav button").forEach(y => y.setAttribute("aria-selected", "false"));
+      list.forEach(t => window.VJ_BILL_ADD(t.id)); fromEst = false; const h = g("sesthint"); if (h) h.hidden = true;
+      const q = g("bq"); if (q) q.scrollIntoView({ behavior: "smooth", block: "start" }); return;
+    }
     window.VJ_EST_NEW(); list.forEach(t => window.VJ_BILL_ADD(t.id));
   }
   function toolbar(box) {
     const bar = document.createElement("div"); bar.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;align-items:center;position:sticky;bottom:0;background:var(--bg,#fff);padding:8px 0";
     const all = document.createElement("button"); all.type = "button"; all.className = "btn ghost"; all.textContent = "Select all";
     const pdf = document.createElement("button"); pdf.type = "button"; pdf.className = "btn"; pdf.textContent = "Download PDF (ticked)";
-    const est = document.createElement("button"); est.type = "button"; est.className = "btn"; est.textContent = "Make estimate for customer (ticked)";
+    const est = document.createElement("button"); est.type = "button"; est.className = "btn"; est.textContent = fromEst && g("bform") && !g("bform").hidden ? "Add ticked to the open estimate / bill" : "Make estimate for customer (ticked)";
     const msg = document.createElement("span"); msg.className = "hint";
     all.addEventListener("click", () => { const on = picked.size < lastRows.length; picked = new Set(on ? lastRows.map(r => r.m.id) : []); box.querySelectorAll("input[data-sim]").forEach(c => { c.checked = on; }); all.textContent = on ? "Clear all" : "Select all"; });
     pdf.addEventListener("click", async () => { pdf.disabled = true; try { await makePdf(msg); } catch (e) { msg.textContent = "Could not make the PDF (" + (e.message || e) + ")."; } pdf.disabled = false; });
@@ -171,6 +178,7 @@
         <label style="flex:1 1 110px">Price from (Rs thousand) <input id="sp1" inputmode="decimal" placeholder="e.g. 150"></label>
         <label style="flex:1 1 90px">to (Rs thousand) <input id="sp2" inputmode="decimal" placeholder="e.g. 250"></label>
         <div><button type="button" class="btn" id="sgo">Find similar</button></div></div>
+      <p class="hint" id="sesthint" hidden style="color:#8a5a00;font-weight:600">Opened from your estimate / bill - ticked pieces will be added to that same one.</p>
       <div id="sres" style="display:flex;flex-direction:column;gap:10px;margin-top:12px"></div>`;
     const h = sec.querySelector("h2"); if (h) sec.insertBefore(d, h); else sec.prepend(d);
     const sc = g("scat"); [...fcat.options].forEach(o => sc.appendChild(o.cloneNode(true))); sc.value = "";
@@ -181,6 +189,16 @@
     g("scamIn").addEventListener("change", () => { take(g("scamIn").files && g("scamIn").files[0]); g("scamIn").value = ""; });
     d.addEventListener("paste", e => { const it = [...((e.clipboardData && e.clipboardData.items) || [])].find(x => /^image\//.test(x.type)); if (it) { e.preventDefault(); take(it.getAsFile()); } });
     g("sgo").addEventListener("click", run);
+    estButton(0);
+  }
+  // C-20261029-SIMEST (owner 29/10 12:30): the same search from the Bill / Estimate screen, next to '+ Add line'
+  function estButton(n) {
+    const nd = g("bnewdes"); if (g("bsimgo")) return;
+    if (!nd) { if (n < 60) setTimeout(() => estButton(n + 1), 500); return; }
+    const w = document.createElement("div"), b = document.createElement("button"); b.type = "button"; b.className = "btn ghost"; b.id = "bsimgo"; b.textContent = "🔍 Similar designs (party photo)";
+    b.addEventListener("click", () => { fromEst = true; const t = g("t-find"); if (t) t.click(); const h = g("sesthint"); if (h) h.hidden = false;
+      setTimeout(() => { const s = g("simCard"); if (s) s.scrollIntoView({ behavior: "smooth", block: "start" }); }, 150); });
+    w.appendChild(b); nd.parentNode.insertAdjacentElement("afterend", w);
   }
   build();
 })();
