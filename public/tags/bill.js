@@ -329,7 +329,7 @@
   }
   function numField() { const e = B.title === "Estimate", n = $("bno"); n.disabled = true; n.value = ""; const d = $("bdate").value || today(); // owner 16/10: bill numbers automatic too
     n.placeholder = "automatic (" + (e ? "E-" : "B-") + d.slice(2, 4) + d.slice(5, 7) + "-01, 02 …)";
-    { const sv = $("bsave"); if (sv && !B.editNo) sv.textContent = e ? "Make estimate PDF (not saved as a bill)" : "Save bill & make PDF"; } } // C-20261028-ESTNOTBILL
+    { const sv = $("bsave"); if (sv && !B.editNo) sv.textContent = e ? "Send on my WhatsApp" : "Save bill & make PDF"; } } // C-20261028-ESTNOTBILL
   // owner 27/10/2026 12:48 (C-20261027-BILLNAME): Saved bills - type a name (e.g. Prachi) and every Prachi's bills show, with one button per party
   // (name · city · mobile, bill count) to narrow to that party; a party with a mobile then works exactly like typing the mobile (Excel, WhatsApp).
   function partyPick(list) { let w = $("bfpick"); if (!w) { w = document.createElement("div"); w.id = "bfpick"; w.className = "row"; w.style.cssText = "gap:8px;flex-wrap:wrap;margin:6px 0"; $("bfmob").closest(".row").after(w); } w.textContent = "";
@@ -488,6 +488,21 @@
   // app installed): the share box opens with the PDF - choose WhatsApp, then the customer. Computer without it: the customer's chat opens in
   // WhatsApp with the message typed, and the PDF is saved to Downloads to drag into the chat.
   function waText(b) { return `Dear ${b.name}, thank you for choosing Vaishnavi Jewels. Please find your ${b.title.toLowerCase()} ${b.no} for ${fmt(b.total)} attached.\n\nShilpi & Abhinav\nMihir Bhai`; }
+  // owner 29/10/2026 12:44 (C-20261029-ESTWA): an Estimate has ONE button, "Send on my WhatsApp" - the estimate is noted for the
+  // follow-up reminder, the PDF is made and the phone's share box opens (choose WhatsApp + the customer). If the phone needs a fresh
+  // tap before it allows sharing, a big "Tap to send on WhatsApp" button appears; nothing is downloaded or kept.
+  async function estSend(b, blob, m, out) {
+    const fname = `${b.title} ${b.no.replace(/[^A-Z0-9\-]/g, "-")} ${String(b.name || "").replace(/[^A-Za-z0-9 .\-]/g, "").trim().slice(0, 40)}.pdf`, file = new File([blob], fname, { type: "application/pdf" });
+    const who = ({ mihir: "Mihir", shilpi: "Shilpi ji", abhinav: "Abhinav" })[b.cust] || "the owner";
+    const share = async () => { try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text: waText(b) }); return "ok"; } return "no"; } catch (e) { return e && e.name === "AbortError" ? "ok" : "retry"; } };
+    out.textContent = ""; out.hidden = true;
+    const r = await share();
+    if (r === "ok") { m.textContent = `Estimate ${b.no} (${fmt(b.total)}): choose WhatsApp and the customer. ${who} gets the follow-up reminder in 2 days.`; return; }
+    if (r === "no") { await myWA(b, blob, m); return; } // computer without a share box: WhatsApp Web + the PDF file
+    const t = document.createElement("button"); t.type = "button"; t.className = "btn"; t.style.cssText = "font-size:18px;padding:14px 22px"; t.textContent = "Tap to send on WhatsApp ✓";
+    t.addEventListener("click", async () => { const r2 = await share(); if (r2 === "ok") { out.hidden = true; m.textContent = `Estimate ${b.no} (${fmt(b.total)}): choose WhatsApp and the customer. ${who} gets the follow-up reminder in 2 days.`; } else await myWA(b, blob, m); });
+    out.append(t); out.hidden = false; m.textContent = `Estimate ${b.no} (${fmt(b.total)}) is ready - tap the button below to send it.`;
+  }
   async function myWA(b, blob, msgEl) {
     const fname = `${b.title} ${b.no.replace(/[^A-Z0-9\-]/g, "-")} ${String(b.name || "").replace(/[^A-Za-z0-9 .\-]/g, "").trim().slice(0, 40)}.pdf`, file = new File([blob], fname, { type: "application/pdf" });
     let can = false; try { can = !!(navigator.canShare && navigator.canShare({ files: [file] })); } catch (e) {}
@@ -725,11 +740,11 @@
       const file = new File([blob], fname, { type: "application/pdf" }), url = URL.createObjectURL(file);
       loadBook(); m.textContent = j.estimate ? `Estimate ${b.no} made: ${fmt(b.total)}. It is NOT saved as a bill - download or send the PDF now (no copy is kept). Only the name and number are kept for the follow-up: ${({ mihir: "Mihir", shilpi: "Shilpi ji", abhinav: "Abhinav" })[b.cust] || "the owner"} gets a WhatsApp reminder in 2 days.` + mobNote
         : `${b.title} ${b.no} saved: ${fmt(b.total)}${b.fine ? " + " + g3(b.fine) + " fine gold" : ""}.` + mobNote; // C-20261028-ESTNOTBILL
+      if (j.estimate) { await estSend(b, blob, m, out); $("bsave").disabled = false; return; } // owner 29/10 12:44: estimate = one button, straight to my WhatsApp
       out.textContent = ""; out.hidden = false;
       const op = document.createElement("a"); op.className = "btn"; op.href = url; op.target = "_blank"; op.rel = "noopener"; op.textContent = "Open PDF (print)";
       const dl = document.createElement("a"); dl.className = "btn ghost"; dl.href = url; dl.download = fname; dl.textContent = "Download";
       out.append(op, dl); // owner 26/10 17:30: no automatic download - the bill stays saved here (PDF button below)
-      if (j.estimate) { try { dl.click(); m.textContent = "PDF downloaded. " + m.textContent; } catch (e) {} } // owner 29/10 12:43: an estimate is not kept, so its PDF downloads at once (buttons stay as a backup)
       { const wa = document.createElement("button"); wa.type = "button"; wa.className = "btn"; wa.textContent = "Send on my WhatsApp"; wa.addEventListener("click", () => myWA(b, blob, m)); out.prepend(wa); } // C-20261026-MYWA: from the owner's own WhatsApp, not Aashvi
     } catch (e) { m.textContent = "Not saved: " + (e.message || e) + "."; }
     $("bsave").disabled = false;
