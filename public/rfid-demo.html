@@ -141,6 +141,7 @@ kbd{font-family:var(--f-mono);font-size:13px;background:var(--sunk);border:1px s
     <button role="tab" id="t-tags" data-tab="tags" aria-selected="false">Tags (20)</button>
     <button role="tab" id="t-labels" data-tab="labels" aria-selected="false">Print labels</button>
     <button role="tab" id="t-scan" data-tab="scan" aria-selected="false">Scan test</button>
+    <button role="tab" id="t-live" data-tab="live" aria-selected="false">Live (all devices)</button>
   </nav>
 
   <!-- HOW TO TEST -->
@@ -241,6 +242,27 @@ kbd{font-family:var(--f-mono);font-size:13px;background:var(--sunk);border:1px s
       <div id="csvBox" hidden class="stack"><p class="hint">Downloads are not available here. Copy the results below and send them.</p><textarea id="csvText" readonly></textarea><div class="actions"><button type="button" class="btn ghost sm" id="csvCopy">Copy</button></div></div>
     </section>
   </div>
+
+  <!-- LIVE (all devices) - C-20261029-RFIDLIVE -->
+  <div id="p-live" class="stack" hidden>
+    <div class="sticky">
+      <div class="totals" id="lvTot"></div>
+      <div class="totline" id="lvLine">Loading live results…</div>
+    </div>
+    <section class="card">
+      <h2>Live from every scanning device</h2>
+      <p class="hint">Every scan made on the Scan test page, on any phone, reader or computer, shows here within a few seconds. Choose one device to see only its test.</p>
+      <div class="actions"><label>Device / test <select id="lvDev"><option value="">All devices</option></select></label><span class="hint" id="lvUpd"></span></div>
+    </section>
+    <section class="card">
+      <h2>Checklist (live)</h2>
+      <div class="list"><table class="items ck"><thead><tr><th>Tag</th><th>Label</th><th style="text-align:center">Bar</th><th style="text-align:center">QR</th><th style="text-align:center">RFID</th><th style="text-align:center">Link</th><th>EPC read</th></tr></thead><tbody id="lvRows"></tbody></table></div>
+    </section>
+    <section class="card">
+      <h2>Latest scans (live)</h2>
+      <div class="log" id="lvLog"><p class="hint">No scans yet.</p></div>
+    </section>
+  </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
@@ -269,12 +291,13 @@ const BYNO=new Map(TAGS.map(t=>[t.no,t])),BYEPC=new Map(TAGS.map(t=>[t.epc,t.no]
 (function(){const d=$("wm").firstElementChild;for(let i=0;i<22;i++){const s=document.createElement("span");s.textContent=(WM+"   \u00b7   ").repeat(6);d.appendChild(s)}})();
 
 /* ---------- tabs ---------- */
-const TABS=["howto","tags","labels","scan"];
+const TABS=["howto","tags","labels","scan","live"];
 function showTab(tab){if(!TABS.includes(tab))tab="howto";
   document.querySelectorAll("nav button").forEach(b=>b.setAttribute("aria-selected",b.dataset.tab===tab?"true":"false"));
   TABS.forEach(k=>$("p-"+k).hidden=k!==tab);
   if(tab==="labels")renderLabels();
   if(tab==="scan"){render();focusScan()}
+  if(tab==="live")livePoll(true);
   try{localStorage.setItem("vjdemo.tab",tab)}catch(e){}
 }
 document.querySelectorAll("nav button").forEach(b=>b.addEventListener("click",()=>{showTab(b.dataset.tab);try{history.replaceState(null,"","#"+b.dataset.tab)}catch(e){}}));
@@ -664,6 +687,47 @@ function dbScan(ev){dbWrite(()=>C.db.collection("scans").doc(ev.id).set({run:S.r
 function dbLink(epc,tag,how){dbWrite(()=>C.db.collection("links").doc(epc).set({epc,tag,how,run:S.run,at:new Date().toISOString(),device:DEV,user:C.uid||null}))}
 function dbUnlink(list){list.forEach(epc=>dbWrite(()=>C.db.collection("links").doc(epc).delete()))}
 sync("Results are kept on this device. Download the CSV at the end and send it to Vaishnavi Jewels.","warn");
+
+/* ---------- live results for Vaishnavi Jewels (C-20261029-RFIDLIVE): every scan / link also goes to the website, the Live tab shows all devices ---------- */
+let lvChain=Promise.resolve(),lvOk=null;
+function lvPost(body){body.run=S.run;body.dev=DEV.slice(0,80);lvChain=lvChain.then(async()=>{for(let a=0;a<3;a++){try{const r=await fetch("/hooks/rfid-demo",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body),keepalive:true});if(r.ok){if(lvOk!==true){lvOk=true;sync("Every scan is also sent live to Vaishnavi Jewels.","ok")}return}if(r.status<500)return}catch(e){}await new Promise(z=>setTimeout(z,1500*(a+1)))}if(lvOk!==true)sync("Live sending failed - results are kept on this device. Download the CSV at the end and send it to Vaishnavi Jewels.","warn")})}
+const _dbScan=dbScan,_dbLink=dbLink,_dbUnlink=dbUnlink;
+dbScan=ev=>{_dbScan(ev);lvPost({k:"scan",id:ev.id,at:ev.t,raw:ev.raw,value:ev.value,type:ev.type,tag:ev.tag,how:ev.how,repeat:ev.dup,via:ev.via,multi:!!ev.multi})};
+dbLink=(epc,tag,how)=>{_dbLink(epc,tag,how);lvPost({k:"link",epc,tag,how})};
+dbUnlink=list=>{_dbUnlink(list);list.forEach(epc=>lvPost({k:"unlink",epc}))};
+const LV={ev:[],links:{},since:0,timer:null,busy:false};
+async function livePoll(now){
+  clearTimeout(LV.timer);if($("p-live").hidden)return;
+  if(!LV.busy&&(now||document.visibilityState!=="hidden")){LV.busy=true;
+    try{const r=await fetch("/hooks/rfid-demo?since="+LV.since,{cache:"no-store"});const j=await r.json();
+      if(r.ok){const seen=new Set(LV.ev.map(e=>e.id));(j.events||[]).forEach(e=>{if(!seen.has(e.id))LV.ev.push(e)});LV.ev.sort((a,b)=>a.ms-b.ms);if(LV.ev.length>5000)LV.ev=LV.ev.slice(-5000);LV.links=j.links||{};LV.since=j.now||LV.since;liveRender();$("lvUpd").textContent="Updated "+new Date().toLocaleTimeString()}
+      else $("lvUpd").textContent="Could not load live results ("+(j.error||r.status)+")"}catch(e){$("lvUpd").textContent="Could not load live results - retrying"}
+    LV.busy=false}
+  LV.timer=setTimeout(livePoll,3000);
+}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&!$("p-live").hidden)livePoll(true)});
+function liveRender(){
+  const sel=$("lvDev"),cur=sel.value,keys=[...new Set(LV.ev.map(e=>e.dev+" | test "+e.run))];
+  sel.textContent="";const o0=document.createElement("option");o0.value="";o0.textContent="All devices ("+keys.length+")";sel.appendChild(o0);
+  keys.forEach(k=>{const o=document.createElement("option");o.value=k;o.textContent=k+" ("+LV.ev.filter(e=>e.dev+" | test "+e.run===k).length+" scans)";sel.appendChild(o)});
+  sel.value=keys.includes(cur)?cur:"";
+  const evs=sel.value?LV.ev.filter(e=>e.dev+" | test "+e.run===sel.value):LV.ev,lk=LV.links;
+  const tagOf=e=>e.tag||(e.type==="rfid"&&lk[e.value]?lk[e.value].tag:null);
+  const per={};TAGS.forEach(t=>per[t.no]={barcode:false,qr:false,rfid:false,epcs:new Set()});
+  evs.forEach(e=>{const tg=tagOf(e);if(!tg||!per[tg])return;if(e.type==="barcode"||e.type==="qr"||e.type==="rfid")per[tg][e.type]=true;if(e.type==="rfid")per[tg].epcs.add(e.value)});
+  let b=0,q=0,r=0,l=0;TAGS.forEach(t=>{const p=per[t.no];p.linked=p.rfid&&(p.barcode||p.qr||Object.values(lk).some(x=>x.tag===t.no));b+=p.barcode;q+=p.qr;r+=p.rfid;l+=p.linked});
+  const N=TAGS.length,tot=$("lvTot");tot.textContent="";
+  [["Barcode",b],["QR",q],["RFID",r],["Linked",l]].forEach(([n,v])=>{const d=document.createElement("div");d.className="tot"+(v===N?" full":"");const x=document.createElement("b");x.textContent=v+"/"+N;const y=document.createElement("span");y.textContent=n;d.append(x,y);tot.appendChild(d)});
+  $("lvLine").textContent=`Live: Barcode ${b}/${N} · QR ${q}/${N} · RFID ${r}/${N} · Linked ${l}/${N} · ${evs.length} scans`;
+  const tb=$("lvRows");tb.textContent="";
+  TAGS.forEach(t=>{const p=per[t.no],tr=document.createElement("tr");if(p.linked&&p.barcode&&p.qr)tr.className="done";
+    const a=document.createElement("td");a.className="mono";a.textContent=t.no;const bl=document.createElement("td");bl.textContent=t.label;tr.append(a,bl);
+    ["barcode","qr","rfid","linked"].forEach(k=>{const td=document.createElement("td");td.className="c "+(p[k]?"y":"n");td.textContent=p[k]?"✓":"·";tr.appendChild(td)});
+    const e=document.createElement("td");e.className="mono";e.style.fontSize="12px";e.textContent=[...p.epcs].map(x=>x===t.epc?"encoded":"…"+x.slice(-8)).join(", ");tr.appendChild(e);tb.appendChild(tr)});
+  const lg=$("lvLog");lg.textContent="";if(!evs.length){const p=document.createElement("p");p.className="hint";p.textContent="No scans yet.";lg.appendChild(p)}
+  evs.slice(-100).reverse().forEach(e=>{const d=document.createElement("div");const a=document.createElement("span");a.textContent=new Date(e.ms).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit",second:"2-digit"});const x=document.createElement("span");const tg=tagOf(e);
+    x.textContent=(tg?tg+" · "+BYNO.get(tg).label:"UNKNOWN "+e.value)+" · "+e.type+(e.type==="rfid"&&tg?(e.tag?"":" (linked)"):"")+(e.repeat?" · repeat":"")+" · "+e.dev;d.append(a,x);lg.appendChild(d)});
+}
 
 render();
 const start=(location.hash||"").slice(1);let t0=TABS.includes(start)?start:null;if(!t0){try{t0=localStorage.getItem("vjdemo.tab")}catch(e){}}
