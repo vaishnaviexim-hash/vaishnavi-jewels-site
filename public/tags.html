@@ -139,6 +139,24 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
       <div class="row" id="karBox" hidden><label>Karigar <select id="karigar"><option value="">Choose karigar…</option><option value="MN">MN</option><option value="BD">BD</option><option value="HR">HR</option><option value="RK">RK</option></select></label></div>
       <!-- owner 16/10/2026 (C-20261016-ORDERS): a piece made for a customer's order (Order option removed 19/10/2026) -->
       <div class="row" id="orderBox" hidden>
+        <div style="flex:1 1 100%;display:flex;flex-wrap:wrap;gap:8px;align-items:center"><button type="button" class="btn ghost" id="oShot">&#128247; Contact screenshot &rarr; fill name &amp; mobile</button><input type="file" id="oShotF" accept="image/*" hidden><span class="hint" id="oShotMsg">or paste a screenshot here (Ctrl+V)</span></div>
+        <script>/* C-20261029-ORDERSHOT (owner 29/10 14:59): same contact screenshot reader as on bills/estimates, for the order party on New tag / Edit tag; the screenshot is not kept */
+        (function () { const g = id => document.getElementById(id), btn = g("oShot"), fi = g("oShotF"), msg = g("oShotMsg"), box = g("orderBox"); if (!btn || !fi || !msg || !box) return;
+          const shrink = f => new Promise((res, rej) => { const u = URL.createObjectURL(f), im = new Image(); im.onload = () => { const k = Math.min(1, 1400 / Math.max(im.width, im.height)), c = document.createElement("canvas"); c.width = Math.max(1, Math.round(im.width * k)); c.height = Math.max(1, Math.round(im.height * k)); c.getContext("2d").drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); res(c.toDataURL("image/jpeg", 0.85).split(",")[1]); }; im.onerror = () => { URL.revokeObjectURL(u); rej(new Error("not an image")); }; im.src = u; });
+          const read = async f => { if (!f || !/^image\//.test(f.type || "")) { msg.textContent = "Please choose a screenshot (an image)."; return; }
+            btn.disabled = true; msg.textContent = "Reading the screenshot...";
+            try { const photo = await shrink(f);
+              const r = await fetch("/api/vj/contactshot", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ photo, type: "image/jpeg" }) });
+              const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status);
+              if (!j.name && !j.mobile) { msg.textContent = "Could not read a name or number in this screenshot - please type them."; return; }
+              const set = (id, v) => { const x = g(id); if (x && v) { x.value = v; x.dispatchEvent(new Event("input", { bubbles: true })); x.dispatchEvent(new Event("change", { bubbles: true })); } };
+              set("oName", j.name); set("oMob", j.mobile);
+              msg.textContent = "From screenshot: " + (j.name || "(no name)") + ", " + (j.mobile || "(no number)") + (j.others && j.others.length ? " - other numbers: " + j.others.join(", ") : "") + ". Please check before saving.";
+            } catch (e) { msg.textContent = "Could not read the screenshot (" + (e.message || e) + "). Please type the name and mobile."; }
+            finally { btn.disabled = false; fi.value = ""; } };
+          btn.addEventListener("click", () => fi.click()); fi.addEventListener("change", () => read(fi.files && fi.files[0]));
+          document.addEventListener("paste", e => { if (e.defaultPrevented || box.hidden || !box.offsetParent || (e.target && e.target.closest && e.target.closest("#bform"))) return; const it = [...((e.clipboardData && e.clipboardData.items) || [])].find(x => /^image\//.test(x.type)); if (it) { e.preventDefault(); read(it.getAsFile()); } });
+        })();</script>
         <label>Party name (required) <input id="oName" autocomplete="off" maxlength="60"></label>
         <label>Mobile (if known) <input id="oMob" inputmode="tel" autocomplete="off" maxlength="20" placeholder="98xxxxxxxx"></label>
         <label>City (if known) <input id="oCity" autocomplete="off" maxlength="40"></label>
