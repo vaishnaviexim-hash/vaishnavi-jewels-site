@@ -2390,6 +2390,55 @@ async function vjHandle(request, env, ctx, url) {
   return vjDeny(404, 'not found');
 }
 
+// C-20261029-RFIDLIVE (owner 29/10 18:14): the public RFID vendor demo (/rfid-demo, 20 made-up tags, no prices, not the real stock)
+// sends each scan / link here so the owner sees every device live on its 'Live (all devices)' tab. Only demo-shaped values are
+// kept (tags A0000001-A0000020, hex EPCs, short text), the table is capped, posts come only from our own page, nothing else is touched.
+let vjRdOk = false;
+async function vjRfidDemo(request, env, url) {
+  const H = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow' };
+  const out = (o, st) => new Response(JSON.stringify(o), { status: st || 200, headers: H });
+  if (!env.DB) return out({ error: 'not set up' }, 503);
+  if (!vjRdOk) { await env.DB.batch([
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS rfid_demo_ev (id TEXT PRIMARY KEY, ms INTEGER, run TEXT, dev TEXT, data TEXT)'),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS rfid_demo_link (epc TEXT PRIMARY KEY, tag TEXT, how TEXT, ms INTEGER, dev TEXT)')]); vjRdOk = true; }
+  const tagOk = t => /^A00000(0[1-9]|1\d|20)$/.test(String(t || ''));
+  const txt = (v, n) => String(v == null ? '' : v).replace(/[\x00-\x1f\x7f<>"\\]/g, ' ').trim().slice(0, n);
+  if (request.method === 'GET') {
+    const since = Math.max(0, Number(url.searchParams.get('since')) || 0), now = Date.now();
+    const ev = ((await env.DB.prepare('SELECT ms, run, dev, data FROM rfid_demo_ev WHERE ms > ? ORDER BY ms LIMIT 3000').bind(since).all()).results) || [];
+    const lk = ((await env.DB.prepare('SELECT epc, tag, how, ms FROM rfid_demo_link').all()).results) || [];
+    const links = {}; lk.forEach(r => { links[r.epc] = { tag: r.tag, how: r.how, ms: r.ms }; });
+    return out({ ok: true, now: ev.length ? ev[ev.length - 1].ms : since, events: ev.map(r => Object.assign(JSON.parse(r.data), { ms: r.ms, run: r.run, dev: r.dev })), links });
+  }
+  if (request.method !== 'POST') return out({ error: 'method' }, 405);
+  const o = request.headers.get('origin') || '';
+  if (o !== 'https://' + VJ_HOST && env.VJ_DEV !== '1') return out({ error: 'not allowed' }, 403);
+  if (Number(request.headers.get('content-length') || 0) > 4000) return out({ error: 'too large' }, 413);
+  let b; try { b = await request.json(); } catch (e) { return out({ error: 'bad json' }, 400); }
+  const run = String(b && b.run || ''), dev = txt(b && b.dev, 80) || 'device';
+  if (!/^\d{8}T\d{6,7}-[a-z0-9]{1,4}$/.test(run)) return out({ error: 'bad run' }, 400);
+  const cnt = (await env.DB.prepare('SELECT count(*) AS n FROM rfid_demo_ev').first()) || {};
+  if (b.k === 'scan') {
+    if (Number(cnt.n) >= 20000) return out({ error: 'demo log full' }, 429);
+    const id = String(b.id || ''), type = String(b.type || '');
+    if (!/^[a-z0-9]{6,20}$/.test(id) || !['barcode', 'qr', 'rfid', 'other'].includes(type)) return out({ error: 'bad scan' }, 400);
+    const tag = tagOk(b.tag) ? b.tag : null, ms = Date.now();
+    const d = { id, type, tag, value: txt(b.value, 64).toUpperCase(), raw: txt(b.raw, 120), how: ['encoded', 'linked'].includes(b.how) ? b.how : null, repeat: !!b.repeat, multi: !!b.multi, via: txt(b.via, 20) };
+    await env.DB.prepare('INSERT INTO rfid_demo_ev (id, ms, run, dev, data) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO NOTHING').bind(id, ms, run, dev, JSON.stringify(d)).run();
+    return out({ ok: true });
+  }
+  const epc = String(b && b.epc || '').toUpperCase();
+  if (!/^[0-9A-F]{16,64}$/.test(epc)) return out({ error: 'bad epc' }, 400);
+  if (b.k === 'link') {
+    if (!tagOk(b.tag)) return out({ error: 'bad tag' }, 400);
+    await env.DB.prepare('INSERT INTO rfid_demo_link (epc, tag, how, ms, dev) VALUES (?, ?, ?, ?, ?) ON CONFLICT(epc) DO UPDATE SET tag = excluded.tag, how = excluded.how, ms = excluded.ms, dev = excluded.dev')
+      .bind(epc, b.tag, txt(b.how, 12), Date.now(), dev).run();
+    return out({ ok: true });
+  }
+  if (b.k === 'unlink') { await env.DB.prepare('DELETE FROM rfid_demo_link WHERE epc = ?').bind(epc).run(); return out({ ok: true }); }
+  return out({ error: 'bad request' }, 400);
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -2399,6 +2448,7 @@ export default {
     if (p === '/hooks/vj-contact') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjContactHook(url, env) : reply('Method not allowed', 405); // C-20261026-CONTACTS
     if (p === '/hooks/vj-billpdf' || p === '/hooks/vj-billpdf-done') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjBillPdfHook(url, env, p.endsWith('-done')) : reply('Method not allowed', 405); // C-20261017-BILLWA
     if (p === '/hooks/vj-estbell') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjEstBell(env) : reply('Method not allowed', 405); // C-20261028-ESTNOTBILL
+    if (p === '/hooks/rfid-demo') return (url.hostname === VJ_HOST || env.VJ_DEV === '1') ? vjRfidDemo(request, env, url) : reply('Not found', 404); // C-20261029-RFIDLIVE
     if (p === '/hooks/vj-estdue') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjEstDue(url, env) : reply('Method not allowed', 405);
     if (p === '/hooks/vj-daily') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjDailyReport(env) : reply('Method not allowed', 405);
     if (p === '/hooks/vj-backup' || p === '/hooks/vj-backupfile') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-backup' ? vjBackup(env) : vjBackupFile(url, env)) : reply('Method not allowed', 405); // C-20261017-TAGSBACKUP
