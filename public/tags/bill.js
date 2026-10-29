@@ -398,9 +398,9 @@
     cell.textContent = ""; const w = document.createElement("div"); w.style.cssText = "display:flex;flex-direction:column;gap:6px;max-width:360px;white-space:normal";
     const nm = "bact" + Math.random().toString(36).slice(2), opts = [];
     const add = (v, l) => { const lb = document.createElement("label"); lb.style.cssText = "flex-direction:row;align-items:flex-start;gap:8px;color:var(--fg);font-size:14px"; const r = document.createElement("input"); r.type = "radio"; r.name = nm; r.value = v; r.style.cssText = "width:auto;margin-top:3px"; lb.append(r, l); w.appendChild(lb); opts.push(r); };
-    if (owner) add("1", `1 · Erase everything: the bill and its ${b.pieces} piece${b.pieces === 1 ? "" : "s"} (tags, codes, photos) are removed for good`);
-    if (!b.cancelled) add("2", "2 · Cancel the bill only: pieces stay as they are (an order stays an order, pending again)");
-    if (owner) add("3", b.cancelled ? "3 · Move this bill's order pieces to stock" : "3 · Cancel the bill and move its order pieces to stock");
+    if (owner) add("1", `1 · Erase all (the bill and its ${b.pieces} piece${b.pieces === 1 ? "" : "s"} are removed for good)`);
+    if (!b.cancelled) add("2", "2 · Cancel the bill (an order stays a pending order)");
+    if (owner) add("3", b.cancelled ? "3 · Cancel order (piece goes to stock)" : "3 · Cancel order (bill cancelled, piece goes to stock)");
     const sel = document.createElement("select"); sel.setAttribute("aria-label", "Reason for cancelling");
     [["", "Reason…"], ["Customer cancelled", "Customer cancelled"], ["Wrong entry", "Wrong entry"], ["Made again", "Made again (new bill)"], ["Other", "Other"]].forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = l; sel.appendChild(o); });
     const note = document.createElement("input"); note.placeholder = "note (needed for Other)"; note.maxLength = 120;
