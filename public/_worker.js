@@ -263,7 +263,34 @@ async function vjWho(request, env) {
   return { email, role: row.role, name: row.name || email };
 }
 
-const VJ_PATH = /^(tags\/[A-Za-z0-9_\-.~]{1,60}|settings\/main|counters\/main)$/;
+const VJ_PATH = /^(tags\/[A-Za-z0-9_\-.~]{1,60}|settings\/main|counters\/main|kdues\/[A-Za-z0-9_\-.~]{1,60}|karigars\/[A-Za-z0-9_\-.~]{1,60})$/; // kdues/karigars: C-20261030-TAGSDROPDOWN
+// Karigar dues (owner 30/10/2026 15:17, C-20261030-TAGSDROPDOWN): kdues/<id> = one job with a karigar (code, customer, item, stage),
+// karigars/<id> = karigar name + Total / Due grams. Every field is cleaned here; the history and who/when are written by the server.
+const VJ_KSTAGES = ['Design', 'CAD', 'Ghaat', 'Setting', 'Polish', 'Ready', 'Hold'];
+const vjGrams = v => { const x = Math.round(Number(v) * 1000) / 1000; return isFinite(x) && Math.abs(x) <= 100000 ? x : null; };
+const VJ_KID = /^[A-Za-z0-9_\-.~]{1,60}$/;
+function vjKdue(d, cur, who) {
+  const k = vjClean(d.karigar, 60), kname = vjClean(d.kname, 40), code = vjClean(d.code, 20), customer = vjClean(d.customer, 60), item = vjClean(d.item, 12);
+  const stage = VJ_KSTAGES.includes(d.stage) ? d.stage : null, status = d.status === 'delivered' ? 'delivered' : 'open';
+  if (!VJ_KID.test(k) || !kname) return { error: 'karigar needed' };
+  if (!code && !customer) return { error: 'code or customer needed' };
+  if (!stage) return { error: 'stage must be one of ' + VJ_KSTAGES.join(', ') };
+  const now = new Date().toISOString(), was = cur || null;
+  const out = { karigar: k, kname, code, customer, item, stage, status, createdAt: was && was.createdAt || now, createdBy: was && was.createdBy || who.email,
+    hist: Array.isArray(was && was.hist) ? was.hist.slice(-40) : [] };
+  if (VJ_KID.test(String(d.tagId || ''))) out.tagId = String(d.tagId);
+  if (was ? was.seed === true : d.seed === true) out.seed = true;
+  if (status === 'delivered') { const keep = was && was.status === 'delivered'; out.deliveredAt = keep && was.deliveredAt || now; out.deliveredBy = keep && was.deliveredBy || who.email; }
+  const ch = !was ? 'added (' + stage + ')' : [was.stage !== stage ? was.stage + ' -> ' + stage : '', was.status !== status ? (status === 'delivered' ? 'delivered' : 'back to pending') : '', was.karigar !== k ? 'moved to ' + kname : ''].filter(Boolean).join(', ');
+  if (ch) out.hist.push({ at: now, by: who.email, what: ch });
+  return { doc: out };
+}
+function vjKarigar(d) {
+  const name = vjClean(d.name, 40); if (!name) return { error: 'karigar name needed' };
+  const total = d.total === '' || d.total == null ? 0 : vjGrams(d.total), due = d.due === '' || d.due == null ? 0 : vjGrams(d.due);
+  if (total === null || due === null) return { error: 'Total / Due must be grams' };
+  return { doc: { name, total, due, sort: Number.isInteger(d.sort) && d.sort >= 0 && d.sort < 10000 ? d.sort : 0, at: new Date().toISOString() } };
+}
 // What staff may change on a piece that already exists (photo, price code fixed at first print, print queue).
 // owner 26/10/2026 (C-20261026-STAFFEDIT): staff may also use Edit tag (design no., remark, box, gold, diamonds, polki, other, sample metal);
 // every change is still logged old -> new in vj_changes / audit with the person's email. Delete stays owner-only.
@@ -359,6 +386,7 @@ async function vjSync(request, env, who, ctx) {
     const data = JSON.parse(r.data);
     if (who.role === 'sales' && (r.path === 'counters/main' || r.path.startsWith('quotes/'))) return null;
     if (who.role === 'tagger' && r.path.startsWith('quotes/')) return null;
+    if (who.role === 'sales' && (r.path.startsWith('kdues/') || r.path.startsWith('karigars/'))) return null; // C-20261030-TAGSDROPDOWN: karigar dues not for the sales login
     if (who.role === 'sales' && data && data.order) delete data.order; // C-20261016-ORDERS: customer details never go to the sales login
     if (who.role === 'sales' && data && data.orderCancelled) delete data.orderCancelled;
     return { path: r.path, data, version: r.version };
@@ -378,6 +406,7 @@ async function vjWrite(request, env, who, ctx) {
   if (op !== 'delete' && (!data || typeof data !== 'object' || Array.isArray(data))) return vjDeny(400, 'bad data');
   if (path === 'settings/main' && who.role !== 'admin') return vjDeny(403, 'owner only');
   if (op === 'delete' && who.role !== 'admin') return vjDeny(403, 'owner only');
+  if (op === 'delete' && /^(kdues|karigars)\//.test(path)) return vjDeny(403, 'karigar dues are never deleted - mark Delivered'); // C-20261030-TAGSDROPDOWN
   const row = await env.DB.prepare('SELECT data, version FROM docs WHERE path = ?').bind(path).first();
   if (ifv === null && row && op !== 'update') return vjDeny(409, 'version required');
   if (ifv !== null && (row ? row.version : 0) !== ifv) return vjJson({ error: 'conflict', version: row ? row.version : 0 }, 409);
@@ -453,6 +482,8 @@ async function vjWrite(request, env, who, ctx) {
       && next.gold.some(g => g && Number(g.net) > 0 && !(g.tunch > 0))) return vjDeny(400, 'a chain needs its tunch on each gold line (e.g. 0.920)');
     if (!cur) next.createdBy = who.email;
   }
+  if (path.startsWith('kdues/')) { const r = vjKdue(next, cur, who); if (r.error) return vjDeny(400, r.error); next = r.doc; } // C-20261030-TAGSDROPDOWN
+  if (path.startsWith('karigars/')) { const r = vjKarigar(next); if (r.error) return vjDeny(400, r.error); next = r.doc; }
   const s = JSON.stringify(next);
   if (s.length > 64000) return vjDeny(413, 'too large');
   const v = row ? row.version + 1 : 1;
