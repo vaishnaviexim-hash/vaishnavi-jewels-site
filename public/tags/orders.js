@@ -74,9 +74,8 @@
         const ed = el("button", { type: "button", className: "btn ghost", textContent: "Edit" }); ed.style.marginLeft = "6px"; ed.addEventListener("click", () => editTag(t)); // owner 27/10/2026 15:28 (C-20261027-ORDEREDIT): Edit for every login
         const due = el("td", { textContent: t.order.due ? dmy(t.order.due) + (late ? " (late)" : "") : "-" }); if (late) due.style.color = "#b3261e";
         const ec = estCell(estFor(t.order.name, t.order.mobile, [t.designNo, t.label]), used); if (ec.text === "-") tNo++; if (/\*$/.test(ec.text)) multi = true;
-        pG += g; pE += ec.amt; const kd = window.VJ_KDUES_FOR ? window.VJ_KDUES_FOR(t) : null;
+        pG += g; pE += ec.amt;
         const pc = el("td", { textContent: (t.designNo ? t.designNo + " · " : "") + (t.pcode || t.label || "") + (t.catName ? " · " + t.catName : "") });
-        if (kd) pc.append(el("div", { className: "hint", textContent: "with " + kd.kname + " · " + kd.stage }));
         body.appendChild(el("tr", {}, [pc,
           el("td", { className: "num", textContent: g ? g.toFixed(3) + " g" : "-" }), el("td", { className: "num", textContent: t.order.rate ? fmt(t.order.rate) : "-" }), el("td", { className: "num", textContent: ec.text, title: ec.title }), due,
           el("td", { textContent: dmy(t.createdAt) }), el("td", {}, [bn, ed])]));
