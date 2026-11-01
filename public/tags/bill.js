@@ -403,7 +403,12 @@
         tr.appendChild(x); body.appendChild(tr); });
       m.textContent = j.bills.length ? `${j.bills.length} in this month${nc ? " (" + nc + " cancelled)" : ""}, total ${fmt(tot)}${nc ? " without the cancelled ones" : ""}.` : "Nothing saved in this month.";
       const live = j.bills.length - nc; // C-20261016-HIDECANCELLED
-      m.textContent = byMob ? (live ? live + " bill" + (live === 1 ? "" : "s") + " for mobile " + fq + " (all months): amount " + fmt(tot) + (ft ? " + fine gold " + g3(ft) : "") + "." : "No bills for mobile " + fq + ".") : (live ? live + " in this month: amount " + fmt(tot) + (ft ? " + fine gold " + g3(ft) : "") + "." : "Nothing saved in this month.") + (nc ? " " + nc + " cancelled " + (nc === 1 ? "bill" : "bills") + " hidden (kept in the Excel, marked CANCELLED)." : "");
+      // owner 01/11/2026 15:00 (C-20261101-LEDGERTOT): a TOTAL line under the list - amount AND fine gold; for one party also what is still due (rupees + fine gold)
+      let due = 0, fdue = 0; j.bills.forEach(b => { if (!b.cancelled && b.title === "Bill") { due += Number(b.balance) || 0; fdue += Math.max(0, Number(b.fineDue) || 0); } });
+      if (live) { const tr = document.createElement("tr"); tr.style.fontWeight = "700"; const td = (x, cl) => { const e = document.createElement("td"); if (cl) e.className = cl; e.textContent = x; tr.appendChild(e); };
+        td("TOTAL"); td(live + " bill" + (live === 1 ? "" : "s")); td(""); td(""); td((byMob || fnm) ? "Still due: " + fmt(due) + (fdue ? " + " + g3(fdue) + " fine gold" : "") : ""); td(fmt(tot), "num"); td(ft ? g3(ft) : "—", "num"); td(""); td(""); body.appendChild(tr); }
+      const dueTxt = (byMob || fnm) && live ? " Still due: " + fmt(due) + (fdue ? " + fine gold " + g3(fdue) : "") + "." : "";
+      m.textContent = byMob ? (live ? live + " bill" + (live === 1 ? "" : "s") + " for mobile " + fq + " (all months): amount " + fmt(tot) + (ft ? " + fine gold " + g3(ft) : "") + "." + dueTxt : "No bills for mobile " + fq + ".") : fnm ? (live ? live + " bill" + (live === 1 ? "" : "s") + " for '" + fraw + "' (all months): amount " + fmt(tot) + (ft ? " + fine gold " + g3(ft) : "") + "." + dueTxt : "No bills for '" + fraw + "'.") : (live ? live + " in this month: amount " + fmt(tot) + (ft ? " + fine gold " + g3(ft) : "") + "." : "Nothing saved in this month.") + (nc ? " " + nc + " cancelled " + (nc === 1 ? "bill" : "bills") + " hidden (kept in the Excel, marked CANCELLED)." : "");
     } catch (e) { m.textContent = "Could not load the saved bills (" + (e.message || e) + ")."; }
   }
   // owners only (C-20261016-BILL3WAY): 1 erase everything, 2 cancel the bill only (pieces stay - orders stay orders), 3 cancel and move order pieces to stock
