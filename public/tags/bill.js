@@ -715,12 +715,14 @@
   }
   // C-20261101-ESTSUMMARY: summary estimate - per piece code / design, piece type, gold g + karat, total diamond ct; no rates or part amounts;
   // the final total is the same b.total the full estimate prints (same rounding and GST), nothing is recomputed here
+  // owner 01/11/2026 13:42 (C-20261101-EST24K): every estimate PDF prints that day's 24K (999 fine) gold rate - b.F, the rate per g typed / prefilled on the estimate; no line when there is none
+  const r24 = b => { const f = Math.round(Number(b && b.F) || 0); return f >= 2000 ? `Gold rate today (24K / 999 fine): ${fmt(f * 10)} per 10 g (${fmt(f)}/g)` : ""; };
   function summaryPdf(b) {
     const { jsPDF } = window.jspdf, doc = new jsPDF({ unit: "mm", format: "a4" });
     const W = 210, M = 14; let y = 20;
     doc.setTextColor(20); doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.text(b.title, M, y);
     doc.setFontSize(12); doc.text(`No. ${b.no}`, W - M, y - 3, { align: "right" }); doc.setFont("helvetica", "normal"); doc.text(`Date ${dmy(b.date)}`, W - M, y + 3, { align: "right" });
-    y += 10; doc.text(`Name: ${b.name}`, M, y); y += 6.5; doc.text(`City: ${b.city || "-"}`, M, y); doc.text(`Mobile: ${!b.mobile ? "-" : /^\d{10}$/.test(b.mobile) ? "+91 " + b.mobile : b.mobile}`, M + 90, y); y += 11;
+    y += 10; doc.text(`Name: ${b.name}`, M, y); y += 6.5; doc.text(`City: ${b.city || "-"}`, M, y); doc.text(`Mobile: ${!b.mobile ? "-" : /^\d{10}$/.test(b.mobile) ? "+91 " + b.mobile : b.mobile}`, M + 90, y); y += 6.5; { const gr = r24(b); if (gr) { doc.setFont("helvetica", "bold"); doc.text(gr, M, y); doc.setFont("helvetica", "normal"); y += 6.5; } } y += 4.5; // C-20261101-EST24K
     const cols = [["#", 9, "l"], ["Piece", 75, "l"], ["Gold", 50, "l"], ["Diamonds", 48, "l"]];
     const row = (vals, bold) => { doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setFontSize(11); let x = M, h = 0;
       const lines = vals.map((v, i) => doc.splitTextToSize(String(v), cols[i][1] - 2)); lines.forEach(l => h = Math.max(h, l.length));
@@ -757,7 +759,8 @@
     y += 10; doc.setFontSize(12);
     doc.text(`Name: ${b.name}`, M, y); y += 6.5; doc.text(`City: ${b.city || "-"}`, M, y); doc.text(`Mobile: ${!b.mobile ? "-" : /^\d{10}$/.test(b.mobile) ? "+91 " + b.mobile : b.mobile}`, M + 90, y); y += 6.5;
     const rts = [...new Set((b.rows || []).map(r => Math.round(r.F || b.F)))], hF = rts.length === 1 ? rts[0] : b.F; // owner 17/10: the rate shown is the one the pieces were billed at (tag rate)
-    doc.text(`Gold Rate (F): ${fmt(hF)} per g (24K)`, M, y); doc.text(`Gold Calculation: ${MODES[b.mode] || b.mode}${b.settle === "fine" ? " (fine gold)" : b.settle === "amount" ? " (in rupees)" : ""}`, M + 90, y);
+    const est24 = b.title === "Estimate" ? r24(b) : ""; if (est24) { doc.setFont("helvetica", "bold"); doc.text(est24, M, y); doc.setFont("helvetica", "normal"); y += 6.5; } // C-20261101-EST24K: estimates only; bills unchanged
+    if (!est24 || hF !== Math.round(b.F)) doc.text(`Gold Rate (F): ${fmt(hF)} per g (24K)`, M, y); doc.text(`Gold Calculation: ${MODES[b.mode] || b.mode}${b.settle === "fine" ? " (fine gold)" : b.settle === "amount" ? " (in rupees)" : ""}`, M + 90, y);
     if (rts.length > 1) { y += 5.5; doc.setFontSize(10); doc.text("Other gold rates are shown under each piece.", M, y); doc.setFontSize(12); } y += 9;
     const pics = {}; if (photos) for (const r of b.rows) { const ph = r.photo || ((tags0().find(t => t.id === r.id) || {}).photo); if (ph) pics[r.id] = await thumb(ph); } // C-20261029-SOLDPHOTO: a photo added after billing also prints
     const P = Object.values(pics).some(Boolean) ? 22 : 0; // photo column (mm) only when a piece has a photo
