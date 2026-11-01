@@ -1042,6 +1042,11 @@ async function vjBill(request, env, who, ctx) { // every login may make bills (o
     const dd = String(d.date || '').split('-').reverse().join('-');
     return `this piece is already billed: ${String(t.label || t.designNo || id)} is on ${d.no} (${dd}, ${d.name || ''}). Cancel that bill first if it must be billed again.` + (hit.size > 1 ? ` ${hit.size - 1} more piece${hit.size > 2 ? 's are' : ' is'} also already billed.` : ''); };
   if (title === 'Bill') { const hit = await onBill(); if (hit.size) return vjJson({ error: dupMsg(hit), duplicate: true }, 409); }
+  // owner 01/11/2026 14:55 (C-20261101-OGREG): Gold to Gold (customer gives fine gold) needs the OG no.; one OG no. on one live bill only
+  const ogNo = vjClean(b && (b.ogNo || (b.og && b.og.no)), 20);
+  if (title === 'Bill' && mode === 'g2g' && settle === 'fine' && !ogNo) return vjDeny(400, 'Gold to Gold: the OG no. (old gold) is needed');
+  if (title === 'Bill' && ogNo) { const used = (await vjOgList(env)).find(x => !x.cancelled && x.og.toUpperCase() === ogNo.toUpperCase() && x.no !== editNo);
+    if (used) return vjDeny(409, `OG no. ${ogNo} is already on ${used.no} (${used.name || ''}) - pick the next OG no.`); }
   const sRow = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first();
   const s = sRow ? JSON.parse(sRow.data) : {};
   vtags.forEach(t => tags.push(t)); // C-20261027-ESTBILL: the typed designs are priced like tags
@@ -1050,7 +1055,7 @@ async function vjBill(request, env, who, ctx) { // every login may make bills (o
   { const miss = []; calc.rows.forEach(r => (r.dias || []).forEach(d => { if (d.ct > 0 && !(d.rate > 0) && !(Number(rates[r.id] && rates[r.id][d.idx]) === -1) && !VJ_Q_NONDIA.test(d.q)) miss.push((r.design ? r.design + ' ' : '') + (r.label || r.id) + ' (' + d.shape + ' ' + d.q + ', ' + d.ct + ' ct)'); }));
     if (miss.length) return vjDeny(400, 'diamond rate missing on ' + miss.slice(0, 6).join('; ') + (miss.length > 6 ? ' and ' + (miss.length - 6) + ' more' : '') + ' - type the rate per ct on the bill (or 0 for a party diamond)'); } // C-20261028-SIGHRATE: never Rs 0 diamonds by mistake
   calc.rows.forEach((r, i) => { const ph = tags[i].photo; if (typeof ph === 'string' && /^[0-9a-f]{32}$/.test(ph)) r.photo = ph; if (tags[i].src) r.src = tags[i].src; }); // owner 16/10: photo on the bill; src = the typed design (C-20261027-ESTBILL)
-  const bill = Object.assign({ no, title, date, name, city, mobile, F, nbb: !!(b && b.nbb === true), by: who.email, byName: who.name, at: new Date().toISOString(), ...(option ? { option } : {}), ...(usd ? { usd } : {}), ...(cust ? { cust } : {}) }, calc); // nbb: 'No Buy Back No Exchange' stamp (owner 17/10, C-20261017-NBB)
+  const bill = Object.assign({ no, title, date, name, city, mobile, F, nbb: !!(b && b.nbb === true), by: who.email, byName: who.name, at: new Date().toISOString(), ...(option ? { option } : {}), ...(usd ? { usd } : {}), ...(cust ? { cust } : {}), ...(title === 'Bill' && ogNo ? { ogNo } : {}) }, calc); // nbb: 'No Buy Back No Exchange' stamp (owner 17/10, C-20261017-NBB)
   if (editNo) { // C-20261026-BILLEDIT (owner 26/10/2026 17:32 'i should be able to edit the bill'): owners only; the old version is kept in vj_bill_old
     if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji can edit a saved bill');
     const old = await env.DB.prepare('SELECT ts, email, data FROM vj_bills WHERE no = ?').bind(editNo).first();
@@ -1409,6 +1414,19 @@ async function vjBillPdfHook(url, env, done) {
 }
 
 // Saved bills & estimates (C-20261016-BILLBOOK): month list, one bill for re-printing, or a summary Excel. Owners + staff only.
+// C-20261101-OGREG: every OG no. used on a bill (live and cancelled), in number order; next = highest number + 1, gaps = skipped numbers
+async function vjOgList(env) { if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
+  const out = []; ((((await env.DB.prepare("SELECT no, email, data FROM vj_bills WHERE no LIKE 'B-%'").all()).results) || [])).forEach(x => { let d; try { d = JSON.parse(x.data); } catch (e) { return; }
+    const og = String((d && (d.ogNo || (d.og && d.og.no))) || '').trim(); if (!og) return;
+    out.push({ og, no: d.no || x.no, date: d.date || '', name: d.name || '', city: d.city || '', fine: d.og && d.og.recv ? d.og.recv : 0, cancelled: !!d.cancelled, email: x.email }); });
+  const num = s => { const m = String(s).match(/\d+/); return m ? Number(m[0]) : Infinity; }; out.sort((a, b) => num(a.og) - num(b.og) || String(a.og).localeCompare(String(b.og)));
+  return out; }
+async function vjOgs(env, who) { const all = await vjOgList(env), live = all.filter(x => !x.cancelled), nums = [...new Set(live.map(x => { const m = /^\D*(\d+)\D*$/.exec(x.og); return m ? Number(m[1]) : NaN; }).filter(n => n >= 0 && n < 1e7))].sort((a, b) => a - b);
+  const last = nums.length ? live.filter(x => (x.og.match(/\d+/) || [])[0] == nums[nums.length - 1]).pop() : null, next = nums.length ? nums[nums.length - 1] + 1 : 0, gaps = [];
+  for (let i = 1; i < nums.length && gaps.length < 30; i++) for (let n = nums[i - 1] + 1; n < nums[i] && gaps.length < 30; n++) gaps.push(n);
+  const free = next ? gaps.concat([next, next + 1, next + 2, next + 3, next + 4]) : [];
+  const list = (who.role === 'sales' ? all.filter(x => x.email === who.email) : all).map(x => ({ og: x.og, no: x.no, date: x.date, name: x.name, city: x.city, fine: x.fine, cancelled: x.cancelled }));
+  return vjJson({ ok: true, list, next, gaps, free, last: last ? { og: last.og, no: last.no, name: last.name } : null }); }
 async function vjBillBook(url, env, who, mobQ) { // a sales login sees only the bills it made; mobQ (header, not URL): one party's bills (owner 26/10 18:03)
   const mq = String(mobQ || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '').slice(0, 12), byMob = mq.length >= 4;
   const mine = b => who.role !== 'sales' || b.by === who.email;
@@ -2385,7 +2403,7 @@ async function vjHandle(request, env, ctx, url) {
   if (!env.DB || !env.PHOTOS) return vjDeny(503, 'not set up');
   const who = await vjWho(request, env);
   if (!who) return p.startsWith('/api/') ? vjDeny(403, 'not allowed') : new Response('Not allowed. Ask Abhinav to add your email.', { status: 403, headers: { 'content-type': 'text/plain', 'x-robots-tag': 'noindex' } });
-  if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties', '/api/vj/moves', '/api/vj/repairs', '/api/vj/estimates', '/api/vj/boxes', '/api/vj/bill/sendstatus'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill', '/api/vj/move', '/api/vj/repair', '/api/vj/estimate/done', '/api/vj/contactshot', '/api/vj/bill/send', '/api/vj/photosearch'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these (+ Karigar & Out, 27/10)
+  if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties', '/api/vj/moves', '/api/vj/repairs', '/api/vj/estimates', '/api/vj/boxes', '/api/vj/bill/sendstatus', '/api/vj/ogs'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill', '/api/vj/move', '/api/vj/repair', '/api/vj/estimate/done', '/api/vj/contactshot', '/api/vj/bill/send', '/api/vj/photosearch'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these (+ Karigar & Out, 27/10)
   // C-20261027-KARIGAROUT: stock out / back, RFID link, party repairs (JSON from our own page only)
   if ((p === '/api/vj/move' || p === '/api/vj/repair') && request.method === 'POST') { if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed'); return p === '/api/vj/move' ? vjMove(request, env, who) : vjRepair(request, env, who); }
   if (p === '/api/vj/moves' && request.method === 'GET') return vjMovesGet(url, env, who);
@@ -2399,6 +2417,7 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/contactshot' && request.method === 'POST') return vjSameSite(request, env) ? vjContactShot(request, env, who) : vjDeny(403, 'not allowed'); // C-20261029-CONTACTSHOT
   if (p === '/api/vj/quote' && request.method === 'POST') return vjSameSite(request, env) ? vjQuote(request, env, who, ctx) : vjDeny(403, 'not allowed'); // JSON from our own page only (C-20261017-QUOTEMODES)
   if (p === '/api/vj/bill' && request.method === 'POST') return vjBill(request, env, who, ctx);
+  if (p === '/api/vj/ogs' && request.method === 'GET') return vjOgs(env, who); // C-20261101-OGREG
   if ((p === '/api/vj/bills' || p === '/api/vj/bills.xlsx' || p === '/api/vj/bill') && request.method === 'GET') return vjBillBook(url, env, who, request.headers.get('x-vj-mob'));
   if (p === '/api/vj/bill/cancel' && request.method === 'POST') return vjBillCancel(request, env, who);
   if (p === '/api/vj/estimates' && request.method === 'GET') return vjEstList(url, env, who); // C-20261028-ESTNOTBILL
