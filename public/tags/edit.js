@@ -42,6 +42,12 @@
       r._get = () => { const o = { k: k.value, net: num(n.value) }; if (String(tn.value).trim() !== "") o.tunch = Math.round(num(tn.value) * 1000) / 1000; return o; }; rm.onclick = () => r.remove(); gBox.append(r); };
     (t.gold || []).forEach(addGold);
     if (t.kind !== "sample") { wrap.append(el("strong", { textContent: "Gold" }), gBox, el("button", { type: "button", className: "btn ghost", textContent: "+ Gold line", onclick: () => addGold(null) })); }
+    // owner 01/11/2026 13:43 (C-20261101-TAGMAKING): making per g, the default (650 / 750) filled in; a different rate typed here is kept on this piece only (Italian / special pieces)
+    const mkGold = () => t.kind === "sample" ? [{ k: "14K", net: fMetal ? num(fMetal.value) : 0 }] : [...gBox.children].map(r => r._get()), mkd = () => window.VJ_MKDEF ? window.VJ_MKDEF(mkGold()) : 0;
+    const fMk = inp(t.makingPerG || mkd() || "", 110, "number"), mkNote = el("div", { className: "hint" }); let mkOwnTyped = false;
+    const mkSync = () => { const d = mkd(); if (!mkOwnTyped && !t.makingPerG) fMk.value = d || ""; const v = Math.round(num(fMk.value)); mkNote.textContent = v > 0 && v !== d ? "Custom making Rs " + v + "/g (default Rs " + d + "/g)" : "Default Rs " + d + "/g - type another rate for Italian / special pieces"; };
+    fMk.oninput = () => { mkOwnTyped = true; mkSync(); }; wrap.addEventListener("input", e => { if (e.target !== fMk) mkSync(); }); mkSync();
+    wrap.append(el("div", { className: "row", style: "display:flex;gap:10px;flex-wrap:wrap;align-items:end" }, [row("Making per gram (Rs)", fMk), mkNote]));
     // diamond / stone lines
     const dBox = el("div", { style: "display:flex;flex-direction:column;gap:6px" });
     const SH = ["Round", "Choki", "Fancy", "Solitaire", "Polki"];
@@ -67,8 +73,9 @@
       if (pdct > 0 && !(pdct <= 1000 && Number.isInteger(pdrate) && pdrate >= 1 && pdrate <= 100000)) { note.textContent = "Party diamond: carats up to 1,000 and setting rate per ct Rs 1-1,00,000, whole rupees."; return; }
       const data = { pdia: pdct > 0 ? { ct: pdct, pcs: pdpcs, rate: pdrate } : null, certNo: fCert.value.trim().toUpperCase().slice(0, 30), designNo: fDesign.value.trim().slice(0, 30), remark: fRemark.value.trim().slice(0, 120), box: fBox.value.trim().slice(0, 60), other: Object.assign({}, t.other || {}, { amt: Math.max(0, num(fOther.value)) }), dias, polki: ppcs > 0 ? { pcs: ppcs, rate: prate } : null };
       if (t.kind === "sample") data.metal = Object.assign({}, t.metal || {}, { net: Math.max(0, num(fMetal.value)) }); else data.gold = gold;
+      { const v = Math.round(num(fMk.value)), mv = mkOwnTyped ? v : (Number(t.makingPerG) || 0), d = mkd(); if (mkOwnTyped && String(fMk.value).trim() !== "" && !(v >= 1 && v <= 100000)) { note.textContent = "Making per gram: whole rupees 1-1,00,000 (empty = default)."; return; } data.makingPerG = mv > 0 && mv !== d ? mv : null; } // C-20261101-TAGMAKING
       const priceChanged = JSON.stringify([t.gold || [], t.dias || [], (t.other && t.other.amt) || 0, (t.metal && t.metal.net) || 0, pk0 ? [pk0.pcs, pk0.rate] : null])
-        !== JSON.stringify([data.gold || t.gold || [], dias, data.other.amt, (data.metal && data.metal.net) || (t.metal && t.metal.net) || 0, data.polki ? [data.polki.pcs, data.polki.rate] : null]) || JSON.stringify(pd0 ? [pd0.ct, pd0.rate] : null) !== JSON.stringify(data.pdia ? [data.pdia.ct, data.pdia.rate] : null);
+        !== JSON.stringify([data.gold || t.gold || [], dias, data.other.amt, (data.metal && data.metal.net) || (t.metal && t.metal.net) || 0, data.polki ? [data.polki.pcs, data.polki.rate] : null]) || JSON.stringify(pd0 ? [pd0.ct, pd0.rate] : null) !== JSON.stringify(data.pdia ? [data.pdia.ct, data.pdia.rate] : null) || (Number(t.makingPerG) || null) !== data.makingPerG; // C-20261101-TAGMAKING
       // C-20261027-EDITCAT: category and main karat decide the printed code (VBN18) and the label series (VBN18/7)
       const cat = CATS.find(c => c.id === fCat.value), gl = (data.gold || t.gold || []), g1 = gl.find(g => g.net > 0 && g.k !== "Chain") || gl.find(g => g.k !== "Chain"), gc = gl.find(g => g.k === "Chain" && g.tunch > 0);
       const mainK = g1 ? g1.k : gc ? (gc.tunch >= 0.88 ? "22K" : gc.tunch >= 0.7 ? "18K" : gc.tunch >= 0.5 ? "14K" : "9K") : "14K";
