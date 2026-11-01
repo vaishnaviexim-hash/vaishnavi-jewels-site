@@ -294,7 +294,7 @@ function vjKarigar(d) {
 // What staff may change on a piece that already exists (photo, price code fixed at first print, print queue).
 // owner 26/10/2026 (C-20261026-STAFFEDIT): staff may also use Edit tag (design no., remark, box, gold, diamonds, polki, other, sample metal);
 // every change is still logged old -> new in vj_changes / audit with the person's email. Delete stays owner-only.
-const VJ_STAFF_FIELDS = new Set(['pdia', 'certNo', 'photo', 'photoAt', 'photoBy', 'code', 'priceAtTag', 'gold24gAtTag', 'queue', 'queueAt', 'printedAt', 'designNo', 'remark', 'box', 'other', 'dias', 'polki', 'metal', 'gold', 'editedAt']);
+const VJ_STAFF_FIELDS = new Set(['pdia', 'certNo', 'photo', 'photoAt', 'photoBy', 'code', 'priceAtTag', 'gold24gAtTag', 'queue', 'queueAt', 'printedAt', 'designNo', 'remark', 'box', 'other', 'dias', 'polki', 'metal', 'gold', 'editedAt', 'makingPerG']); // makingPerG: C-20261101-TAGMAKING
 
 async function vjAudit(env, who, action, path, detail) {
   try { await env.DB.prepare('INSERT INTO audit (ts, email, action, path, detail) VALUES (?, ?, ?, ?, ?)').bind(Date.now(), who.email, action, path || '', String(detail || '').slice(0, 500)).run(); } catch (e) {}
@@ -465,6 +465,8 @@ async function vjWrite(request, env, who, ctx) {
       else next.pdia = { ct, pcs, rate };
     }
     if (next.certNo !== undefined) { const c = vjClean(next.certNo, 30).toUpperCase(); if (c) next.certNo = c; else delete next.certNo; } // IGI / GIA certificate no.
+    if (next.makingPerG !== undefined) { // C-20261101-TAGMAKING (owner 01/11 13:43): the piece's own making Rs per g (stored only when it differs from 650/750); empty / null = default
+      const v = Number(next.makingPerG); if (next.makingPerG === null || next.makingPerG === '' || v === 0) delete next.makingPerG; else if (!Number.isInteger(v) || v < 1 || v > 100000) return vjDeny(400, 'making per g must be whole rupees 1-1,00,000'); else next.makingPerG = v; }
     // C-20261017-CHAINTUNCH (owner 17/10/2026 18:16 / 18:19): any gold line can be a chain with its own tunch (fine gold factor, e.g.
     // 0.900 or 0.940; 0.30-1.10, 3 decimals): gold:[{k:'18K',net:8,tunch:0.94}]. A chain line is priced net x tunch x fine rate with
     // no making and no extra wastage; a tag of category Chain has every gold line as a chain line.
@@ -886,7 +888,7 @@ function vjBillCalc(tags, o) {
     let mk = 0;
     // owner 17/10/2026 17:00 (C-20261017-MAKINGMIN): making Rs 650/g (750/g when the first gold line is up to 5 g), never below Rs 1,000 a piece,
     // plus 10% wastage on the gold - in every mode (W/s: wastage in the gold value; Nett: wastage added to the making; Gold to Gold: in the fine factor)
-    const b = g0 ? (g0.net > m.limit ? m.base : m.small) : 0; if (g0 && mode !== 'item') mk = b;
+    const tmk = Number(t.makingPerG), b = g0 ? (tmk >= 1 && tmk <= 100000 ? Math.round(tmk) : (g0.net > m.limit ? m.base : m.small)) : 0; if (g0 && mode !== 'item') mk = b; // C-20261101-TAGMAKING (owner 01/11 13:43): the tag's own making per g (Italian / special pieces) replaces 650/750; Rs 1,000 minimum, wastage and modes unchanged
     let gold = 0, net = 0, fine = 0, nc = 0, ng = 0;
     gl.forEach(g => { net += g.net;
       if (g.tn) { if (fineMode) fine += g.net * g.tn; else gold += g.net * g.tn * Fr; return; }
@@ -1873,7 +1875,7 @@ const vjSameSite = (request, env) => /^application\/json\b/i.test(request.header
 const VJ_PHOTO_F = new Set(['photo', 'photoAt', 'photoBy']);
 const VJ_PRINT_F = new Set(['code', 'priceAtTag', 'gold24gAtTag', 'queue', 'queueAt', 'printedAt']);
 const VJ_FIELD_NAME = { designNo: 'Design no.', label: 'Tag', catName: 'Category', remark: 'Remark', gold: 'Gold', dias: 'Diamonds', polki: 'Polki', other: 'Other charges',
-  metal: 'Sample weight', box: 'Packet / box', kind: 'Order / stock / sample', order: 'Order customer', status: 'Status', photo: 'Photo', code: 'Price code', priceAtTag: 'Price when tagged' };
+  metal: 'Sample weight', box: 'Packet / box', kind: 'Order / stock / sample', order: 'Order customer', status: 'Status', photo: 'Photo', code: 'Price code', priceAtTag: 'Price when tagged', makingPerG: 'Making per g' };
 const vjGoldTxt = t => t && t.kind === 'sample' ? (vjSmpNet(t) > 0 ? vjSmpNet(t).toFixed(3) + ' g (14K)' : '') : (Array.isArray(t && t.gold) ? t.gold.filter(g => g && g.net > 0).map(g => g.k + ' ' + Number(g.net).toFixed(3) + ' g' + (vjLineT(g) ? ' chain tunch ' + vjLineT(g).toFixed(3) : '')).join('; ') : '');
 const vjDiaTxt = t => (Array.isArray(t && t.dias) ? t.dias.filter(Boolean).map(d => `${d.shape || ''} ${d.q || ''} ${Number(d.ct || 0).toFixed(2)} ct${d.pcs ? ' (' + d.pcs + ')' : ''}`.replace(/\s+/g, ' ').trim()) : [])
   .concat(t && t.polki && t.polki.pcs > 0 ? ['Polki ' + t.polki.pcs + ' pc'] : []).join('; '); // + polki (C-20261017-POLKI)
@@ -2004,7 +2006,7 @@ async function vjOrdersReport(env, who) {
   const priceToday = t => { const r24o = Number(t.gold24gAtTag) || r24; if (!r24o) return 0; /* the order's own rate (C-20261016-ORDERRATE) */ const gl = (Array.isArray(t.gold) ? t.gold : []).filter(g => g && g.net > 0), dias = Array.isArray(t.dias) ? t.dias.filter(Boolean) : [];
     const dia = dias.reduce((a, d) => a + (Number(d.ct) || 0) * (Number(d.rate) || 0), 0) + (t.polki && Number(t.polki.pcs) > 0 ? Number(t.polki.pcs) * (Number(t.polki.rate) || 0) : 0) /* polki, C-20261017-POLKI */, oth = Number(t.other && t.other.amt) || 0;
     if (!gl.length) { const s0 = up(dia + oth, 10); return s0 > 0 ? up(s0 + s0 * gstP / 100, 10) : 0; }
-    const g0 = gl.find(g => !vjLineT(g)), b0 = g0 && g0.net > mkS.limit ? mkS.base : mkS.small; // C-20261017-MAKINGMIN: 650/g (750 up to 5 g), min Rs 1,000, + 10% wastage on gold
+    const g0 = gl.find(g => !vjLineT(g)), tmk = Number(t.makingPerG), b0 = tmk >= 1 && tmk <= 100000 ? Math.round(tmk) : g0 && g0.net > mkS.limit ? mkS.base : mkS.small; /* C-20261101-TAGMAKING: the tag's own making per g */ // C-20261017-MAKINGMIN: 650/g (750 up to 5 g), min Rs 1,000, + 10% wastage on gold
     // chain lines (C-20261017-CHAINTUNCH): net x tunch x rate, no making / wastage; making on the non-chain weight only
     let gold = 0, ch = 0, nt = 0; gl.forEach(g => { const tn = vjLineT(g); if (tn) ch += g.net * r24o * tn; else { gold += g.net * r24o * (pur[g.k] || 0); nt += g.net; } }); const making = g0 ? Math.max(b0 * nt, Number(mkS.min) || 0) + gold * mkS.pct / 100 : 0;
     const sub = up(gold + ch + making + dia + oth, 100); return up(sub + sub * gstP / 100, 1000); };
