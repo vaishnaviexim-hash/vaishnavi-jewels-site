@@ -6,7 +6,7 @@
   "use strict";
   const $ = id => document.getElementById(id);
   const fmt = n => "Rs " + Math.round(n).toLocaleString("en-IN");
-  const B = { items: [], mode: "ws", settle: "fine", title: "Bill", g2g: "ws", photos: true, nbb: false, disc: {}, rates: {}, frates: {}, prates: {}, pdrates: {}, mkamt: {}, designs: [], option: "", usd: 0 }; // designs / option / usd: C-20261027-ESTBILL // prates: polki rate per pc for this bill (C-20261017-POLKI)
+  const B = { items: [], mode: "ws", settle: "fine", title: "Bill", g2g: "ws", photos: true, estPhotos: false, summ: true, nbb: false, disc: {}, rates: {}, frates: {}, prates: {}, pdrates: {}, mkamt: {}, designs: [], option: "", usd: 0 }; // designs / option / usd: C-20261027-ESTBILL // prates: polki rate per pc for this bill (C-20261017-POLKI)
   const MODES = { ws: "W/s", nett: "Nett", g2g: "Gold to Gold", item: "Gold Item" };
   const fineMode = () => B.mode === "g2g" || B.mode === "item";
   const g3 = n => Number(n || 0).toFixed(3) + " g";
@@ -254,7 +254,8 @@
       <div id="bpick" class="row" style="gap:8px"></div>
       <div id="bdes"></div>
       <div class="list"><table class="items" style="min-width:820px"><thead><tr><th>Piece</th><th>Gold</th><th>Gold value</th><th>Making</th><th>Diamonds</th><th id="bpolh" hidden>Polki / Party dia.</th><th>Other</th><th>Amount</th><th>Discount<br><span style="font-weight:400;text-transform:none">Rs or %</span></th><th>Net</th><th></th></tr></thead><tbody id="brows"></tbody></table></div>
-      <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg);margin-top:8px"><input type="checkbox" id="bphoto" checked style="width:auto"> Show piece photos on the bill</label>
+      <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg);margin-top:8px"><input type="checkbox" id="bphoto" checked style="width:auto"> <span id="bphotol">Show piece photos on the bill</span></label>
+      <label id="bsummrow" hidden style="flex-direction:row;align-items:center;gap:8px;color:var(--fg);margin-top:4px;margin-left:26px"><input type="checkbox" id="bsumm" checked style="width:auto"> Summary only – no breakup (gold g, karat, total diamond ct, final amount)</label>
       <label style="flex-direction:row;align-items:center;gap:8px;color:var(--fg);margin-top:4px"><input type="checkbox" id="bnbb" style="width:auto"> Stamp <b>No Buy Back · No Exchange</b> on this bill</label>
       <div class="row" style="margin-top:8px;align-items:end"><label>Final amount - what the customer pays (optional) <input id="bfinal" inputmode="numeric" autocomplete="off" maxlength="9" placeholder="e.g. 152000" style="max-width:180px"></label><button type="button" class="btn ghost" id="bfinalgo">Set final amount</button></div><p class="hint" id="bfinalhint">Type the final figure (e.g. 152000): the discount is worked out so the bill closes at exactly that amount. The bill prints only the final amount.</p>
       <table class="sum"><tr id="bfinerow" hidden><td><b>Fine gold to receive</b></td><td id="bfine"><b>—</b></td></tr><tr id="bogrow" hidden><td id="bogl">Balance fine gold</td><td id="bogamt">—</td></tr><tr><td>Total</td><td id="bsum">—</td></tr><tr id="bdiscrow" hidden><td>Less discount</td><td id="bdisc">—</td></tr><tr hidden><td>Total after discount</td><td id="bsub">—</td></tr>
@@ -281,7 +282,7 @@
     document.querySelectorAll("input[name=bmode]").forEach(r => r.addEventListener("change", () => { B.mode = r.value; render(); }));
     document.querySelectorAll("input[name=bset]").forEach(r => r.addEventListener("change", () => { B.settle = r.value; render(); }));
     document.querySelectorAll("input[name=bg2g]").forEach(r => r.addEventListener("change", () => { B.g2g = r.value; render(); })); // C-20261026-G2GNETT
-    document.querySelectorAll("input[name=btitle]").forEach(r => r.addEventListener("change", () => { if (r.value === "Bill" && B.designs.length) { r.checked = false; document.querySelector('input[name=btitle][value=Estimate]').checked = true; $("bmsg").textContent = "A new design (no tag) can only go on an Estimate. Remove the design to make a Bill."; return; } B.title = r.value; numField(); }));
+    document.querySelectorAll("input[name=btitle]").forEach(r => r.addEventListener("change", () => { if (r.value === "Bill" && B.designs.length) { r.checked = false; document.querySelector('input[name=btitle][value=Estimate]').checked = true; $("bmsg").textContent = "A new design (no tag) can only go on an Estimate. Remove the design to make a Bill."; return; } if (r.value === "Estimate" && B.title !== "Estimate") estDefaults(); B.title = r.value; numField(); }));
     document.querySelectorAll("input[name=bopt]").forEach(r => r.addEventListener("change", () => { B.option = r.value; if (!B.editNo) B.rates = {}; render(); })); /* C-20261029-BILLFROZEN: on Edit the billed diamond rates stay */ // C-20261027-ESTBILL: diamonds choice resets the per-line rate edits
     document.querySelectorAll("input[name=bcust]").forEach(r => r.addEventListener("change", () => { B.cust = r.value; })); // C-20261027-ESTOWNER: whose customer (Mihir / Shilpi ji / Abhinav) - for the follow-up reminder and the morning report, not printed
     $("bnewdes").addEventListener("click", () => { B.designs.push(newDesign()); drawDesigns(); render(); $("bmsg").textContent = ""; });
@@ -289,8 +290,8 @@
     $("busd").addEventListener("input", () => { const v = Math.round(num($("busd").value) * 100) / 100; B.usd = v > 50 && v < 200 ? v : 0; if (B.usd) { usdSave(B.usd, true); $("busdinfo").textContent = "Rate typed today."; } render(); }); usdInit();
     $("bmonth").value = today().slice(0, 7); bShotInit(); $("bmonth").addEventListener("change", loadBook); { let tm = 0; $("bfmob").addEventListener("input", () => { B.fcity = null; clearTimeout(tm); tm = setTimeout(loadBook, 350); }); } // owner 26/10 17:58: type a mobile no. and see all that customer's bills
     $("bxl").addEventListener("click", () => xl($("bmonth").value || today().slice(0, 7))); $("bxlall").addEventListener("click", () => xl("all")); $("bxwa").addEventListener("click", e => partyWA(e.currentTarget));
-    $("bF").addEventListener("input", render); /* owner 27/10 18:08: "Amount before GST" box removed - only the final amount is typed */ $("bfinalgo").addEventListener("click", applyFinal); $("bfinal").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applyFinal(); } }); /* C-20261027-FINALAMT */  ["bogno", "bogfine", "bograte"].forEach(i => $(i).addEventListener("input", () => totals())); /* C-20261027-OGBAL */  /* owner 27/10 12:21 (C-20261027-BILLTARGET) */ $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { B.photos = $("bphoto").checked; render(); }); $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
-    $("bclear").addEventListener("click", () => { B.editNo = null; B.final = 0; { const bf = $("bfinal"); if (bf) bf.value = ""; } { const bt = $("btarget"); if (bt) bt.value = ""; ["bogno", "bogfine", "bograte"].forEach(i => { const x = $(i); if (x) x.value = ""; }); } { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.designs = []; drawDesigns(); B.option = ""; document.querySelectorAll("input[name=bopt]").forEach(x => { x.checked = x.value === ""; }); B.cust = ""; document.querySelectorAll("input[name=bcust]").forEach(x => { x.checked = x.value === ""; }); B.nbb = false; $("bnbb").checked = false; B.nbbAuto = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; B.pdrates = {}; B.mkamt = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
+    $("bF").addEventListener("input", render); /* owner 27/10 18:08: "Amount before GST" box removed - only the final amount is typed */ $("bfinalgo").addEventListener("click", applyFinal); $("bfinal").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applyFinal(); } }); /* C-20261027-FINALAMT */  ["bogno", "bogfine", "bograte"].forEach(i => $(i).addEventListener("input", () => totals())); /* C-20261027-OGBAL */  /* owner 27/10 12:21 (C-20261027-BILLTARGET) */ $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { if (B.title === "Estimate") { B.estPhotos = $("bphoto").checked; if (!B.estPhotos) B.summ = true; } else B.photos = $("bphoto").checked; phSync(); render(); }); $("bsumm").addEventListener("change", () => { B.summ = $("bsumm").checked; }); /* C-20261101-ESTSUMMARY */ $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
+    $("bclear").addEventListener("click", () => { estDefaults(); B.editNo = null; B.final = 0; { const bf = $("bfinal"); if (bf) bf.value = ""; } { const bt = $("btarget"); if (bt) bt.value = ""; ["bogno", "bogfine", "bograte"].forEach(i => { const x = $(i); if (x) x.value = ""; }); } { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.designs = []; drawDesigns(); B.option = ""; document.querySelectorAll("input[name=bopt]").forEach(x => { x.checked = x.value === ""; }); B.cust = ""; document.querySelectorAll("input[name=bcust]").forEach(x => { x.checked = x.value === ""; }); B.nbb = false; $("bnbb").checked = false; B.nbbAuto = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; B.pdrates = {}; B.mkamt = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
     $("bsave").addEventListener("click", save);
     $("bback").addEventListener("click", () => { const c = document.querySelector('nav button[data-tab="check"]'); if (c) c.click(); });
   }
@@ -332,7 +333,15 @@
   }
   function numField() { const e = B.title === "Estimate", n = $("bno"); n.disabled = true; n.value = ""; const d = $("bdate").value || today(); // owner 16/10: bill numbers automatic too
     n.placeholder = "automatic (" + (e ? "E-" : "B-") + d.slice(2, 4) + d.slice(5, 7) + "-01, 02 …)";
-    { const sv = $("bsave"); if (sv && !B.editNo) sv.textContent = e ? "Send on my WhatsApp" : "Save bill & make PDF"; } } // C-20261028-ESTNOTBILL
+    { const sv = $("bsave"); if (sv && !B.editNo) sv.textContent = e ? "Send on my WhatsApp" : "Save bill & make PDF"; } phSync(); } // C-20261028-ESTNOTBILL
+  // owner 01/11/2026 13:30 (C-20261101-ESTSUMMARY): on an ESTIMATE the photo option starts OFF every time (not remembered) and under it
+  // "Summary only" starts ON: the PDF then shows per piece only gold g + karat and total diamond ct, and the final amount as the full estimate.
+  // Photo ON = the full estimate with photos (summary ignored); photo OFF + summary OFF = full breakup without photos. Bills are unchanged.
+  function estDefaults() { B.estPhotos = false; B.summ = true; }
+  const phOn = () => B.title === "Estimate" ? B.estPhotos : B.photos;
+  function phSync() { const p = $("bphoto"), s = $("bsumm"), row = $("bsummrow"), l = $("bphotol"); if (!p || !s || !row) return; const e = B.title === "Estimate";
+    p.checked = !!phOn(); if (l) l.textContent = e ? "Show piece photos on the estimate (full details)" : "Show piece photos on the bill";
+    row.hidden = !e; s.disabled = !!B.estPhotos; s.checked = !B.estPhotos && !!B.summ; row.style.opacity = B.estPhotos ? "0.5" : ""; }
   // owner 27/10/2026 12:48 (C-20261027-BILLNAME): Saved bills - type a name (e.g. Prachi) and every Prachi's bills show, with one button per party
   // (name · city · mobile, bill count) to narrow to that party; a party with a mobile then works exactly like typing the mobile (Excel, WhatsApp).
   function partyPick(list) { let w = $("bfpick"); if (!w) { w = document.createElement("div"); w.id = "bfpick"; w.className = "row"; w.style.cssText = "gap:8px;flex-wrap:wrap;margin:6px 0"; $("bfmob").closest(".row").after(w); } w.textContent = "";
@@ -601,7 +610,7 @@
         const fi = document.createElement("input"); fi.className = "brate"; fi.inputMode = "decimal"; fi.autocomplete = "off"; fi.style.cssText = "width:78px;text-align:right;padding:4px 6px"; fi.value = B.frates[r.id] || Math.round(r.Fdef) || "";
         fi.addEventListener("input", () => { const v = Number(fi.value.replace(/[^0-9.]/g, "")) || 0; if (v && v !== Math.round(r.Fdef)) B.frates[r.id] = v; else delete B.frates[r.id]; totals(); });
         ln.append(r.orderRate ? "tag rate " : "rate ", fi); gt.appendChild(ln); tr.appendChild(gt); }
-      const t0 = tags().find(t => t.id === r.id); if (B.photos && t0 && t0.photo) { const im = document.createElement("img"); im.alt = ""; im.src = "/_blob/" + t0.photo; im.style.cssText = "width:56px;height:56px;object-fit:cover;border-radius:4px;display:block;margin-bottom:4px"; tr.firstChild.prepend(im); }
+      const t0 = tags().find(t => t.id === r.id); if (phOn() && t0 && t0.photo) { const im = document.createElement("img"); im.alt = ""; im.src = "/_blob/" + t0.photo; im.style.cssText = "width:56px;height:56px;object-fit:cover;border-radius:4px;display:block;margin-bottom:4px"; tr.firstChild.prepend(im); }
       td(ok || c.settle === "fine" ? goldCell(r, c) : "—", "num"); td(ok ? mkCell(r, c) : "—", "num");
       // diamonds: the rate saved on the tag, editable here for this bill only (C-20261016-BILLALL)
       const dt = document.createElement("td"); dt.className = "num"; if (!r.dias.length) dt.textContent = "—";
@@ -704,7 +713,40 @@
     if (!party && b && ({ gh: 1, ij: 1, fg: 1 })[b.option] && d.shape !== "Polki" && !NON_DIAMOND.test(q0 + " " + String(d.code || ""))) return ["N", sh, ({ gh: "VS GH", ij: "VS IJ", fg: "VVS FG" })[b.option]].filter(Boolean).join(" "); // diamonds choice decides the quality shown
     return [party ? "Party" : lab ? "LG" : "N", sh, party ? "" : q].filter(Boolean).join(" ");
   }
-  async function makePdf(b, photos) {
+  // C-20261101-ESTSUMMARY: summary estimate - per piece code / design, piece type, gold g + karat, total diamond ct; no rates or part amounts;
+  // the final total is the same b.total the full estimate prints (same rounding and GST), nothing is recomputed here
+  function summaryPdf(b) {
+    const { jsPDF } = window.jspdf, doc = new jsPDF({ unit: "mm", format: "a4" });
+    const W = 210, M = 14; let y = 20;
+    doc.setTextColor(20); doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.text(b.title, M, y);
+    doc.setFontSize(12); doc.text(`No. ${b.no}`, W - M, y - 3, { align: "right" }); doc.setFont("helvetica", "normal"); doc.text(`Date ${dmy(b.date)}`, W - M, y + 3, { align: "right" });
+    y += 10; doc.text(`Name: ${b.name}`, M, y); y += 6.5; doc.text(`City: ${b.city || "-"}`, M, y); doc.text(`Mobile: ${!b.mobile ? "-" : /^\d{10}$/.test(b.mobile) ? "+91 " + b.mobile : b.mobile}`, M + 90, y); y += 11;
+    const cols = [["#", 9, "l"], ["Piece", 75, "l"], ["Gold", 50, "l"], ["Diamonds", 48, "l"]];
+    const row = (vals, bold) => { doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setFontSize(11); let x = M, h = 0;
+      const lines = vals.map((v, i) => doc.splitTextToSize(String(v), cols[i][1] - 2)); lines.forEach(l => h = Math.max(h, l.length));
+      lines.forEach((l, i) => { doc.text(l, x, y); x += cols[i][1]; }); y += h * 5.2 + 2.5; };
+    doc.setFillColor(243, 230, 211); doc.rect(M, y - 5, W - 2 * M, 8, "F"); row(cols.map(c => c[0]), true); y += 1;
+    const STONE = /EMR|MOZ|RUBY|PEARL|MOTI|STONE|KUNDAN/i;
+    (b.rows || []).forEach((r, i) => { if (y > 250) { doc.addPage(); y = 20; }
+      const gl = String(r.gold || "").split(" + ").map(g => { const m = g.match(/^(\S+)\s+([\d.]+) g/); return m ? m[2] + " g · " + m[1] : g; }).filter(Boolean);
+      const ds = (r.dias || []).filter(d => d.ct > 0), dct = ds.filter(d => !STONE.test(String(d.q || "") + " " + String(d.code || ""))).reduce((a, d) => a + d.ct, 0), sct = ds.reduce((a, d) => a + d.ct, 0) - dct;
+      const dd = [dct > 0 ? "Diamonds " + dct.toFixed(2) + " ct" : "", Number(r.pdCt) > 0 ? "Party diamonds " + Number(r.pdCt).toFixed(2) + " ct" : "", Number(r.polkiPcs) > 0 ? "Polki " + r.polkiPcs + " pc" : "", sct > 0.0001 ? "Stones " + sct.toFixed(2) + " ct" : ""].filter(Boolean).join("\n") || "-";
+      row([String(i + 1), (r.design ? r.design + " - " : "") + r.label + (r.cat ? "\n" + r.cat : "") + (r.certNo ? "\n" + (r.cert && r.cert !== "TGL" ? r.cert : "Cert.") + " " + r.certNo : ""), gl.join("\n") || "-", dd]);
+      doc.setDrawColor(225); doc.line(M, y - 3, W - M, y - 3); });
+    y += 3; if (y > 240) { doc.addPage(); y = 20; }
+    const tot = (l, v, big) => { doc.setFont("helvetica", big ? "bold" : "normal"); doc.setFontSize(big ? 15 : 12); doc.text(l, W - M - 50, y, { align: "right" }); doc.text(v, W - M, y, { align: "right" }); y += big ? 9 : 7; };
+    if (b.og) { tot("Fine gold due", g3(b.og.due)); tot("Old gold received" + (b.og.no ? " (OG " + b.og.no + ")" : ""), "- " + g3(b.og.recv)); tot("Balance fine gold (in the total)", g3(b.og.bal)); y += 2; } else if (b.settle === "fine") { tot("Fine gold to receive", g3(b.fine), true); y += 2; }
+    doc.setDrawColor(180, 150, 80); doc.line(W - M - 95, y - 4, W - M, y - 4); y += 2; tot(b.final ? "Final amount" : b.title + " total", fmt(b.total), true);
+    if (b.gstPct) { doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.setTextColor(90); doc.text(`incl. GST ${b.gstPct}%`, W - M, y - 4, { align: "right" }); doc.setTextColor(20); y += 3; }
+    if (b.usd) tot(`In US$ (approx., at Rs ${Number(b.usd).toFixed(2)} per US$)`, "US$ " + Math.round(b.total / b.usd).toLocaleString("en-US"));
+    y += 2; doc.setFont("helvetica", "bold"); doc.setFontSize(10.5); doc.setTextColor(20); doc.text("Above are approximate estimates. Actual may vary when the final product is ready.", M, y); y += 8;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(80);
+    const notes = ["All diamonds are third-party certified (IGI / EGL / TGL) and all gold is BIS HUID hallmarked.", b.option ? "Diamonds: " + (OPT_NAMES[b.option] || b.option) + "." : "", b.usd ? "US dollar figures are indicative only; billing is in Indian rupees." : ""].filter(Boolean);
+    doc.text(doc.splitTextToSize(notes.join(" "), W - 2 * M), M, y);
+    return doc.output("blob");
+  }
+  async function makePdf(b, photos, summ) {
+    if (summ && b.title === "Estimate") return summaryPdf(b); // C-20261101-ESTSUMMARY: estimates only, never bills
     const { jsPDF } = window.jspdf, doc = new jsPDF({ unit: "mm", format: "a4" });
     const W = 210, M = 14; let y = 14;
     y += 6; // owner 16/10/2026 19:31: no company name, logo or address on bills / estimates
@@ -774,7 +816,7 @@
       const r = await fetch("/api/vj/bill", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
       const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("server " + r.status));
       const b = j.bill; m.textContent = "Making the PDF…";
-      const blob = await makePdf(b, B.photos), fname = `${b.title} ${b.no.replace(/[^A-Z0-9\-]/g, "-")} ${b.name.replace(/[^A-Za-z0-9 .\-]/g, "").trim().slice(0, 40)}.pdf`;
+      const est = b.title === "Estimate", blob = await makePdf(b, est ? B.estPhotos : B.photos, est && !B.estPhotos && B.summ), fname = `${b.title} ${b.no.replace(/[^A-Z0-9\-]/g, "-")} ${b.name.replace(/[^A-Za-z0-9 .\-]/g, "").trim().slice(0, 40)}.pdf`;
       const file = new File([blob], fname, { type: "application/pdf" }), url = URL.createObjectURL(file);
       loadBook(); m.textContent = j.estimate ? `Estimate ${b.no} made: ${fmt(b.total)}. It is NOT saved as a bill - download or send the PDF now (no copy is kept). Only the name and number are kept for the follow-up: ${({ mihir: "Mihir", shilpi: "Shilpi ji", abhinav: "Abhinav" })[b.cust] || "the owner"} gets a WhatsApp reminder in 2 days.` + mobNote
         : `${b.title} ${b.no} saved: ${fmt(b.total)}${b.fine ? " + " + g3(b.fine) + " fine gold" : ""}.` + mobNote; // C-20261028-ESTNOTBILL
