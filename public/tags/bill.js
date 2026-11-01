@@ -142,7 +142,7 @@
       let mk = 0;
       // owner 17/10/2026 17:00 (C-20261017-MAKINGMIN): making Rs 650/g (750/g when the first gold line is up to 5 g), never below Rs 1,000 a piece,
       // plus 10% wastage on the gold - in every mode (W/s: wastage in the gold value; Nett: wastage added to the making; Gold to Gold: in the fine factor)
-      const b = g0 ? (g0.net > m.limit ? m.base : m.small) : 0; if (g0 && mode !== 'item') mk = b;
+      const tmk = Number(t.makingPerG), b = g0 ? (tmk >= 1 && tmk <= 100000 ? Math.round(tmk) : (g0.net > m.limit ? m.base : m.small)) : 0; if (g0 && mode !== 'item') mk = b; // C-20261101-TAGMAKING (owner 01/11 13:43): the tag's own making per g (Italian / special pieces) replaces 650/750; Rs 1,000 minimum, wastage and modes unchanged
       let gold = 0, net = 0, fine = 0, nc = 0, ng = 0;
       gl.forEach(g => { net += g.net;
         if (g.tn) { if (fineMode) fine += g.net * g.tn; else gold += g.net * g.tn * Fr; return; }
