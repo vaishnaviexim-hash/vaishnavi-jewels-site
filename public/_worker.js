@@ -1044,7 +1044,7 @@ async function vjBill(request, env, who, ctx) { // every login may make bills (o
   if (title === 'Bill') { const hit = await onBill(); if (hit.size) return vjJson({ error: dupMsg(hit), duplicate: true }, 409); }
   // owner 01/11/2026 14:55 (C-20261101-OGREG): Gold to Gold (customer gives fine gold) needs the OG no.; one OG no. on one live bill only
   const ogNo = vjClean(b && (b.ogNo || (b.og && b.og.no)), 20);
-  if (title === 'Bill' && mode === 'g2g' && settle === 'fine' && !ogNo) return vjDeny(400, 'Gold to Gold: the OG no. (old gold) is needed');
+  // owner 01/11 15:00: OG no. NOT compulsory - a Gold to Gold bill is made without it when the party gives the gold later
   if (title === 'Bill' && ogNo) { const used = (await vjOgList(env)).find(x => !x.cancelled && x.og.toUpperCase() === ogNo.toUpperCase() && x.no !== editNo);
     if (used) return vjDeny(409, `OG no. ${ogNo} is already on ${used.no} (${used.name || ''}) - pick the next OG no.`); }
   const sRow = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first();
