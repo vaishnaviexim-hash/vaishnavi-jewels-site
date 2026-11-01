@@ -394,6 +394,7 @@
           ck.addEventListener("change", async () => { st(); ck.disabled = true; try { const db = await window.claude.use("db"); const cur = Object.assign({}, ((window.VJ_SETTINGS && window.VJ_SETTINGS()) || {}).tally || {}); if (ck.checked) cur[b.no] = new Date().toISOString(); else delete cur[b.no]; await db.doc("settings/main").update({ tally: cur }); $("bbookmsg").textContent = b.no + (ck.checked ? " marked as entered in Tally." : " - Tally tick removed."); }
             catch (e) { ck.checked = !ck.checked; st(); $("bbookmsg").textContent = "Could not save the Tally tick for " + b.no + " (" + (e.message || e) + ")."; } ck.disabled = false; }); }
         const o = document.createElement("button"); o.type = "button"; o.className = "btn ghost"; o.textContent = "PDF"; o.addEventListener("click", () => reprint(b.no, o)); x.appendChild(o);
+        { const pp = document.createElement("button"); pp.type = "button"; pp.className = "btn ghost"; pp.textContent = "\u{1F5A8} Print"; pp.title = "Send this bill to the printer"; pp.addEventListener("click", () => reprint(b.no, pp, true)); x.appendChild(pp); } // C-20261101-DIRECTPRINT
         if (j.canCancel && !b.cancelled && !b.settled) { const ed = document.createElement("button"); ed.type = "button"; ed.className = "btn ghost"; ed.textContent = "Edit"; ed.title = "Change this bill (same number) - owners only"; ed.addEventListener("click", () => editBill(b.no, ed)); x.appendChild(ed); } // C-20261026-BILLEDIT
         { const w = document.createElement("button"); w.type = "button"; w.className = "btn ghost"; w.textContent = "WhatsApp"; w.title = "Send this bill from your own WhatsApp"; // C-20261026-MYWA
           w.addEventListener("click", async () => { try { if (!w._b) { w.textContent = "Preparing…"; const r = await fetch("/api/vj/bill?no=" + encodeURIComponent(b.no), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); w._b = j.bill; w._blob = await makePdf(j.bill, B.photos); w.textContent = "Tap to send ✓"; $("bbookmsg").textContent = b.no + " is ready - tap 'Tap to send' to open WhatsApp."; return; }
@@ -548,9 +549,17 @@
     window.open((/^[6-9]\d{9}$/.test(mob) ? "https://wa.me/91" + mob : "https://wa.me/") + "?text=" + encodeURIComponent(waText(b)), "_blank", "noopener");
     msgEl.textContent = `${b.title} ${b.no}: WhatsApp opened` + (/^[6-9]\d{9}$/.test(mob) ? ` for +91 ${mob}` : "") + ` with the message. The PDF "${fname}" is in Downloads - drag it into the chat. (Install the WhatsApp app for Windows to send the PDF straight from the share box, with no download.)`;
   }
-  async function reprint(no, btn) { btn.disabled = true;
+  // owner 01/11/2026 14:49 (C-20261101-DIRECTPRINT): 'Print' sends the bill PDF straight to the printer - the PDF is loaded in a hidden frame and
+  // the print command is given at once (Chrome started with --kiosk-printing prints to the default printer with no box). Phones: the PDF opens instead.
+  function printBlob(blob, msgEl) { const url = URL.createObjectURL(blob);
+    if (/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "")) { window.open(url, "_blank", "noopener"); if (msgEl) msgEl.textContent = "PDF opened - use Print / Share there."; return; }
+    const old = document.getElementById("vjprintf"); if (old) old.remove();
+    const f = document.createElement("iframe"); f.id = "vjprintf"; f.style.cssText = "position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0"; f.src = url;
+    f.onload = () => setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); if (msgEl) msgEl.textContent = "Sent to the printer."; } catch (e) { window.open(url, "_blank", "noopener"); } }, 400);
+    document.body.appendChild(f); setTimeout(() => { URL.revokeObjectURL(url); f.remove(); }, 120000); }
+  async function reprint(no, btn, pr) { btn.disabled = true;
     try { const r = await fetch("/api/vj/bill?no=" + encodeURIComponent(no), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
-      const b = j.bill, blob = await makePdf(b, B.photos), a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+      const b = j.bill, blob = await makePdf(b, B.photos); if (pr) { printBlob(blob, $("bbookmsg")); btn.disabled = false; return; } const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
       a.download = `${b.title} ${b.no.replace(/[^A-Z0-9\-]/g, "-")} ${String(b.name).replace(/[^A-Za-z0-9 .\-]/g, "").trim().slice(0, 40)}.pdf`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
     } catch (e) { $("bbookmsg").textContent = "Could not open " + no + " (" + (e.message || e) + ")."; } btn.disabled = false; }
   // owner 26/10 18:03: with a customer mobile typed, Excel = that party's bills (all months), file named "Party name, City"; WhatsApp sends it from his own WhatsApp
@@ -827,6 +836,7 @@
       out.textContent = ""; out.hidden = false;
       const op = document.createElement("a"); op.className = "btn"; op.href = url; op.target = "_blank"; op.rel = "noopener"; op.textContent = "Open PDF (print)";
       const dl = document.createElement("a"); dl.className = "btn ghost"; dl.href = url; dl.download = fname; dl.textContent = "Download";
+      { const pr = document.createElement("button"); pr.type = "button"; pr.className = "btn"; pr.textContent = "\u{1F5A8} Print"; pr.addEventListener("click", () => printBlob(blob, m)); out.append(pr); } // C-20261101-DIRECTPRINT
       out.append(op, dl); // owner 26/10 17:30: no automatic download - the bill stays saved here (PDF button below)
       { const wa = document.createElement("button"); wa.type = "button"; wa.className = "btn"; wa.textContent = "Send on my WhatsApp"; wa.addEventListener("click", () => myWA(b, blob, m)); out.prepend(wa); } // C-20261026-MYWA: from the owner's own WhatsApp, not Aashvi
     } catch (e) { m.textContent = "Not saved: " + (e.message || e) + "."; }
