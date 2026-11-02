@@ -1397,12 +1397,13 @@ const vjRvTok = n => btoa(String.fromCharCode(...crypto.getRandomValues(new Uint
 async function vjReviewBell(url, env) {
   if (!env.DB) return reply('not set up', 503);
   const now = Date.now(), ist = new Date(now + 5.5 * 3600e3), ymd = ist.toISOString().slice(0, 10), min = ist.getUTCHours() * 60 + ist.getUTCMinutes();
-  if (min < 11 * 60 || min > 18 * 60) return reply('outside 11:00-18:00 IST', 200); // owner's sending window (ends 18:30)
-  await vjRvT(env);
   const test = url.searchParams.get('test') === '1'; // one sample to Abhinav only (no bill, no customer), at most 3 a day
+  const onlyClicks = !test && url.searchParams.get('clicks') === '1'; // only the new button clicks, any hour (07:05 run, before the morning report)
+  if (!onlyClicks && (min < 11 * 60 || min > 18 * 60)) return reply('outside 11:00-18:00 IST', 200); // owner's sending window (ends 18:30)
+  await vjRvT(env);
   const key = test ? 'reviewtest:' + ymd : 'reviewbell:' + ymd;
   if (test) { const r = await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES (?, '1') ON CONFLICT(k) DO UPDATE SET v = CAST(CAST(v AS INTEGER) + 1 AS TEXT) RETURNING v").bind(key).first(); if (Number(r && r.v) > 3) return reply('test limit reached today', 429); }
-  else { const claim = await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO NOTHING').bind(key, new Date().toISOString()).run(); if (!claim.meta || claim.meta.changes !== 1) return reply('already done today', 200); }
+  else if (!onlyClicks) { const claim = await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO NOTHING').bind(key, new Date().toISOString()).run(); if (!claim.meta || claim.meta.changes !== 1) return reply('already done today', 200); }
   const day = vjAddDays(ymd, -1), items = [], skipped = [], seen = new Set();
   const clean = v => String(v || '').replace(/[\u0000-\u001f"\\<>{}*_~`]/g, ' ').replace(/\s+/g, ' ').trim();
   const imgFor = async rows => { for (const r of rows || []) { const id = String(r && r.photo || ''); if (!/^[0-9a-f]{32}$/.test(id)) continue;
@@ -1412,7 +1413,7 @@ async function vjReviewBell(url, env) {
     items.push({ no, date: day, name: name || 'Customer', to: '91' + mobile, masked: '+91 ' + mobile.slice(0, 2) + 'XXXXX' + mobile.slice(-3), tok,
       img: img ? 'https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok : VJ_RV_BRAND, photo: img ? 'tag photo' : 'brand image' }); };
   if (test) await add('TEST', '7567400099', 'Abhinav', []);
-  else {
+  else if (!onlyClicks) {
     if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
     const bills = ((((await env.DB.prepare("SELECT no, data FROM vj_bills WHERE no LIKE 'B-%'").all()).results) || [])).map(vjParse).filter(b => b && b.date === day);
     for (const b of bills.sort((x, y) => String(x.no).localeCompare(String(y.no)))) {
@@ -1432,10 +1433,10 @@ async function vjReviewBell(url, env) {
   let clicks = []; if (!test) { clicks = (((await env.DB.prepare('SELECT no, MIN(ts) AS ts FROM vj_review_clicks WHERE reported = 0 GROUP BY no').all()).results) || []).map(c => ({ no: c.no, at: waIst(Number(c.ts)) }));
     await env.DB.prepare('UPDATE vj_review_clicks SET reported = 1 WHERE reported = 0').run(); }
   const token = [...crypto.getRandomValues(new Uint8Array(16))].map(x => x.toString(16).padStart(2, '0')).join('');
-  await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('reviewdue:' + token, JSON.stringify({ test, day, items, skipped, clicks, at: now })).run();
+  await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('reviewdue:' + token, JSON.stringify({ test, clicksOnly: onlyClicks, day, items, skipped, clicks, at: now })).run();
   try { const r = await fetch(VJ_RV_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(20000), body: JSON.stringify({ token }) }); if (!r.ok) throw new Error('hook ' + r.status); }
   catch (e) { const st = [env.DB.prepare('DELETE FROM vj_meta WHERE k = ?').bind('reviewdue:' + token)].concat(items.map(i => env.DB.prepare('DELETE FROM vj_review_ask WHERE tok = ?').bind(i.tok)));
-    if (!test) st.push(env.DB.prepare('DELETE FROM vj_meta WHERE k = ?').bind(key), env.DB.prepare('UPDATE vj_review_clicks SET reported = 0 WHERE no IN (' + (clicks.map(() => '?').join(',') || "''") + ')').bind(...clicks.map(c => c.no)));
+    if (!test) st.push(env.DB.prepare('DELETE FROM vj_meta WHERE k = ?').bind(onlyClicks ? '-' : key), env.DB.prepare('UPDATE vj_review_clicks SET reported = 0 WHERE no IN (' + (clicks.map(() => '?').join(',') || "''") + ')').bind(...clicks.map(c => c.no)));
     await env.DB.batch(st); return reply('failed', 502); }
   return reply('handed ' + items.length + ' (skipped ' + skipped.length + ', clicks ' + clicks.length + ')', 200);
 }
@@ -1445,7 +1446,7 @@ async function vjReviewDue(url, env) { // one-time hand-out to Make
   const r = await env.DB.prepare('SELECT v FROM vj_meta WHERE k = ?').bind('reviewdue:' + t).first(); if (!r) return reply('gone', 410);
   const del = await env.DB.prepare('DELETE FROM vj_meta WHERE k = ? AND v = ?').bind('reviewdue:' + t, r.v).run(); if (!del.meta || del.meta.changes !== 1) return reply('gone', 410);
   const s = JSON.parse(r.v); if (Date.now() - s.at > 3600e3) return reply('gone', 410);
-  return vjJson({ test: s.test, day: s.day, items: s.items, skipped: s.skipped, clicks: s.clicks });
+  return vjJson({ test: s.test, clicksOnly: !!s.clicksOnly, day: s.day, items: s.items, skipped: s.skipped, clicks: s.clicks });
 }
 async function vjReviewImg(url, env) { // the tag photo for the WhatsApp header, 3 days, random link
   const t = String(url.searchParams.get('t') || ''); if (!/^[A-Za-z0-9_-]{20,24}$/.test(t)) return reply('not found', 404);
