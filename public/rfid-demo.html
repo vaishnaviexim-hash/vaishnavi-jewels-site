@@ -622,11 +622,21 @@ const editable=el=>el&&el!==inp&&(el.tagName==="SELECT"||el.tagName==="TEXTAREA"
 function scanVisible(){return !$("p-scan").hidden}
 function focusScan(){if(scanVisible()&&!editable(document.activeElement)){try{inp.focus({preventScroll:true})}catch(e){inp.focus()}}}
 let idleT=null;
-function submitInput(){clearTimeout(idleT);const v=inp.value;inp.value="";if(v.trim())handleScan(v,S.typing?"typed":"scanner")}
+function submitInput(){clearTimeout(idleT);const v=inp.value;inp.value="";lastV="";if(!v.trim())return;
+  /* split newline-separated or back-to-back codes (some readers repeat the code); same code once per submit */
+  const out=[];v.split(/[\r\n]+/).map(s=>s.trim()).filter(Boolean).forEach(p=>{const c=p.toUpperCase().replace(/\s/g,"");const m=c.match(/(?:\]..)?A\d{7}|[0-9A-F]{24}/g);if(m&&m.length>1&&m.join("")===c)m.forEach(x=>out.push(x));else out.push(p)});
+  const seen=new Set();out.forEach(x=>{const k=x.toUpperCase().replace(/^\]../,"");if(seen.has(k))return;seen.add(k);handleScan(x,S.typing?"typed":"scanner")})}
 inp.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key==="Tab"){if(inp.value.trim()||e.key==="Enter"){e.preventDefault();submitInput()}}});
-inp.addEventListener("input",()=>{clearTimeout(idleT);const c=inp.value.trim().toUpperCase().replace(/\s/g,"");
-  /* readers set up without an Enter suffix: submit a complete value after a short pause */
-  if(/^(\]..)?A\d{7}$/.test(c)||/^[0-9A-F]{24}$/.test(c))idleT=setTimeout(submitInput,450)});
+/* Android readers (Chainway Keyboardemulator etc.) may set the whole value at once with no key events,
+   send Enter as a newline, or repeat the code. Submit any complete value after a short pause. */
+let lastV="";
+function scanReady(){const raw=inp.value;if(/[\r\n]/.test(raw)){submitInput();return}
+  const c=raw.trim().toUpperCase().replace(/\s/g,"");if(!c)return;
+  const m=c.match(/(?:\]..)?A\d{7}|[0-9A-F]{24}/g);
+  if(m&&m.join("")===c){clearTimeout(idleT);idleT=setTimeout(submitInput,300)}}
+inp.addEventListener("input",()=>{clearTimeout(idleT);lastV=inp.value;scanReady()});
+inp.addEventListener("beforeinput",e=>{if(e.inputType==="insertLineBreak"||e.inputType==="insertParagraph"){e.preventDefault();submitInput()}});
+setInterval(()=>{if(inp.value!==lastV){lastV=inp.value;scanReady()}},200);
 inp.addEventListener("paste",e=>{const t=(e.clipboardData||window.clipboardData).getData("text");if(/[\r\n]/.test(t)){e.preventDefault();handleScan(inp.value+t,"pasted");inp.value=""}});
 inp.addEventListener("focus",()=>{$("focusDot").classList.add("on");$("focusTxt").textContent="Ready for the next scan"});
 inp.addEventListener("blur",()=>{$("focusDot").classList.remove("on");$("focusTxt").textContent="Tap here to scan";setTimeout(focusScan,250)});
