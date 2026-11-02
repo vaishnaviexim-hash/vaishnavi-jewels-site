@@ -1880,22 +1880,30 @@ function vjChIn(s) {
     items.push({ desc, pcs, wt: Math.round(wt * 1000) / 1000, value }); }
   const value = items.reduce((a, x) => a + x.value, 0), ins = s.ins == null || s.ins === '' ? value : Number(s.ins);
   if (!(Number.isInteger(ins) && ins >= 0 && ins <= 1e10)) return { err: 'insured value (INS) must be whole rupees' };
-  const billNo = purpose === 'bill' ? String(s.billNo || '').trim().toUpperCase().slice(0, 20) : '';
-  if (purpose === 'bill' && !/^B-\d{4}-\d{2,4}$/.test(billNo)) return { err: 'the bill number (e.g. B-2611-03) is needed for "Against Bill"' };
-  return { ch: { date, direction, purpose, billNo, party, items, value, ins } };
+  // C-20261102-CHMULTI (owner 02/11 13:53): one challan may carry 1-10 bills of one party (billNos); old challans keep their single billNo
+  const braw = Array.isArray(s.billNos) ? s.billNos.slice(0, 11) : s.billNo ? [s.billNo] : [];
+  const billNos = purpose === 'bill' ? [...new Set(braw.map(x => String(x || '').trim().toUpperCase().slice(0, 20)).filter(Boolean))] : [];
+  if (purpose === 'bill' && (!billNos.length || billNos.length > 10 || billNos.some(x => !/^B-\d{4}-\d{2,4}$/.test(x)))) return { err: 'add 1 to 10 bills (e.g. B-2611-03) for "Against Bill"' };
+  items.forEach((x, i) => { const bl = String(li[i] && li[i].bill || '').trim().toUpperCase(); if (billNos.includes(bl)) x.bill = bl; });
+  return { ch: { date, direction, purpose, billNos, billNo: billNos.join(', '), party, items, value, ins } }; // value = sum of the lines, never a total from the page
 }
 const vjChRow = (env, c, ts) => env.DB.prepare('INSERT INTO vj_challans (no, ts, date, direction, purpose, party, address, items, value, ins, bill_no, made_by, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(no) DO UPDATE SET date = excluded.date, direction = excluded.direction, purpose = excluded.purpose, party = excluded.party, address = excluded.address, items = excluded.items, value = excluded.value, ins = excluded.ins, bill_no = excluded.bill_no, data = excluded.data')
-  .bind(c.no, ts, c.date, c.direction, c.purpose, JSON.stringify({ name: c.party.name, mobile: c.party.mobile }), JSON.stringify({ addr: c.party.addr, area: c.party.area, city: c.party.city, state: c.party.state, pin: c.party.pin }), JSON.stringify(c.items), c.value, c.ins, c.billNo || '', c.by, JSON.stringify(c));
+  .bind(c.no, ts, c.date, c.direction, c.purpose, JSON.stringify({ name: c.party.name, mobile: c.party.mobile }), JSON.stringify({ addr: c.party.addr, area: c.party.area, city: c.party.city, state: c.party.state, pin: c.party.pin }), JSON.stringify(c.items), c.value, c.ins, JSON.stringify(Array.isArray(c.billNos) ? c.billNos : c.billNo ? [c.billNo] : []), c.by, JSON.stringify(c));
 async function vjChallanSave(request, env, who) {
   if (Number(request.headers.get('content-length') || 0) > 20000) return vjDeny(413, 'too large');
   let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
   const r = vjChIn(b); if (r.err) return vjDeny(400, r.err); const ch = r.ch;
   await vjChT(env);
-  if (ch.billNo) { // 'Against Bill': a live Bill (a sales / tagger login: one it made)
+  if (ch.billNos.length) { // 'Against Bill(s)': every bill a live Bill of ONE party (same 10-digit mobile, else same name + city); sales / tagger: only bills they made (C-20261102-CHMULTI)
     if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
-    const br = await env.DB.prepare('SELECT data FROM vj_bills WHERE no = ?').bind(ch.billNo).first(), bd = br ? vjParse(br) : null;
-    if (!bd || bd.title !== 'Bill' || ((who.role === 'sales' || who.role === 'tagger') && bd.by !== who.email)) return vjDeny(404, 'bill ' + ch.billNo + ' not found');
-    if (bd.cancelled) return vjDeny(409, 'bill ' + ch.billNo + ' is cancelled'); }
+    const bs = [];
+    for (const bn of ch.billNos) { const br = await env.DB.prepare('SELECT data FROM vj_bills WHERE no = ?').bind(bn).first(), bd = br ? vjParse(br) : null;
+      if (!bd || bd.title !== 'Bill' || ((who.role === 'sales' || who.role === 'tagger') && bd.by !== who.email)) return vjDeny(404, 'bill ' + bn + ' not found');
+      if (bd.cancelled) return vjDeny(409, 'bill ' + bn + ' is cancelled'); bs.push(bd); }
+    const md = v => { const d = String(v || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, ''); return /^[6-9]\d{9}$/.test(d) ? d : ''; }, nk = v => String(v || '').toLowerCase().replace(/\s+ji$/, '').replace(/[^a-z0-9]/g, '');
+    const allM = bs.every(x => md(x.mobile)), keys = new Set(bs.map(x => allM ? md(x.mobile) : nk(x.name) + '|' + nk(x.city)));
+    if (keys.size > 1) return vjDeny(400, 'these bills are for different parties - one challan carries the bills of one party only');
+    if (allM && md(ch.party.mobile) && md(ch.party.mobile) !== md(bs[0].mobile)) return vjDeny(400, 'the bills are for another mobile number than the party on this challan'); }
   const at = new Date().toISOString(), editNo = Number(b && b.edit) || 0;
   if (editNo) {
     if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji can edit a saved challan');
