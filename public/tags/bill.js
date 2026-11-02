@@ -877,9 +877,8 @@
   }
   // C-20261102-CHMULTI (owner 02/11 13:53): several bills of one party in one parcel - tick them in Saved bills, then one challan
   async function chSel() { const m = $("bbookmsg"), nos = [...document.querySelectorAll("input.bchsel:checked")].map(x => x.dataset.no);
-    if (!nos.length) { m.textContent = "Tick the bills that go in one parcel (same party), then press 'Delivery challan for selected'."; return; }
-    const brief = nos.map(n => (B.bk || {})[n]).filter(Boolean);
-    if (window.vjChallan && window.vjChallan.sameParty && !window.vjChallan.sameParty(brief)) { m.textContent = "The ticked bills are for different parties (" + [...new Set(brief.map(b => b.name + (b.city ? ", " + b.city : "")))].join(" / ") + ") - one challan carries the bills of one party only. Untick the others."; return; }
+    if (!nos.length) { m.textContent = "Tick the bills that go in one parcel, then press 'Delivery challan for selected'."; return; }
+    /* C-20261102-ADDRBOOK (owner 02/11 14:16): bills of different parties may go in one parcel - the challan shows a note to check the receiver */
     try { if (!window.vjChallan || !window.vjChallan.fromBills) throw new Error("challan page still loading - try again"); const full = [];
       for (const n of nos) { const r = await fetch("/api/vj/bill?no=" + encodeURIComponent(n), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(n + ": " + (j.error || r.status)); full.push(j.bill); }
       window.vjChallan.fromBills(full); } catch (e) { m.textContent = "Could not make the challan (" + (e.message || e) + ")."; } }
