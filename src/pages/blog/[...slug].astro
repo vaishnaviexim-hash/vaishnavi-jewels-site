@@ -18,6 +18,20 @@ export async function getStaticPaths() {
 
 const { post } = Astro.props;
 const { Content } = await post.render();
+
+// T-20261027-JOURNALLINKS (02/11/2026): every post links to its collection page(s), a visit and WhatsApp.
+import { business as biz } from '../../data/business.js';
+const hay = (post.data.tags.join(' ') + ' ' + post.data.title + ' ' + post.slug).toLowerCase();
+const COLLECTIONS = [
+  [/polki|kundan/, '/polki-jewellery', 'Polki jewellery'],
+  [/bridal|bride|lehenga|wedding|sangeet|reception|groom|sherwani|saree|engagement/, '/bridal-jewellery', 'Bridal jewellery'],
+  [/solitaire|inscription|loupe|certificate|igi/, '/solitaire-rings', 'Certified solitaire rings'],
+  [/lab[- ]?grown|cvd|hpht/, '/lab-grown-diamond-jewellery', 'Lab-grown diamond jewellery'],
+  [/mangalsutra/, '/diamond-mangalsutra', 'Diamond mangalsutra'],
+  [/earring/, '/diamond-earrings', 'Diamond earrings'],
+];
+let related = COLLECTIONS.filter(([re]) => re.test(hay)).slice(0, 3).map(([, href, label]) => ({ href, label }));
+if (related.length === 0) related = [{ href: '/natural-diamond-jewellery', label: 'Natural diamond jewellery' }];
 ---
 <BaseLayout
   title={`${post.data.title} | Vaishnavi Jewels Journal`}
@@ -50,6 +64,10 @@ const { Content } = await post.render();
         <div class="prose">
           <Content />
         </div>
+        <nav class="post-related" aria-label="Related collections">
+          <p><strong>See the pieces:</strong> {related.map((r, i) => (<>{i > 0 && ' · '}<a href={r.href}>{r.label}</a></>))}</p>
+          <p><a href="/book-a-visit" class="btn btn-solid">Book a visit or video call</a> <a href={biz.whatsapp} class="btn btn-outline" target="_blank" rel="noopener">WhatsApp {biz.whatsappDisplay}</a></p>
+        </nav>
         <a href="/blog" class="btn btn-outline back-link">&larr; Back to Journal</a>
       </div>
     </article>
@@ -85,5 +103,6 @@ const { Content } = await post.render();
   .prose :global(a) { color: var(--color-gold-deep); text-decoration: underline; }
   .prose :global(ul), .prose :global(ol) { margin-bottom: 20px; padding-left: 22px; color: var(--color-ink-soft); }
 
+  .post-related { margin-top: 40px; }
   .back-link { margin: 48px 0 72px; }
 </style>
