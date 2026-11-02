@@ -1524,9 +1524,198 @@ async function vjOgList(env) { if (!vjBillsOk) { await env.DB.prepare('CREATE TA
   return out; }
 // C-20261101-OGTAB (owner 01/11/2026 15:11): OG register - old gold slips entered with OG no. + party (own tab, like New tag). On a Gold to Gold bill the
 // OG drop-down offers only the FREE OGs (in the register, not yet on a live bill). Everyone (not the sales login) may add; only Abhinav / Shilpiji may delete a free OG.
+// C-20261102-OGREG2 (owner Abhinav 02/11/2026 14:13): OG register phase 1 = old gold INWARD / OUTWARD register.
+// INWARD (vj_ogs, one row per OG no.): src 'party' = customer's old gold: gross g x ACTUAL tunch % (tested) = actual fine; party credit tunch = actual - margin
+// (0/1/2, default 2) -> party credit fine = gross x credit tunch (this is what the party gets and what a Gold to Gold bill prefills); our margin fine =
+// actual fine - party credit. src 'stock' = one of our own pieces melted: the tag leaves stock (status sold, sold.og, + vj_moves 'og'), gold net x karat
+// purity = fine (tunch editable), its diamonds go to vj_og_dia ('to get back from the karigar', pending / returned).
+// OUTWARD (vj_og_out): fine issued to a KARIGAR (per-karigar balance) or moved to our own stock. Summary: in hand = actual fine in - issued - to stock.
+// Every figure is recomputed here (integer milligrams), never taken from the page. Abhinav / Shilpiji (admin) edit / cancel - the old version goes to
+// vj_og_hist + audit; staff / tagger add; the sales login only reads. Margin, actual tunch / fine and profit go to admin only.
+// Old entries (before today) have no tunch: they read as PARTY entries whose typed fine g is both the actual fine and the party credit (margin 0).
+let vjOg2T = false;
+async function vjOg2Tables(env) { if (vjOg2T) return; await vjOgTable(env); await vjMetaT(env); await env.DB.batch([
+  env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_og_out (id TEXT PRIMARY KEY, ts INTEGER, date TEXT, email TEXT, data TEXT)'),
+  env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_og_dia (id TEXT PRIMARY KEY, ts INTEGER, og TEXT, tag TEXT, status TEXT, data TEXT)'),
+  env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_og_hist (ts INTEGER, email TEXT, kind TEXT, ref TEXT, action TEXT, data TEXT)')]); vjOg2T = true; }
+const vjOgMg = v => Math.round((Number(v) || 0) * 1000); // grams -> integer milligrams
+function vjOgCalc(r) { // the only place the OG figures are worked out
+  const gMg = vjOgMg(r.gross), t = r.tunch === '' || r.tunch == null ? NaN : Number(r.tunch);
+  if (r.src === 'stock') { const act = t > 0 ? Math.round(gMg * t / 100) : 0; return { actFine: act / 1000, credTunch: null, credFine: 0, marginFine: 0 }; }
+  if (!(t > 0)) { const f = vjOgMg(r.fine); return { actFine: f / 1000, credTunch: null, credFine: f / 1000, marginFine: 0 }; } // no tunch (old entries): fine as typed
+  const m = Number(r.margin) >= 0 ? Number(r.margin) : 2, ct = Math.max(0, Math.round((t - m) * 100) / 100);
+  const act = Math.round(gMg * t / 100), cred = Math.round(gMg * ct / 100);
+  return { actFine: act / 1000, credTunch: ct, credFine: cred / 1000, marginFine: (act - cred) / 1000 };
+}
+const vjOgYm = d => String(d || '').slice(0, 7);
+async function vjOgKarigars(env, outs) {
+  const set = new Set(VJ_KARIGARS);
+  try { (((await env.DB.prepare("SELECT data FROM docs WHERE path LIKE 'karigars/%'").all()).results) || []).forEach(x => { const d = vjParse(x); if (d && d.name) set.add(vjClean(d.name, 40)); }); } catch (e) {}
+  try { const m = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'og:karigars'").first(); (m ? JSON.parse(m.v) : []).forEach(n => set.add(n)); } catch (e) {}
+  (outs || []).forEach(o => { if (o.karigar) set.add(o.karigar); });
+  return [...set].filter(Boolean).sort((a, b) => a.localeCompare(b));
+}
+async function vjOg2Load(env) { await vjOg2Tables(env);
+  const reg = ((((await env.DB.prepare('SELECT data FROM vj_ogs').all()).results) || []).map(vjParse).filter(Boolean));
+  const outs = ((((await env.DB.prepare('SELECT data FROM vj_og_out ORDER BY ts').all()).results) || []).map(vjParse).filter(Boolean));
+  const dias = ((((await env.DB.prepare('SELECT data FROM vj_og_dia ORDER BY ts').all()).results) || []).map(vjParse).filter(Boolean));
+  return { reg, outs, dias };
+}
+function vjOg2Sum(reg, outs, dias) { // reg rows already carry the calc fields
+  const z = () => ({ n: 0, gross: 0, act: 0, cred: 0, margin: 0 }), all = z(), months = {}, add = (o, r) => { o.n++; o.gross += vjOgMg(r.gross); o.act += vjOgMg(r.actFine); o.cred += vjOgMg(r.credFine); o.margin += vjOgMg(r.marginFine); };
+  reg.filter(r => !r.cancelled).forEach(r => { add(all, r); const ym = vjOgYm(r.date); add(months[ym] = months[ym] || z(), r); });
+  let issued = 0, toStock = 0; const perK = {}, outM = {};
+  outs.filter(o => !o.cancelled).forEach(o => { const f = vjOgMg(o.fine), ym = vjOgYm(o.date); outM[ym] = outM[ym] || { issued: 0, stock: 0 };
+    if (o.to === 'karigar') { issued += f; perK[o.karigar] = (perK[o.karigar] || 0) + f; outM[ym].issued += f; } else { toStock += f; outM[ym].stock += f; } });
+  const pend = dias.filter(d => d.status === 'pending'), g = n => n / 1000, gs = o => ({ n: o.n, gross: g(o.gross), act: g(o.act), cred: g(o.cred), margin: g(o.margin) });
+  const pk = {}; pend.forEach(d => { const k = d.karigar || '(not issued yet)'; pk[k] = pk[k] || { pcs: 0, ct: 0 }; pk[k].pcs += Number(d.pcs) || 0; pk[k].ct = Math.round((pk[k].ct + (Number(d.ct) || 0)) * 1000) / 1000; });
+  return { all: gs(all), months: Object.fromEntries(Object.entries(months).map(([k, v]) => [k, gs(v)])), outMonths: Object.fromEntries(Object.entries(outM).map(([k, v]) => [k, { issued: g(v.issued), stock: g(v.stock) }])),
+    issued: g(issued), toStock: g(toStock), inHand: g(all.act - issued - toStock), perKarigar: Object.entries(perK).map(([name, f]) => ({ name, fine: g(f) })).sort((a, b) => b.fine - a.fine),
+    diaPending: { pcs: pend.reduce((a, d) => a + (Number(d.pcs) || 0), 0), ct: Math.round(pend.reduce((a, d) => a + (Number(d.ct) || 0), 0) * 1000) / 1000, byKarigar: pk } };
+}
+async function vjOgs(env, who, url) { const all = await vjOgList(env), live = all.filter(x => !x.cancelled), { reg: raw, outs, dias } = await vjOg2Load(env), adm = who.role === 'admin';
+  const useOf = no => live.find(x => x.og.toUpperCase() === String(no).toUpperCase()) || null;
+  const reg = raw.map(r => Object.assign({}, r, { src: r.src === 'stock' ? 'stock' : 'party' }, vjOgCalc(r)));
+  const S = vjOg2Sum(reg, outs, dias);
+  const regOut = reg.map(r => { const u = useOf(r.no), c = !u && all.find(x => x.cancelled && x.og.toUpperCase() === String(r.no).toUpperCase());
+    const o = { no: r.no, date: r.date || '', src: r.src, name: r.name || '', mobile: who.role === 'sales' ? '' : (r.mobile || ''), city: r.city || '', item: r.item || '', gross: r.gross || 0,
+      credFine: r.credFine, fine: r.credFine, note: r.note || '', byName: r.byName || '', bill: u ? u.no : '', billName: u ? u.name : '', cancelledOn: c ? c.no : '',
+      cancelled: r.cancelled ? { at: r.cancelled.at, byName: r.cancelled.byName, why: r.cancelled.why || '' } : null, edited: r.editedAt ? { at: r.editedAt, byName: r.editedByName || '' } : null, legacy: !(Number(r.tunch) > 0) && r.src !== 'stock' };
+    if (r.src === 'stock') { o.tag = r.tag || null; o.actFine = r.actFine; o.tunch = r.tunch; } // own piece: no party, no margin - its fine is shown to all
+    if (adm) Object.assign(o, { tunch: r.tunch === '' || r.tunch == null ? null : Number(r.tunch), margin: r.src === 'stock' ? null : (Number(r.tunch) > 0 ? Number(r.margin) : null), credTunch: r.credTunch, actFine: r.actFine, marginFine: r.marginFine });
+    else if (r.src !== 'stock') o.credTunch = r.credTunch;
+    return o; }).sort((a, b) => vjOgNum(a.no) - vjOgNum(b.no) || String(a.no).localeCompare(String(b.no)));
+  const nums = [...new Set(live.map(x => x.og).concat(raw.map(r => r.no)).map(vjOgNum).filter(n => n >= 0 && n < 1e7))].sort((a, b) => a - b);
+  const next = nums.length ? nums[nums.length - 1] + 1 : 0, lastB = live.slice().sort((a, b) => vjOgNum(a.og) - vjOgNum(b.og)).pop() || null;
+  const free = regOut.filter(r => !r.bill && !r.cancelled && r.src !== 'stock').map(r => ({ no: r.no, name: r.name, city: r.city, fine: r.credFine, date: r.date })); // bill prefills the PARTY CREDIT fine
+  const list = (who.role === 'sales' ? all.filter(x => x.email === who.email) : all).map(x => ({ og: x.og, no: x.no, date: x.date, name: x.name, city: x.city, fine: x.fine, cancelled: x.cancelled }));
+  const outOut = outs.map(o => ({ id: o.id, date: o.date, ogs: o.ogs || [], fine: o.fine, gross: o.gross || 0, to: o.to, karigar: o.karigar || '', note: o.note || '', byName: o.byName || '', cancelled: o.cancelled ? { at: o.cancelled.at, byName: o.cancelled.byName, why: o.cancelled.why || '' } : null, edited: o.editedAt ? { at: o.editedAt, byName: o.editedByName || '' } : null }))
+    .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.id).localeCompare(String(a.id)));
+  // owner 14:17: in hand (actual) + per-karigar balances + diamonds pending go to admin AND staff / tagger (Mihir bhai checks it daily); margin / profit (and the
+  // actual-fine-in total, from which the margin follows) stay admin-only; the sales login gets neither. asOf = when the server worked it out (IST).
+  const sum = adm ? Object.assign({}, S) : Object.assign({}, S, { all: Object.assign({}, S.all, { act: null, margin: null }), months: Object.fromEntries(Object.entries(S.months).map(([k, v]) => [k, Object.assign({}, v, { act: null, margin: null })])) });
+  if (who.role === 'sales') Object.assign(sum, { inHand: null, issued: null, toStock: null, perKarigar: [], diaPending: null, outMonths: {} });
+  sum.asOf = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 16).replace('T', ' ') + ' IST';
+  if (url && url.searchParams.get('xlsx') === '1') { if (!adm) return vjDeny(403, 'only Abhinav or Shilpiji can download the OG Excel');
+    const n3 = v => v == null || v === '' ? '' : Math.round(Number(v) * 1000) / 1000;
+    const xl = vjXlsx([{ name: 'OG inward', land: true, widths: [9, 11, 10, 22, 13, 26, 10, 9, 9, 10, 10, 10, 10, 12, 14, 22], head: ['OG no.', 'Date', 'Source', 'Party / piece', 'Mobile', 'Item', 'Gross g', 'Tunch %', 'Margin %', 'Credit tunch %', 'Actual fine g', 'Party credit fine g', 'Margin fine g', 'Bill', 'Status', 'Note'],
+      rows: regOut.map(r => [r.no, vjDmy(r.date), r.src === 'stock' ? 'Own stock' : 'Party', r.src === 'stock' ? (r.tag ? r.tag.label : r.name) : [r.name, r.city].filter(Boolean).join(', '), r.mobile, r.item, n3(r.gross), r.tunch == null ? '' : r.tunch, r.margin == null ? '' : r.margin, r.credTunch == null ? '' : r.credTunch, n3(r.actFine), n3(r.credFine), n3(r.marginFine), r.bill, r.cancelled ? 'Cancelled ' + vjDmy(r.cancelled.at) : 'OK', r.note]), mark: r => /^Cancelled/.test(r[14]) },
+    { name: 'OG outward', land: true, widths: [11, 16, 20, 12, 10, 16, 24, 14], head: ['Date', 'OG no(s)', 'To', 'Fine g', 'Gross g', 'By', 'Note', 'Status'],
+      rows: outOut.map(o => [vjDmy(o.date), o.ogs.length ? o.ogs.join(', ') : 'OG pool', o.to === 'karigar' ? 'Karigar ' + o.karigar : 'Our stock (fine)', n3(o.fine), o.gross ? n3(o.gross) : '', o.byName, o.note, o.cancelled ? 'Cancelled ' + vjDmy(o.cancelled.at) : 'OK']), mark: r => /^Cancelled/.test(r[7]) },
+    { name: 'Diamonds to get back', widths: [9, 14, 20, 8, 9, 14, 12], head: ['OG no.', 'Tag', 'Shape / quality', 'Pcs', 'Ct', 'Karigar', 'Status'],
+      rows: dias.map(d => [d.og, d.label || d.tag, [d.shape, d.q].filter(Boolean).join(' '), Number(d.pcs) || 0, n3(d.ct), d.karigar || '', d.status]) },
+    { name: 'Summary', widths: [34, 16], head: ['Item', 'Grams'], rows: [['OG fine in hand (actual)', n3(S.inHand)], ['Gross in (all time)', n3(S.all.gross)], ['Actual fine in (all time)', n3(S.all.act)], ['Party credit fine (all time)', n3(S.all.cred)], ['Margin profit fine (all time)', n3(S.all.margin)], ['Issued to karigars', n3(S.issued)], ['Moved to our stock', n3(S.toStock)]].concat(S.perKarigar.map(k => ['Karigar ' + k.name, n3(k.fine)])) }]);
+    const bin = atob(xl), out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_OG_register.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } }); }
+  return vjJson({ ok: true, list, reg: regOut, free, next, last: lastB ? { og: lastB.og, no: lastB.no, name: lastB.name } : null, out: who.role === 'sales' ? [] : outOut, dias: (who.role === 'sales' ? [] : dias).map(d => ({ id: d.id, og: d.og, tag: d.tag, label: d.label || '', shape: d.shape || '', q: d.q || '', pcs: d.pcs || 0, ct: d.ct || 0, karigar: d.karigar || '', status: d.status, retAt: d.retAt || '', retByName: d.retByName || '' })),
+    sum, karigars: await vjOgKarigars(env, outs), margins: [0, 1, 2], admin: adm, canDelete: adm, canAdd: who.role !== 'sales' }); }
+async function vjOgHist(env, who, kind, ref, action, old) { await env.DB.prepare('INSERT INTO vj_og_hist (ts, email, kind, ref, action, data) VALUES (?, ?, ?, ?, ?, ?)').bind(Date.now(), who.email, kind, ref, action, JSON.stringify(old || null)).run(); }
+async function vjOgSave(request, env, who) { if (who.role === 'sales') return vjDeny(403, 'read only');
+  if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed');
+  const len = Number(request.headers.get('content-length') || 0); if (len > 6000) return vjDeny(413, 'too large');
+  let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); } await vjOg2Tables(env);
+  const adm = who.role === 'admin', now = new Date().toISOString(), byName = vjByName(who), op = String(b && b.op || 'in');
+  const dateOk = d => /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(Date.parse(d));
+  if (op === 'out' || op === 'outcancel') return vjOgOutSave(b, env, who, adm, now, byName, op, dateOk);
+  if (op === 'dia') return vjOgDiaSave(b, env, who, adm, now, byName);
+  const no = vjClean(b && b.no, 20).replace(/\s+/g, '').toUpperCase(); if (!/^[A-Z0-9\-\/]{1,20}$/.test(no)) return vjDeny(400, 'OG no. is needed (e.g. 189)');
+  const used = (await vjOgList(env)).find(x => !x.cancelled && x.og.toUpperCase() === no);
+  const oldRow = await env.DB.prepare('SELECT data FROM vj_ogs WHERE no = ?').bind(no).first(), old = oldRow ? vjParse(oldRow) : null;
+  if (b && (b.del || op === 'cancel')) { if (!adm) return vjDeny(403, 'only Abhinav or Shilpiji can cancel an OG'); if (!old) return vjDeny(404, 'OG ' + no + ' is not in the register');
+    if (old.cancelled) return vjDeny(409, 'OG ' + no + ' is already cancelled');
+    if (used) return vjDeny(409, 'OG ' + no + ' is on bill ' + used.no + ' - cancel that bill first');
+    const rec = Object.assign({}, old, { cancelled: { at: now, by: who.email, byName, why: vjClean(b.why, 120) } });
+    if (old.src === 'stock' && old.tag && old.tag.id) { await vjMarkSold(env, who, [old.tag.id], null, 'OG-' + no); await vjKoTables(env);
+      await env.DB.prepare('INSERT INTO vj_moves (ts, email, tag, act, kind, name, why, note, photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(Date.now(), who.email, old.tag.id, 'ogback', 'og', 'OG ' + no, 'OG entry cancelled - back in stock', rec.cancelled.why, '').run();
+      await env.DB.prepare("UPDATE vj_og_dia SET status = 'cancelled', data = json_set(data, '$.status', 'cancelled') WHERE og = ? AND status = 'pending'").bind(no).run(); }
+    await vjOgHist(env, who, 'in', no, 'cancel', old);
+    await env.DB.prepare('UPDATE vj_ogs SET data = ?, ts = ? WHERE no = ?').bind(JSON.stringify(rec), Date.now(), no).run();
+    await vjAudit(env, who, 'og-cancel', 'ogs/' + no, rec.cancelled.why); return vjJson({ ok: true, cancelled: no }); }
+  const edit = !!(b && b.edit), date = String(b && b.date || '');
+  if (!dateOk(date)) return vjDeny(400, 'bad date');
+  if (old && !edit) return vjDeny(409, 'OG ' + no + ' is already in the register (' + (old.name || '') + ')' + (old.cancelled ? ' - cancelled; Abhinav / Shilpiji can Edit it to bring it back' : ''));
+  if (edit && !old) return vjDeny(404, 'OG ' + no + ' is not in the register');
+  if (old && !adm) return vjDeny(403, 'only Abhinav or Shilpiji can change a saved OG');
+  const tunchIn = b.tunch === '' || b.tunch == null ? null : Number(b.tunch), note = vjClean(b.note, 120);
+  if (tunchIn !== null && !(tunchIn > 0 && tunchIn <= 100)) return vjDeny(400, 'tunch % must be between 0 and 100');
+  let rec;
+  if ((old && old.src === 'stock') || (!old && b.src === 'stock')) { // our own piece melted
+    if (old && old.cancelled) return vjDeny(409, 'a cancelled own-stock OG cannot be brought back - make a new OG entry');
+    if (old) { rec = Object.assign({}, old, { date, note, tunch: tunchIn !== null ? tunchIn : old.tunch }); }
+    else { const id = String(b.tagId || ''); if (!/^[A-Za-z0-9_\-.~]{1,60}$/.test(id)) return vjDeny(400, 'type the tag code of the piece');
+      const row = await env.DB.prepare('SELECT data FROM docs WHERE path = ?').bind('tags/' + id).first(); if (!row) return vjDeny(404, 'tag not found');
+      const t = JSON.parse(row.data); if (t.status === 'sold') return vjDeny(409, 'this piece is not in stock (' + ((t.sold && t.sold.no) || 'sold') + ')');
+      if (t.out) return vjDeny(409, 'this piece is out with ' + (t.out.name || 'someone') + ' - bring it back first');
+      const set = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first(), pur = vjQSt(set ? JSON.parse(set.data) : {}).pur;
+      let lines = Array.isArray(t.gold) ? t.gold.filter(g => g && Number(g.net) > 0).map(g => ({ k: String(g.k || ''), net: vjR3(g.net), p: vjLineT(g) || pur[g.k] || 0 })) : [];
+      if (!lines.length && t.kind === 'sample' && vjSmpNet(t) > 0) lines = [{ k: '14K', net: vjR3(vjSmpNet(t)), p: pur['14K'] || 0.6 }];
+      const gMg = lines.reduce((a, g) => a + vjOgMg(g.net), 0), fMg = lines.reduce((a, g) => a + vjOgMg(g.net) * g.p, 0); if (!(gMg > 0)) return vjDeny(400, 'this tag has no gold weight');
+      const karT = Math.round(fMg / gMg * 10000) / 100, ds = (Array.isArray(t.dias) ? t.dias : []).filter(d => d && (Number(d.ct) > 0 || Number(d.pcs) > 0));
+      rec = { no, date, src: 'stock', name: 'Own stock: ' + (t.label || id), item: [t.catName, t.designNo ? 'design ' + t.designNo : ''].filter(Boolean).join(' · '), gross: gMg / 1000, tunch: tunchIn !== null ? tunchIn : karT, karatTunch: karT, note,
+        tag: { id, label: t.label || id, code: t.code || '', designNo: t.designNo || '', gold: lines.map(g => ({ k: g.k, net: g.net })), dias: ds.length, pcs: ds.reduce((a, d) => a + (Number(d.pcs) || 0), 0), ct: Math.round(ds.reduce((a, d) => a + (Number(d.ct) || 0), 0) * 1000) / 1000 }, by: who.email, byName, at: now };
+      const n = await vjMarkSold(env, who, [id], { no: 'OG-' + no, date, name: 'Old gold OG ' + no + ' (melted)', at: now, og: no });
+      if (n !== 1) return vjDeny(409, 'could not take the piece out of stock - try again');
+      await vjKoTables(env); const st = [env.DB.prepare('INSERT INTO vj_moves (ts, email, tag, act, kind, name, why, note, photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(Date.now(), who.email, id, 'og', 'og', 'OG ' + no, 'Melted / old gold', note, '')];
+      ds.forEach((d, i) => { const dd = { id: no + '-' + (i + 1), og: no, tag: id, label: t.label || id, shape: vjClean(d.shape, 20), q: vjClean(d.q || d.code, 30), pcs: Math.max(0, Math.round(Number(d.pcs) || 0)), ct: vjR3(d.ct), karigar: '', status: 'pending', at: now, by: who.email };
+        st.push(env.DB.prepare('INSERT INTO vj_og_dia (id, ts, og, tag, status, data) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data, status = excluded.status, ts = excluded.ts').bind(dd.id, Date.now() + i, no, id, 'pending', JSON.stringify(dd))); });
+      await env.DB.batch(st); }
+  } else { // party's old gold
+    const name = vjClean(b && b.name, 60), city = vjClean(b && b.city, 40), mobile = vjPhone(b && b.mobile), item = vjClean(b && b.item, 120);
+    const gross = b.gross === '' || b.gross == null ? 0 : vjR3(b.gross), fine = b.fine === '' || b.fine == null ? 0 : vjR3(b.fine);
+    const margin = adm && b.margin !== '' && b.margin != null ? Number(b.margin) : (old && Number(old.tunch) > 0 ? Number(old.margin) : 2); // staff never set the margin: default 2 (an edit by the owner keeps or changes it)
+    if (!name) return vjDeny(400, 'party name is needed');
+    if (!(gross >= 0 && gross <= 5000)) return vjDeny(400, 'gross weight (g) looks wrong');
+    if (!(margin >= 0 && margin <= 10)) return vjDeny(400, 'tunch margin must be 0 to 10');
+    if (tunchIn !== null && !(gross > 0)) return vjDeny(400, 'type the gross weight');
+    if (tunchIn !== null && margin >= tunchIn) return vjDeny(400, 'margin is bigger than the tunch');
+    if (tunchIn === null && !(fine >= 0 && fine <= 2000)) return vjDeny(400, 'fine gold (g) looks wrong');
+    rec = Object.assign(old ? { by: old.by, byName: old.byName, at: old.at } : { by: who.email, byName, at: now }, { no, date, src: 'party', name, city, mobile, item, gross, tunch: tunchIn, margin: tunchIn !== null ? Math.round(margin * 100) / 100 : null, fine: tunchIn !== null ? 0 : fine, note });
+  }
+  Object.assign(rec, vjOgCalc(rec)); delete rec.cancelled;
+  if (old) { rec.editedAt = now; rec.editedBy = who.email; rec.editedByName = byName; await vjOgHist(env, who, 'in', no, old.cancelled ? 'restore' : 'edit', old); }
+  await env.DB.prepare('INSERT INTO vj_ogs (no, ts, email, data) VALUES (?, ?, ?, ?) ON CONFLICT(no) DO UPDATE SET data = excluded.data, ts = excluded.ts').bind(no, Date.now(), who.email, JSON.stringify(rec)).run();
+  await vjAudit(env, who, old ? 'og-edit' : 'og-add', 'ogs/' + no, rec.src + ' ' + rec.name + ' gross ' + (rec.gross || 0) + ' credit ' + rec.credFine);
+  const view = { no, src: rec.src, name: rec.name, gross: rec.gross, credFine: rec.credFine, fine: rec.credFine, credTunch: rec.credTunch };
+  if (adm || rec.src === 'stock') Object.assign(view, { actFine: rec.actFine, tunch: rec.tunch });
+  if (adm) Object.assign(view, { margin: rec.margin, marginFine: rec.marginFine });
+  if (rec.tag) view.tag = rec.tag;
+  return vjJson({ ok: true, og: view }); }
+async function vjOgOutSave(b, env, who, adm, now, byName, op, dateOk) {
+  const id = String(b.id || '');
+  const oldRow = /^O[a-z0-9]{6,20}$/.test(id) ? await env.DB.prepare('SELECT data FROM vj_og_out WHERE id = ?').bind(id).first() : null, old = oldRow ? vjParse(oldRow) : null;
+  if (op === 'outcancel') { if (!adm) return vjDeny(403, 'only Abhinav or Shilpiji can cancel an issue'); if (!old) return vjDeny(404, 'not found'); if (old.cancelled) return vjDeny(409, 'already cancelled');
+    await vjOgHist(env, who, 'out', id, 'cancel', old); const rec = Object.assign({}, old, { cancelled: { at: now, by: who.email, byName, why: vjClean(b.why, 120) } });
+    await env.DB.prepare('UPDATE vj_og_out SET data = ?, ts = ts WHERE id = ?').bind(JSON.stringify(rec), id).run(); await vjAudit(env, who, 'og-out-cancel', 'ogout/' + id, old.fine + ' g'); return vjJson({ ok: true }); }
+  if (id && !old) return vjDeny(404, 'not found'); if (old && !adm) return vjDeny(403, 'only Abhinav or Shilpiji can change an issue'); if (old && old.cancelled) return vjDeny(409, 'this issue is cancelled');
+  const date = String(b.date || ''); if (!dateOk(date)) return vjDeny(400, 'bad date');
+  const fine = vjR3(b.fine), gross = b.gross === '' || b.gross == null ? 0 : vjR3(b.gross), to = b.to === 'stock' ? 'stock' : b.to === 'karigar' ? 'karigar' : '';
+  if (!(fine > 0 && fine <= 100000)) return vjDeny(400, 'type the fine grams'); if (!(gross >= 0 && gross <= 100000)) return vjDeny(400, 'gross (g) looks wrong'); if (!to) return vjDeny(400, 'issued to a karigar or moved to our stock?');
+  const karigar = to === 'karigar' ? vjClean(b.karigar, 40) : ''; if (to === 'karigar' && !karigar) return vjDeny(400, 'pick the karigar');
+  const { reg, outs } = await vjOg2Load(env), live = reg.filter(r => !r.cancelled), ogs = [...new Set((Array.isArray(b.ogs) ? b.ogs : String(b.ogs || '').split(/[\s,]+/)).map(x => vjClean(x, 20).toUpperCase()).filter(Boolean))].slice(0, 60);
+  const bad = ogs.filter(n => !live.some(r => String(r.no).toUpperCase() === n)); if (bad.length) return vjDeny(400, 'not in the OG register: ' + bad.join(', '));
+  const S = vjOg2Sum(live.map(r => Object.assign({}, r, vjOgCalc(r))), outs.filter(o => o.id !== id), []);
+  if (vjOgMg(fine) > vjOgMg(S.inHand)) return vjDeny(409, 'only ' + S.inHand.toFixed(3) + ' g fine is in hand');
+  const rec = Object.assign(old ? { id, by: old.by, byName: old.byName, at: old.at } : { id: 'O' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), by: who.email, byName, at: now }, { date, ogs, fine, gross, to, karigar, note: vjClean(b.note, 120) });
+  if (old) { rec.editedAt = now; rec.editedBy = who.email; rec.editedByName = byName; await vjOgHist(env, who, 'out', id, 'edit', old); }
+  const st = [env.DB.prepare('INSERT INTO vj_og_out (id, ts, date, email, data) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data, date = excluded.date').bind(rec.id, Date.now(), date, who.email, JSON.stringify(rec))];
+  if (karigar) { const known = await vjOgKarigars(env, outs); if (!known.includes(karigar)) { const m = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'og:karigars'").first(); let l = []; try { l = m ? JSON.parse(m.v) : []; } catch (e) {} l.push(karigar);
+      st.push(env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('og:karigars', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(l.slice(-200)))); }
+    ogs.forEach(n => st.push(env.DB.prepare("UPDATE vj_og_dia SET data = json_set(data, '$.karigar', ?) WHERE og = ? AND status = 'pending' AND COALESCE(json_extract(data, '$.karigar'), '') = ''").bind(karigar, n))); }
+  await env.DB.batch(st);
+  await vjAudit(env, who, old ? 'og-out-edit' : 'og-out', 'ogout/' + rec.id, fine + ' g -> ' + (to === 'karigar' ? karigar : 'our stock') + (ogs.length ? ' (OG ' + ogs.join(', ') + ')' : ' (OG pool)'));
+  return vjJson({ ok: true, out: rec }); }
+async function vjOgDiaSave(b, env, who, adm, now, byName) {
+  const id = vjClean(b.id, 40), row = await env.DB.prepare('SELECT data FROM vj_og_dia WHERE id = ?').bind(id).first(); if (!row) return vjDeny(404, 'not found');
+  const d = vjParse(row), old = JSON.parse(JSON.stringify(d)); if (d.status === 'cancelled') return vjDeny(409, 'this OG was cancelled');
+  if (b.karigar != null) d.karigar = vjClean(b.karigar, 40);
+  if (b.returned === true) { if (d.status === 'returned') return vjDeny(409, 'already marked returned'); d.status = 'returned'; d.retAt = now; d.retBy = who.email; d.retByName = byName; }
+  else if (b.returned === false) { if (!adm) return vjDeny(403, 'only Abhinav or Shilpiji can undo a return'); d.status = 'pending'; delete d.retAt; delete d.retBy; delete d.retByName; }
+  await vjOgHist(env, who, 'dia', id, d.status === old.status ? 'edit' : d.status, old);
+  await env.DB.prepare('UPDATE vj_og_dia SET data = ?, status = ? WHERE id = ?').bind(JSON.stringify(d), d.status, id).run();
+  await vjAudit(env, who, 'og-dia', 'ogdia/' + id, d.status + (d.karigar ? ' ' + d.karigar : '')); return vjJson({ ok: true }); }
 let vjOgT = false; async function vjOgTable(env) { if (!vjOgT) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_ogs (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjOgT = true; } }
 const vjOgNum = s => { const m = String(s).match(/\d+/); return m ? Number(m[0]) : Infinity; };
-async function vjOgs(env, who) { await vjOgTable(env); const all = await vjOgList(env), live = all.filter(x => !x.cancelled);
+async function vjOgsV1(env, who) { /* old version, replaced by vjOgs above (C-20261102-OGREG2) */ await vjOgTable(env); const all = await vjOgList(env), live = all.filter(x => !x.cancelled);
   const reg = ((((await env.DB.prepare('SELECT data FROM vj_ogs').all()).results) || []).map(x => { try { return JSON.parse(x.data); } catch (e) { return null; } }).filter(Boolean));
   const useOf = no => live.find(x => x.og.toUpperCase() === String(no).toUpperCase()) || null;
   const regOut = reg.map(r => { const u = useOf(r.no), c = !u && all.find(x => x.cancelled && x.og.toUpperCase() === String(r.no).toUpperCase());
@@ -1537,7 +1726,7 @@ async function vjOgs(env, who) { await vjOgTable(env); const all = await vjOgLis
   const free = regOut.filter(r => !r.bill).map(r => ({ no: r.no, name: r.name, city: r.city, fine: r.fine, date: r.date }));
   const list = (who.role === 'sales' ? all.filter(x => x.email === who.email) : all).map(x => ({ og: x.og, no: x.no, date: x.date, name: x.name, city: x.city, fine: x.fine, cancelled: x.cancelled }));
   return vjJson({ ok: true, list, reg: regOut, free, next, last: lastB ? { og: lastB.og, no: lastB.no, name: lastB.name } : null, canDelete: who.role === 'admin', canAdd: who.role !== 'sales' }); }
-async function vjOgSave(request, env, who) { if (who.role === 'sales') return vjDeny(403, 'read only');
+async function vjOgSaveV1(request, env, who) { /* old version, replaced by vjOgSave above (C-20261102-OGREG2) */ if (who.role === 'sales') return vjDeny(403, 'read only');
   const len = Number(request.headers.get('content-length') || 0); if (len > 4000) return vjDeny(413, 'too large');
   let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); } await vjOgTable(env);
   const no = vjClean(b && b.no, 20).replace(/\s+/g, '').toUpperCase(); if (!/^[A-Z0-9\-\/]{1,20}$/.test(no)) return vjDeny(400, 'OG no. is needed (e.g. 189)');
@@ -2699,7 +2888,7 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/contactshot' && request.method === 'POST') return vjSameSite(request, env) ? vjContactShot(request, env, who) : vjDeny(403, 'not allowed'); // C-20261029-CONTACTSHOT
   if (p === '/api/vj/quote' && request.method === 'POST') return vjSameSite(request, env) ? vjQuote(request, env, who, ctx) : vjDeny(403, 'not allowed'); // JSON from our own page only (C-20261017-QUOTEMODES)
   if (p === '/api/vj/bill' && request.method === 'POST') return vjBill(request, env, who, ctx);
-  if (p === '/api/vj/ogs' && request.method === 'GET') return vjOgs(env, who); // C-20261101-OGREG
+  if (p === '/api/vj/ogs' && request.method === 'GET') return vjOgs(env, who, url); // C-20261101-OGREG
   if (p === '/api/vj/og' && request.method === 'POST') return vjOgSave(request, env, who); // C-20261101-OGTAB
   if ((p === '/api/vj/bills' || p === '/api/vj/bills.xlsx' || p === '/api/vj/bill') && request.method === 'GET') return vjBillBook(url, env, who, request.headers.get('x-vj-mob'));
   if (p === '/api/vj/bill/cancel' && request.method === 'POST') return vjBillCancel(request, env, who);
