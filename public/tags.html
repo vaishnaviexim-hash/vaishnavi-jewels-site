@@ -308,7 +308,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="/tags/shim.js?v=20261102c"></script>
+<script src="/tags/shim.js?v=20261102d"></script>
 <script src="/tags/navsel.js?v=20261101c" defer></script>
 <script src="/tags/boxes.js?v=20261029a" defer></script>
 <script src="/tags/similar.js?v=20261029c" defer></script>
@@ -390,7 +390,7 @@ function renderCheck(){
   if(many.length>1){const p=document.createElement("p");p.textContent=`${many.length} pieces match ${q} (tag number or design number). Tap the right one:`;card.appendChild(p);const w=document.createElement("div");w.style.cssText="display:flex;flex-wrap:wrap;gap:8px";
     many.forEach(x=>{const b=document.createElement("button");b.type="button";b.className="btn ghost";b.textContent=(x.designNo?x.designNo+" · ":"")+x.label+(x.catName?" · "+x.catName:"");b.addEventListener("click",()=>{$("cq").value=x.label;renderCheck()});w.appendChild(b)});card.appendChild(w);box.appendChild(card);return}
   if(!t&&!many.length&&S.sold&&S.sold.length){const sd=S.sold.find(x=>(x.code&&x.code.toLowerCase()===q.toLowerCase())||x.id===id||tagId(x.label)===id||(/^\d{1,6}$/.test(q)&&(String(x.no)===String(+q)||String(x.designNo||"")===q))||String(x.designNo||"").toUpperCase()===q.toUpperCase());
-    if(sd){const so=sd.sold||{};card.textContent=`${sd.designNo?sd.designNo+" · ":""}${sd.label} is SOLD on bill ${so.no||""}${so.date?" ("+so.date.split("-").reverse().join("-")+(so.name?", "+so.name:"")+")":""}. It is no longer in stock. To bring it back, cancel that bill.`;
+    if(sd){const so=sd.sold||{};card.textContent=`${sd.designNo?sd.designNo+" · ":""}${sd.label} ${so.og?"was moved to old gold (OG "+so.og+", melted)":"is SOLD on bill "+(so.no||"")}${so.date?" ("+so.date.split("-").reverse().join("-")+(so.name?", "+so.name:"")+")":""}. It is no longer in stock. ${so.og?"To bring it back, cancel that OG entry in the OG register.":"To bring it back, cancel that bill."}`; /* C-20261102-OGREG2 */
       /* owner 29/10/2026 13:04 (C-20261029-SOLDPHOTO): a sold piece can still get its photo (shows on the bill when it is printed again) */
       {const row=document.createElement("div");row.style.cssText="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px";if(sd.photo){const im=document.createElement("img");im.alt="";im.src="/_blob/"+sd.photo;im.style.cssText="width:90px;height:90px;object-fit:cover;border-radius:6px";row.appendChild(im)}const pb=photoButton(sd,()=>{const all=S.sold||[];const x=all.find(y=>y.id===sd.id);if(x)x.photo=sd.photo;renderCheck()});if(pb)row.appendChild(pb);card.appendChild(row)}
       box.appendChild(card);return}} /* C-20261026-SOLD */
