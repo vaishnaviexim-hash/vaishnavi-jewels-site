@@ -1849,17 +1849,23 @@ let vjKoOT = false;
 async function vjKoOrdT(env) { if (vjKoOT) return; await vjOg2Tables(env); await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_korders (no INTEGER PRIMARY KEY, ts INTEGER, email TEXT, status TEXT, data TEXT)').run(); vjKoOT = true; }
 const VJ_KO_STATUS = ['open', 'karigar', 'received', 'tagged', 'cancelled'];
 const vjKoNum = v => { const n = Number(String(v == null ? '' : v).replace(/[^0-9.]/g, '')); return isFinite(n) && n > 0 ? n : 0; };
-function vjKoRows(a) { if (!Array.isArray(a)) return []; const out = [];
-  for (const x of a.slice(0, 30)) { if (!x || typeof x !== 'object') continue; const pcs = Math.round(vjKoNum(x.pcs)), ct = vjR3(vjKoNum(x.ct));
-    if (!pcs && !ct) continue; if (pcs > 100000 || ct > 10000) return null; out.push({ pcs, ct, q: vjClean(x.q, 30), shape: vjClean(x.shape, 20) }); }
+// 02/11 16:45 (owner's filled slip, C-20261102-KORDER2): a diamond row = packet no. (e.g. PL12/644), shape / type, pcs, ct, rate per ct (rate: Abhinav / Shilpiji only)
+function vjKoRows(a, adm, old) { if (!Array.isArray(a)) return []; const out = [], ol = Array.isArray(old) ? old : [];
+  for (const [i, x] of a.slice(0, 30).entries()) { if (!x || typeof x !== 'object') continue; const pcs = Math.round(vjKoNum(x.pcs)), ct = vjR3(vjKoNum(x.ct));
+    if (!pcs && !ct) continue; if (pcs > 100000 || ct > 10000) return null; const rate = Math.round(vjKoNum(x.rate)); if (rate > 10000000) return null;
+    const r = { pkt: vjClean(x.pkt, 30), shape: vjClean(x.shape, 20), pcs, ct, q: vjClean(x.q, 30) };
+    if (adm) { if (rate) r.rate = rate; } else { const o = ol[i]; if (o && o.rate && o.shape === r.shape && o.pkt === r.pkt) r.rate = o.rate; } // a staff save never sets a rate, but keeps the rate already on the same row
+    out.push(r); }
   return out; }
 const vjKoTot = l => ({ pcs: (l || []).reduce((a, r) => a + (Number(r.pcs) || 0), 0), ct: (l || []).reduce((a, r) => a + vjOgMg(r.ct), 0) / 1000 });
 function vjKoCalc(o) { const I = vjKoTot(o.iss), R = vjKoTot(o.rec), U = vjKoTot(o.used), t = o.tag || {};
-  const n = vjKoNum(t.gGold) > 0 ? (vjOgMg(t.gGold) - vjOgMg(t.csWt) - Math.round(vjOgMg(t.dWt) * 0.2)) / 1000 : null;
+  const n = vjKoNum(t.gGold) > 0 ? (vjOgMg(t.gGold) - vjOgMg(t.csWt) - vjOgMg(t.dWt)) / 1000 : null; // 16:45: D.WT is in GRAMS (used ct x 0.2), as on the slip: 2.420 - 0.178 = 2.242
   const today = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
   return { diaIss: I, diaRec: R, diaUsed: U, diaPend: { pcs: I.pcs - U.pcs - R.pcs, ct: Math.round((I.ct - U.ct - R.ct) * 1000) / 1000 }, nGold: n,
     overdue: !!(o.delDate && o.delDate < today && (o.status === 'open' || o.status === 'karigar')) }; }
-function vjKoView(o, who) { const v = Object.assign({}, o, vjKoCalc(o)); if (who.role === 'sales') v.mobile = ''; delete v.by; delete v.editedBy; return v; }
+function vjKoView(o, who) { const v = Object.assign({}, o, vjKoCalc(o)); if (who.role === 'sales') v.mobile = ''; delete v.by; delete v.editedBy;
+  if (who.role !== 'admin') ['iss', 'rec', 'used'].forEach(k => { v[k] = (v[k] || []).map(r => { const c = Object.assign({}, r); delete c.rate; return c; }); }); // rates: admin only
+  return v; }
 async function vjKoNext(env, rows) { let st = 1; try { const m = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'ko:start'").first(); if (m) st = Math.max(1, Number(m.v) || 1); } catch (e) {}
   return Math.max(st, rows.reduce((a, o) => Math.max(a, Number(o.no) || 0), 0) + 1); }
 async function vjKorders(env, who, url) { await vjKoOrdT(env); const adm = who.role === 'admin';
@@ -1871,11 +1877,12 @@ async function vjKorders(env, who, url) { await vjKoOrdT(env); const adm = who.r
   if (url && url.searchParams.get('xlsx') === '1') { if (who.role === 'sales') return vjDeny(403, 'not for this login');
     const n3 = v => v == null || v === '' ? '' : Math.round(Number(v) * 1000) / 1000, SN = { open: 'Open', karigar: 'With karigar', received: 'Received', tagged: 'Tagged', cancelled: 'Cancelled' }, dc = t => t.pcs || t.ct ? t.pcs + ' pcs / ' + n3(t.ct) + ' ct' : '';
     const xl = vjXlsx([{ name: 'Karigar orders', land: true, widths: [8, 11, 12, 18, 8, 7, 8, 6, 10, 8, 20, 12, 13, 11, 13, 8, 16, 16, 16, 16, 9, 9, 9, 9, 9, 9, 10, 14, 10, 10, 26, 10, 14],
-      head: ['Order no.', 'Date', 'Karigar', 'Item', 'Size', 'Gold Y/W/R', 'G.Wt g', 'KT', 'D.Q', 'D.Ct', 'Party', 'City', 'Mobile', 'Del date', 'Status', 'Overdue', 'Diamonds issued', 'Received back', 'Used', 'Pending', 'G.Gold g', 'CS Wt g', 'D.Wt ct', 'N Gold g', 'Lab', 'CS rate', 'Other ch.', 'Gold issued (OG OUT)', 'Gold rate', 'Budget', 'Special instructions', 'Setting', 'C/S tones'],
-      rows: list.slice().reverse().map(o => { const t = o.tag || {}, g = o.goldOut ? outs.find(x => x.id === o.goldOut) : null; return [o.no, vjDmy(o.date), o.karigar, o.item, o.size, o.colour, n3(o.gwt), o.kt, o.dq, n3(o.dct), o.name, o.city, o.mobile, vjDmy(o.delDate), SN[o.status] || o.status, o.overdue ? 'YES' : '', dc(o.diaIss), dc(o.diaRec), dc(o.diaUsed), dc(o.diaPend), n3(t.gGold), n3(t.csWt), n3(t.dWt), n3(o.nGold), t.lab || '', t.csRate || '', t.otherCh || '', g ? vjDmy(g.date) + ' ' + n3(g.fine) + ' g' : o.goldOut ? '(linked)' : '', o.goldRate || '', o.budget || '', o.instr, o.setting, o.cs]; }), mark: r => r[14] === 'Cancelled' }]);
+      head: ['Order no.', 'Date', 'Karigar', 'Item', 'Size', 'Gold Y/W/R', 'G.Wt g', 'KT', 'D.Q', 'D.Ct (note)', 'Party', 'City', 'Mobile', 'Del date', 'Status', 'Overdue', 'Diamonds issued', 'Received back', 'Used', 'Pending', 'G.Gold g', 'CS Wt g', 'D.Wt g', 'N Gold g', 'Lab', 'CS rate', 'Other ch.', 'Gold issued (OG OUT)', 'Gold rate', 'Budget', 'Special instructions', 'Setting', 'C/S tones'],
+      rows: list.slice().reverse().map(o => { const t = o.tag || {}, g = o.goldOut ? outs.find(x => x.id === o.goldOut) : null; return [o.no, vjDmy(o.date), o.karigar, o.item, o.size, o.colour, n3(o.gwt), o.kt, o.dq, n3(o.dct) + (o.dctNote ? ' ' + o.dctNote : ''), o.name, o.city, o.mobile, vjDmy(o.delDate), SN[o.status] || o.status, o.overdue ? 'YES' : '', dc(o.diaIss), dc(o.diaRec), dc(o.diaUsed), dc(o.diaPend), n3(t.gGold), n3(t.csWt), n3(t.dWt), n3(o.nGold), t.lab || '', t.csRate || '', t.otherCh || '', g ? vjDmy(g.date) + ' ' + n3(g.fine) + ' g' : o.goldOut ? '(linked)' : '', o.goldRate || '', o.budget || '', o.instr, o.setting, o.cs]; }), mark: r => r[14] === 'Cancelled' }]);
     const bin = atob(xl), out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
     return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_karigar_orders.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } }); }
-  return vjJson({ ok: true, orders: list, next: await vjKoNext(env, rows), karigars: await vjOgKarigars(env), outs, pending: pend, admin: adm, canAdd: who.role !== 'sales', canEdit: adm }); }
+  let startSet = false; try { startSet = !!(await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'ko:start'").first()); } catch (e) {}
+  return vjJson({ ok: true, orders: list, next: await vjKoNext(env, rows), startSet, karigars: await vjOgKarigars(env), outs, pending: pend, admin: adm, canAdd: who.role !== 'sales', canEdit: adm }); }
 async function vjKorderSave(request, env, who) { if (who.role === 'sales') return vjDeny(403, 'read only');
   if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed');
   const len = Number(request.headers.get('content-length') || 0); if (len > 20000) return vjDeny(413, 'too large');
@@ -1895,14 +1902,18 @@ async function vjKorderSave(request, env, who) { if (who.role === 'sales') retur
     const colour = ['Y', 'W', 'R', 'Y+W', 'Y+R', 'W+R', 'Y+W+R'].includes(String(b.colour || '')) ? String(b.colour) : '';
     const kt = ['9K', '14K', '18K', '22K', '24K', 'Silver', 'Platinum'].includes(String(b.kt || '')) ? String(b.kt) : '';
     const dr = String(b.drawing || ''); if (dr && !/^[0-9a-f]{32}$/.test(dr)) return 'drawing photo not valid'; if (dr && env.PHOTOS && !(await vjPhotoHas(env, dr))) return 'drawing photo not found - upload it again';
-    const iss = vjKoRows(b.iss); if (!iss) return 'diamond pcs / ct look wrong';
+    const iss = vjKoRows(b.iss, adm, old && old.iss); if (!iss) return 'diamond pcs / ct / rate look wrong';
     const setting = ['MICRO', 'NIL', 'MIXED'].includes(String(b.setting || '').toUpperCase()) ? String(b.setting).toUpperCase() : '';
-    const gr = vjKoNum(b.goldRate), bud = vjKoNum(b.budget), gwt = vjR3(vjKoNum(b.gwt)), dct = vjR3(vjKoNum(b.dct));
+    const gr = vjKoNum(b.goldRate), bud = vjKoNum(b.budget), gwt = vjR3(vjKoNum(b.gwt)), dct = b.dct === '' || b.dct == null ? vjKoTot(iss).ct : vjR3(vjKoNum(b.dct)); // D.CT blank = total issued ct
     if (gr > 1e6 || bud > 1e10 || gwt > 10000 || dct > 10000) return 'a number looks wrong';
-    Object.assign(o, { date, delDate: del, karigar, item, size: vjClean(b.size, 20), colour, gwt, kt, dq: vjClean(b.dq, 30), dct, name: vjClean(b.name, 60), mobile: vjPhone(b.mobile), city: vjClean(b.city, 40),
+    Object.assign(o, { date, delDate: del, karigar, item, size: vjClean(b.size, 20), colour, gwt, kt, dq: vjClean(b.dq, 30), dct, dctNote: vjClean(b.dctNote, 30), name: vjClean(b.name, 60), mobile: vjPhone(b.mobile), city: vjClean(b.city, 40),
       goldRate: gr ? Math.round(gr * 100) / 100 : 0, budget: bud ? Math.round(bud) : 0, drawing: dr, iss, instr: vjClean(b.instr, 300), setting, cs: vjClean(b.cs, 120) });
     return ''; };
   if (op === 'new') { const o = { status: 'open', rec: [], used: [], tag: null, goldOut: '', by: who.email, byName, at: now }; const e = await fields(o, null); if (e) return vjDeny(400, e);
+    if (b.no !== '' && b.no != null) { const n = Math.round(Number(String(b.no).replace(/[^0-9]/g, ''))); if (!(n >= 1 && n <= 9999999)) return vjDeny(400, 'order no. looks wrong'); // 16:45: an old slip with its own printed no.
+      o.no = n; const r = await env.DB.prepare('INSERT INTO vj_korders (no, ts, email, status, data) VALUES (?, ?, ?, ?, ?) ON CONFLICT(no) DO NOTHING').bind(n, Date.now(), who.email, o.status, JSON.stringify(o)).run();
+      if (!r.meta || r.meta.changes !== 1) return vjDeny(409, 'order no. ' + n + ' is already used - check the slip no.');
+      await vjAudit(env, who, 'ko-add', 'korders/' + n, o.karigar + ' ' + o.item + ' (typed no.)'); return vjJson({ ok: true, order: vjKoView(o, who) }); }
     const rows = ((((await env.DB.prepare('SELECT data FROM vj_korders').all()).results) || []).map(vjParse)).filter(Boolean);
     for (let k = 0; k < 3; k++) { o.no = await vjKoNext(env, rows) + k;
       const r = await env.DB.prepare('INSERT INTO vj_korders (no, ts, email, status, data) VALUES (?, ?, ?, ?, ?) ON CONFLICT(no) DO NOTHING').bind(o.no, Date.now(), who.email, o.status, JSON.stringify(o)).run();
@@ -1922,13 +1933,13 @@ async function vjKorderSave(request, env, who) { if (who.role === 'sales') retur
     if ((to === 'received' || to === 'tagged') && !o.tag && !adm) return vjDeny(400, 'fill the TAG USE ONLY figures with Receive first');
     o.status = to; if (old.status === 'cancelled') delete o.cancelled; o.statusAt = Object.assign({}, o.statusAt || {}, { [to]: now }); }
   else if (op === 'receive') { if (old.status === 'cancelled') return vjDeny(409, 'order ' + no + ' is cancelled'); if (old.tag && !adm) return vjDeny(403, 'already received - only Abhinav or Shilpiji can change the figures');
-    const t = { date: String(b.tDate || today), kt: vjClean(b.tKt, 10), gGold: vjR3(vjKoNum(b.gGold)), csWt: vjR3(vjKoNum(b.csWt)), dWt: vjR3(vjKoNum(b.dWt)), lab: vjClean(b.lab, 30), csRate: Math.round(vjKoNum(b.csRate)), otherCh: Math.round(vjKoNum(b.otherCh)), details: vjClean(b.details, 200) };
+    const rec = vjKoRows(b.rec, adm, old.rec), used = vjKoRows(b.used, adm, old.used); if (!rec || !used) return vjDeny(400, 'diamond pcs / ct look wrong');
+    const t = { date: String(b.tDate || today), kt: vjClean(b.tKt, 10), gGold: vjR3(vjKoNum(b.gGold)), csWt: vjR3(vjKoNum(b.csWt)), dWt: b.dWt === '' || b.dWt == null ? Math.round(vjOgMg(vjKoTot(used).ct) * 0.2) / 1000 : vjR3(vjKoNum(b.dWt)), lab: vjClean(b.lab, 30), csRate: Math.round(vjKoNum(b.csRate)), otherCh: Math.round(vjKoNum(b.otherCh)), details: vjClean(b.details, 200) };
     if (!dateOk(t.date)) return vjDeny(400, 'bad date'); if (!(t.gGold > 0 && t.gGold <= 10000)) return vjDeny(400, 'type the G.GOLD (gross) weight');
-    if (vjOgMg(t.csWt) + Math.round(vjOgMg(t.dWt) * 0.2) >= vjOgMg(t.gGold)) return vjDeny(400, 'stones weigh more than the gross - check CS WT (g) and D.WT (ct)');
-    const rec = vjKoRows(b.rec), used = vjKoRows(b.used); if (!rec || !used) return vjDeny(400, 'diamond pcs / ct look wrong');
+    if (vjOgMg(t.csWt) + vjOgMg(t.dWt) >= vjOgMg(t.gGold)) return vjDeny(400, 'stones weigh more than the gross - check CS WT (g) and D.WT (g)');
     const I = vjKoTot(o.iss), R = vjKoTot(rec), U = vjKoTot(used); if (I.pcs && (R.pcs + U.pcs > I.pcs || vjOgMg(R.ct) + vjOgMg(U.ct) > vjOgMg(I.ct))) return vjDeny(400, 'received back + used is more than the diamonds issued (' + I.pcs + ' pcs / ' + I.ct.toFixed(3) + ' ct)');
     Object.assign(o, { tag: t, rec, used }); if (o.status === 'open' || o.status === 'karigar') { o.status = 'received'; o.statusAt = Object.assign({}, o.statusAt || {}, { received: now }); } }
-  else if (op === 'diaadd') { if (old.status === 'cancelled') return vjDeny(409, 'order ' + no + ' is cancelled'); const rows = vjKoRows(b.iss); if (!rows || !rows.length) return vjDeny(400, 'type pcs / ct of the diamonds issued');
+  else if (op === 'diaadd') { if (old.status === 'cancelled') return vjDeny(409, 'order ' + no + ' is cancelled'); const rows = vjKoRows(b.iss, adm, []); if (!rows || !rows.length) return vjDeny(400, 'type pcs / ct of the diamonds issued');
     o.iss = (o.iss || []).concat(rows).slice(0, 60); }
   else if (op === 'gold') { if (old.status === 'cancelled') return vjDeny(409, 'order ' + no + ' is cancelled'); if (!o.karigar) return vjDeny(400, 'pick the karigar first');
     if (b.link) { const id = String(b.link); if (!/^O[a-z0-9]{6,20}$/.test(id)) return vjDeny(400, 'pick the OG OUT entry'); const r0 = await env.DB.prepare('SELECT data FROM vj_og_out WHERE id = ?').bind(id).first(), g = r0 ? vjParse(r0) : null;
