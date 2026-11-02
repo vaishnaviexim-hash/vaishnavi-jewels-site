@@ -1902,6 +1902,9 @@ async function vjOgSaveV1(request, env, who) { /* old version, replaced by vjOgS
   const rec = { no, name, city, mobile, date, fine, note, by: who.email, byName: vjByName(who), at: new Date().toISOString() };
   await env.DB.prepare('INSERT INTO vj_ogs (no, ts, email, data) VALUES (?, ?, ?, ?) ON CONFLICT(no) DO UPDATE SET data = excluded.data, ts = excluded.ts').bind(no, Date.now(), who.email, JSON.stringify(rec)).run();
   await vjAudit(env, who, old ? 'og-edit' : 'og-add', 'ogs/' + no, name + ' ' + (fine || '')); return vjJson({ ok: true, og: rec }); }
+// C-20261102-BILLORDER (owner 02/11 15:18): bills in BILL-NUMBER order - B-2611-06 < B-2611-10 < B-2612-01 (numeric YYMM, then NN); ties or other numbers: bill date, then created time
+const vjBillKey = no => { const m = String(no || '').match(/^([A-Z]+)-(\d{2})(\d{2})-(\d+)$/i); return m ? [Number(m[2]) * 100 + Number(m[3]), Number(m[4])] : null; };
+const vjBillOrd = (a, b) => { const x = vjBillKey(a.no), y = vjBillKey(b.no); return (x && y ? (x[0] - y[0]) || (x[1] - y[1]) : 0) || String(a.date || '').localeCompare(String(b.date || '')) || String(a.at || '').localeCompare(String(b.at || '')) || String(a.no || '').localeCompare(String(b.no || '')); };
 async function vjBillBook(url, env, who, mobQ) { // a sales login sees only the bills it made; mobQ (header, not URL): one party's bills (owner 26/10 18:03)
   const mq = String(mobQ || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '').slice(0, 12), byMob = mq.length >= 4;
   const mine = b => who.role !== 'sales' || b.by === who.email;
@@ -1915,7 +1918,7 @@ async function vjBillBook(url, env, who, mobQ) { // a sales login sees only the 
   const month = String(url.searchParams.get('month') || ''), all = month === 'all';
   if (!all && !/^\d{4}-\d{2}$/.test(month)) return vjDeny(400, 'month as YYYY-MM or all');
   const bills = (((await env.DB.prepare('SELECT data FROM vj_bills ORDER BY ts').all()).results) || []).map(r => JSON.parse(r.data))
-    .filter(b => !b.cancelled && b.title !== 'Estimate' /* C-20261028-ESTNOTBILL */ && (all || String(b.date || '').startsWith(month)) && mine(b) && (!byMob || String(b.mobile || '').replace(/\D/g, '').includes(mq))).sort(/* owner 17/10 16:03: cancelled bills appear nowhere (list, summary, bills, pieces); the record stays only in the database (C-20261017-NOCANCELLED) */ (a, b) => String(a.date).localeCompare(String(b.date)) || String(a.at).localeCompare(String(b.at)));
+    .filter(b => !b.cancelled && b.title !== 'Estimate' /* C-20261028-ESTNOTBILL */ && (all || String(b.date || '').startsWith(month)) && mine(b) && (!byMob || String(b.mobile || '').replace(/\D/g, '').includes(mq))).sort(/* owner 17/10 16:03: cancelled bills appear nowhere (list, summary, bills, pieces); the record stays only in the database (C-20261017-NOCANCELLED) */ vjBillOrd); // owner 02/11 15:18 (C-20261102-BILLORDER): by BILL NUMBER (B-YYMM-NN), not by edit / cancel time; the page shows it newest first
   const MODE = { ws: 'W/s', nett: 'Nett', g2g: 'Gold to Gold', item: 'Gold Item' };
   const dmy = d => String(d || '').split('-').reverse().join('-');
   const rcs = url.pathname === '/api/vj/bills' ? (await vjLedgerLoad(env)).rcs : []; // C-20261017-LEDGER: paid / balance per bill
