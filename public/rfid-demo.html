@@ -203,7 +203,7 @@ kbd{font-family:var(--f-mono);font-size:13px;background:var(--sunk);border:1px s
         <label><input type="radio" name="mode" id="m-bar" value="barcode"> Code 128</label>
         <label><input type="radio" name="mode" id="m-qr" value="qr" checked> QR</label>
       </div>
-      <input id="scanIn" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="none" enterkeyhint="go" placeholder="Pull the trigger to scan a barcode, QR or RFID tag" aria-label="Scanner input">
+      <input id="scanIn" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text" enterkeyhint="go" placeholder="Pull the trigger to scan a barcode, QR or RFID tag" aria-label="Scanner input">
       <div class="scanstate"><span class="dot" id="focusDot"></span><span id="focusTxt">Ready</span>
         <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
           <button type="button" class="btn ghost sm" id="typeBtn">Type</button>
