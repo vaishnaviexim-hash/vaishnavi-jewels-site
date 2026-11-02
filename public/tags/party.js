@@ -12,30 +12,35 @@
   const digits = v => String(v || "").replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "");
   const fire = el => el.dispatchEvent(new Event("input", { bubbles: true }));
   const setOf = id => SETS.find(s => s.includes(id));
-  async function look(q) { const n = ++seq; try { const r = await fetch("/api/vj/parties?q=" + encodeURIComponent(q), { credentials: "same-origin", cache: "no-store" }); const j = await r.json(); return n === seq && r.ok ? (j.parties || []) : null; } catch (e) { return null; } }
+  // C-20261102-ADDRBOOK: on Bill and Delivery challan the address book (/api/vj/addrbook: Client_Addresses sheet + saved bills / challans) is asked too
+  async function look(q, ab) { const n = ++seq; const get = async u => { try { const r = await fetch(u, { credentials: "same-origin", cache: "no-store" }); const j = await r.json(); return r.ok ? j : null; } catch (e) { return null; } };
+    const [j, k] = await Promise.all([get("/api/vj/parties?q=" + encodeURIComponent(q)), ab ? get("/api/vj/addrbook?q=" + encodeURIComponent(q)) : null]); if (n !== seq || (!j && !k)) return null;
+    const e = ((k && k.entries) || []).map(x => Object.assign({ _ab: 1 }, x)), dg = v => String(v || "").replace(/\D/g, "");
+    return e.concat(((j && j.parties) || []).filter(p => !e.some(x => dg(x.mobile) && dg(x.mobile) === dg(p.mobile)))).slice(0, 10); }
+  const mask = m => { const d = String(m || "").replace(/\D/g, ""); return d.length >= 6 ? d.slice(0, 2) + "x".repeat(d.length - 5) + d.slice(-3) : d; };
   function close() { if (box) { box.remove(); box = null; } }
   function fill(set, p, all) { const [n, m, c] = set.map($); if (!n) return;
     if (all || !n.value.trim()) { n.value = p.name; fire(n); }
     if (all || !m.value.trim()) { m.value = /^\d{10}$/.test(p.mobile || "") ? p.mobile : (p.mobile || ""); fire(m); }
     if (c && (all || !c.value.trim()) && p.city) { c.value = p.city; fire(c); }
-    (ADDR[set[1]] || []).forEach(([id, k]) => { const e = $(id); if (e && !e.value.trim() && p[k]) { e.value = String(p[k]); fire(e); } }); }
+    (ADDR[set[1]] || []).forEach(([id, k]) => { const e = $(id); if (e && p[k] && ((p._ab && all) || !e.value.trim())) { e.value = String(p[k]); fire(e); } }); } // an address-book pick fills every address box
   function show(input, set, list) { close(); if (!list.length) return;
     const r = input.getBoundingClientRect(); box = document.createElement("div");
     box.style.cssText = `position:absolute;z-index:9999;left:${r.left + scrollX}px;top:${r.bottom + scrollY + 2}px;min-width:${Math.max(r.width, 260)}px;max-width:420px;background:#fff;border:1px solid #c9b98f;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.15);font-size:15px`;
     list.forEach(p => { const b = document.createElement("button"); b.type = "button";
       b.style.cssText = "display:block;width:100%;text-align:left;padding:9px 12px;border:0;background:none;cursor:pointer;color:#222";
-      b.textContent = p.name + (p.city ? " · " + p.city : "") + (p.mobile ? " · " + (/^\d{10}$/.test(p.mobile) ? "+91 " + p.mobile : p.mobile) : "");
+      b.textContent = p._ab ? "\u{1F4CD} " + [p.name, p.city, p.pin, mask(p.mobile)].filter(Boolean).join(" · ") : p.name + (p.city ? " · " + p.city : "") + (p.mobile ? " · " + (/^\d{10}$/.test(p.mobile) ? "+91 " + p.mobile : p.mobile) : "");
       b._pick = () => { fill(set, p, true); close(); }; b.addEventListener("mousedown", e => { e.preventDefault(); b._pick(); }); box.appendChild(b); });
     box._i = 0; hl();
     document.body.appendChild(box); }
   document.addEventListener("input", e => {
     const t = e.target; if (!e.isTrusted || !t || !t.id) return; const set = setOf(t.id); if (!set) return;
     clearTimeout(timer);
-    if (t.id === set[1]) { const d = digits(t.value); if (d.length < 4) { close(); return; } // owner 17/10 17:32: suggestions from 4 digits, auto-fill at 10
-      timer = setTimeout(async () => { const l = await look(d); if (!l) return; const p = d.length === 10 && l.find(x => digits(x.mobile) === d);
+    if (t.id === set[1]) { const d = digits(t.value); if (d.length < 3) { close(); return; } // owner 17/10 17:32: suggestions from 4 digits, auto-fill at 10
+      timer = setTimeout(async () => { const l = await look(d, !!ADDR[set[1]]); if (!l) return; const p = d.length === 10 && l.find(x => digits(x.mobile) === d);
         if (p) { close(); fill(set, p, false); } else if (document.activeElement === t) show(t, set, l); }, 250); return; }
     if (t.id === set[0]) { const q = t.value.trim(); if (q.length < 2) { close(); return; }
-      timer = setTimeout(async () => { const l = await look(q); if (l && document.activeElement === t) show(t, set, l); }, 250); }
+      timer = setTimeout(async () => { const l = await look(q, !!ADDR[set[1]]); if (l && document.activeElement === t) show(t, set, l); }, 250); }
   });
   document.addEventListener("focusout", e => { if (e.target && setOf(e.target.id || "")) setTimeout(close, 150); });
   // owner 17/10/2026 17:35: pick from the keyboard - Down / Up to move, Enter to fill
