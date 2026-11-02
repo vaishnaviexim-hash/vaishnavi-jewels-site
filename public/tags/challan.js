@@ -14,6 +14,7 @@
   const purTxt = c => c.purpose === "bill" ? (billsOf(c).length > 1 ? "Against Bills " : "Against Bill ") + billsOf(c).join(", ") : (PURPOSES.find(p => p[0] === c.purpose) || ["", ""])[1];
   const md = b => { const d = String(b && b.mobile || "").replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""); return /^[6-9]\d{9}$/.test(d) ? d : ""; };
   const nk = v => String(v || "").toLowerCase().replace(/\s+ji$/, "").replace(/[^a-z0-9]/g, "");
+  const near1 = (a, b) => { if (a === b) return true; if (Math.abs(a.length - b.length) > 1) return false; let i = 0, j = 0, e = 0; while (i < a.length && j < b.length) { if (a[i] === b[j]) { i++; j++; continue; } if (++e > 1) return false; if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; } } return e + (a.length - i) + (b.length - j) <= 1; }; // one digit off
   const sameParty = list => { const all = list.every(md); return new Set(list.map(b => all ? md(b) : nk(b.name) + "|" + nk(b.city))).size <= 1; }; // same 10-digit mobile, else same name + city
   const inr = n => Math.round(Number(n) || 0).toLocaleString("en-IN");
   const today = () => new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
@@ -103,11 +104,11 @@
       <div class="seg" role="radiogroup" aria-label="Direction"><label><input type="radio" name="chdir" value="out"> Outgoing - we send to the party</label><label><input type="radio" name="chdir" value="in"> Incoming - the party sends to us</label></div>
       <div class="row" style="margin-top:8px;align-items:end"><label style="flex:2 1 240px">Purpose <select id="chpur"></select></label><label>Date <input id="chdate" type="date"></label></div>
       <p class="hint" style="margin-top:2px">For a sale, the tax invoice (bill) must go with the goods; a challan alone is for repair/approval/job work.</p>
-      <div id="chbillw" style="margin:4px 0 8px"><div id="chbills" class="row" style="gap:6px;flex-wrap:wrap;align-items:center"></div><div class="row" style="align-items:end;margin-top:4px"><label style="flex:2 1 260px">+ Add bill (this party's bills) <select id="chbpick"><option value="">- pick a bill -</option></select></label><label>or type bill no. <input id="chbill" autocomplete="off" maxlength="20" placeholder="B-2611-03"></label><div><button type="button" class="btn ghost" id="chbadd">+ Add bill</button></div></div><p class="hint" id="chbmsg"></p></div>
+      <div id="chbillw" style="margin:4px 0 8px"><div id="chbills" class="row" style="gap:6px;flex-wrap:wrap;align-items:center"></div><div class="row" style="align-items:end;margin-top:4px"><label style="flex:2 1 260px">+ Add bill (recent bills of every party) <select id="chbpick"><option value="">- pick a bill -</option></select></label><label>search name / bill no. <input id="chbill" autocomplete="off" maxlength="20" placeholder="B-2611-03"></label><div><button type="button" class="btn ghost" id="chbadd">+ Add bill</button></div></div><p class="hint" id="chbmsg"></p></div>
       <h3 style="margin:10px 0 4px">Party</h3>
       <div class="row"><label>Mobile No. <input id="chmob" inputmode="tel" autocomplete="off" maxlength="20" placeholder="98xxxxxxxx"></label><label>Name <input id="chname" autocomplete="off" maxlength="60"></label><label>City <input id="chcity" autocomplete="off" maxlength="40"></label></div>
       <div class="row"><label style="flex:2 1 260px">Address (line) <input id="chaddr" autocomplete="off" maxlength="160" placeholder="house / flat / shop no., building, street"></label><label>Area / Society <input id="charea" autocomplete="off" maxlength="80"></label><label>State <input id="chstate" autocomplete="off" maxlength="40"></label><label>PIN code <input id="chpin" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="395007"></label></div>
-      <h3 style="margin:10px 0 4px">Items (HSN 711319)</h3><div id="chitems"></div><div class="actions" style="margin:4px 0"><button type="button" class="btn ghost" id="chadd">+ Line</button></div>
+      <p class="hint" id="chabmsg" style="font-weight:600;color:#8a5a00;margin:4px 0"></p><h3 style="margin:10px 0 4px">Items (HSN 711319)</h3><div id="chitems"></div><div class="actions" style="margin:4px 0"><button type="button" class="btn ghost" id="chadd">+ Line</button></div>
       <div class="row" style="align-items:end"><div style="flex:1 1 200px;font-size:18px"><b>Total Rs <span id="chtot">0</span>/-</b><div class="hint" id="chwords"></div></div><label>INS (insured value, Rs) <input id="chins" inputmode="numeric" autocomplete="off" maxlength="11"><a href="#" id="chinsreset" hidden style="font-size:14px;margin-top:2px"></a></label></div>
       <p class="hint" id="chmsg2" style="font-weight:600"></p>
       <div class="actions"><button type="button" class="btn" id="chsave"></button><button type="button" class="btn ghost" id="chclose">Close</button></div>`;
@@ -135,13 +136,14 @@
     // + Add bill: this party's live Bills (same 10-digit mobile, else name + city) or a typed number; each bill is its own line
     const chips = () => { const w = $("chbills"); w.textContent = ""; bills.forEach(no => { const b = el("button", { type: "button", className: "btn ghost", textContent: no + " ✕", title: "Take this bill (and its line) off the challan" });
         b.addEventListener("click", () => { bills.splice(bills.indexOf(no), 1); delete binfo[no]; for (let i = items.length - 1; i >= 0; i--) if (items[i].bill === no) items.splice(i, 1); if (!items.length) items.push({ desc: "", pcs: "1", wt: "", value: "", bill: "" }); draw(); sum(); pickFill(); }); w.append(b); });
-      if (!bills.length) w.append(el("span", { className: "hint", textContent: "No bill on this challan yet." })); };
+      if (!bills.length) w.append(el("span", { className: "hint", textContent: "No bill on this challan yet." }));
+      { const ps = Object.values(binfo), all = ps.every(md), n = new Set(ps.map(p => all ? md(p) : nk(p.name) + "|" + nk(p.city))).size; if (n > 1) w.append(el("span", { textContent: "Bills of " + n + " parties – check the receiver name/address", style: "color:#8a5a00;font-weight:600;margin-left:6px" })); } };
     let book = null; const party = () => Object.values(binfo)[0] || { name: $("chname").value, mobile: $("chmob").value, city: $("chcity").value };
     async function pickFill() { chips(); const s = $("chbpick");
       try { if (!book) { const r = await fetch("/api/vj/bills?month=all", { credentials: "same-origin", cache: "no-store" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); book = (j.bills || []).filter(b => b.title === "Bill" && !b.cancelled); }
-        const p = party(), list = (p.name || md(p)) ? book.filter(b => !bills.includes(b.no) && sameParty([p, b])) : []; s.textContent = "";
-        s.append(el("option", { value: "", textContent: list.length ? "- pick a bill (" + list.length + ") -" : "- no other bills for this party -" }));
-        list.slice().reverse().forEach(b => s.append(el("option", { value: b.no, textContent: b.no + " · " + dmy(b.date) + " · Rs " + inr(b.total) + " · " + (b.pieces || 0) + " pc" })));
+        const f = $("chbill").value.trim().toLowerCase(), list = book.filter(b => !bills.includes(b.no) && (!f || String(b.no).toLowerCase().includes(f) || String(b.name || "").toLowerCase().includes(f))).slice(-60); /* recent live bills of every party */ s.textContent = "";
+        s.append(el("option", { value: "", textContent: list.length ? "- pick a bill (" + list.length + ") -" : "- no matching bills -" }));
+        list.slice().reverse().forEach(b => s.append(el("option", { value: b.no, textContent: b.no + " · " + dmy(b.date) + " · " + b.name + (b.city ? ", " + b.city : "") + " · Rs " + inr(b.total) + " · " + (b.pieces || 0) + " pc" })));
       } catch (e) { $("chbmsg").textContent = "Could not list the bills (" + (e.message || e) + ")."; } }
     function addBillObj(b) { if (bills.includes(b.no)) return; const first = !bills.length; bills.push(b.no); binfo[b.no] = { name: b.name, mobile: b.mobile, city: b.city };
       if (first) [["chmob", "mobile"], ["chname", "name"], ["chcity", "city"], ["chaddr", "addr"], ["charea", "area"], ["chstate", "state"], ["chpin", "pin"]].forEach(([id, k]) => { if (!$(id).value.trim() && b[k]) $(id).value = b[k]; });
@@ -149,11 +151,24 @@
     async function addBill(no) { const m = $("chbmsg"); no = String(no || "").trim().toUpperCase();
       if (!/^B-\d{4}-\d{2,4}$/.test(no)) { m.textContent = "Pick a bill or type a number like B-2611-03."; return; } if (bills.includes(no)) { m.textContent = no + " is already on this challan."; return; } if (bills.length >= 10) { m.textContent = "At most 10 bills on one challan."; return; }
       try { const r = await fetch("/api/vj/bill?no=" + encodeURIComponent(no), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); const b = j.bill;
-        if (b.title !== "Bill" || b.cancelled) throw new Error("not a live bill");
-        if ((bills.length || $("chname").value.trim()) && !sameParty([party(), b])) throw new Error("it is for " + b.name + (b.city ? ", " + b.city : "") + " - one challan carries the bills of one party only");
+        if (b.title !== "Bill" || b.cancelled) throw new Error("not a live bill"); // C-20261102-ADDRBOOK: bills of other parties may share the parcel
         addBillObj(b); m.textContent = no + " added."; $("chbill").value = ""; } catch (e) { m.textContent = "Cannot add " + no + ": " + (e.message || e) + "."; } }
     $("chbadd").addEventListener("click", () => addBill($("chbpick").value || $("chbill").value)); $("chbpick").addEventListener("change", () => { if ($("chbpick").value) addBill($("chbpick").value); });
-    $("chbill").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addBill($("chbill").value); } });
+    $("chbill").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); addBill($("chbill").value); } }); { let tq = 0; $("chbill").addEventListener("input", () => { clearTimeout(tq); tq = setTimeout(pickFill, 200); }); }
+    // C-20261102-ADDRBOOK: no address yet -> look the party up in the address book (Client_Addresses sheet + saved bills / challans).
+    // A match needs the same first name and a mobile that is equal, contained, or one digit off (bills sometimes carry a 9-digit typo).
+    async function abFill() { const am = $("chabmsg"); if ($("chaddr").value.trim() || $("chpin").value.trim()) return; const nm = $("chname").value.trim(), dg = $("chmob").value.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""), fn = nk(nm.split(/\s+/)[0] || "");
+      const qs = [...new Set([dg.length >= 5 ? dg.slice(-5) : "", fn.length >= 2 ? fn : ""].filter(Boolean))]; if (!qs.length) return; const seen = {}, cand = [];
+      for (const q of qs) { try { const r = await fetch("/api/vj/addrbook?q=" + encodeURIComponent(q), { credentials: "same-origin", cache: "no-store" }); const j = await r.json(); (j.entries || []).forEach(e => { const k = e.name + "|" + e.mobile + "|" + e.pin; if (!seen[k]) { seen[k] = 1; cand.push(e); } }); } catch (e) {} }
+      if ($("chaddr").value.trim() || $("chpin").value.trim()) return;
+      const ed = e => String(e.mobile || "").replace(/\D/g, ""), mob = e => dg.length >= 9 && ed(e).length >= 9 && (ed(e).includes(dg) || dg.includes(ed(e)) || near1(dg, ed(e)));
+      let hit = cand.filter(e => mob(e) && (!fn || nk(String(e.name).split(/\s+/)[0]) === fn || ed(e) === dg)); if (!hit.length && !dg) hit = cand.filter(e => nk(e.name) === nk(nm));
+      if (hit.length === 1) { const e = hit[0]; [["chaddr", "addr"], ["charea", "area"], ["chcity", "city"], ["chstate", "state"], ["chpin", "pin"]].forEach(([id, k]) => { if (e[k] && (k !== "city" || !$(id).value.trim())) $(id).value = e[k]; });
+        am.textContent = "Address filled from the address book (" + e.name + ", " + [e.city, e.pin].filter(Boolean).join(" ") + ") - check it before printing.";
+        if (ed(e) && ed(e) !== dg) { am.textContent += " Its mobile is " + ed(e) + ", the bill has " + (dg || "none") + "."; const u = el("button", { type: "button", className: "btn ghost", textContent: "Use " + ed(e), style: "margin-left:6px" }); u.addEventListener("click", () => { $("chmob").value = ed(e); u.remove(); }); am.append(u); } }
+      else if (hit.length > 1) am.textContent = hit.length + " address-book entries match - type the name or mobile in the Name / Mobile box and pick one.";
+      else if (cand.length) am.textContent = "No sure address-book match. Similar: " + cand.slice(0, 3).map(e => e.name + " (" + (e.city || "") + ")").join(", ") + " - type the name in the Name box to pick one if it is the same party."; }
+    if (!c.no) abFill();
     (c._bills || []).forEach(addBillObj); bw();
     $("chadd").addEventListener("click", () => { if (items.length < 20) { items.push({ desc: "", pcs: "1", wt: "", value: "" }); draw(); } });
     $("chins").addEventListener("input", () => { const v = $("chins").value.trim(); insEdited = v !== "" && Math.round(num(v)) !== tot(); insUi(); });
@@ -180,8 +195,8 @@
   function billLine(b) { const rows = b.rows || [], dia = rows.some(r => Number(r.ct) > 0 || (r.dias || []).some(d => Number(d.ct) > 0)), wt = rows.reduce((a, r) => a + (Number(r.wt) || 0), 0);
     return { desc: (dia ? "DIAMOND JEWELLERY" : "GOLD JEWELLERY") + " - " + rows.length + " (Bill " + b.no + ")", pcs: String(rows.length || 1), wt: wt ? String(Math.round(wt * 1000) / 1000) : "", value: String(Math.round(Number(b.total) || 0)), bill: b.no }; }
   // from one or several saved Bills of ONE party (C-20261102-CHMULTI): party from the first bill, address from the first bill that has one
-  function fromBills(list) { list = (list || []).filter(Boolean); if (!list.length) return; if (!sameParty(list)) throw new Error("the bills are for different parties - one challan carries the bills of one party only");
-    const b = list[0], a = list.find(x => x.addr || x.pin) || b;
+  function fromBills(list) { list = (list || []).filter(Boolean); if (!list.length) return; /* C-20261102-ADDRBOOK (owner 02/11 14:16): bills of different parties may share one parcel; receiver = the first bill's party, editable */
+    const b = list[0], a = list.find(x => (x.addr || x.pin) && sameParty([b, x])) || b;
     open({ direction: "out", purpose: "bill", date: today(), party: { name: b.name, mobile: b.mobile, city: b.city || a.city, addr: a.addr, area: a.area, state: a.state, pin: a.pin }, _bills: list });
   }
   function fromBill(b) { fromBills([b]); }
