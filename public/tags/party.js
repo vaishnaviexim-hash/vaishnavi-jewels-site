@@ -4,7 +4,9 @@
    by the mobile lookup, a picked name fills all three. */
 (function () {
   "use strict";
-  const SETS = [["oName", "oMob", "oCity"], ["bname", "bmob", "bcity"], ["rname", "rmob", "rcity"], ["qname", "qmob", "qcity"]]; // + Quote tab, both choices (C-20261017-QUOTEMODES)
+  const SETS = [["oName", "oMob", "oCity"], ["bname", "bmob", "bcity"], ["rname", "rmob", "rcity"], ["qname", "qmob", "qcity"], ["chname", "chmob", "chcity"]]; // + delivery challan (C-20261102-CHALLAN)
+  // C-20261102-BILLADDR: with a full mobile the server also returns the latest saved address; it fills only empty boxes
+  const ADDR = { bmob: [["baddr", "addr"], ["barea", "area"], ["bstate", "state"], ["bpin", "pin"]], chmob: [["chaddr", "addr"], ["charea", "area"], ["chstate", "state"], ["chpin", "pin"]] }; // + Quote tab, both choices (C-20261017-QUOTEMODES)
   const $ = id => document.getElementById(id);
   let box = null, timer = 0, seq = 0;
   const digits = v => String(v || "").replace(/\D/g, "").replace(/^91(?=\d{10}$)/, "");
@@ -15,7 +17,8 @@
   function fill(set, p, all) { const [n, m, c] = set.map($); if (!n) return;
     if (all || !n.value.trim()) { n.value = p.name; fire(n); }
     if (all || !m.value.trim()) { m.value = /^\d{10}$/.test(p.mobile || "") ? p.mobile : (p.mobile || ""); fire(m); }
-    if (c && (all || !c.value.trim()) && p.city) { c.value = p.city; fire(c); } }
+    if (c && (all || !c.value.trim()) && p.city) { c.value = p.city; fire(c); }
+    (ADDR[set[1]] || []).forEach(([id, k]) => { const e = $(id); if (e && !e.value.trim() && p[k]) { e.value = String(p[k]); fire(e); } }); }
   function show(input, set, list) { close(); if (!list.length) return;
     const r = input.getBoundingClientRect(); box = document.createElement("div");
     box.style.cssText = `position:absolute;z-index:9999;left:${r.left + scrollX}px;top:${r.bottom + scrollY + 2}px;min-width:${Math.max(r.width, 260)}px;max-width:420px;background:#fff;border:1px solid #c9b98f;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.15);font-size:15px`;
