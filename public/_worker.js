@@ -1541,7 +1541,7 @@ async function vjOg2Tables(env) { if (vjOg2T) return; await vjOgTable(env); awai
 const vjOgMg = v => Math.round((Number(v) || 0) * 1000); // grams -> integer milligrams
 const vjOgTun = v => { if (v === '' || v == null) return null; let n = Number(String(v).replace(/[^0-9.]/g, '')); if (!isFinite(n) || n <= 0) return NaN; if (n <= 1.1) n = n * 100; return Math.round(n * 100) / 100; }; // tunch is always kept in PERCENT (owner 02/11 14:35): 0.76 or 76 -> 76
 function vjOgCalc(r) { // the only place the OG figures are worked out
-  const gMg = vjOgMg(r.gross), t = r.tunch === '' || r.tunch == null ? NaN : Number(r.tunch);
+  const gMg = vjOgMg(r.gross), t0 = vjOgTun(r.tunch), t = t0 == null ? NaN : t0; // 02/11 14:51: a tunch saved as a fraction (0.351) by an old cached page counts as 35.1 %
   if (r.src === 'stock' || r.src === 'part' || r.src === 'own') { const act = t > 0 && gMg > 0 ? Math.round(gMg * t / 100) : vjOgMg(r.fine); return { actFine: act / 1000, credTunch: null, credFine: 0, marginFine: 0 }; } // our own gold (whole piece / part of a piece / plain fine): no party, no margin
   if (!(t > 0)) { const f = vjOgMg(r.fine); return { actFine: f / 1000, credTunch: null, credFine: f / 1000, marginFine: 0 }; } // no tunch (old entries): fine as typed
   const m = Number(r.margin) >= 0 ? Number(r.margin) : 2, ct = Math.max(0, Math.round((t - m) * 100) / 100);
@@ -1576,7 +1576,7 @@ function vjOg2Sum(reg, outs, dias) { // reg rows already carry the calc fields
 }
 async function vjOgs(env, who, url) { const all = await vjOgList(env), live = all.filter(x => !x.cancelled), { reg: raw, outs, dias } = await vjOg2Load(env), adm = who.role === 'admin';
   const useOf = no => live.find(x => x.og.toUpperCase() === String(no).toUpperCase()) || null;
-  const reg = raw.map(r => Object.assign({}, r, { src: ['stock', 'part', 'own'].includes(r.src) ? r.src : 'party' }, vjOgCalc(r)));
+  const reg = raw.map(r => Object.assign({}, r, { src: ['stock', 'part', 'own'].includes(r.src) ? r.src : 'party', tunch: vjOgTun(r.tunch) > 0 ? vjOgTun(r.tunch) : r.tunch }, vjOgCalc(r)));
   const S = vjOg2Sum(reg, outs, dias);
   const regOut = reg.map(r => { const u = useOf(r.no), c = !u && all.find(x => x.cancelled && x.og.toUpperCase() === String(r.no).toUpperCase());
     const o = { no: r.no, date: r.date || '', src: r.src, name: r.name || '', mobile: who.role === 'sales' ? '' : (r.mobile || ''), city: r.city || '', item: r.item || '', gross: r.gross || 0,
