@@ -4,7 +4,7 @@
    by the mobile lookup, a picked name fills all three. */
 (function () {
   "use strict";
-  const SETS = [["oName", "oMob", "oCity"], ["bname", "bmob", "bcity"], ["rname", "rmob", "rcity"], ["qname", "qmob", "qcity"], ["chname", "chmob", "chcity"]]; // + delivery challan (C-20261102-CHALLAN)
+  const SETS = [["oName", "oMob", "oCity"], ["bname", "bmob", "bcity"], ["rname", "rmob", "rcity"], ["qname", "qmob", "qcity"], ["chname", "chmob", "chcity"], ["ogName", "ogMob", "ogCity"]]; // + delivery challan (C-20261102-CHALLAN), + OG register party (C-20261102-OGREG2)
   // C-20261102-BILLADDR: with a full mobile the server also returns the latest saved address; it fills only empty boxes
   const ADDR = { bmob: [["baddr", "addr"], ["barea", "area"], ["bstate", "state"], ["bpin", "pin"]], chmob: [["chaddr", "addr"], ["charea", "area"], ["chstate", "state"], ["chpin", "pin"]] }; // + Quote tab, both choices (C-20261017-QUOTEMODES)
   const $ = id => document.getElementById(id);
