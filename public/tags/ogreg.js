@@ -64,6 +64,7 @@
     $("ogAsOf").textContent = "As of " + (S.asOf ? S.asOf.slice(8, 10) + "-" + S.asOf.slice(5, 7) + "-" + S.asOf.slice(0, 4) + " " + S.asOf.slice(11) : new Date().toLocaleString("en-IN")) + (J.next ? " · next OG no.: " + J.next : "");
   }
   function kList() { const dl = $("ogKdl"); if (!dl || !J) return; dl.textContent = ""; (J.karigars || []).forEach(k => dl.appendChild(el("option", { value: k })));
+    kSel(); /* C-20261102-OGKARIGAR: issue drop-down = the server's list (Montu, Badshah, Hiru, Priyank + names admin added); "+ new karigar" for admin only */
     const vd = $("ogVdl"); if (vd) { vd.textContent = ""; (J.vendors || []).forEach(v => vd.appendChild(el("option", { value: v }))); } }
   // ---------- inward form ----------
   /* 02/11 15:00 (owner): ONE flat "Gold from:" drop-down - party / stock (whole piece) / part (part of a piece) / own (plain fine) / vendor (purchased, C-20261102-OGVENDOR) */
@@ -168,13 +169,17 @@
     b.disabled = false;
   }
   // ---------- outward form ----------
+  function kSel(cur) { const s = $("ogOKSel"); if (!s || !J) return; const v = cur != null ? cur : s.value; s.textContent = ""; s.appendChild(el("option", { value: "", textContent: "- pick the karigar -" }));
+    const l = (J.karigars || []).slice(); if (v && v !== "__new" && !l.includes(v)) l.push(v); /* an old issue keeps its old name when edited */ l.forEach(k => s.appendChild(el("option", { value: k, textContent: k })));
+    if (J.admin) s.appendChild(el("option", { value: "__new", textContent: "+ new karigar" })); s.value = l.includes(v) || (v === "__new" && J.admin) ? v : ""; kNew(); }
+  function kNew() { const n = $("ogOKSel").value === "__new"; $("ogOK").hidden = !n; if (!n) $("ogOK").value = $("ogOKSel").value; else if ((J.karigars || []).includes($("ogOK").value)) $("ogOK").value = ""; }
   function toSync() { const k = (document.querySelector("input[name=ogTo]:checked") || {}).value === "karigar"; $("ogKbox").hidden = !k; }
-  function oClear() { ["ogOOgs", "ogOFine", "ogOGross", "ogOK", "ogONote"].forEach(i => { $(i).value = ""; }); $("ogODate").value = today(); delete $("ogOSave").dataset.id; $("ogOSave").textContent = "Save issue"; }
-  function oFill(o) { oClear(); $("ogODate").value = o.date; $("ogOOgs").value = (o.ogs || []).join(", "); $("ogOFine").value = String(o.fine); $("ogOGross").value = o.gross ? String(o.gross) : ""; $("ogOK").value = o.karigar || ""; $("ogONote").value = o.note || "";
+  function oClear() { ["ogOOgs", "ogOFine", "ogOGross", "ogOK", "ogONote"].forEach(i => { $(i).value = ""; }); kSel(""); $("ogODate").value = today(); delete $("ogOSave").dataset.id; $("ogOSave").textContent = "Save issue"; }
+  function oFill(o) { oClear(); $("ogODate").value = o.date; $("ogOOgs").value = (o.ogs || []).join(", "); $("ogOFine").value = String(o.fine); $("ogOGross").value = o.gross ? String(o.gross) : ""; kSel(o.karigar || ""); $("ogOK").value = o.karigar || ""; $("ogONote").value = o.note || "";
     document.querySelectorAll("input[name=ogTo]").forEach(x => { x.checked = x.value === o.to; }); toSync(); $("ogOSave").dataset.id = o.id; $("ogOSave").textContent = "Update issue"; $("ogOutForm").hidden = false; window.scrollTo({ top: $("ogOutForm").offsetTop - 10, behavior: "smooth" }); }
   async function oSave() { const m = $("ogOMsg"), b = $("ogOSave"), to = (document.querySelector("input[name=ogTo]:checked") || {}).value;
-    const body = { op: "out", id: b.dataset.id || "", date: $("ogODate").value, ogs: $("ogOOgs").value.trim(), fine: $("ogOFine").value.trim().replace(/[^0-9.]/g, ""), gross: $("ogOGross").value.trim().replace(/[^0-9.]/g, ""), to, karigar: $("ogOK").value.trim(), note: $("ogONote").value.trim() };
-    if (!(num(body.fine) > 0)) { m.textContent = "Type the fine grams."; return; } if (!to) { m.textContent = "Issued to a karigar or moved to our stock?"; return; } if (to === "karigar" && !body.karigar) { m.textContent = "Pick or type the karigar."; return; }
+    const body = { op: "out", id: b.dataset.id || "", date: $("ogODate").value, ogs: $("ogOOgs").value.trim(), fine: $("ogOFine").value.trim().replace(/[^0-9.]/g, ""), gross: $("ogOGross").value.trim().replace(/[^0-9.]/g, ""), to, karigar: ($("ogOKSel").value === "__new" ? $("ogOK").value : $("ogOKSel").value).trim(), note: $("ogONote").value.trim() };
+    if (!(num(body.fine) > 0)) { m.textContent = "Type the fine grams."; return; } if (!to) { m.textContent = "Issued to a karigar or moved to our stock?"; return; } if (to === "karigar" && !body.karigar) { m.textContent = $("ogOKSel").value === "__new" ? "Type the new karigar's name." : "Pick the karigar."; return; }
     b.disabled = true; m.textContent = "Saving…";
     try { await post(body); const ok = "Saved: " + g3(body.fine) + " fine " + (to === "karigar" ? "issued to " + body.karigar : "moved to our stock") + "."; m.textContent = ok; $("ogMsg").textContent = ok; oClear(); $("ogOutForm").hidden = true; view = "out"; await load(); } /* 02/11: the message box is inside the form, which closes on save - also show it above the list */
     catch (e) { m.textContent = "Not saved: " + (e.message || e) + "."; } b.disabled = false; }
@@ -304,7 +309,7 @@
     const outForm = el("div", { id: "ogOutForm", className: "ogbox", hidden: true }, [el("h3", { textContent: "Old gold OUT (issue)" }),
       el("div", { className: "row" }, [lab("Date", inp("ogODate", "", { type: "date", value: today() })), lab("OG no(s) - blank = from OG pool", inp("ogOOgs", "e.g. 151, 152", { maxLength: 200 })), lab("Fine g", inp("ogOFine", "e.g. 25.000", { maxLength: 10, inputMode: "decimal" })), lab("Gross g (if known)", inp("ogOGross", "", { maxLength: 10, inputMode: "decimal" }))]),
       el("div", { className: "row", style: "align-items:center" }, [radio("ogTo", "karigar", "Issued to KARIGAR", true), radio("ogTo", "stock", "Moved to our stock (refined / kept as fine)"),
-        el("label", { id: "ogKbox" }, ["Karigar (pick or type a new name) ", Object.assign(inp("ogOK", "e.g. Montu", { maxLength: 40 }), {})]), el("datalist", { id: "ogKdl" })]),
+        el("label", { id: "ogKbox" }, ["Karigar ", el("select", { id: "ogOKSel" }), Object.assign(inp("ogOK", "new karigar's name", { maxLength: 40 }), { hidden: true })]), el("datalist", { id: "ogKdl" })]),
       el("div", { className: "row" }, [lab("Note (optional)", inp("ogONote", "", { maxLength: 120 }), "flex:2 1 300px")]),
       el("div", { className: "actions" }, [el("button", { type: "button", className: "btn", id: "ogOSave", textContent: "Save issue" }), el("button", { type: "button", className: "btn ghost", id: "ogOClear", textContent: "Clear" })]), el("p", { className: "hint", id: "ogOMsg" })]);
     const tabs = el("div", { className: "ogtabs", id: "ogTabs" }, [["in", "Inward list"], ["out", "Outward list"], ["dia", "Diamonds to get back"]].map(([v, t]) => { const x = el("button", { type: "button", className: "btn ghost", textContent: t }); x.dataset.v = v; x.addEventListener("click", () => { view = v; render(); }); return x; }));
@@ -316,7 +321,7 @@
       el("div", { className: "row", style: "align-items:center" }, [lab("Search", inp("ogQ", "OG no., party, mobile, karigar, tag", { maxLength: 40 })), lab("Month", inp("ogLMon", "", { type: "month" }), "flex:0 0 auto"),
         el("label", { id: "ogFreeL", style: "flex:0 0 auto;flex-direction:row;align-items:center;gap:6px" }, [el("input", { type: "checkbox", id: "ogFree" }), "Only free OGs (party, not on a bill)"])]),
       el("div", { id: "ogList" }));
-    rates.parentNode.insertBefore(sec, rates); $("ogOK").setAttribute("list", "ogKdl");
+    rates.parentNode.insertBefore(sec, rates); $("ogOKSel").addEventListener("change", kNew);
     $("ogSave").addEventListener("click", save); $("ogClear").addEventListener("click", () => { clear(); $("ogMsg").textContent = ""; });
     $("ogOSave").addEventListener("click", oSave); $("ogOClear").addEventListener("click", () => { oClear(); $("ogOMsg").textContent = ""; });
     $("ogAddIn").addEventListener("click", () => { const f = $("ogInForm"); f.hidden = !f.hidden; if (!f.hidden && !$("ogNo").dataset.edit) clear(); });
