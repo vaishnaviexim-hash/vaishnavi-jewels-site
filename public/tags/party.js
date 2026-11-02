@@ -4,7 +4,7 @@
    by the mobile lookup, a picked name fills all three. */
 (function () {
   "use strict";
-  const SETS = [["oName", "oMob", "oCity"], ["bname", "bmob", "bcity"], ["rname", "rmob", "rcity"], ["qname", "qmob", "qcity"], ["chname", "chmob", "chcity"], ["ogName", "ogMob", "ogCity"]]; // + delivery challan (C-20261102-CHALLAN), + OG register party (C-20261102-OGREG2)
+  const SETS = [["oName", "oMob", "oCity"], ["bname", "bmob", "bcity"], ["rname", "rmob", "rcity"], ["qname", "qmob", "qcity"], ["chname", "chmob", "chcity"], ["ogName", "ogMob", "ogCity"], ["koName", "koMob", "koCity"]]; // + delivery challan (C-20261102-CHALLAN), + OG register party (C-20261102-OGREG2)
   // C-20261102-BILLADDR: with a full mobile the server also returns the latest saved address; it fills only empty boxes
   const ADDR = { bmob: [["baddr", "addr"], ["barea", "area"], ["bstate", "state"], ["bpin", "pin"]], chmob: [["chaddr", "addr"], ["charea", "area"], ["chstate", "state"], ["chpin", "pin"]] }; // + Quote tab, both choices (C-20261017-QUOTEMODES)
   const $ = id => document.getElementById(id);
@@ -13,7 +13,7 @@
   const fire = el => el.dispatchEvent(new Event("input", { bubbles: true }));
   const setOf = id => SETS.find(s => s.includes(id));
   // C-20261102-ADDRBOOK: on Bill and Delivery challan the address book (/api/vj/addrbook: Client_Addresses sheet + saved bills / challans) is asked too
-  const OG = set => set[1] === "ogMob"; // C-20261102-OGPARTY (owner 15:26): OG register - address book + bills + earlier OGs, one row per mobile, full number + last bill
+  const OG = set => set[1] === "ogMob" || set[1] === "koMob"; /* + Karigar order (C-20261102-KORDER) */ // C-20261102-OGPARTY (owner 15:26): OG register - address book + bills + earlier OGs, one row per mobile, full number + last bill
   const dmy = d => String(d || "").slice(0, 10).split("-").reverse().join("-");
   async function look(q, ab, og) { const n = ++seq; const get = async u => { try { const r = await fetch(u, { credentials: "same-origin", cache: "no-store" }); const j = await r.json(); return r.ok ? j : null; } catch (e) { return null; } };
     const [j, k] = await Promise.all([get("/api/vj/parties?q=" + encodeURIComponent(q)), ab ? get("/api/vj/addrbook?q=" + encodeURIComponent(q)) : null]); if (n !== seq || (!j && !k)) return null;
