@@ -3009,6 +3009,265 @@ async function vjAddrBook(url, env, who) {
   return vjJson({ ok: true, entries: rows.slice(0, 8).map(r => ({ name: r.name, mobile: r.mobile, addr: r.addr, area: r.area, city: r.city, state: r.state, pin: r.pin })) });
 }
 
+// ---------------------------------------------------------------------------------------------
+// Enquiries follow-up (owner Abhinav 02/11/2026 22:57 + 22:58 + 23:00, C-20261102-ENQTAB / C-20261102-ENQREMIND).
+// Every WhatsApp enquiry Aashvi logs in VJ_Marketing_Engine > Enquiries is listed on VJ Tags > Enquiries so the team follows each one up,
+// notes what was done and closes it. The sheet is read through the existing gold relay (VJ_GOLD_HOOK + ?want=enquiries, same secret URL,
+// Make 7952405) at most every 5 minutes; follow-ups live in D1 (vj_enq_followup, history only, never deleted) and D1 is the source of
+// truth for the status. Every change is copied to the sheet row(s) (I status, L visit booked, M visited, N quote, O bought, P lost
+// reason - never J / K, which Aashvi writes) through the same relay (?want=enqset, row checked against its number by Make).
+// One enquiry = one customer number; a closed enquiry (Bought / Not interested / Not relevant / Closed) leaves the main list and comes
+// back as a NEW enquiry only when the customer writes again later. A VJ Tags Bill to the same mobile (last 10 digits) marks it Bought.
+// Sales logins see the list without numbers and cannot change anything. The WhatsApp button only opens WhatsApp on the user's own phone
+// with a ready message (wa.me) - nothing is sent from here.
+const VJ_ENQ_ST = ['New', 'Messaged', 'Called', 'Visit booked', 'Visited', 'Quote', 'Bought', 'Not interested', 'Not relevant', 'Closed'];
+const VJ_ENQ_CLOSED = new Set(['Bought', 'Not interested', 'Not relevant', 'Closed']);
+const VJ_ENQ_TEAM = new Set(['7567400099', '9374050969', '9099763201']); // owners / Mihir testing Aashvi - not enquiries
+const VJ_ENQ_HOOK = 'https://hook.eu1.make.com/s5gudt23wsigqws6v3t11vi7rl6wojug'; // Make hook 4026811 (scenario 8333273, sends to Abhinav only): gets only a one-time token
+let vjEnqOk = false, vjEnqMem = null;
+async function vjEnqT(env) {
+  if (vjEnqOk) return;
+  await env.DB.batch([env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_enq_followup (id INTEGER PRIMARY KEY AUTOINCREMENT, number TEXT, enquiry_date TEXT, status TEXT, next_followup_date TEXT, note TEXT, amount INTEGER, bill_no TEXT, kind TEXT, "by" TEXT, by_name TEXT, at INTEGER)'),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS vj_enq_followup_num ON vj_enq_followup (number)'),
+    env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_meta (k TEXT PRIMARY KEY, v TEXT)')]);
+  vjEnqOk = true;
+}
+const vjEnqIst = (ms) => new Date((ms || Date.now()) + 5.5 * 3600e3).toISOString();
+const vjEnqKey = d => { const g = String(d || '').replace(/\D/g, ''); return g.length >= 10 ? g.slice(-10) : 'h:' + String(d || '').trim().toLowerCase().slice(0, 40); };
+const vjEnqWa = d => { const s = String(d || '').trim(), g = s.replace(/\D/g, ''); if (g.length < 10) return ''; if (g.length === 10) return /^[6-9]/.test(g) ? '91' + g : ''; if (/^91\d{10}$/.test(g)) return g; return s.startsWith('+') || g.length > 11 ? g.slice(0, 15) : ''; };
+const vjEnqChan = (b, q) => { const s = (String(b || '') + ' ' + String(q || '')).toLowerCase(); return /meta|facebook|instagram|fb ad|ig ad/.test(s) ? 'Meta ad' : /google/.test(s) ? 'Google ad' : /website|site/.test(s) ? 'Website' : /broadcast/.test(s) ? 'Broadcast' : 'Direct'; };
+// sheet rows (cached 5 min in D1 so every server copy shares one pull)
+async function vjEnqSheet(env, force) {
+  await vjEnqT(env);
+  if (!force && vjEnqMem && Date.now() - vjEnqMem.at < 5 * 60e3) return vjEnqMem;
+  const st = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'enq-sheet'").first(); let c = null; try { c = st ? JSON.parse(st.v) : null; } catch (e) {}
+  if (!force && c && Date.now() - c.at < 5 * 60e3) { vjEnqMem = c; return c; }
+  if (env.VJ_GOLD_HOOK && /^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_GOLD_HOOK)) try {
+    const r = await fetch(env.VJ_GOLD_HOOK + '?want=enquiries', { signal: AbortSignal.timeout(15000) }), t = await r.text(); let j = null; try { j = JSON.parse(t); } catch (e) {}
+    if (r.ok && j && Array.isArray(j.rows)) {
+      c = { at: Date.now(), ok: true, rows: j.rows.filter(x => Array.isArray(x) && Number.isInteger(x[0]) && x[0] >= 2).slice(0, 6000).map(x => x.slice(0, 18).map((v, i) => i === 0 ? v : String(v == null ? '' : v).slice(0, i === 6 ? 700 : i === 10 ? 400 : 120))) };
+      await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('enq-sheet', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(c)).run();
+    } else if (c) c.ok = false;
+  } catch (e) { if (c) c.ok = false; }
+  vjEnqMem = c || { at: Date.now() - 4 * 60e3, ok: false, rows: [] };
+  return vjEnqMem;
+}
+const vjEnqSheetSt = s => { const x = String(s || '').trim().toLowerCase(); return !x ? '' : /bought/.test(x) ? 'Bought' : /not interested/.test(x) ? 'Not interested' : /visited/.test(x) ? 'Visited' : /called/.test(x) ? 'Called' : ''; };
+// Builds every enquiry (one per number) from the sheet rows + the D1 history. Returns { list, rows by key }.
+function vjEnqBuild(sheetRows, hist) {
+  const by = new Map();
+  for (const x of sheetRows) {
+    const [row, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q] = x; const key = vjEnqKey(D || C); if (!D && !C) continue;
+    if (VJ_ENQ_TEAM.has(key) || /^test/i.test(String(C))) continue;
+    const t = vjAbTime(A) || vjAbTime(K) || 0;
+    if (!by.has(key)) by.set(key, { key, rows: [], hist: [] });
+    by.get(key).rows.push({ row, t, A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q });
+  }
+  for (const h of hist) { const e = by.get(h.number); if (e) e.hist.push(h); }
+  const out = [];
+  for (const e of by.values()) {
+    e.rows.sort((a, b) => a.t - b.t || a.row - b.row); e.hist.sort((a, b) => a.at - b.at || a.id - b.id);
+    // walk messages + follow-ups in time order; a message after a closed state opens a new episode
+    const ev = e.rows.map(r => ({ t: r.t, m: r })).concat(e.hist.map(h => ({ t: h.at, h }))).sort((a, b) => a.t - b.t || (a.m ? -1 : 1));
+    let s = null; const eps = [];
+    for (const x of ev) {
+      if (x.m) {
+        if (!s || VJ_ENQ_CLOSED.has(s.status)) { if (s) eps.push(s); s = { start: x.t, rows: [], hist: [], status: 'New', next: '', visitBooked: '', visited: '', quote: 0, bought: 0, billNo: '', lost: '', closedAt: 0, closedBy: '' };
+          if (!eps.length) { const ss = vjEnqSheetSt(x.m.I); if (ss) s.status = ss; } }
+        s.rows.push(x.m);
+      } else if (s) {
+        const h = x.h; s.hist.push(h);
+        if (h.status && VJ_ENQ_ST.includes(h.status)) {
+          s.status = h.status;
+          if (h.status === 'Visit booked') s.visitBooked = h.next_followup_date || s.visitBooked;
+          if (h.status === 'Visited') s.visited = vjEnqIst(h.at).slice(0, 10);
+          if (h.status === 'Quote' && h.amount) s.quote = h.amount;
+          if (h.status === 'Bought') { s.bought = h.amount || s.bought; s.billNo = h.bill_no || s.billNo; }
+          if (h.status === 'Not interested' || h.status === 'Not relevant' || h.status === 'Closed') s.lost = h.note || h.status;
+          s.closedAt = VJ_ENQ_CLOSED.has(h.status) ? h.at : 0; s.closedBy = VJ_ENQ_CLOSED.has(h.status) ? (h.by_name || h.by) : '';
+        }
+        if (h.next_followup_date !== null && h.next_followup_date !== undefined) s.next = VJ_ENQ_CLOSED.has(s.status) ? '' : h.next_followup_date;
+      }
+    }
+    if (!s) continue; eps.push(s);
+    const cur = eps[eps.length - 1], first = cur.rows[0], last = cur.rows[cur.rows.length - 1];
+    out.push({ key: e.key, id: 'r' + e.rows[0].row, ep: cur, earlier: eps.slice(0, -1), first, last, allRows: e.rows, allHist: e.hist });
+  }
+  return out;
+}
+async function vjEnqLoad(env, force) {
+  const sh = await vjEnqSheet(env, force);
+  const hist = ((await env.DB.prepare('SELECT * FROM vj_enq_followup ORDER BY id').all()).results) || [];
+  let list = vjEnqBuild(sh.rows || [], hist);
+  // auto "Bought": a VJ Tags Bill (not cancelled) to the same mobile on or after the enquiry date
+  if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
+  const bills = ((((await env.DB.prepare("SELECT data FROM vj_bills WHERE no LIKE 'B-%'").all()).results) || []).map(vjParse)).filter(b => b && !b.cancelled && b.title === 'Bill' && /^\d{10}$/.test(String(b.mobile || '').replace(/\D/g, '').slice(-10)));
+  const done = new Set(hist.filter(h => h.kind === 'auto-bill' && h.bill_no).map(h => h.number + '|' + h.bill_no)), adds = [];
+  for (const q of list) {
+    if (q.key.startsWith('h:') || q.ep.status === 'Bought') continue;
+    const start = vjEnqIst(q.ep.start).slice(0, 10);
+    const b = bills.filter(b => String(b.mobile).replace(/\D/g, '').slice(-10) === q.key && String(b.date || '') >= start && !done.has(q.key + '|' + b.no)).sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+    if (b) adds.push(env.DB.prepare('INSERT INTO vj_enq_followup (number, enquiry_date, status, next_followup_date, note, amount, bill_no, kind, "by", by_name, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(q.key, start, 'Bought', '', 'Bill ' + b.no + ' made in VJ Tags', Math.round(Number(b.total) || 0), String(b.no), 'auto-bill', 'vj-tags', 'VJ Tags bill', Date.now()));
+  }
+  if (adds.length) {
+    await env.DB.batch(adds.slice(0, 50));
+    const h2 = ((await env.DB.prepare('SELECT * FROM vj_enq_followup ORDER BY id').all()).results) || [];
+    list = vjEnqBuild(sh.rows || [], h2); list.autoBought = list.filter(q => q.ep.status === 'Bought' && q.ep.hist.some(h => h.kind === 'auto-bill' && Date.now() - h.at < 60e3));
+  }
+  return { list, sheetAt: sh.at, sheetOk: sh.ok !== false };
+}
+// copy the status of one enquiry to its sheet row(s) - never J / K
+function vjEnqPush(env, ctx, q) {
+  if (!env.VJ_GOLD_HOOK || !/^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_GOLD_HOOK) || !q || q.key.startsWith('h:')) return;
+  const dm = ymd => /^\d{4}-\d{2}-\d{2}$/.test(ymd || '') ? ymd.split('-').reverse().join('/') : '';
+  const e = q.ep, body = { rows: e.rows.map(r => r.row).slice(-10).join(','), num: q.key, I: e.status === 'New' ? '' : e.status, L: dm(e.visitBooked), M: dm(e.visited), N: e.quote ? String(e.quote) : '', O: e.bought ? String(e.bought) : '', P: e.lost ? String(e.lost).slice(0, 100) : '' };
+  const p = fetch(env.VJ_GOLD_HOOK + '?want=enqset', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(20000), body: JSON.stringify(body) }).catch(() => {});
+  if (ctx && ctx.waitUntil) ctx.waitUntil(p);
+}
+// Ready WhatsApp message to the customer (rule-based; opens on the user's own WhatsApp, nothing sent from here)
+function vjEnqMsg(q, sender) {
+  const e = q.ep, rowsTxt = e.rows.map(r => r.F).join('; '), cat = String(e.rows.map(r => r.E).filter(x => x && x !== 'Other').pop() || ''), all = (cat + '; ' + rowsTxt).toLowerCase();
+  const segs = String(rowsTxt).split(/;\s*/).filter(Boolean), lastSeg = (segs[segs.length - 1] || '').toLowerCase();
+  // name: first real word of the WhatsApp name (no handles, emails, numbers)
+  const words = String(q.last.C || '').replace(/[^\p{L}\s.'-]/gu, ' ').split(/\s+/).filter(Boolean).filter(w => !/^(mr|mrs|ms|dr|shri|smt|miss)\.?$/i.test(w));
+  let name = /[\d@_]/.test(String(q.last.C || '')) ? '' : (words[0] || '');
+  if (!/^[A-Za-z][A-Za-z'.-]{1,14}$/.test(name) || /^(retail|available|hotel|jewel|creation|collection|tech|foods|you|not|health|hello|hi|the|love|my|sir|madam|ok)$/i.test(name.replace(/s$/i, '')) || /^(retail|hotel|jewel)/i.test(name)) name = '';
+  else name = name[0].toUpperCase() + name.slice(1).toLowerCase();
+  // Hindi / Hinglish when Aashvi answered them that way
+  const hi = /[ऀ-ॿ]/.test(String(e.rows.map(r => r.J).join(' ') + q.last.C)) || /\b(aap|aapka|aapke|kya|hai|hain|hum|hamare|hamari|bahut|chahenge|karegi|karenge|dhanyavaad|shukriya|mein|ke baare|chahiye|batayein|chhe|tamne|amari|kevu)\b/i.test(String(q.last.J || ''));
+  // budget
+  let bud = ''; const bm = String(rowsTxt).match(/(?:₹|(?<![a-z])rs\.?)\s*\d[\d.,]*(?:\s*[–-]\s*\d[\d.,]*)?(?:\s*(?:lakhs?|lac|l|k|thousand)\b)?|\b\d[\d.]*(?:\s*[–-]\s*\d[\d.]*)?\s*(?:lakhs?|lac)\b/gi);
+  if (bm) { const m = bm[bm.length - 1].replace(/^(?:₹|rs\.?)\s*/i, '').replace(/\s+/g, ' ').trim(); bud = '₹' + m.replace(/[.,]$/, '').replace(/\s*\b(lac|lakhs|l)$/i, ' lakh').replace(/\s+lakh/i, ' lakh'); if (bud.length > 22) bud = ''; }
+  const occ = /bridal|wedding|shaadi|shadi|marriage|dulhan/.test(all) ? 'wedding' : /engagement|sagai/.test(all) ? 'engagement' : /anniversary/.test(all) ? 'anniversary' : /birthday/.test(all) ? 'birthday' : /gift/.test(all) ? 'gift' : '';
+  const lab = /lab[- ]?grown|\blgd\b|\bcvd\b/.test(all), polki = /polki/.test(all), sol = /solitaire|one[- ]carat|1[- ]?ct|\bcarat\b/.test(all);
+  const items = [['mangalsutra', 'mangalsutra'], ['necklace', 'necklace'], ['earring', 'earrings'], ['jhumka', 'earrings'], ['bangle', 'bangles'], ['kada', 'bangles'], ['bracelet', 'bracelet'], ['pendant', 'pendant'], ['nose pin', 'nose pin'], ['chain', 'chain'], ['ring', 'ring'], ['set', 'set']];
+  const pick = t => (items.find(([w]) => new RegExp('\\b' + w).test(t)) || [])[1] || '';
+  let item = pick(lastSeg) || pick(all); if (sol && (!item || item === 'ring')) item = 'solitaire ring';
+  const adj = item === 'solitaire ring' ? '' : lab ? 'lab-grown diamond ' : polki ? 'Polki ' : /diamond/.test(all) ? 'diamond ' : /gold/.test(all) ? 'gold ' : '';
+  const who = sender || 'Abhinav Agarwal', nm = name ? name + ' ji' : 'ji';
+  let m;
+  // owner 23:03: no designs / photos on WhatsApp - every message invites a call, a video call (pieces shown live) or a showroom visit
+  if (!hi) {
+    const open = 'Hi ' + nm + ", I'm " + who + ' from Vaishnavi Jewels, Surat.', ask = " Could we have a quick call? I'd be happy to show you the pieces on a video call at a time that suits you.";
+    if (occ === 'wedding') m = open + " Congratulations on the wedding! We'd love to help with the bridal " + (item && item !== 'set' ? item : 'set') + (bud ? ' around ' + bud : '') + ". Can we talk for a few minutes? I can show you our Polki and diamond bridal pieces on a video call, or you're welcome at our showroom at Parle Point.";
+    else if (lab && !item) m = open + " We have certified lab-grown diamond pieces with IGI reports. Could we discuss what you're looking for? I can show you the options live on a video call.";
+    else if (item) m = open + ' Thank you for your enquiry about ' + (/s$/.test(item) ? '' : /^[aeiou]/i.test(adj + item) ? 'an ' : 'a ') + adj + item + (occ ? ' for the ' + occ : '') + (bud ? ' around ' + bud : '') + ' - we have a lovely range' + (bud ? ' in that budget' : '') + (lab && !/natural/.test(all) ? ', certified with IGI reports' : sol ? ', with certified diamonds' : '') + ', and we can also make one to your own design.' + ask;
+    else if (polki) m = open + " Thank you for your interest in our Polki jewellery! Can we talk for a few minutes? I can show you our Polki pieces on a video call, or you're welcome at our showroom at Parle Point.";
+    else m = open + " Thank you for reaching out! Can we have a quick chat about what you're looking for? I'd be glad to show you pieces on a video call whenever convenient.";
+  } else {
+    const open = 'Namaste ' + nm + ', main ' + who + ', Vaishnavi Jewels, Surat se.', ask = ' Kya hum thodi baat kar sakte hain? Aapke suvidha ke samay video call par main aapko designs dikha sakta hoon.';
+    if (occ === 'wedding') m = open + ' Shaadi ki bahut badhai! Bridal ' + (item && item !== 'set' ? item : 'set') + (bud ? ' (' + bud + ' ke aas-paas)' : '') + ' mein hum aapki madad karna chahenge. Kya hum thodi baat kar sakte hain? Video call par main hamare Polki aur diamond bridal designs dikha sakta hoon, ya aap Parle Point showroom aa sakte hain.';
+    else if (lab && !item) m = open + ' Hamare paas IGI report ke saath certified lab-grown diamond jewellery hai.' + ask;
+    else if (item) m = open + ' Aapne ' + (bud ? bud + ' ke aas-paas ' : '') + adj + item + ' ke baare mein poocha tha - ' + (bud ? 'is budget mein ' : '') + 'hamare paas bahut sundar designs hain, aur hum aapki pasand ka design bana bhi sakte hain.' + ask;
+    else if (polki) m = open + ' Aapne Polki jewellery mein ruchi dikhayi, dhanyavaad!' + ask;
+    else m = open + ' Sampark karne ke liye dhanyavaad! Kya hum thodi baat kar sakte hain ki aap kya dhoondh rahe hain? Aapke suvidha ke samay video call par main aapko designs dikha sakta hoon.';
+  }
+  if (sender && sender !== 'Abhinav Agarwal' && sender !== 'Shilpi Agarwal') m = m.replace(/ main aapko designs dikha sakta hoon/g, ' hum aapko designs dikha sakte hain').replace(/ main hamare/g, ' hum hamare');
+  if (sender === 'Shilpi Agarwal') m = m.replace(/sakta hoon/g, 'sakti hoon');
+  return m.replace(/\s+/g, ' ').replace(/ - /g, ' — ').slice(0, 480);
+}
+const vjEnqSender = who => who.role === 'admin' ? (who.email === 'vaishnavijewels@gmail.com' ? 'Shilpi Agarwal' : 'Abhinav Agarwal') : (vjClean(who.name, 30).split(/[\s@]/)[0] || 'the Vaishnavi Jewels team');
+function vjEnqView(q, who, today) {
+  const e = q.ep, sales = who.role === 'sales', f = q.first, l = q.last;
+  const what = [...new Set(e.rows.map(r => String(r.F || '').split(/;\s*/).pop()).filter(Boolean))].slice(-3).join(' | ');
+  const v = { id: q.id, date: vjEnqIst(e.start).slice(0, 16).replace('T', ' '), last: vjEnqIst(l.t).slice(0, 16).replace('T', ' '), msgs: e.rows.length, channel: vjEnqChan(f.B, f.Q), chan: String(f.B || '').slice(0, 60), src: String(f.Q || '').slice(0, 80),
+    name: String(l.C || '').slice(0, 60), cat: String(e.rows.map(r => r.E).filter(x => x && x !== 'Other').pop() || l.E || ''), what: what.slice(0, 400), relevant: String(l.G || ''), urgent: String(l.H || ''),
+    reply: String(l.J || '').slice(0, 400), status: e.status, open: !VJ_ENQ_CLOSED.has(e.status), next: e.next || '', due: !VJ_ENQ_CLOSED.has(e.status) && e.next ? (e.next < today ? 'overdue' : e.next === today ? 'today' : '') : '',
+    quote: e.quote || 0, bought: e.bought || 0, billNo: e.billNo || '', lost: e.lost || '', closedBy: e.closedBy || '', closedAt: e.closedAt ? vjEnqIst(e.closedAt).slice(0, 10) : '',
+    notes: e.hist.map(h => ({ at: vjEnqIst(h.at).slice(0, 16).replace('T', ' '), by: h.by_name || h.by, status: h.status || '', next: h.next_followup_date || '', note: h.note || '', amount: h.amount || 0, bill: h.bill_no || '' })).slice(-30),
+    earlier: q.earlier.map(p => ({ from: vjEnqIst(p.start).slice(0, 10), status: p.status, closedAt: p.closedAt ? vjEnqIst(p.closedAt).slice(0, 10) : '' })).slice(-5) };
+  if (!sales) { const d = String(l.D || ''), wa = vjEnqWa(d); v.number = d.slice(0, 20); v.wa = wa; v.tel = wa ? '+' + wa : ''; v.msg = vjEnqMsg(q, vjEnqSender(who)); }
+  return v;
+}
+function vjEnqStats(list, now) {
+  const today = vjEnqIst(now).slice(0, 10), month = today.slice(0, 7), run = list.filter(q => !VJ_ENQ_CLOSED.has(q.ep.status));
+  const byCh = {}; run.forEach(q => { const c = vjEnqChan(q.first.B, q.first.Q); byCh[c] = (byCh[c] || 0) + 1; });
+  return { today, newToday: run.filter(q => vjEnqIst(q.ep.start).slice(0, 10) === today).length, new24: run.filter(q => now - q.ep.start <= 24 * 3600e3).length, open: run.length,
+    dueToday: run.filter(q => q.ep.next === today).length, overdue: run.filter(q => q.ep.next && q.ep.next < today).length, notStarted: run.filter(q => q.ep.status === 'New').length,
+    boughtMonth: list.filter(q => q.ep.status === 'Bought' && q.ep.closedAt && vjEnqIst(q.ep.closedAt).slice(0, 7) === month).length,
+    boughtMonthRs: list.filter(q => q.ep.status === 'Bought' && q.ep.closedAt && vjEnqIst(q.ep.closedAt).slice(0, 7) === month).reduce((a, q) => a + (q.ep.bought || 0), 0), byChannel: byCh };
+}
+async function vjEnqGet(url, env, who, ctx) {
+  if (!['admin', 'staff', 'sales'].includes(who.role)) return vjDeny(403, 'not allowed');
+  const { list, sheetAt, sheetOk } = await vjEnqLoad(env, url.searchParams.get('fresh') === '1' && who.role !== 'sales');
+  if (list.autoBought) list.autoBought.forEach(q => vjEnqPush(env, ctx, q));
+  const now = Date.now(), today = vjEnqIst(now).slice(0, 10), closed = url.searchParams.get('closed') === '1';
+  const pick = list.filter(q => closed ? VJ_ENQ_CLOSED.has(q.ep.status) : !VJ_ENQ_CLOSED.has(q.ep.status));
+  pick.sort((a, b) => closed ? (b.ep.closedAt - a.ep.closedAt) : (b.ep.start - a.ep.start));
+  const views = pick.slice(0, 1000).map(q => vjEnqView(q, who, today));
+  if (url.pathname === '/api/vj/enquiries.xlsx') {
+    const rows = views.map(v => [v.date, v.channel + (v.chan && v.chan !== v.channel ? ' (' + v.chan + ')' : ''), v.name, v.number || '(hidden)', v.cat, v.what, v.relevant, v.status, v.next ? vjDmy(v.next) : '', v.notes.length ? v.notes[v.notes.length - 1].note : '', v.reply, v.quote || '', v.bought || '', v.billNo, v.lost,
+      v.notes.map(n => n.at + ' ' + n.by + ': ' + [n.status, n.next ? 'next ' + vjDmy(n.next) : '', n.amount ? 'Rs ' + n.amount : '', n.note].filter(Boolean).join(', ')).join(' | ').slice(0, 3000)]);
+    const xlsx = vjXlsx([{ name: closed ? 'Closed enquiries' : 'Running enquiries', land: true, head: ['First message', 'Channel', 'Name', 'Number', 'Category', 'What they want', 'Relevant?', 'Status', 'Next follow-up', 'Last note', "Aashvi's last reply", 'Quote Rs', 'Bought Rs', 'Bill no.', 'Lost reason', 'History'], rows,
+      widths: [16, 18, 20, 16, 14, 40, 10, 13, 13, 30, 40, 11, 11, 11, 20, 60], wrap: [5, 9, 10, 15], mark: r => r[8] && r[7] !== 'Bought' && String(r[8]).split('-').reverse().join('-') < today }]);
+    const bin = atob(xlsx), out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    await vjAudit(env, who, 'enquiries-xlsx', 'enquiries/', views.length + ' rows');
+    return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_Enquiries_' + today + '.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
+  }
+  return vjJson({ ok: true, enquiries: views, stats: vjEnqStats(list, now), statuses: VJ_ENQ_ST, sheetAt, sheetOk, canEdit: who.role === 'admin' || who.role === 'staff', canReopen: who.role === 'admin' });
+}
+async function vjEnqSave(request, env, who, ctx) {
+  if (who.role !== 'admin' && who.role !== 'staff') return vjDeny(403, 'only Abhinav, Shilpiji or staff can change an enquiry');
+  if (Number(request.headers.get('content-length') || 0) > 8000) return vjDeny(413, 'too large');
+  let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+  const id = String(b && b.id || ''); if (!/^r\d{1,6}$/.test(id)) return vjDeny(400, 'bad enquiry');
+  const op = ['status', 'note', 'messaged', 'reopen'].includes(b.op) ? b.op : ''; if (!op) return vjDeny(400, 'bad request');
+  const { list } = await vjEnqLoad(env); const q = list.find(x => x.id === id); if (!q) return vjDeny(404, 'enquiry not found - reload');
+  const today = vjEnqIst().slice(0, 10), isClosed = VJ_ENQ_CLOSED.has(q.ep.status);
+  const ymd = v => v === '' || v == null ? '' : /^\d{4}-\d{2}-\d{2}$/.test(String(v)) && String(v) >= '2026-01-01' && String(v) <= '2030-12-31' ? String(v) : null;
+  let status = null, next = null, note = vjClean(b.note, 300), amount = null, bill = '';
+  if (op === 'reopen') { if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji can reopen'); if (!isClosed) return vjDeny(409, 'already running'); status = VJ_ENQ_ST.includes(b.status) && !VJ_ENQ_CLOSED.has(b.status) ? b.status : 'Called'; next = ymd(b.next) || today; note = note || 'Reopened'; }
+  else {
+    if (isClosed) return vjDeny(409, 'this enquiry is closed - reopen it first');
+    if (op === 'messaged') { status = q.ep.status === 'New' ? 'Messaged' : null; next = ymd(b.next) || vjAddDays(today, 2); note = ('Messaged ✓ ' + vjDmy(today) + (note ? ' - ' + note : '')).slice(0, 300); }
+    else if (op === 'note') { if (!note) return vjDeny(400, 'write the note'); if (b.next !== undefined) { next = ymd(b.next); if (next === null) return vjDeny(400, 'bad follow-up date'); } }
+    else { // status
+      if (!VJ_ENQ_ST.includes(b.status) || b.status === 'New') return vjDeny(400, 'choose a status'); status = b.status;
+      if (b.next !== undefined) { next = ymd(b.next); if (next === null) return vjDeny(400, 'bad follow-up date'); }
+      if (VJ_ENQ_CLOSED.has(status)) next = '';
+      if (status === 'Visit booked' && !next) return vjDeny(400, 'give the visit date');
+      if (status === 'Bought' || status === 'Quote') { amount = vjNum(b.amount, 0, 100000000, 0); if (amount === null || (status === 'Bought' && !(amount > 0))) return vjDeny(400, 'give the amount in Rs'); }
+      if (status === 'Bought') bill = vjClean(b.billNo, 20).toUpperCase().replace(/[^A-Z0-9\-\/]/g, '');
+      if ((status === 'Not interested' || status === 'Not relevant' || status === 'Closed') && !note) note = status;
+    }
+  }
+  await env.DB.prepare('INSERT INTO vj_enq_followup (number, enquiry_date, status, next_followup_date, note, amount, bill_no, kind, "by", by_name, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .bind(q.key, vjEnqIst(q.ep.start).slice(0, 10), status, next, note, amount, bill, op, who.email, who.role === 'admin' ? (who.email === 'vaishnavijewels@gmail.com' ? 'Shilpiji' : 'Abhinav') : vjClean(who.name, 40), Date.now()).run();
+  await vjAudit(env, who, 'enquiry-' + op, 'enquiries/' + id, [status, next, amount, note].filter(x => x !== null && x !== '').join(' | '));
+  const r2 = await vjEnqLoad(env), q2 = r2.list.find(x => x.id === id);
+  if (status !== null || op === 'reopen') vjEnqPush(env, ctx, q2);
+  return vjJson({ ok: true, enquiry: q2 ? vjEnqView(q2, who, today) : null, stats: vjEnqStats(r2.list, Date.now()) });
+}
+// 11:40 IST reminder to Abhinav only (owner-requested exception to the no-daytime-message rule). A Make schedule rings
+// GET /hooks/vj-enqbell (no data, no secret). Works only 11:25-12:59 IST and once per day, so a stranger ringing it can at most make
+// the owner's own reminder come a little early. Counts only (no names / numbers) go out under a one-time token; skipped when all are 0.
+async function vjEnqBell(env) {
+  if (!env.DB) return reply('not set up', 503);
+  const ist = vjEnqIst(), ymd = ist.slice(0, 10), hm = ist.slice(11, 16);
+  if (hm < '11:25' || hm > '12:59') return reply('not now', 200);
+  await vjEnqT(env);
+  const key = 'enqbell:' + ymd, claim = await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO NOTHING').bind(key, new Date().toISOString()).run();
+  if (!claim.meta || claim.meta.changes !== 1) return reply('already done today', 200);
+  const { list, sheetOk } = await vjEnqLoad(env, true), s = vjEnqStats(list, Date.now());
+  if (!sheetOk) { await env.DB.prepare('DELETE FROM vj_meta WHERE k = ?').bind(key).run(); return reply('sheet not read', 502); }
+  if (!s.new24 && !s.dueToday && !s.overdue) return reply('nothing to remind', 200);
+  const text = `Enquiries: ${s.new24} new since yesterday, ${s.dueToday} follow-up${s.dueToday === 1 ? '' : 's'} due today, ${s.overdue} overdue. Open: vaishnavijewels.com/tags → Enquiries`;
+  const token = [...crypto.getRandomValues(new Uint8Array(16))].map(x => x.toString(16).padStart(2, '0')).join('');
+  await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('enqdue:' + token, JSON.stringify({ text, at: Date.now() })).run();
+  try { const r = await fetch(VJ_ENQ_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(20000), body: JSON.stringify({ token }) }); if (!r.ok) throw new Error('hook ' + r.status); }
+  catch (e) { await env.DB.batch([env.DB.prepare('DELETE FROM vj_meta WHERE k = ?').bind(key), env.DB.prepare('DELETE FROM vj_meta WHERE k = ?').bind('enqdue:' + token)]); return reply('failed', 502); }
+  return reply('sent', 200);
+}
+async function vjEnqDue(url, env) {
+  const t = String(url.searchParams.get('t') || ''); if (!/^[a-f0-9]{32}$/.test(t)) return reply('not found', 404);
+  await vjEnqT(env);
+  const r = await env.DB.prepare('SELECT v FROM vj_meta WHERE k = ?').bind('enqdue:' + t).first(); if (!r) return reply('gone', 410);
+  const del = await env.DB.prepare('DELETE FROM vj_meta WHERE k = ? AND v = ?').bind('enqdue:' + t, r.v).run(); if (!del.meta || del.meta.changes !== 1) return reply('gone', 410);
+  const s = JSON.parse(r.v); if (Date.now() - s.at > 3600e3) return reply('gone', 410);
+  return vjJson({ text: s.text });
+}
+
 // Customer recall (owner 17/10/2026 17:04, C-20261017-PARTY): type a mobile number or part of a name on New tag (order), Bill or
 // Ledger receipt and get the party's name, mobile and city from earlier bills, estimates, receipts, quotes and order tags.
 // Read-only, logged-in users only, at most 8 matches, nothing else about the customer is returned.
@@ -3634,6 +3893,8 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/parties' && request.method === 'GET') return vjParties(url, env, who); // C-20261017-PARTY
   if ((p === '/api/vj/challans' || p === '/api/vj/challan') && request.method === 'GET') return vjChallanGet(url, env, who); // C-20261102-CHALLAN
   if (p === '/api/vj/addrbook' && request.method === 'GET') return vjAddrBook(url, env, who); // C-20261102-ADDRBOOK
+  if ((p === '/api/vj/enquiries' || p === '/api/vj/enquiries.xlsx') && request.method === 'GET') return vjEnqGet(url, env, who, ctx); // C-20261102-ENQTAB
+  if (p === '/api/vj/enquiry' && request.method === 'POST') return vjSameSite(request, env) ? vjEnqSave(request, env, who, ctx) : vjDeny(403, 'not allowed'); // C-20261102-ENQTAB
   if ((p === '/api/vj/challan' || p === '/api/vj/challan/cancel') && request.method === 'POST') { if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed'); return p === '/api/vj/challan' ? vjChallanSave(request, env, who) : vjChallanCancel(request, env, who); }
   if (['/api/vj/receipt', '/api/vj/receipt/reverse', '/api/vj/ledger/settle', '/api/vj/ledger/unsettle'].includes(p) && request.method === 'POST') {
     if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed');
@@ -3710,6 +3971,7 @@ export default {
     if (p === '/hooks/rfid-demo') return (url.hostname === VJ_HOST || env.VJ_DEV === '1') ? vjRfidDemo(request, env, url) : reply('Not found', 404); // C-20261029-RFIDLIVE
     if (p === '/hooks/vj-reviewbell' || p === '/hooks/vj-reviewdue' || p === '/hooks/vj-reviewimg') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-reviewbell' ? vjReviewBell(url, env) : p === '/hooks/vj-reviewdue' ? vjReviewDue(url, env) : vjReviewImg(url, env)) : reply('Method not allowed', 405); // C-20261102-REVIEWASK
     if (p.startsWith('/r/')) return vjReviewClick(request, env, ctx, url); // C-20261102-REVIEWASK: tracked review button -> Google
+    if (p === '/hooks/vj-enqbell' || p === '/hooks/vj-enqdue') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-enqbell' ? vjEnqBell(env) : vjEnqDue(url, env)) : reply('Method not allowed', 405); // C-20261102-ENQREMIND
     if (p === '/hooks/vj-estdue') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjEstDue(url, env) : reply('Method not allowed', 405);
     if (p === '/hooks/vj-daily') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjDailyReport(env) : reply('Method not allowed', 405);
     if (p === '/hooks/vj-backup' || p === '/hooks/vj-backupfile') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-backup' ? vjBackup(env) : vjBackupFile(url, env)) : reply('Method not allowed', 405); // C-20261017-TAGSBACKUP
