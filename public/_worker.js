@@ -1386,7 +1386,7 @@ async function vjContactHook(url, env) {
 // straight on to Google's write-review page (unknown / old tokens go there too, so nobody ever sees an error).
 // The header photo is the piece's own tag photo (jpg/png) through /hooks/vj-reviewimg?t=<random> for 3 days, otherwise the brand image.
 const VJ_RV_HOOK = 'https://hook.eu1.make.com/1rdirr1j8xtk4ifnvvnuk1fbzhnys7ro'; // Make hook 4022375 (S-REVIEWASK sender)
-const VJ_RV_LINK = 'https://search.google.com/local/writereview?placeid=ChIJa5MF_XNS4DsR72RsaVArQ7w';
+const VJ_RV_LINK = 'https://g.page/r/Ce9kbGlQK0O8EBE/review'; // owner 02/11 14:27: official GBP review link (opens the Google Maps app where the customer is signed in); was search.google.com/local/writereview?placeid=ChIJa5MF_XNS4DsR72RsaVArQ7w
 const VJ_RV_BRAND = 'https://res.cloudinary.com/rknejib2/image/fetch/e_trim/h_380,c_scale/c_pad,w_1200,h_500,b_rgb:FAF5EB/c_pad,w_1200,h_628,g_north,b_rgb:FAF5EB/l_text:Times_44_italic:Thank%20you%20for%20choosing%20Vaishnavi%20Jewels,co_rgb:6E5028,g_south,y_50/f_jpg,q_85/https://vaishnavijewels.com/logo_vaishnavi_jewels.png';
 let vjRvOk = false;
 async function vjRvT(env) { if (vjRvOk) return; await env.DB.batch([
