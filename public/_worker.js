@@ -1375,6 +1375,101 @@ async function vjContactHook(url, env) {
   const s = JSON.parse(r.v); if (Date.now() - s.at > 3600e3) return reply('gone', 410);
   return vjJson({ name: s.name, phone: s.phone, city: s.city, type: s.type, src: s.src });
 }
+// ---------------------------------------------------------------------------------------------
+// Google review requests (owner Abhinav 02/11/2026 13:57 + 13:59, C-20261102-REVIEWASK; supersedes T-20261023-REVIEWCYCLE's Interakt plan).
+// One WhatsApp per customer the day after a Bill (never an Estimate; not cancelled; valid 10-digit mobile), at most once in 6 months.
+// A Make schedule rings GET /hooks/vj-reviewbell (no data, no secret) at 11:35 IST. The worker picks yesterday's bills, keeps the list under
+// a random one-time token and sends ONLY {token} to the Make hook below; Make fetches /hooks/vj-reviewdue?t=token once (numbers come from
+// the worker, never from Make), skips STOP / already-reviewed people, sends template vj_review_ask_hi_v1 and logs Review_Requests.
+// The template's button is https://vaishnavijewels.com/r/<token> (random, no personal data): the click is logged and the customer goes
+// straight on to Google's write-review page (unknown / old tokens go there too, so nobody ever sees an error).
+// The header photo is the piece's own tag photo (jpg/png) through /hooks/vj-reviewimg?t=<random> for 3 days, otherwise the brand image.
+const VJ_RV_HOOK = 'https://hook.eu1.make.com/1rdirr1j8xtk4ifnvvnuk1fbzhnys7ro'; // Make hook 4022375 (S-REVIEWASK sender)
+const VJ_RV_LINK = 'https://search.google.com/local/writereview?placeid=ChIJa5MF_XNS4DsR72RsaVArQ7w';
+const VJ_RV_BRAND = 'https://res.cloudinary.com/rknejib2/image/fetch/e_trim/h_380,c_scale/c_pad,w_1200,h_500,b_rgb:FAF5EB/c_pad,w_1200,h_628,g_north,b_rgb:FAF5EB/l_text:Times_44_italic:Thank%20you%20for%20choosing%20Vaishnavi%20Jewels,co_rgb:6E5028,g_south,y_50/f_jpg,q_85/https://vaishnavijewels.com/logo_vaishnavi_jewels.png';
+let vjRvOk = false;
+async function vjRvT(env) { if (vjRvOk) return; await env.DB.batch([
+  env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_review_ask (tok TEXT PRIMARY KEY, no TEXT, mobile TEXT, ts INTEGER, img TEXT, itok TEXT)'),
+  env.DB.prepare('CREATE INDEX IF NOT EXISTS vj_review_ask_m ON vj_review_ask (mobile, ts)'),
+  env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_review_clicks (ts INTEGER, tok TEXT, no TEXT, ih TEXT, reported INTEGER DEFAULT 0)'),
+  env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_meta (k TEXT PRIMARY KEY, v TEXT)')]); vjRvOk = true; }
+const vjRvTok = n => btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(n)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+async function vjReviewBell(url, env) {
+  if (!env.DB) return reply('not set up', 503);
+  const now = Date.now(), ist = new Date(now + 5.5 * 3600e3), ymd = ist.toISOString().slice(0, 10), min = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+  if (min < 11 * 60 || min > 18 * 60) return reply('outside 11:00-18:00 IST', 200); // owner's sending window (ends 18:30)
+  await vjRvT(env);
+  const test = url.searchParams.get('test') === '1'; // one sample to Abhinav only (no bill, no customer), at most 3 a day
+  const key = test ? 'reviewtest:' + ymd : 'reviewbell:' + ymd;
+  if (test) { const r = await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES (?, '1') ON CONFLICT(k) DO UPDATE SET v = CAST(CAST(v AS INTEGER) + 1 AS TEXT) RETURNING v").bind(key).first(); if (Number(r && r.v) > 3) return reply('test limit reached today', 429); }
+  else { const claim = await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO NOTHING').bind(key, new Date().toISOString()).run(); if (!claim.meta || claim.meta.changes !== 1) return reply('already done today', 200); }
+  const day = vjAddDays(ymd, -1), items = [], skipped = [], seen = new Set();
+  const clean = v => String(v || '').replace(/[\u0000-\u001f"\\<>{}*_~`]/g, ' ').replace(/\s+/g, ' ').trim();
+  const imgFor = async rows => { for (const r of rows || []) { const id = String(r && r.photo || ''); if (!/^[0-9a-f]{32}$/.test(id)) continue;
+    try { const o = await vjPhotoGet(env, id); if (!o) continue; try { o.body.cancel(); } catch (e) {} if (/^image\/(jpeg|png)$/.test(o.type || '')) return id; } catch (e) {} } return ''; };
+  const add = async (no, mobile, name, rows) => { const tok = vjRvTok(16), img = await imgFor(rows), itok = img ? vjRvTok(16) : '';
+    await env.DB.prepare('INSERT INTO vj_review_ask (tok, no, mobile, ts, img, itok) VALUES (?, ?, ?, ?, ?, ?)').bind(tok, no, test ? '' : mobile, now, img, itok || null).run();
+    items.push({ no, date: day, name: name || 'Customer', to: '91' + mobile, masked: '+91 ' + mobile.slice(0, 2) + 'XXXXX' + mobile.slice(-3), tok,
+      img: img ? 'https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok : VJ_RV_BRAND, photo: img ? 'tag photo' : 'brand image' }); };
+  if (test) await add('TEST', '7567400099', 'Abhinav', []);
+  else {
+    if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
+    const bills = ((((await env.DB.prepare("SELECT no, data FROM vj_bills WHERE no LIKE 'B-%'").all()).results) || [])).map(vjParse).filter(b => b && b.date === day);
+    for (const b of bills.sort((x, y) => String(x.no).localeCompare(String(y.no)))) {
+      const m = String(b.mobile || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, ''), no = String(b.no || ''), why = w => skipped.push({ no, reason: w });
+      if (b.title !== 'Bill' || !/^B-/.test(no)) continue;
+      if (b.cancelled) { why('cancelled'); continue; }
+      if (!/^[6-9]\d{9}$/.test(m)) { why('no valid mobile'); continue; }
+      if (seen.has(m)) { why('same customer, asked once'); continue; } seen.add(m);
+      if (await env.DB.prepare('SELECT 1 FROM vj_review_ask WHERE mobile = ? AND ts > ?').bind(m, now - 183 * 864e5).first()) { why('asked in the last 6 months'); continue; }
+      let stop = false; try { const t = ((await env.DB.prepare('SELECT text FROM wa_inbox WHERE sender = ? AND length(text) < 40').bind('91' + m).all()).results) || []; stop = t.some(x => WA_OPTOUT.test(String(x.text || '').trim()) || /^stop\b/i.test(String(x.text || '').trim())); } catch (e) {}
+      if (stop) { why('STOP on WhatsApp'); continue; }
+      if (items.length >= 60) { why('daily cap 60'); continue; }
+      await add(no, m, clean(b.name).replace(/\s+ji$/i, '').slice(0, 40), b.rows);
+    }
+  }
+  // first click per asked bill since the last hand-out (for Review_Requests 'Clicked')
+  let clicks = []; if (!test) { clicks = (((await env.DB.prepare('SELECT no, MIN(ts) AS ts FROM vj_review_clicks WHERE reported = 0 GROUP BY no').all()).results) || []).map(c => ({ no: c.no, at: waIst(Number(c.ts)) }));
+    await env.DB.prepare('UPDATE vj_review_clicks SET reported = 1 WHERE reported = 0').run(); }
+  const token = [...crypto.getRandomValues(new Uint8Array(16))].map(x => x.toString(16).padStart(2, '0')).join('');
+  await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('reviewdue:' + token, JSON.stringify({ test, day, items, skipped, clicks, at: now })).run();
+  try { const r = await fetch(VJ_RV_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(20000), body: JSON.stringify({ token }) }); if (!r.ok) throw new Error('hook ' + r.status); }
+  catch (e) { const st = [env.DB.prepare('DELETE FROM vj_meta WHERE k = ?').bind('reviewdue:' + token)].concat(items.map(i => env.DB.prepare('DELETE FROM vj_review_ask WHERE tok = ?').bind(i.tok)));
+    if (!test) st.push(env.DB.prepare('DELETE FROM vj_meta WHERE k = ?').bind(key), env.DB.prepare('UPDATE vj_review_clicks SET reported = 0 WHERE no IN (' + (clicks.map(() => '?').join(',') || "''") + ')').bind(...clicks.map(c => c.no)));
+    await env.DB.batch(st); return reply('failed', 502); }
+  return reply('handed ' + items.length + ' (skipped ' + skipped.length + ', clicks ' + clicks.length + ')', 200);
+}
+async function vjReviewDue(url, env) { // one-time hand-out to Make
+  const t = String(url.searchParams.get('t') || ''); if (!/^[a-f0-9]{32}$/.test(t)) return reply('not found', 404);
+  await vjRvT(env);
+  const r = await env.DB.prepare('SELECT v FROM vj_meta WHERE k = ?').bind('reviewdue:' + t).first(); if (!r) return reply('gone', 410);
+  const del = await env.DB.prepare('DELETE FROM vj_meta WHERE k = ? AND v = ?').bind('reviewdue:' + t, r.v).run(); if (!del.meta || del.meta.changes !== 1) return reply('gone', 410);
+  const s = JSON.parse(r.v); if (Date.now() - s.at > 3600e3) return reply('gone', 410);
+  return vjJson({ test: s.test, day: s.day, items: s.items, skipped: s.skipped, clicks: s.clicks });
+}
+async function vjReviewImg(url, env) { // the tag photo for the WhatsApp header, 3 days, random link
+  const t = String(url.searchParams.get('t') || ''); if (!/^[A-Za-z0-9_-]{20,24}$/.test(t)) return reply('not found', 404);
+  await vjRvT(env);
+  const r = await env.DB.prepare('SELECT img, ts FROM vj_review_ask WHERE itok = ?').bind(t).first();
+  if (!r || Date.now() - r.ts > 3 * 864e5) return reply('not found', 404);
+  const o = await vjPhotoGet(env, String(r.img)); if (!o) return reply('not found', 404);
+  return new Response(o.body, { headers: { 'content-type': /^image\/(jpeg|png)$/.test(o.type || '') ? o.type : 'image/jpeg', 'cache-control': 'private, max-age=3600', 'x-robots-tag': 'noindex', 'x-content-type-options': 'nosniff' } });
+}
+function vjReviewClick(request, env, ctx, url) { // /r/<token>: log the click, go straight to Google (never an error page)
+  const go = new Response(null, { status: 302, headers: { location: VJ_RV_LINK, 'cache-control': 'no-store', 'x-robots-tag': 'noindex', 'referrer-policy': 'no-referrer' } });
+  const t = url.pathname.slice(3);
+  if (!env.DB || !/^[A-Za-z0-9_-]{16,40}$/.test(t) || (request.method !== 'GET' && request.method !== 'HEAD')) return go;
+  const p = (async () => { try {
+    await vjRvT(env);
+    const a = await env.DB.prepare('SELECT no, ts FROM vj_review_ask WHERE tok = ?').bind(t).first(); if (!a || Date.now() - a.ts > 120 * 864e5) return;
+    const ip = request.headers.get('cf-connecting-ip') || '', ih = ip ? (await hmacHex('vj-rv-' + new Date().toISOString().slice(0, 10), enc.encode(ip))).slice(0, 16) : '';
+    const n = await env.DB.prepare('SELECT (SELECT count(*) FROM vj_review_clicks WHERE tok = ?) AS a, (SELECT count(*) FROM vj_review_clicks WHERE ih = ? AND ts > ?) AS b').bind(t, ih, Date.now() - 600e3).first();
+    if (n && (n.a >= 5 || (ih && n.b >= 20))) return; // light rate limit: 5 per link, 20 per visitor in 10 minutes
+    await env.DB.prepare('INSERT INTO vj_review_clicks (ts, tok, no, ih, reported) VALUES (?, ?, ?, ?, 0)').bind(Date.now(), t, a.no, ih).run();
+  } catch (e) {} })();
+  if (ctx && ctx.waitUntil) ctx.waitUntil(p);
+  return go;
+}
 async function vjBillPdfHook(url, env, done) {
   const t = String(url.searchParams.get('t') || ''); if (!/^[a-f0-9]{32}$/.test(t)) return reply('not found', 404);
   await vjMetaT(env);
@@ -2642,6 +2737,8 @@ export default {
     if (p === '/hooks/vj-billpdf' || p === '/hooks/vj-billpdf-done') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjBillPdfHook(url, env, p.endsWith('-done')) : reply('Method not allowed', 405); // C-20261017-BILLWA
     if (p === '/hooks/vj-estbell') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjEstBell(env) : reply('Method not allowed', 405); // C-20261028-ESTNOTBILL
     if (p === '/hooks/rfid-demo') return (url.hostname === VJ_HOST || env.VJ_DEV === '1') ? vjRfidDemo(request, env, url) : reply('Not found', 404); // C-20261029-RFIDLIVE
+    if (p === '/hooks/vj-reviewbell' || p === '/hooks/vj-reviewdue' || p === '/hooks/vj-reviewimg') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-reviewbell' ? vjReviewBell(url, env) : p === '/hooks/vj-reviewdue' ? vjReviewDue(url, env) : vjReviewImg(url, env)) : reply('Method not allowed', 405); // C-20261102-REVIEWASK
+    if (p.startsWith('/r/')) return vjReviewClick(request, env, ctx, url); // C-20261102-REVIEWASK: tracked review button -> Google
     if (p === '/hooks/vj-estdue') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjEstDue(url, env) : reply('Method not allowed', 405);
     if (p === '/hooks/vj-daily') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjDailyReport(env) : reply('Method not allowed', 405);
     if (p === '/hooks/vj-backup' || p === '/hooks/vj-backupfile') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-backup' ? vjBackup(env) : vjBackupFile(url, env)) : reply('Method not allowed', 405); // C-20261017-TAGSBACKUP
