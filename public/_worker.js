@@ -1060,6 +1060,7 @@ async function vjBill(request, env, who, ctx) { // every login may make bills (o
     if (miss.length) return vjDeny(400, 'diamond rate missing on ' + miss.slice(0, 6).join('; ') + (miss.length > 6 ? ' and ' + (miss.length - 6) + ' more' : '') + ' - type the rate per ct on the bill (or 0 for a party diamond)'); } // C-20261028-SIGHRATE: never Rs 0 diamonds by mistake
   calc.rows.forEach((r, i) => { const ph = tags[i].photo; if (typeof ph === 'string' && /^[0-9a-f]{32}$/.test(ph)) r.photo = ph; if (tags[i].src) r.src = tags[i].src; }); // owner 16/10: photo on the bill; src = the typed design (C-20261027-ESTBILL)
   const bill = Object.assign({ no, title, date, name, city, mobile, ...adr, F, nbb: !!(b && b.nbb === true), by: who.email, byName: who.name, at: new Date().toISOString(), ...(option ? { option } : {}), ...(usd ? { usd } : {}), ...(cust ? { cust } : {}), ...(title === 'Bill' && ogNo ? { ogNo } : {}) }, calc); // nbb: 'No Buy Back No Exchange' stamp (owner 17/10, C-20261017-NBB)
+  if (adr.addr || adr.pin) { try { await vjAbPut(env, { name, mobile, city, ...adr }, who, title.toLowerCase(), Date.now()); } catch (e) {} } // C-20261102-ADDRBOOK: typed / edited address saved to the address book
   if (editNo) { // C-20261026-BILLEDIT (owner 26/10/2026 17:32 'i should be able to edit the bill'): owners only; the old version is kept in vj_bill_old
     if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji can edit a saved bill');
     const old = await env.DB.prepare('SELECT ts, email, data FROM vj_bills WHERE no = ?').bind(editNo).first();
@@ -1990,16 +1991,14 @@ async function vjChallanSave(request, env, who) {
   let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
   const r = vjChIn(b); if (r.err) return vjDeny(400, r.err); const ch = r.ch;
   await vjChT(env);
-  if (ch.billNos.length) { // 'Against Bill(s)': every bill a live Bill of ONE party (same 10-digit mobile, else same name + city); sales / tagger: only bills they made (C-20261102-CHMULTI)
+  if (ch.billNos.length) { // 'Against Bill(s)': every bill a live Bill (parties may differ - owner 02/11 14:16, C-20261102-ADDRBOOK); sales / tagger: only bills they made (C-20261102-CHMULTI)
     if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
     const bs = [];
     for (const bn of ch.billNos) { const br = await env.DB.prepare('SELECT data FROM vj_bills WHERE no = ?').bind(bn).first(), bd = br ? vjParse(br) : null;
       if (!bd || bd.title !== 'Bill' || ((who.role === 'sales' || who.role === 'tagger') && bd.by !== who.email)) return vjDeny(404, 'bill ' + bn + ' not found');
       if (bd.cancelled) return vjDeny(409, 'bill ' + bn + ' is cancelled'); bs.push(bd); }
-    const md = v => { const d = String(v || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, ''); return /^[6-9]\d{9}$/.test(d) ? d : ''; }, nk = v => String(v || '').toLowerCase().replace(/\s+ji$/, '').replace(/[^a-z0-9]/g, '');
-    const allM = bs.every(x => md(x.mobile)), keys = new Set(bs.map(x => allM ? md(x.mobile) : nk(x.name) + '|' + nk(x.city)));
-    if (keys.size > 1) return vjDeny(400, 'these bills are for different parties - one challan carries the bills of one party only');
-    if (allM && md(ch.party.mobile) && md(ch.party.mobile) !== md(bs[0].mobile)) return vjDeny(400, 'the bills are for another mobile number than the party on this challan'); }
+  } // two parties may share one parcel / address: no same-party block (receiver checked by hand)
+  try { await vjAbPut(env, ch.party, who, 'challan', Date.now()); } catch (e) {} // C-20261102-ADDRBOOK
   const at = new Date().toISOString(), editNo = Number(b && b.edit) || 0;
   if (editNo) {
     if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji can edit a saved challan');
@@ -2042,6 +2041,58 @@ async function vjChallanCancel(request, env, who) {
   if (!res[1].meta || res[1].meta.changes !== 1) return vjDeny(409, 'the challan changed meanwhile - reload and try again');
   await vjAudit(env, who, 'challan-cancel', 'challans/' + no, reason);
   return vjJson({ ok: true, challan: c });
+}
+
+// Address book (owner 02/11/2026 14:16, C-20261102-ADDRBOOK): the delivery addresses of parties in one table, vj_addrbook. Filled from
+// (a) every bill / challan saved with an address and (b) the team's Client_Addresses sheet (Mihir's address screenshots via Aashvi, Make
+// 8319318). The sheet is pulled through the existing gold relay (VJ_GOLD_HOOK + ?want=addrs, same secret URL, Make 7952405) at most every
+// 10 minutes, only when someone looks an address up - no new secret, nothing pushed in from outside; the first pull is the one-time import.
+// Latest wins (by time: sheet rows carry their 'Received at'). Admin + staff see every entry; sales / tagger only parties on their own bills
+// (same mobile, one digit off allowed, or same name).
+let vjAbOk = false;
+async function vjAbT(env) { if (vjAbOk) return; await env.DB.batch([env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_addrbook (key TEXT PRIMARY KEY, name TEXT, mobile TEXT, addr TEXT, area TEXT, city TEXT, state TEXT, pin TEXT, updated_at INTEGER, "by" TEXT, src TEXT)'),
+  env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_meta (k TEXT PRIMARY KEY, v TEXT)')]); vjAbOk = true; }
+const vjAbDig = v => String(v || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '').replace(/^0(?=\d{10}$)/, '');
+const vjAbNk = v => String(v || '').toLowerCase().replace(/\s+ji$/, '').replace(/[^a-z0-9]/g, '');
+const vjNear1 = (a, b) => { if (a === b) return true; if (Math.abs(a.length - b.length) > 1) return false; let i = 0, j = 0, e = 0;
+  while (i < a.length && j < b.length) { if (a[i] === b[j]) { i++; j++; continue; } if (++e > 1) return false; if (a.length > b.length) i++; else if (b.length > a.length) j++; else { i++; j++; } }
+  return e + (a.length - i) + (b.length - j) <= 1; };
+const vjMobSame = (a, b) => { a = vjAbDig(a); b = vjAbDig(b); return a.length >= 9 && b.length >= 9 && (a.includes(b) || b.includes(a) || vjNear1(a, b)); };
+async function vjAbPut(env, e, who, src, at) {
+  const r = { name: vjClean(e && e.name, 60), mobile: vjAbDig(e && e.mobile).slice(0, 13), addr: vjClean(e && e.addr, 160), area: vjClean(e && e.area, 80), city: vjClean(e && e.city, 40), state: vjClean(e && e.state, 40), pin: /^[1-9]\d{5}$/.test(String(e && e.pin || '')) ? String(e.pin) : '' };
+  if (!r.name || !(r.addr || r.area) || !(r.pin || r.city)) return;
+  const key = r.mobile.length >= 8 ? 'm:' + r.mobile.slice(-10) : 'n:' + vjAbNk(r.name) + '|' + (r.pin || vjAbNk(r.city));
+  await vjAbT(env);
+  await env.DB.prepare('INSERT INTO vj_addrbook (key, name, mobile, addr, area, city, state, pin, updated_at, "by", src) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(key) DO UPDATE SET name = excluded.name, mobile = excluded.mobile, addr = excluded.addr, area = excluded.area, city = excluded.city, state = excluded.state, pin = excluded.pin, updated_at = excluded.updated_at, "by" = excluded."by", src = excluded.src WHERE excluded.updated_at >= vj_addrbook.updated_at')
+    .bind(key, r.name, r.mobile, r.addr, r.area, r.city, r.state, r.pin, Number(at) || Date.now(), String(who && who.email || who || '').slice(0, 80), String(src || '').slice(0, 40)).run();
+}
+const vjAbTime = s => { const m = String(s || '').match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/); return m ? Date.UTC(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]) - 5.5 * 3600e3 : 0; };
+async function vjAbSync(env, force) {
+  await vjAbT(env); const st = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'addrbook-sync'").first(); let s = {}; try { s = st ? JSON.parse(st.v) : {}; } catch (e) {}
+  if (!s.saved) { // once: addresses already typed on bills / challans
+    if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
+    for (const x of ((((await env.DB.prepare('SELECT data FROM vj_bills').all()).results) || []).map(vjParse))) if (x && !x.cancelled && (x.addr || x.pin)) await vjAbPut(env, x, x.by, 'bill ' + x.no, Date.parse(x.at) || 1);
+    await vjChT(env); for (const c of ((((await env.DB.prepare('SELECT data FROM vj_challans').all()).results) || []).map(vjParse))) if (c && !c.cancelled && c.party) await vjAbPut(env, c.party, c.by, 'challan ' + c.no, Date.parse(c.at) || 1);
+    s.saved = Date.now(); }
+  if (force || !s.at || Date.now() - s.at > 10 * 60e3) { s.at = Date.now();
+    if (env.VJ_GOLD_HOOK && /^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_GOLD_HOOK)) try {
+      const r = await fetch(env.VJ_GOLD_HOOK + '?want=addrs', { signal: AbortSignal.timeout(10000) }), t = await r.text(); let j = null; try { j = JSON.parse(t); } catch (e) {}
+      if (r.ok && j && Array.isArray(j.rows)) { let n = 0; for (const x of j.rows.slice(0, 5000)) { if (!Array.isArray(x) || /reject|wrong|test/i.test(String(x[8] || ''))) continue;
+          await vjAbPut(env, { name: x[0], addr: x[1], area: x[2], city: x[3], state: x[4], pin: x[5], mobile: x[6] }, 'Client_Addresses', 'sheet', vjAbTime(x[7]) || 1); n++; } s.ok = true; s.n = n; } else s.ok = false;
+    } catch (e) { s.ok = false; } }
+  await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('addrbook-sync', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(s)).run();
+}
+async function vjAddrBook(url, env, who) {
+  const q = String(url.searchParams.get('q') || '').trim().slice(0, 40), qd = q.replace(/\D/g, ''), qn = vjAbNk(q), byName = qn.replace(/\d/g, '').length >= 2;
+  if (qd.length < 3 && !byName) return vjJson({ ok: true, entries: [] });
+  try { await vjAbSync(env, url.searchParams.get('fresh') === '1' && who.role === 'admin'); } catch (e) {}
+  let rows = ((await env.DB.prepare('SELECT name, mobile, addr, area, city, state, pin FROM vj_addrbook ORDER BY updated_at DESC LIMIT 5000').all()).results) || [];
+  rows = rows.filter(r => (qd.length >= 3 && String(r.mobile || '').includes(qd)) || (byName && vjAbNk(r.name).includes(qn)));
+  if (who.role === 'sales' || who.role === 'tagger') { // only parties on bills this login made
+    if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
+    const own = ((((await env.DB.prepare('SELECT data FROM vj_bills WHERE email = ?').bind(who.email).all()).results) || []).map(vjParse)).filter(b => b && b.by === who.email);
+    rows = rows.filter(r => own.some(b => vjMobSame(b.mobile, r.mobile) || (vjAbNk(b.name) && vjAbNk(b.name) === vjAbNk(r.name)))); }
+  return vjJson({ ok: true, entries: rows.slice(0, 8).map(r => ({ name: r.name, mobile: r.mobile, addr: r.addr, area: r.area, city: r.city, state: r.state, pin: r.pin })) });
 }
 
 // Customer recall (owner 17/10/2026 17:04, C-20261017-PARTY): type a mobile number or part of a name on New tag (order), Bill or
@@ -2634,7 +2685,7 @@ async function vjHandle(request, env, ctx, url) {
   if (!env.DB || !env.PHOTOS) return vjDeny(503, 'not set up');
   const who = await vjWho(request, env);
   if (!who) return p.startsWith('/api/') ? vjDeny(403, 'not allowed') : new Response('Not allowed. Ask Abhinav to add your email.', { status: 403, headers: { 'content-type': 'text/plain', 'x-robots-tag': 'noindex' } });
-  if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties', '/api/vj/moves', '/api/vj/repairs', '/api/vj/estimates', '/api/vj/boxes', '/api/vj/bill/sendstatus', '/api/vj/ogs', '/api/vj/challans', '/api/vj/challan'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill', '/api/vj/move', '/api/vj/repair', '/api/vj/estimate/done', '/api/vj/contactshot', '/api/vj/bill/send', '/api/vj/photosearch', '/api/vj/og', '/api/vj/challan'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these (+ Karigar & Out, 27/10)
+  if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties', '/api/vj/moves', '/api/vj/repairs', '/api/vj/estimates', '/api/vj/boxes', '/api/vj/bill/sendstatus', '/api/vj/ogs', '/api/vj/challans', '/api/vj/challan', '/api/vj/addrbook'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill', '/api/vj/move', '/api/vj/repair', '/api/vj/estimate/done', '/api/vj/contactshot', '/api/vj/bill/send', '/api/vj/photosearch', '/api/vj/og', '/api/vj/challan'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these (+ Karigar & Out, 27/10)
   // C-20261027-KARIGAROUT: stock out / back, RFID link, party repairs (JSON from our own page only)
   if ((p === '/api/vj/move' || p === '/api/vj/repair') && request.method === 'POST') { if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed'); return p === '/api/vj/move' ? vjMove(request, env, who) : vjRepair(request, env, who); }
   if (p === '/api/vj/moves' && request.method === 'GET') return vjMovesGet(url, env, who);
@@ -2664,6 +2715,7 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/wa-ready' && request.method === 'GET') return vjWaReady(env);
   if (p === '/api/vj/parties' && request.method === 'GET') return vjParties(url, env); // C-20261017-PARTY
   if ((p === '/api/vj/challans' || p === '/api/vj/challan') && request.method === 'GET') return vjChallanGet(url, env, who); // C-20261102-CHALLAN
+  if (p === '/api/vj/addrbook' && request.method === 'GET') return vjAddrBook(url, env, who); // C-20261102-ADDRBOOK
   if ((p === '/api/vj/challan' || p === '/api/vj/challan/cancel') && request.method === 'POST') { if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed'); return p === '/api/vj/challan' ? vjChallanSave(request, env, who) : vjChallanCancel(request, env, who); }
   if (['/api/vj/receipt', '/api/vj/receipt/reverse', '/api/vj/ledger/settle', '/api/vj/ledger/unsettle'].includes(p) && request.method === 'POST') {
     if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed');
