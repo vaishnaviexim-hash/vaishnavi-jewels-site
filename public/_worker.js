@@ -1554,12 +1554,13 @@ function vjOgCalc(r) { // the only place the OG figures are worked out
   return { actFine: act / 1000, credTunch: ct, credFine: cred / 1000, marginFine: (act - cred) / 1000 };
 }
 const vjOgYm = d => String(d || '').slice(0, 7);
-async function vjOgKarigars(env, outs) {
-  const set = new Set(VJ_KARIGARS);
-  try { (((await env.DB.prepare("SELECT data FROM docs WHERE path LIKE 'karigars/%'").all()).results) || []).forEach(x => { const d = vjParse(x); if (d && d.name) set.add(vjClean(d.name, 40)); }); } catch (e) {}
-  try { const m = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'og:karigars'").first(); (m ? JSON.parse(m.v) : []).forEach(n => set.add(n)); } catch (e) {}
-  (outs || []).forEach(o => { if (o.karigar) set.add(o.karigar); });
-  return [...set].filter(Boolean).sort((a, b) => a.localeCompare(b));
+// C-20261102-OGKARIGAR (owner 02/11 15:31): the OG issue list = exactly Montu, Badshah, Hiru, Priyank (in this order) + names Abhinav / Shilpiji add later
+// (vj_meta og:karigars2). Older names stay on their old records and in the per-karigar balances; they are just not offered any more.
+const VJ_OG_KARIGARS = ['Montu', 'Badshah', 'Hiru', 'Priyank'];
+async function vjOgKarigars(env) {
+  const l = VJ_OG_KARIGARS.slice();
+  try { const m = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'og:karigars2'").first(); (m ? JSON.parse(m.v) : []).forEach(n => { n = vjClean(n, 40); if (n && !l.some(x => x.toLowerCase() === n.toLowerCase())) l.push(n); }); } catch (e) {}
+  return l;
 }
 async function vjOg2Load(env) { await vjOg2Tables(env);
   const reg = ((((await env.DB.prepare('SELECT data FROM vj_ogs').all()).results) || []).map(vjParse).filter(Boolean));
@@ -1625,7 +1626,7 @@ async function vjOgs(env, who, url) { const all = await vjOgList(env), live = al
     const bin = atob(xl), out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
     return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_OG_register.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } }); }
   return vjJson({ ok: true, list, reg: regOut, free, next, last: lastB ? { og: lastB.og, no: lastB.no, name: lastB.name } : null, out: who.role === 'sales' ? [] : outOut, dias: (who.role === 'sales' ? [] : dias).map(d => ({ id: d.id, og: d.og, tag: d.tag, label: d.label || '', shape: d.shape || '', q: d.q || '', pcs: d.pcs || 0, ct: d.ct || 0, karigar: d.karigar || '', status: d.status, retAt: d.retAt || '', retByName: d.retByName || '' })),
-    sum, karigars: await vjOgKarigars(env, outs), vendors: who.role === 'sales' ? [] : [...new Set(reg.filter(r => r.src === 'vendor').map(r => r.vendor || r.name).filter(Boolean))].sort((a, b) => a.localeCompare(b)), margins: [0, 1, 2], admin: adm, canDelete: adm, canAdd: who.role !== 'sales' }); }
+    sum, karigars: await vjOgKarigars(env), vendors: who.role === 'sales' ? [] : [...new Set(reg.filter(r => r.src === 'vendor').map(r => r.vendor || r.name).filter(Boolean))].sort((a, b) => a.localeCompare(b)), margins: [0, 1, 2], admin: adm, canDelete: adm, canAdd: who.role !== 'sales' }); }
 async function vjOgHist(env, who, kind, ref, action, old) { await env.DB.prepare('INSERT INTO vj_og_hist (ts, email, kind, ref, action, data) VALUES (?, ?, ?, ?, ?, ?)').bind(Date.now(), who.email, kind, ref, action, JSON.stringify(old || null)).run(); }
 async function vjOgSave(request, env, who) { if (who.role === 'sales') return vjDeny(403, 'read only');
   if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed');
@@ -1849,6 +1850,7 @@ async function vjOgOutSave(b, env, who, adm, now, byName, op, dateOk) {
   const fine = vjR3(b.fine), gross = b.gross === '' || b.gross == null ? 0 : vjR3(b.gross), to = b.to === 'stock' ? 'stock' : b.to === 'karigar' ? 'karigar' : '';
   if (!(fine > 0 && fine <= 100000)) return vjDeny(400, 'type the fine grams'); if (!(gross >= 0 && gross <= 100000)) return vjDeny(400, 'gross (g) looks wrong'); if (!to) return vjDeny(400, 'issued to a karigar or moved to our stock?');
   const karigar = to === 'karigar' ? vjClean(b.karigar, 40) : ''; if (to === 'karigar' && !karigar) return vjDeny(400, 'pick the karigar');
+  if (karigar && !adm) { const kl = await vjOgKarigars(env); if (!kl.includes(karigar)) return vjDeny(403, 'pick the karigar from the list (' + kl.join(', ') + ') - only Abhinav / Shilpiji can add a new name'); } // C-20261102-OGKARIGAR
   const { reg, outs } = await vjOg2Load(env), live = reg.filter(r => !r.cancelled), ogs = [...new Set((Array.isArray(b.ogs) ? b.ogs : String(b.ogs || '').split(/[\s,]+/)).map(x => vjClean(x, 20).toUpperCase().replace(/^OG[-\s.:#]*/, '')).filter(Boolean))].slice(0, 60); // 02/11: 'OG 151' / 'OG-151' read as 151
   const bad = ogs.filter(n => !live.some(r => String(r.no).toUpperCase() === n)); if (bad.length) return vjDeny(400, 'not in the OG register: ' + bad.join(', '));
   const S = vjOg2Sum(live.map(r => Object.assign({}, r, vjOgCalc(r))), outs.filter(o => o.id !== id), []);
@@ -1856,8 +1858,8 @@ async function vjOgOutSave(b, env, who, adm, now, byName, op, dateOk) {
   const rec = Object.assign(old ? { id, by: old.by, byName: old.byName, at: old.at } : { id: 'O' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), by: who.email, byName, at: now }, { date, ogs, fine, gross, to, karigar, note: vjClean(b.note, 120) });
   if (old) { rec.editedAt = now; rec.editedBy = who.email; rec.editedByName = byName; await vjOgHist(env, who, 'out', id, 'edit', old); }
   const st = [env.DB.prepare('INSERT INTO vj_og_out (id, ts, date, email, data) VALUES (?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data, date = excluded.date').bind(rec.id, Date.now(), date, who.email, JSON.stringify(rec))];
-  if (karigar) { const known = await vjOgKarigars(env, outs); if (!known.includes(karigar)) { const m = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'og:karigars'").first(); let l = []; try { l = m ? JSON.parse(m.v) : []; } catch (e) {} l.push(karigar);
-      st.push(env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('og:karigars', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(l.slice(-200)))); }
+  if (karigar) { const known = await vjOgKarigars(env); if (!known.includes(karigar) && !(old && old.karigar === karigar)) { const m = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'og:karigars2'").first(); let l = []; try { l = m ? JSON.parse(m.v) : []; } catch (e) {} l.push(karigar); // a new name (admin only, checked above)
+      st.push(env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('og:karigars2', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(l.slice(-200)))); }
     ogs.forEach(n => st.push(env.DB.prepare("UPDATE vj_og_dia SET data = json_set(data, '$.karigar', ?) WHERE og = ? AND status = 'pending' AND COALESCE(json_extract(data, '$.karigar'), '') = ''").bind(karigar, n))); }
   await env.DB.batch(st);
   await vjAudit(env, who, old ? 'og-out-edit' : 'og-out', 'ogout/' + rec.id, fine + ' g -> ' + (to === 'karigar' ? karigar : 'our stock') + (ogs.length ? ' (OG ' + ogs.join(', ') + ')' : ' (OG pool)'));
