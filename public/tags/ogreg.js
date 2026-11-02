@@ -33,6 +33,7 @@
 #p-ogreg .ogprev div{border:1px solid var(--line);border-radius:8px;padding:6px 10px;min-width:130px}#p-ogreg .ogprev b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
 #p-ogreg .ogprev .main{background:var(--ok-soft);border-color:var(--ok)}#p-ogreg tr.ogx td{opacity:.5;text-decoration:line-through}
 #p-ogreg .ogtabs{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px}#p-ogreg .ogtabs .btn[aria-pressed="true"]{background:var(--gold);color:#fff;border-color:var(--gold)}
+#p-ogreg tr.ogdone td{opacity:.55;text-decoration:line-through}#p-ogreg tr.ogdone td.ogst{text-decoration:none;opacity:1}#p-ogreg .ogorph{border:1px dashed var(--warn);border-radius:8px;padding:6px 10px;margin:6px 0;font-size:14px}
 #p-ogreg .ogbox{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0}`;
 
   async function load() {
@@ -205,7 +206,7 @@
     if (view === "in") {
       head = ["OG no.", "Date", "From", "Item", "Gross g"].concat(A ? ["Tunch %", "Margin", "Actual fine"] : []).concat(["Credit tunch", "Party credit fine"]).concat(A ? ["Margin fine"] : []).concat(["Diamonds", "Status", ""]);
       rows = (J.reg || []).filter(r => (!ym || String(r.date).slice(0, 7) === ym) && (!only || (!r.bill && !r.cancelled && r.src === "party" && !r.cash)) && (!q || [r.no, r.name, r.city, r.mobile, r.bill, r.item, r.tag && r.tag.label, r.vendor, r.inv].join(" ").toLowerCase().includes(q))).slice().reverse();
-      rows.forEach(r => { const tr = el("tr", { className: r.cancelled ? "ogx" : "" }); td(tr, r.no); td(tr, dmy(r.date));
+      rows.forEach(r => { const tr = el("tr", { className: r.cancelled ? "ogx" : r.src === "party" && (r.bill || r.cash) ? "ogdone" : "" }); /* C-20261102-OGDONE: party already credited (bill or cash) - greyed + struck, gold still in hand */ td(tr, r.no); td(tr, dmy(r.date));
         td(tr, r.src === "stock" ? "Own piece (whole) " + (r.tag ? r.tag.label : "") : r.src === "part" ? "Part of " + (r.tag ? r.tag.label : "") : r.src === "own" ? "Own gold: " + r.name : r.src === "vendor" ? "Vendor: " + (r.vendor || r.name) + (r.inv ? " (inv " + r.inv + ")" : "") : [r.name, r.city].filter(Boolean).join(", ") + (r.mobile ? " · " + r.mobile : "")); td(tr, r.item || (r.legacy ? "(old entry)" : "-"));
         td(tr, r.gross ? r3(r.gross) : "-", "num");
         if (A) { td(tr, r.tunch != null ? r.tunch : "-", "num"); td(tr, r.margin != null ? r.margin : "-", "num"); td(tr, r3(r.actFine), "num"); }
@@ -213,8 +214,8 @@
         const cf = el("td", { className: "num", textContent: r.src !== "party" ? (r.actFine != null ? "fine " + r3(r.actFine) : "-") : r3(r.credFine) }); cf.style.fontWeight = "700"; cf.style.fontSize = "17px"; tr.appendChild(cf);
         if (A) td(tr, r.src !== "party" ? "-" : r3(r.marginFine), "num");
         td(tr, stSum(r.stones) || (r.src === "stock" && r.tag && r.tag.ct ? r.tag.pcs + " pcs / " + Number(r.tag.ct).toFixed(3) + " ct" : "-"), "num");
-        const st = el("td"); st.style.fontWeight = "600";
-        st.textContent = r.cancelled ? "Cancelled " + dmy(r.cancelled.at) + (r.cancelled.why ? " (" + r.cancelled.why + ")" : "") : r.src === "part" ? "Part taken (" + r3(r.gross) + " g; tag kept)" + (r.dia && !(r.stones || []).length ? " · " + r.dia.pcs + " pcs / " + Number(r.dia.ct).toFixed(3) + " ct dia" : "") : r.src === "own" ? "Own gold" : r.src === "vendor" ? "Purchased" + (r.amount != null ? " · ₹ " + Number(r.amount).toLocaleString("en-IN") + (r.rate != null ? " @ " + r.rate + "/g" : "") : "") : r.cash ? "✔ Converted to cash" + (r.cash.amount != null ? " ₹ " + Number(r.cash.amount).toLocaleString("en-IN") : "") + " on " + dmy(r.cash.date) + " (" + r3(r.cash.fine) + " g)" : r.src === "stock" ? "Melted (out of stock)" : r.bill ? "On bill " + r.bill : "Free" + (r.cancelledOn ? " (bill " + r.cancelledOn + " cancelled)" : "");
+        const st = el("td", { className: "ogst" }); st.style.fontWeight = "600";
+        st.textContent = r.cancelled ? "Cancelled " + dmy(r.cancelled.at) + (r.cancelled.why ? " (" + r.cancelled.why + ")" : "") : r.src === "part" ? "Part taken (" + r3(r.gross) + " g; tag kept)" + (r.dia && !(r.stones || []).length ? " · " + r.dia.pcs + " pcs / " + Number(r.dia.ct).toFixed(3) + " ct dia" : "") : r.src === "own" ? "Own gold" : r.src === "vendor" ? "Purchased" + (r.amount != null ? " · ₹ " + Number(r.amount).toLocaleString("en-IN") + (r.rate != null ? " @ " + r.rate + "/g" : "") : "") : r.cash ? "✔ Converted to cash" + (r.cash.amount != null ? " ₹ " + Number(r.cash.amount).toLocaleString("en-IN") : "") + " (" + dmy(r.cash.date) + ") · " + r3(r.cash.fine) + " g" : r.src === "stock" ? "Melted (out of stock)" : r.bill ? "✔ Adjusted in bill " + r.bill + (r.billDate ? " (" + dmy(r.billDate) + ")" : "") : "Free" + (r.cancelledOn ? " (bill " + r.cancelledOn + " cancelled)" : "");
         if (!r.cancelled && !r.bill && r.src === "party" && !r.cash) st.style.color = "var(--ok)"; if (r.cash && !r.cancelled) st.style.color = "var(--gold)"; if (r.edited) st.title = "Edited " + dmy(r.edited.at) + " by " + r.edited.byName; tr.appendChild(st);
         const x = el("td"); x.style.whiteSpace = "nowrap";
         if (J.canDelete && !(r.cancelled && (r.src === "stock" || r.src === "part"))) { const e = el("button", { type: "button", className: "btn ghost", textContent: r.cancelled ? "Bring back" : "Edit" }); e.addEventListener("click", () => fill(r)); x.appendChild(e); }
@@ -252,7 +253,9 @@
     }
     head.forEach(h => hr.appendChild(el("th", { textContent: h }))); t.appendChild(el("thead", {}, [hr])); t.style.minWidth = (head.length * 92) + "px";
     if (!rows.length) tb.appendChild(el("tr", {}, [el("td", { colSpan: head.length, className: "hint", textContent: view === "dia" ? "No diamonds to get back." : "Nothing here" + (ym ? " for " + ym.split("-").reverse().join("-") : "") + "." })]));
-    t.appendChild(tb); box.appendChild(el("div", { className: "list" }, [t]));
+    t.appendChild(tb);
+    if (view === "in" && (J.orphans || []).length) box.appendChild(el("div", { className: "ogorph", textContent: "OG nos. on bills but not in register (add them with + Old gold IN): " + J.orphans.map(o => "OG " + o.og + " - " + o.no + (o.name ? " " + o.name : "") + (o.date ? " (" + dmy(o.date) + ")" : "")).join("; ") })); /* C-20261102-OGDONE */
+    box.appendChild(el("div", { className: "list" }, [t]));
   }
   async function xl() { const b = $("ogXl"); b.disabled = true;
     try { const r = await fetch("/api/vj/ogs?xlsx=1", { credentials: "same-origin", cache: "no-store" }); if (!r.ok) throw new Error(r.status); const a = el("a", { href: URL.createObjectURL(await r.blob()), download: "VJ_OG_register_" + dmy(today()) + ".xlsx" }); document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000); }
