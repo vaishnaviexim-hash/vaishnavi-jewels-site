@@ -1052,8 +1052,8 @@ async function vjBill(request, env, who, ctx) { // every login may make bills (o
   if (title === 'Bill' && ogNo) { const used = (await vjOgList(env)).find(x => !x.cancelled && x.og.toUpperCase() === ogNo.toUpperCase() && x.no !== editNo);
     try { const r0 = await env.DB.prepare('SELECT data FROM vj_ogs WHERE no = ?').bind(ogNo.replace(/\s+/g, '').toUpperCase()).first(), o0 = r0 ? vjParse(r0) : null; // C-20261102-OGVENDOR / OGCASH: only a party OG not converted to cash
       if (o0 && !o0.cancelled && o0.src && o0.src !== 'party') return vjDeny(409, `OG no. ${ogNo} is not a party's old gold (own stock / vendor entry) - it cannot go on a bill`);
-      if (o0 && !o0.cancelled && o0.cash) return vjDeny(409, `OG no. ${ogNo} was converted to cash - it cannot go on a Gold to Gold bill`); } catch (e) {}
-    if (used) return vjDeny(409, `OG no. ${ogNo} is already on ${used.no} (${used.name || ''}) - pick the next OG no.`); }
+      if (o0 && !o0.cancelled && o0.cash) return vjDeny(409, `OG ${ogNo} already converted to cash on ${vjDmy(o0.cash.date)} (₹${Number(o0.cash.amount || 0).toLocaleString('en-IN')}) — can't adjust in a bill.`); } catch (e) {} // C-20261102-OGDUP (owner 15:27)
+    if (used) return vjDeny(409, `OG ${ogNo} already adjusted in bill ${used.no}${used.name ? ' (' + used.name + ')' : ''}.`); }
   const sRow = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first();
   const s = sRow ? JSON.parse(sRow.data) : {};
   vtags.forEach(t => tags.push(t)); // C-20261027-ESTBILL: the typed designs are priced like tags
@@ -1818,7 +1818,8 @@ async function vjOgCashSave(b, env, who, adm, now, byName, op, dateOk) {
       env.DB.prepare('INSERT INTO vj_party_ledger (id, ts, date, party, mobile, type, ref, amount, fine, status, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(rid, Date.now(), now.slice(0, 10), old.name || '', old.mobile || '', 'og_cash_rev', no, -Number(old.cash.amount || 0), -Number(old.cash.fine || 0), 'ok', JSON.stringify(rd)),
       env.DB.prepare('UPDATE vj_ogs SET data = ?, ts = ? WHERE no = ?').bind(JSON.stringify(rec), Date.now(), no)]);
     await vjAudit(env, who, 'og-cash-cancel', 'ogs/' + no, 'Rs ' + old.cash.amount + ' ' + c.cancelled.why); return vjJson({ ok: true }); }
-  const used = (await vjOgList(env)).find(x => !x.cancelled && x.og.toUpperCase() === no); if (used) return vjDeny(409, 'OG ' + no + ' is on bill ' + used.no + ' - it cannot be converted to cash');
+  const used = (await vjOgList(env)).find(x => !x.cancelled && x.og.toUpperCase() === no); if (used) return vjDeny(409, 'OG ' + no + ' already adjusted in bill ' + used.no + '.'); // C-20261102-OGDUP (owner 15:27)
+  if (old.cash && !(b && b.edit)) return vjDeny(409, 'OG ' + no + ' already converted to cash on ' + vjDmy(old.cash.date) + '.'); // a second conversion is refused; 'Edit cash' (admin) sends edit
   if (old.cash && !adm) return vjDeny(403, 'only Abhinav or Shilpiji can change a cash conversion');
   const date = String(b.date || ''); if (!dateOk(date)) return vjDeny(400, 'bad date');
   const calc = vjOgCalc(Object.assign({}, old, { src: 'party' })), cap = Math.max(vjOgMg(calc.actFine), vjOgMg(calc.credFine));
@@ -2447,18 +2448,20 @@ async function vjAddrBook(url, env, who) {
 // Customer recall (owner 17/10/2026 17:04, C-20261017-PARTY): type a mobile number or part of a name on New tag (order), Bill or
 // Ledger receipt and get the party's name, mobile and city from earlier bills, estimates, receipts, quotes and order tags.
 // Read-only, logged-in users only, at most 8 matches, nothing else about the customer is returned.
-async function vjParties(url, env) {
+async function vjParties(url, env, who) {
   const q = String(url.searchParams.get('q') || '').trim().slice(0, 40), qd = q.replace(/\D/g, ''), qn = vjNk(q);
   if (qd.length < 3 && qn.replace(/\s/g, '').length < 2) return vjJson({ ok: true, parties: [] });
   await vjRcT(env); if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
-  const seen = new Map(), add = (name, mobile, city, at, ad) => {
+  const seen = new Map(), add = (name, mobile, city, at, ad, bl) => {
     name = vjClean(name, 60); if (!name) return; const m = vjPhone(mobile), d = String(m).replace(/\D/g, '').slice(-10);
     const key = /^[6-9]\d{9}$/.test(d) ? 'm:' + d : 'n:' + vjNk(name) + '|' + vjNk(city);
-    const old = seen.get(key), e = !old || String(at || '') >= old.at ? { name, mobile: m, city: vjClean(city, 40), at: String(at || ''), adr: old ? old.adr : null, adrAt: old ? old.adrAt : '' } : old;
+    const old = seen.get(key), e = !old || String(at || '') >= old.at ? { name, mobile: m, city: vjClean(city, 40), at: String(at || ''), adr: old ? old.adr : null, adrAt: old ? old.adrAt : '', last: old ? old.last : null } : old;
+    if (bl && bl.no && (!e.last || String(bl.date || '') >= String(e.last.date || ''))) e.last = { no: bl.no, date: bl.date || '' }; // C-20261102-OGPARTY: last bill of this party
     // C-20261102-BILLADDR: the address of the latest bill / delivery challan that has one
     if (ad && (ad.addr || ad.area || ad.state || ad.pin) && (!e.adr || String(at || '') >= e.adrAt)) { e.adr = { addr: vjClean(ad.addr, 160), area: vjClean(ad.area, 80), state: vjClean(ad.state, 40), pin: /^[1-9]\d{5}$/.test(String(ad.pin || '')) ? String(ad.pin) : '' }; e.adrAt = String(at || ''); }
     seen.set(key, e); };
-  ((((await env.DB.prepare('SELECT data FROM vj_bills').all()).results) || []).map(vjParse)).forEach(b => { if (b && !b.cancelled) add(b.name, b.mobile, b.city, b.at || b.date, b); });
+  ((((await env.DB.prepare('SELECT data FROM vj_bills').all()).results) || []).map(vjParse)).forEach(b => { if (b && !b.cancelled) add(b.name, b.mobile, b.city, b.at || b.date, b, b.title === 'Bill' ? { no: b.no, date: b.date } : null); });
+  try { await vjOgTable(env); ((((await env.DB.prepare('SELECT data FROM vj_ogs').all()).results) || []).map(vjParse)).forEach(o => { if (o && !o.cancelled && (!o.src || o.src === 'party')) add(o.name, o.mobile, o.city, o.at || o.date); }); } catch (e) {} // C-20261102-OGPARTY: earlier OG parties
   ((((await env.DB.prepare('SELECT data FROM vj_receipts').all()).results) || []).map(vjParse)).forEach(r => { if (r && !r.reversed) add(r.name, r.mobile, r.city, r.at || r.date); });
   await vjChT(env); ((((await env.DB.prepare('SELECT data FROM vj_challans').all()).results) || []).map(vjParse)).forEach(c => { if (c && !c.cancelled && c.party) add(c.party.name, c.party.mobile, c.party.city, c.at, c.party); }); // C-20261102-CHALLAN
   ((((await env.DB.prepare("SELECT data FROM docs WHERE path LIKE 'quotes/%' OR path LIKE 'tags/%'").all()).results) || []).map(vjParse)).forEach(x => {
@@ -2467,7 +2470,7 @@ async function vjParties(url, env) {
   hit.sort((a, b) => (qd.length >= 3 ? (String(b.mobile).replace(/\D/g, '').endsWith(qd) ? 1 : 0) - (String(a.mobile).replace(/\D/g, '').endsWith(qd) ? 1 : 0) : 0) || b.at.localeCompare(a.at));
   // the address goes out only when a full 10-digit mobile is typed and matches exactly (no address lists by partial number or name)
   const full = /^[6-9]\d{9}$/.test(qd);
-  return vjJson({ ok: true, parties: hit.slice(0, 8).map(p => ({ name: p.name, mobile: p.mobile, city: p.city, ...(full && p.adr && String(p.mobile).replace(/\D/g, '').slice(-10) === qd ? p.adr : {}) })) });
+  return vjJson({ ok: true, parties: hit.slice(0, 12).map(p => ({ name: p.name, mobile: p.mobile, city: p.city, last: who && who.role !== 'sales' ? p.last || null : null, ...(full && p.adr && String(p.mobile).replace(/\D/g, '').slice(-10) === qd ? p.adr : {}) })) });
 }
 
 // Sundry debtors (owner 17/10/2026 16:43, C-20261017-DEBTORS): every customer who still owes money or fine gold, customer-wise,
@@ -3062,7 +3065,7 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/ledger.xlsx' && request.method === 'GET') return vjLedgerXlsx(url, env, who);
   if ((p === '/api/vj/debtors' || p === '/api/vj/debtors.xlsx') && request.method === 'GET') return vjDebtors(url, env, who); // C-20261017-DEBTORS
   if (p === '/api/vj/wa-ready' && request.method === 'GET') return vjWaReady(env);
-  if (p === '/api/vj/parties' && request.method === 'GET') return vjParties(url, env); // C-20261017-PARTY
+  if (p === '/api/vj/parties' && request.method === 'GET') return vjParties(url, env, who); // C-20261017-PARTY
   if ((p === '/api/vj/challans' || p === '/api/vj/challan') && request.method === 'GET') return vjChallanGet(url, env, who); // C-20261102-CHALLAN
   if (p === '/api/vj/addrbook' && request.method === 'GET') return vjAddrBook(url, env, who); // C-20261102-ADDRBOOK
   if ((p === '/api/vj/challan' || p === '/api/vj/challan/cancel') && request.method === 'POST') { if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed'); return p === '/api/vj/challan' ? vjChallanSave(request, env, who) : vjChallanCancel(request, env, who); }
