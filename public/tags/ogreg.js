@@ -185,7 +185,7 @@
     $("ogCMsg").textContent = ""; $("ogCashForm").hidden = false; cPrev(); window.scrollTo({ top: $("ogCashForm").offsetTop - 10, behavior: "smooth" }); }
   function cPrev() { const f = num($("ogCFine").value), rt = num($("ogCRate").value), a = J && J.admin && num($("ogCAmt").value) > 0 ? num($("ogCAmt").value) : (f > 0 && rt > 0 ? Math.round(f * rt) : 0); $("ogCPrev").textContent = a ? "Amount: ₹ " + a.toLocaleString("en-IN") + (J && J.admin && num($("ogCAmt").value) > 0 ? " (typed)" : " = " + r3(f) + " g × " + rt) : ""; }
   async function cSave() { const m = $("ogCMsg"), b = $("ogCSave"); if (!cRec) return;
-    const body = { op: "cash", no: cRec.no, date: $("ogCDate").value, rate: $("ogCRate").value.trim(), fine: $("ogCFine").value.trim(), note: $("ogCNote").value.trim() }; if (J && J.admin) body.amount = $("ogCAmt").value.trim();
+    const body = { op: "cash", edit: !!cRec.cash, no: cRec.no, date: $("ogCDate").value, rate: $("ogCRate").value.trim(), fine: $("ogCFine").value.trim(), note: $("ogCNote").value.trim() }; if (J && J.admin) body.amount = $("ogCAmt").value.trim();
     if (!(num(body.rate) > 0)) { m.textContent = "Type the rate per g of fine."; return; } if (!(num(body.fine) > 0)) { m.textContent = "Type the fine g."; return; }
     b.disabled = true; m.textContent = "Saving…";
     try { const j = await post(body); $("ogMsg").textContent = "OG " + cRec.no + " converted to cash: ₹ " + Number(j.cash.amount).toLocaleString("en-IN") + " (" + r3(j.cash.fine) + " g @ " + j.cash.rate + ") - credit noted for " + cRec.name + "; no longer offered on a Gold to Gold bill."; $("ogCashForm").hidden = true; cRec = null; await load(); }
