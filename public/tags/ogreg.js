@@ -46,13 +46,15 @@
   }
   function tile(k, v, s, cls) { return el("div", { className: "ogtile" + (cls ? " " + cls : "") }, [el("div", { className: "k", textContent: k }), el("div", { className: "v", textContent: v }), s ? el("div", { className: "s", textContent: s }) : ""]); }
   function summary() {
-    const box = $("ogSumBox"); if (!box || !J) return; box.textContent = ""; const S = J.sum || {}, ym = $("ogMon").value || today().slice(0, 7), M = (S.months || {})[ym] || { n: 0, gross: 0, cred: 0, act: J.admin ? 0 : null, margin: J.admin ? 0 : null }, A = S.all || {}, OM = (S.outMonths || {})[ym] || { issued: 0, stock: 0 };
+    const box = $("ogSumBox"); if (!box || !J) return; box.textContent = ""; const S = J.sum || {}, ym = $("ogMon").value || today().slice(0, 7), M = (S.months || {})[ym] || { n: 0, gross: 0, cred: 0, act: J.admin ? 0 : null, margin: J.admin ? 0 : null, pur: (S.all || {}).pur != null ? 0 : null }, A = S.all || {}, OM = (S.outMonths || {})[ym] || { issued: 0, stock: 0 };
     const ml = ym.split("-").reverse().join("-");
     if (S.inHand != null) box.append(tile("OG fine in hand (actual)", big(S.inHand), "Actual fine in − issued to karigars (" + g3(S.issued) + ") − moved to our stock (" + g3(S.toStock) + ")", "oghand"));
     box.append(tile("Gross in · " + ml, big(M.gross), "All time: " + big(A.gross) + " · " + (M.n || 0) + " / " + (A.n || 0) + " OGs"));
     if (J.admin) box.append(tile("Actual fine in · " + ml, big(M.act), "All time: " + big(A.act), "ogadm"));
     box.append(tile("Party credit fine · " + ml, big(M.cred), "All time: " + big(A.cred)));
     if (J.admin) box.append(tile("Margin profit fine · " + ml, big(M.margin), "All time: " + big(A.margin), "ogadm"));
+    if (M.pur != null && A.pur != null) box.append(tile("Purchased fine · " + ml, big(M.pur), "All time: " + big(A.pur) + " (from vendors)"));
+    if (J.admin && S.cash) box.append(tile("Converted to cash", S.cash.n + " OG" + (S.cash.n === 1 ? "" : "s") + " · " + big(S.cash.fine), "₹ " + Number(S.cash.amt || 0).toLocaleString("en-IN") + " credited to parties (gold still in hand)", "ogadm"));
     if (S.inHand != null) box.append(tile("Issued · " + ml, big(OM.issued), "Moved to stock: " + big(OM.stock)));
     if (S.perKarigar) { const k = el("div", { className: "ogtile" }, [el("div", { className: "k", textContent: "Fine with karigars (balance)" })]);
       if (!S.perKarigar.length) k.append(el("div", { className: "s", textContent: "Nothing issued yet." }));
@@ -61,16 +63,37 @@
     if (S.diaPending) { const d = S.diaPending; box.append(tile("Diamonds pending from karigars", d.pcs + " pcs · " + Number(d.ct || 0).toFixed(3) + " ct", Object.entries(d.byKarigar || {}).map(([n, v]) => n + ": " + v.pcs + " pcs / " + Number(v.ct).toFixed(3) + " ct").join(" · ") || "None pending")); }
     $("ogAsOf").textContent = "As of " + (S.asOf ? S.asOf.slice(8, 10) + "-" + S.asOf.slice(5, 7) + "-" + S.asOf.slice(0, 4) + " " + S.asOf.slice(11) : new Date().toLocaleString("en-IN")) + (J.next ? " · next OG no.: " + J.next : "");
   }
-  function kList() { const dl = $("ogKdl"); if (!dl || !J) return; dl.textContent = ""; (J.karigars || []).forEach(k => dl.appendChild(el("option", { value: k }))); }
+  function kList() { const dl = $("ogKdl"); if (!dl || !J) return; dl.textContent = ""; (J.karigars || []).forEach(k => dl.appendChild(el("option", { value: k })));
+    const vd = $("ogVdl"); if (vd) { vd.textContent = ""; (J.vendors || []).forEach(v => vd.appendChild(el("option", { value: v }))); } }
   // ---------- inward form ----------
-  function src() { const s = (document.querySelector("input[name=ogSrc]:checked") || {}).value || "party"; return s === "party" ? "party" : ((document.querySelector("input[name=ogOwn]:checked") || {}).value || "stock"); }
-  function srcSync() { const s = src(); $("ogParty").hidden = s !== "party"; $("ogOwnBox").hidden = s === "party"; $("ogStock").hidden = s !== "stock" && s !== "part"; $("ogWhole").hidden = s !== "stock"; $("ogPart").hidden = s !== "part"; $("ogPlain").hidden = s !== "own"; prev(); }
+  /* 02/11 15:00 (owner): ONE flat "Gold from:" drop-down - party / stock (whole piece) / part (part of a piece) / own (plain fine) / vendor (purchased, C-20261102-OGVENDOR) */
+  const SRCS = [["party", "1) Party (customer's old gold)"], ["stock", "2) Our stock - whole piece (tag no.)"], ["part", "3) Our stock - part of a piece (tag no. + weight taken)"], ["own", "4) Plain fine / own gold"], ["vendor", "5) Purchased from vendor"]];
+  function src() { const v = ($("ogSrcSel") || {}).value; return SRCS.some(x => x[0] === v) ? v : "party"; }
+  let lastSrc = "party";
+  function srcSync() { const s = src(); $("ogParty").hidden = s !== "party"; $("ogStock").hidden = s !== "stock" && s !== "part"; $("ogWhole").hidden = s !== "stock"; $("ogPart").hidden = s !== "part"; $("ogPlain").hidden = s !== "own"; $("ogVendor").hidden = s !== "vendor";
+    $("ogStonesBox").hidden = !(s === "party" || s === "stock" || s === "part"); $("ogStCol").hidden = s === "party"; document.querySelectorAll("#ogStRows .ogStC").forEach(c => { c.hidden = s === "party"; });
+    if (s !== lastSrc && !$("ogNo").dataset.edit) { if (stockTag && (s === "stock" || s === "part")) stPrefill(); else if (s === "party" || lastSrc === "party") stRows([]); } lastSrc = s; prev(); }
+  // ---------- diamonds on an OG (C-20261102-OGSTONES, owner 02/11 14:58) ----------
+  function stRow(d, ro) { const s = src(), tr = el("tr"); tr.dataset.line = d.line == null ? "" : String(d.line);
+    const i = (k, ph, w, mode) => { const x = el("input", { value: d[k] == null ? "" : String(d[k]), placeholder: ph, maxLength: k === "note" ? 60 : 30, disabled: !!ro }); x.dataset.k = k; x.style.width = w; if (mode) x.inputMode = mode; x.addEventListener("input", stTot); const c = el("td"); c.appendChild(x); tr.appendChild(c); };
+    i("shape", "RD", "60px"); i("q", "VVS-EF", "100px"); i("pcs", "0", "60px", "numeric"); i("ct", "0.000", "80px", "decimal"); i("note", "", "130px");
+    const sc = el("td", { className: "ogStC" }); sc.hidden = s === "party"; const sel = el("select", { disabled: !!ro }); [["out", "came out"], ["missing", "missing"]].forEach(([v, t]) => sel.appendChild(el("option", { value: v, textContent: t }))); sel.value = d.st === "missing" ? "missing" : "out"; sel.dataset.k = "st"; sel.addEventListener("change", stTot); sc.appendChild(sel); tr.appendChild(sc);
+    return tr; }
+  function stRows(list, ro) { const tb = $("ogStRows"); tb.textContent = ""; (list || []).forEach(d => tb.appendChild(stRow(d, ro))); $("ogStAdd").disabled = !!ro; stTot(); }
+  function stGet() { return [...$("ogStRows").querySelectorAll("tr")].map(tr => { const o = { line: tr.dataset.line === "" ? null : Number(tr.dataset.line) }; tr.querySelectorAll("[data-k]").forEach(x => { o[x.dataset.k] = x.value.trim(); }); return o; }).filter(o => num(o.pcs) > 0 || num(o.ct) > 0); }
+  function stTot() { const r = stGet(), out = r.filter(x => x.st !== "missing" || src() === "party"), p = out.reduce((a, x) => a + (num(x.pcs) || 0), 0), c = out.reduce((a, x) => a + (num(x.ct) || 0), 0);
+    $("ogStTot").textContent = r.length ? "Total: " + p + " pcs · " + c.toFixed(3) + " ct" + (src() !== "party" && r.length !== out.length ? " (+ " + (r.length - out.length) + " row(s) missing)" : "") : "No diamond rows."; }
+  function stPrefill() { if (!stockTag) return; const s = src(); // whole piece: all the tag's stones (edit pcs / ct, mark missing); part: the tag's lines with pcs / ct empty - type what came out
+    stRows((stockTag.dias || []).map(x => ({ line: x.i, shape: x.d.shape || "", q: x.d.q || x.d.code || "", pcs: s === "stock" ? (x.d.pcs || 0) : "", ct: s === "stock" ? Number(x.d.ct || 0) : "", note: "", st: "out" })));
+    if (s === "part" || (stockTag.dias || []).length) $("ogStonesBox").open = true; }
+  const stSum = l => { const a = (l || []).filter(x => x.src === "party" || x.st !== "missing"); return a.length ? a.reduce((s, x) => s + (Number(x.pcs) || 0), 0) + " pcs / " + a.reduce((s, x) => s + (Number(x.ct) || 0), 0).toFixed(3) + " ct" : ""; };
   function calc() { // same formula as the server (integer milligrams); the server works it out again on Save
     const s = src();
     if (s === "stock") { if (!stockTag) return null; const t = tun($("ogSTunch").value), tn = t > 0 ? t : stockTag.karT; return { gross: stockTag.gMg / 1000, act: Math.round(stockTag.gMg * tn / 100) / 1000, tunch: tn }; }
-    if (s === "part" || s === "own") { const p = s === "part" ? "ogP" : "ogOwn", g = mg(num($(p + "Gross").value)), t = tun($(p + "Tunch").value), f = num($(p + "Fine").value);
+    if (s === "part" || s === "own" || s === "vendor") { const p = s === "part" ? "ogP" : s === "vendor" ? "ogV" : "ogOwn", g = mg(num($(p + "Gross").value)), t = tun($(p + "Tunch").value), f = num($(p + "Fine").value);
       const c = t > 0 && g > 0 ? { gross: g / 1000, act: Math.round(g * t / 100) / 1000, tunch: t } : f > 0 ? { gross: g / 1000, act: Math.round(f * 1000) / 1000, tunch: null } : null;
-      if (c && s === "part" && stockTag && !stockTag.edit) { const ln = (stockTag.lines || [])[Number($("ogPLine").value) || 0]; c.after = (stockTag.gMg - g) / 1000; c.bad = !ln || g >= mg(ln.net) || g >= stockTag.gMg; } return c; }
+      if (c && s === "part" && stockTag && !stockTag.edit) { const ln = (stockTag.lines || [])[Number($("ogPLine").value) || 0]; c.after = (stockTag.gMg - g) / 1000; c.bad = !ln || g >= mg(ln.net) || g >= stockTag.gMg; }
+      if (c && s === "vendor" && J && J.admin) { const rt = num($("ogVRate").value), am = num($("ogVAmt").value); c.amt = rt > 0 ? Math.round(rt * c.act * 100) / 100 : am > 0 ? am : null; } return c; }
     const g = mg(num($("ogGross").value)), t = tun($("ogTunch").value), m = J && J.admin ? num($("ogMargin").value) : 2;
     if (!(t > 0)) { const f = num($("ogFine").value); return f > 0 ? { gross: g / 1000, cred: Math.round(f * 1000) / 1000, act: Math.round(f * 1000) / 1000, margin: 0, ct: null } : null; }
     if (!(g > 0)) return null; const ct = Math.max(0, Math.round((t - (m >= 0 ? m : 2)) * 100) / 100), a = Math.round(g * t / 100), c = Math.round(g * ct / 100);
@@ -79,11 +102,11 @@
   function prev() { const box = $("ogPrev"); if (!box) return; box.textContent = ""; const c = calc(); if (!c) return; const b = (k, v, cls) => box.append(el("div", { className: cls || "" }, [k, el("b", { textContent: v })]));
     const s = src();
     if (s === "stock") { b("Gold (gross) g", r3(c.gross)); b("Tunch %", String(c.tunch)); b("Fine in", g3(c.act), "main"); if (stockTag && stockTag.ct) b("Diamonds to get back", stockTag.pcs + " pcs · " + stockTag.ct.toFixed(3) + " ct"); return; }
-    if (s === "part" || s === "own") { b(s === "part" ? "Part gross g" : "Gross g", c.gross ? r3(c.gross) : "-"); if (c.tunch) b("Tunch %", String(c.tunch)); b("Fine in", g3(c.act), "main");
+    if (s === "part" || s === "own" || s === "vendor") { b(s === "part" ? "Part gross g" : "Gross g", c.gross ? r3(c.gross) : "-"); if (c.tunch) b("Tunch %", String(c.tunch)); b(s === "vendor" ? "Purchased fine" : "Fine in", g3(c.act), "main"); if (c.amt) b("Amount", "₹ " + c.amt.toLocaleString("en-IN"));
       if (s === "part" && c.after != null) b("Tag gold after", c.bad ? "too much - must be less than the gold line" : g3(c.after)); return; }
     if (J && J.admin && c.ct != null) { b("Actual fine", g3(c.act)); b("Party credit tunch", c.ct + " %"); }
     b("Party credit fine", g3(c.cred), "main"); if (J && J.admin && c.ct != null) b("Our margin fine", g3(c.margin)); }
-  function findTag() { const q = String($("ogCode").value || "").trim(), m = $("ogStockInfo"); stockTag = null; m.textContent = ""; $("ogSTunch").value = ""; ["ogPLine", "ogPDLine"].forEach(i => { $(i).textContent = ""; }); if (!q) { prev(); return; }
+  function findTag() { const q = String($("ogCode").value || "").trim(), m = $("ogStockInfo"); stockTag = null; m.textContent = ""; $("ogSTunch").value = ""; $("ogPLine").textContent = ""; if (!$("ogNo").dataset.edit) stRows([]); if (!q) { prev(); return; }
     const all = (window.VJ_TAGS ? window.VJ_TAGS() : []), qu = q.toUpperCase().replace(/\s+/g, ""), nq = N(q);
     let hit = /^[A-Z]{3}\d+[A-Z]{3}$/.test(qu) ? all.filter(t => t.code && String(t.code).toUpperCase() === qu) : [];
     if (!hit.length) hit = all.filter(t => (/^\d+$/.test(qu) && String(t.no) === qu) || (nq && (N(t.designNo) === nq || N(t.label) === nq))).slice(0, 12);
@@ -101,22 +124,24 @@
     stockTag.lines = lines; stockTag.dias = (t.dias || []).map((d, i) => ({ d, i })).filter(x => x.d && (Number(x.d.ct) > 0 || Number(x.d.pcs) > 0));
     $("ogSTunch").value = String(stockTag.karT);
     const pl = $("ogPLine"); lines.forEach((g, j) => pl.appendChild(el("option", { value: String(j), textContent: g.k + " " + r3(g.net) + " g · tunch " + (Math.round(g.p * 10000) / 100) + " %" }))); $("ogPTunch").value = lines[0] ? String(Math.round(lines[0].p * 10000) / 100) : "";
-    const dl = $("ogPDLine"); dl.appendChild(el("option", { value: "", textContent: "no diamonds taken out" })); stockTag.dias.forEach(x => dl.appendChild(el("option", { value: String(x.i), textContent: [x.d.shape, x.d.q].filter(Boolean).join(" ") + " · " + (x.d.pcs || 0) + " pcs · " + Number(x.d.ct || 0).toFixed(3) + " ct" })));
+    stPrefill();
     m.append(el("div", { className: "labelno", textContent: t.label + (t.designNo ? " · design " + t.designNo : "") + (t.catName ? " · " + t.catName : "") }),
       el("div", { textContent: "Gold: " + lines.map(g => g.k + " " + r3(g.net) + " g").join(", ") + " · karat tunch " + stockTag.karT + " %" }),
-      el("div", { className: "hint", textContent: ds.length ? "Diamonds: " + ds.map(d => [d.shape, d.q].filter(Boolean).join(" ") + " " + (d.pcs || 0) + " pcs " + Number(d.ct || 0).toFixed(3) + " ct").join("; ") + " - they go to 'Diamonds to get back from karigar'." : "No diamonds." }),
+      el("div", { className: "hint", textContent: ds.length ? "Diamonds: " + ds.map(d => [d.shape, d.q].filter(Boolean).join(" ") + " " + (d.pcs || 0) + " pcs " + Number(d.ct || 0).toFixed(3) + " ct").join("; ") + " - see Diamonds below (change pcs / ct, mark missing, add a row); they go to 'Diamonds to get back from karigar'." : "No diamonds on the tag (add rows below if any)." }),
       el("div", { className: "hint", textContent: "a. Whole piece: on Save it leaves stock (moved to OG / melted). b. Part of a piece: the tag stays in stock, its gold weight (and diamonds taken out) go down." }));
     prev(); }
   function fill(r) { clear(); $("ogNo").value = r.no; $("ogNo").dataset.edit = "1"; $("ogNo").readOnly = true; $("ogDate").value = r.date || today(); $("ogNote").value = r.note || "";
-    document.querySelectorAll("input[name=ogSrc]").forEach(x => { x.checked = x.value === (r.src === "party" ? "party" : "own"); x.disabled = true; }); document.querySelectorAll("input[name=ogOwn]").forEach(x => { x.checked = x.value === r.src; x.disabled = true; });
+    $("ogSrcSel").value = SRCS.some(x => x[0] === r.src) ? r.src : "party"; $("ogSrcSel").disabled = true; lastSrc = src();
+    stRows((r.stones || []).map(x => Object.assign({}, x, { line: null })), r.src !== "party"); if ((r.stones || []).length) $("ogStonesBox").open = true;
     if (r.src === "stock" || r.src === "part") { $("ogCode").value = r.tag ? r.tag.label : ""; $("ogCode").disabled = true; $("ogFindB").disabled = true; stockTag = { id: r.tag && r.tag.id, label: r.tag && r.tag.label, gMg: mg(r.gross), karT: Number(r.tunch) || 0, pcs: (r.tag && r.tag.pcs) || 0, ct: (r.tag && r.tag.ct) || 0, lines: [], dias: [], edit: true };
       if (r.src === "stock") $("ogSTunch").value = r.tunch != null ? String(r.tunch) : ""; else { $("ogPGross").value = String(r.gross || ""); $("ogPGross").disabled = true; $("ogPTunch").value = r.tunch != null ? String(r.tunch) : ""; $("ogPFine").value = r.tunch == null && r.actFine ? String(r.actFine) : ""; }
       $("ogStockInfo").textContent = (r.src === "part" ? "Part (" + r3(r.gross) + " g) of " : "Own piece ") + (r.tag ? r.tag.label : "") + " - only date, tunch and note can be changed. To undo, Cancel the OG (" + (r.src === "part" ? "the weight is added back to the tag" : "the piece goes back to stock") + ")."; }
+    else if (r.src === "vendor") { $("ogVName").value = r.vendor || r.name || ""; $("ogVInv").value = r.inv || ""; $("ogVDesc").value = r.item || ""; $("ogVGross").value = r.gross ? String(r.gross) : ""; $("ogVTunch").value = r.tunch != null ? String(r.tunch) : ""; $("ogVFine").value = r.tunch == null && r.actFine ? String(r.actFine) : ""; $("ogVRate").value = r.rate != null ? String(r.rate) : ""; $("ogVAmt").value = r.amount != null ? String(r.amount) : ""; }
     else if (r.src === "own") { $("ogOwnDesc").value = r.name || ""; $("ogOwnGross").value = r.gross ? String(r.gross) : ""; $("ogOwnTunch").value = r.tunch != null ? String(r.tunch) : ""; $("ogOwnFine").value = r.tunch == null && r.actFine ? String(r.actFine) : ""; }
     else { $("ogName").value = r.name || ""; $("ogMob").value = r.mobile || ""; $("ogCity").value = r.city || ""; $("ogItem").value = r.item || ""; $("ogGross").value = r.gross ? String(r.gross) : ""; $("ogTunch").value = r.tunch != null ? String(r.tunch) : ""; $("ogMargin").value = r.margin != null ? String(r.margin) : "2"; $("ogFine").value = r.tunch == null && r.credFine ? String(r.credFine) : ""; }
     srcSync(); $("ogSave").textContent = (r.cancelled ? "Bring back OG " : "Update OG ") + r.no; $("ogInForm").hidden = false; $("ogMsg").textContent = "Editing OG " + r.no + " - change and Update, or Clear."; window.scrollTo({ top: $("ogInForm").offsetTop - 10, behavior: "smooth" }); }
-  function clear() { ["ogNo", "ogName", "ogMob", "ogCity", "ogItem", "ogGross", "ogTunch", "ogFine", "ogNote", "ogCode", "ogSTunch", "ogPGross", "ogPTunch", "ogPFine", "ogPDPcs", "ogPDCt", "ogOwnDesc", "ogOwnGross", "ogOwnTunch", "ogOwnFine"].forEach(i => { $(i).value = ""; }); $("ogPGross").disabled = false; ["ogPLine", "ogPDLine"].forEach(i => { $(i).textContent = ""; }); $("ogMargin").value = "2"; $("ogStockInfo").textContent = ""; stockTag = null;
-    delete $("ogNo").dataset.edit; $("ogNo").readOnly = false; $("ogCode").disabled = false; $("ogFindB").disabled = false; document.querySelectorAll("input[name=ogSrc], input[name=ogOwn]").forEach(x => { x.disabled = false; });
+  function clear() { ["ogNo", "ogName", "ogMob", "ogCity", "ogItem", "ogGross", "ogTunch", "ogFine", "ogNote", "ogCode", "ogSTunch", "ogPGross", "ogPTunch", "ogPFine", "ogOwnDesc", "ogOwnGross", "ogOwnTunch", "ogOwnFine", "ogVName", "ogVInv", "ogVDesc", "ogVFine", "ogVGross", "ogVTunch", "ogVRate", "ogVAmt"].forEach(i => { $(i).value = ""; }); $("ogPGross").disabled = false; $("ogPLine").textContent = ""; stRows([]); $("ogStonesBox").open = false; $("ogMargin").value = "2"; $("ogStockInfo").textContent = ""; stockTag = null;
+    delete $("ogNo").dataset.edit; $("ogNo").readOnly = false; $("ogCode").disabled = false; $("ogFindB").disabled = false; $("ogSrcSel").disabled = false; $("ogSrcSel").value = "party"; lastSrc = "party"; /* default = Party */
     $("ogDate").value = today(); $("ogSave").textContent = "Save OG"; if (J && J.next) $("ogNo").value = String(J.next); srcSync(); }
   async function save() {
     const m = $("ogMsg"), b = $("ogSave"), edit = $("ogNo").dataset.edit === "1", s = src();
@@ -125,16 +150,19 @@
     if (s === "stock") { if (!stockTag) { m.textContent = "Type the tag code of the piece and tap Find."; return; } body.tagId = stockTag.id; body.tunch = $("ogSTunch").value.trim(); }
     else if (s === "part") { if (!stockTag) { m.textContent = "Type the tag code of the piece and tap Find."; return; } const ln = (stockTag.lines || [])[Number($("ogPLine").value) || 0];
       Object.assign(body, { tagId: stockTag.id, line: ln ? ln.i : null, gross: $("ogPGross").value.trim(), tunch: $("ogPTunch").value.trim(), fine: $("ogPFine").value.trim() });
-      if ($("ogPDLine").value !== "") body.dia = { line: Number($("ogPDLine").value), pcs: $("ogPDPcs").value.trim(), ct: $("ogPDCt").value.trim() };
       if (!edit && !(num(body.gross) > 0)) { m.textContent = "Type the gross weight of the part."; return; } if (!body.tunch && !body.fine) { m.textContent = "Type the tunch % or the fine g of the part."; return; } }
+    else if (s === "vendor") { Object.assign(body, { vendor: $("ogVName").value.trim(), inv: $("ogVInv").value.trim(), desc: $("ogVDesc").value.trim(), gross: $("ogVGross").value.trim(), tunch: $("ogVTunch").value.trim(), fine: $("ogVFine").value.trim() });
+      if (J && J.admin) Object.assign(body, { rate: $("ogVRate").value.trim(), amount: $("ogVAmt").value.trim() });
+      if (!body.vendor) { m.textContent = "Type the vendor name."; return; } if (!body.tunch && !body.fine) { m.textContent = "Type the fine g, or gross + tunch %."; return; } }
     else if (s === "own") { Object.assign(body, { name: $("ogOwnDesc").value.trim(), gross: $("ogOwnGross").value.trim(), tunch: $("ogOwnTunch").value.trim(), fine: $("ogOwnFine").value.trim() });
       if (!body.tunch && !body.fine) { m.textContent = "Type the fine g, or gross + tunch %."; return; } }
     else { Object.assign(body, { name: $("ogName").value.trim(), mobile: $("ogMob").value.trim(), city: $("ogCity").value.trim(), item: $("ogItem").value.trim(), gross: $("ogGross").value.trim().replace(/[^0-9.]/g, ""), tunch: $("ogTunch").value.trim().replace(/[^0-9.]/g, ""), fine: $("ogFine").value.trim().replace(/[^0-9.]/g, "") });
       if (J && J.admin) body.margin = $("ogMargin").value; if (!body.name) { m.textContent = "Type the party name."; return; }
       if (!body.tunch && !body.fine) { m.textContent = "Type the gross weight and the tested tunch %."; return; } }
+    if (s === "party" || (!edit && (s === "stock" || s === "part"))) body.stones = stGet(); // C-20261102-OGSTONES
     b.disabled = true; m.textContent = "Saving…";
     try { const j = await post(body), o = j.og;
-      m.textContent = (edit ? "Updated" : "Saved") + ": OG " + o.no + " - " + o.name + (o.src !== "party" ? ", fine in " + g3(o.actFine) + (o.src === "stock" ? " (piece moved out of stock)" : o.src === "part" ? " (tag kept, its gold weight reduced)" : "") : ", party credit " + g3(o.credFine) + (o.credTunch != null ? " @ " + o.credTunch + " %" : "") + (o.marginFine != null && o.tunch ? " · actual " + g3(o.actFine) + ", margin " + g3(o.marginFine) : "") + ". Free for a Gold to Gold bill.");
+      m.textContent = (edit ? "Updated" : "Saved") + ": OG " + o.no + " - " + o.name + (o.src !== "party" ? ", fine in " + g3(o.actFine) + (o.src === "stock" ? " (piece moved out of stock)" : o.src === "part" ? " (tag kept, its gold weight reduced)" : o.src === "vendor" ? " (purchased)" : "") : ", party credit " + g3(o.credFine) + (o.credTunch != null ? " @ " + o.credTunch + " %" : "") + (o.marginFine != null && o.tunch ? " · actual " + g3(o.actFine) + ", margin " + g3(o.marginFine) : "") + ". Free for a Gold to Gold bill.");
       clear(); $("ogNo").value = ""; $("ogInForm").hidden = true; await load();
     } catch (e) { m.textContent = "Not saved: " + (e.message || e) + "."; }
     b.disabled = false;
@@ -148,7 +176,19 @@
     const body = { op: "out", id: b.dataset.id || "", date: $("ogODate").value, ogs: $("ogOOgs").value.trim(), fine: $("ogOFine").value.trim().replace(/[^0-9.]/g, ""), gross: $("ogOGross").value.trim().replace(/[^0-9.]/g, ""), to, karigar: $("ogOK").value.trim(), note: $("ogONote").value.trim() };
     if (!(num(body.fine) > 0)) { m.textContent = "Type the fine grams."; return; } if (!to) { m.textContent = "Issued to a karigar or moved to our stock?"; return; } if (to === "karigar" && !body.karigar) { m.textContent = "Pick or type the karigar."; return; }
     b.disabled = true; m.textContent = "Saving…";
-    try { await post(body); m.textContent = "Saved: " + g3(body.fine) + " fine " + (to === "karigar" ? "issued to " + body.karigar : "moved to our stock") + "."; oClear(); $("ogOutForm").hidden = true; view = "out"; await load(); }
+    try { await post(body); const ok = "Saved: " + g3(body.fine) + " fine " + (to === "karigar" ? "issued to " + body.karigar : "moved to our stock") + "."; m.textContent = ok; $("ogMsg").textContent = ok; oClear(); $("ogOutForm").hidden = true; view = "out"; await load(); } /* 02/11: the message box is inside the form, which closes on save - also show it above the list */
+    catch (e) { m.textContent = "Not saved: " + (e.message || e) + "."; } b.disabled = false; }
+  // ---------- convert a party OG to cash (C-20261102-OGCASH, owner 02/11 14:58) ----------
+  let cRec = null;
+  function cFill(r) { cRec = r; const c = r.cash; $("ogCTitle").textContent = (c ? "Edit cash conversion - OG " : "Convert to cash - OG ") + r.no + " · " + r.name + " (party credit fine " + r3(r.credFine) + " g)";
+    $("ogCDate").value = c ? c.date : today(); $("ogCRate").value = c && c.rate != null ? String(c.rate) : ""; $("ogCFine").value = c ? String(c.fine) : r3(r.credFine); $("ogCAmt").value = c && c.amount != null && J.admin ? String(c.amount) : ""; $("ogCNote").value = c ? c.note || "" : "";
+    $("ogCMsg").textContent = ""; $("ogCashForm").hidden = false; cPrev(); window.scrollTo({ top: $("ogCashForm").offsetTop - 10, behavior: "smooth" }); }
+  function cPrev() { const f = num($("ogCFine").value), rt = num($("ogCRate").value), a = J && J.admin && num($("ogCAmt").value) > 0 ? num($("ogCAmt").value) : (f > 0 && rt > 0 ? Math.round(f * rt) : 0); $("ogCPrev").textContent = a ? "Amount: ₹ " + a.toLocaleString("en-IN") + (J && J.admin && num($("ogCAmt").value) > 0 ? " (typed)" : " = " + r3(f) + " g × " + rt) : ""; }
+  async function cSave() { const m = $("ogCMsg"), b = $("ogCSave"); if (!cRec) return;
+    const body = { op: "cash", no: cRec.no, date: $("ogCDate").value, rate: $("ogCRate").value.trim(), fine: $("ogCFine").value.trim(), note: $("ogCNote").value.trim() }; if (J && J.admin) body.amount = $("ogCAmt").value.trim();
+    if (!(num(body.rate) > 0)) { m.textContent = "Type the rate per g of fine."; return; } if (!(num(body.fine) > 0)) { m.textContent = "Type the fine g."; return; }
+    b.disabled = true; m.textContent = "Saving…";
+    try { const j = await post(body); $("ogMsg").textContent = "OG " + cRec.no + " converted to cash: ₹ " + Number(j.cash.amount).toLocaleString("en-IN") + " (" + r3(j.cash.fine) + " g @ " + j.cash.rate + ") - credit noted for " + cRec.name + "; no longer offered on a Gold to Gold bill."; $("ogCashForm").hidden = true; cRec = null; await load(); }
     catch (e) { m.textContent = "Not saved: " + (e.message || e) + "."; } b.disabled = false; }
   // ---------- lists ----------
   function sure(btn, label, fn) { btn.addEventListener("click", async () => { if (btn.dataset.sure !== "1") { btn.dataset.sure = "1"; btn.textContent = label; return; } btn.disabled = true; try { await fn(); } catch (e) { btn.disabled = false; $("ogMsg").textContent = "Not done: " + (e.message || e) + "."; } }); }
@@ -158,21 +198,27 @@
     const t = el("table", { className: "items" }), hr = el("tr"), tb = el("tbody"), A = J.admin; let rows = [], head = [];
     const td = (tr, x, cl) => tr.appendChild(el("td", { className: cl || "", textContent: x == null ? "" : x }));
     if (view === "in") {
-      head = ["OG no.", "Date", "From", "Item", "Gross g"].concat(A ? ["Tunch %", "Margin", "Actual fine"] : []).concat(["Credit tunch", "Party credit fine"]).concat(A ? ["Margin fine"] : []).concat(["Status", ""]);
-      rows = (J.reg || []).filter(r => (!ym || String(r.date).slice(0, 7) === ym) && (!only || (!r.bill && !r.cancelled && r.src === "party")) && (!q || [r.no, r.name, r.city, r.mobile, r.bill, r.item, r.tag && r.tag.label].join(" ").toLowerCase().includes(q))).slice().reverse();
+      head = ["OG no.", "Date", "From", "Item", "Gross g"].concat(A ? ["Tunch %", "Margin", "Actual fine"] : []).concat(["Credit tunch", "Party credit fine"]).concat(A ? ["Margin fine"] : []).concat(["Diamonds", "Status", ""]);
+      rows = (J.reg || []).filter(r => (!ym || String(r.date).slice(0, 7) === ym) && (!only || (!r.bill && !r.cancelled && r.src === "party" && !r.cash)) && (!q || [r.no, r.name, r.city, r.mobile, r.bill, r.item, r.tag && r.tag.label, r.vendor, r.inv].join(" ").toLowerCase().includes(q))).slice().reverse();
       rows.forEach(r => { const tr = el("tr", { className: r.cancelled ? "ogx" : "" }); td(tr, r.no); td(tr, dmy(r.date));
-        td(tr, r.src === "stock" ? "Own piece (whole) " + (r.tag ? r.tag.label : "") : r.src === "part" ? "Part of " + (r.tag ? r.tag.label : "") : r.src === "own" ? "Own gold: " + r.name : [r.name, r.city].filter(Boolean).join(", ") + (r.mobile ? " · " + r.mobile : "")); td(tr, r.item || (r.legacy ? "(old entry)" : "-"));
+        td(tr, r.src === "stock" ? "Own piece (whole) " + (r.tag ? r.tag.label : "") : r.src === "part" ? "Part of " + (r.tag ? r.tag.label : "") : r.src === "own" ? "Own gold: " + r.name : r.src === "vendor" ? "Vendor: " + (r.vendor || r.name) + (r.inv ? " (inv " + r.inv + ")" : "") : [r.name, r.city].filter(Boolean).join(", ") + (r.mobile ? " · " + r.mobile : "")); td(tr, r.item || (r.legacy ? "(old entry)" : "-"));
         td(tr, r.gross ? r3(r.gross) : "-", "num");
         if (A) { td(tr, r.tunch != null ? r.tunch : "-", "num"); td(tr, r.margin != null ? r.margin : "-", "num"); td(tr, r3(r.actFine), "num"); }
         td(tr, r.src !== "party" ? "-" : r.credTunch != null ? r.credTunch + " %" : "-", "num");
         const cf = el("td", { className: "num", textContent: r.src !== "party" ? (r.actFine != null ? "fine " + r3(r.actFine) : "-") : r3(r.credFine) }); cf.style.fontWeight = "700"; cf.style.fontSize = "17px"; tr.appendChild(cf);
         if (A) td(tr, r.src !== "party" ? "-" : r3(r.marginFine), "num");
+        td(tr, stSum(r.stones) || (r.src === "stock" && r.tag && r.tag.ct ? r.tag.pcs + " pcs / " + Number(r.tag.ct).toFixed(3) + " ct" : "-"), "num");
         const st = el("td"); st.style.fontWeight = "600";
-        st.textContent = r.cancelled ? "Cancelled " + dmy(r.cancelled.at) + (r.cancelled.why ? " (" + r.cancelled.why + ")" : "") : r.src === "part" ? "Part taken (" + r3(r.gross) + " g; tag kept)" + (r.dia ? " · " + r.dia.pcs + " pcs / " + Number(r.dia.ct).toFixed(3) + " ct dia" : "") : r.src === "own" ? "Own gold" : r.src === "stock" ? "Melted (out of stock)" + (r.tag && r.tag.ct ? " · " + r.tag.pcs + " pcs / " + Number(r.tag.ct).toFixed(3) + " ct dia" : "") : r.bill ? "On bill " + r.bill : "Free" + (r.cancelledOn ? " (bill " + r.cancelledOn + " cancelled)" : "");
-        if (!r.cancelled && !r.bill && r.src === "party") st.style.color = "var(--ok)"; if (r.edited) st.title = "Edited " + dmy(r.edited.at) + " by " + r.edited.byName; tr.appendChild(st);
+        st.textContent = r.cancelled ? "Cancelled " + dmy(r.cancelled.at) + (r.cancelled.why ? " (" + r.cancelled.why + ")" : "") : r.src === "part" ? "Part taken (" + r3(r.gross) + " g; tag kept)" + (r.dia && !(r.stones || []).length ? " · " + r.dia.pcs + " pcs / " + Number(r.dia.ct).toFixed(3) + " ct dia" : "") : r.src === "own" ? "Own gold" : r.src === "vendor" ? "Purchased" + (r.amount != null ? " · ₹ " + Number(r.amount).toLocaleString("en-IN") + (r.rate != null ? " @ " + r.rate + "/g" : "") : "") : r.cash ? "✔ Converted to cash" + (r.cash.amount != null ? " ₹ " + Number(r.cash.amount).toLocaleString("en-IN") : "") + " on " + dmy(r.cash.date) + " (" + r3(r.cash.fine) + " g)" : r.src === "stock" ? "Melted (out of stock)" : r.bill ? "On bill " + r.bill : "Free" + (r.cancelledOn ? " (bill " + r.cancelledOn + " cancelled)" : "");
+        if (!r.cancelled && !r.bill && r.src === "party" && !r.cash) st.style.color = "var(--ok)"; if (r.cash && !r.cancelled) st.style.color = "var(--gold)"; if (r.edited) st.title = "Edited " + dmy(r.edited.at) + " by " + r.edited.byName; tr.appendChild(st);
         const x = el("td"); x.style.whiteSpace = "nowrap";
         if (J.canDelete && !(r.cancelled && (r.src === "stock" || r.src === "part"))) { const e = el("button", { type: "button", className: "btn ghost", textContent: r.cancelled ? "Bring back" : "Edit" }); e.addEventListener("click", () => fill(r)); x.appendChild(e); }
-        if (J.canDelete && !r.bill && !r.cancelled) { const d = el("button", { type: "button", className: "btn ghost", textContent: "Cancel" }); d.style.color = "var(--bad)";
+        if (r.src === "party" && !r.cancelled && !r.bill) { /* C-20261102-OGCASH: staff convert a free party OG; admin edits / cancels */
+          if (!r.cash && J.canAdd) { const c = el("button", { type: "button", className: "btn ghost", textContent: "Convert to cash" }); c.addEventListener("click", () => cFill(r)); x.appendChild(c); }
+          if (r.cash && J.canDelete) { const c = el("button", { type: "button", className: "btn ghost", textContent: "Edit cash" }); c.addEventListener("click", () => cFill(r)); x.appendChild(c);
+            const u = el("button", { type: "button", className: "btn ghost", textContent: "Cancel cash" }); u.style.color = "var(--bad)";
+            sure(u, "Sure? Cancel cash for OG " + r.no, async () => { const why = prompt("Why cancel the cash conversion of OG " + r.no + "? (optional)") || ""; await post({ op: "cashcancel", no: r.no, why }); $("ogMsg").textContent = "Cash conversion of OG " + r.no + " cancelled (party ledger entry reversed, history kept)."; load(); }); x.appendChild(u); } }
+        if (J.canDelete && !r.bill && !r.cancelled && !r.cash) { const d = el("button", { type: "button", className: "btn ghost", textContent: "Cancel" }); d.style.color = "var(--bad)";
           sure(d, "Sure? Cancel OG " + r.no, async () => { const why = prompt("Why cancel OG " + r.no + "? (optional)") || ""; await post({ op: "cancel", no: r.no, why }); $("ogMsg").textContent = "OG " + r.no + " cancelled (kept in the register, struck through)" + (r.src === "stock" ? "; the piece is back in stock" : r.src === "part" ? "; the part's weight is added back to the tag" : "") + "."; load(); }); x.appendChild(d); }
         tr.appendChild(x); tb.appendChild(tr); });
     } else if (view === "out") {
@@ -221,11 +267,19 @@
     const inp = (id, ph, extra) => Object.assign(el("input", { id, placeholder: ph || "", autocomplete: "off" }), extra || {});
     const lab = (t, i, st) => el("label", st ? { style: st } : {}, [t + " ", i]);
     const radio = (name, v, t, on) => el("label", { style: "flex:0 0 auto;flex-direction:row;align-items:center;gap:6px" }, [el("input", { type: "radio", name, value: v, checked: !!on }), t]);
+    const srcSel = el("select", { id: "ogSrcSel" }); SRCS.forEach(([v, t]) => srcSel.appendChild(el("option", { value: v, textContent: t }))); srcSel.value = "party"; /* 02/11: one flat drop-down, default Party */
+    const stHead = el("tr"); ["Shape", "Quality / type", "Pcs", "Ct", "Note"].forEach(h => stHead.appendChild(el("th", { textContent: h }))); stHead.appendChild(el("th", { id: "ogStCol", textContent: "Status" }));
+    const stBox = el("details", { id: "ogStonesBox", className: "ogbox" }, [el("summary", { textContent: "Diamonds (optional)" }), el("div", { className: "list" }, [el("table", { className: "items" }, [el("thead", {}, [stHead]), el("tbody", { id: "ogStRows" })])]),
+      el("div", { className: "actions" }, [el("button", { type: "button", className: "btn ghost", id: "ogStAdd", textContent: "+ Add row" }), el("span", { className: "hint", id: "ogStTot" })])]); /* C-20261102-OGSTONES */
+    const cashForm = el("div", { id: "ogCashForm", className: "ogbox", hidden: true }, [el("h3", { id: "ogCTitle", textContent: "Convert to cash" }), /* C-20261102-OGCASH */
+      el("div", { className: "row" }, [lab("Date", inp("ogCDate", "", { type: "date", value: today() })), lab("Rate per g of fine ₹", inp("ogCRate", "e.g. 7150", { maxLength: 10, inputMode: "decimal" })), lab("Fine g", inp("ogCFine", "", { maxLength: 10, inputMode: "decimal" })),
+        el("label", { className: "ogA", hidden: true }, ["Amount ₹ (blank = fine × rate) ", inp("ogCAmt", "", { maxLength: 14, inputMode: "decimal" })])]),
+      el("div", { className: "row" }, [lab("Note (optional)", inp("ogCNote", "", { maxLength: 120 }), "flex:2 1 300px")]), el("p", { className: "hint", id: "ogCPrev" }),
+      el("div", { className: "actions" }, [el("button", { type: "button", className: "btn", id: "ogCSave", textContent: "Save cash conversion" }), el("button", { type: "button", className: "btn ghost", id: "ogCClose", textContent: "Close" })]), el("p", { className: "hint", id: "ogCMsg" })]);
     const mSel = el("select", { id: "ogMargin" }); ["0", "1", "2"].forEach(v => mSel.appendChild(el("option", { value: v, textContent: v + " %" }))); mSel.value = "2";
     const inForm = el("div", { id: "ogInForm", className: "ogbox", hidden: true }, [el("h3", { textContent: "Old gold IN" }),
       el("div", { className: "row" }, [lab("OG no.", inp("ogNo", "e.g. 189", { maxLength: 20, inputMode: "numeric" })), lab("Date", inp("ogDate", "", { type: "date", value: today() })),
-        el("div", { className: "row", style: "align-items:center;flex:2 1 300px" }, [el("b", { textContent: "From:" }), radio("ogSrc", "party", "Party (customer's old gold)", true), radio("ogSrc", "own", "Our own stock / gold")])]),
-      el("div", { id: "ogOwnBox", className: "row", style: "align-items:center", hidden: true }, [el("b", { textContent: "Which:" }), radio("ogOwn", "stock", "a. Whole piece (melt - tag leaves stock)", true), radio("ogOwn", "part", "b. Part of a piece (tag stays, weight goes down)"), radio("ogOwn", "own", "c. Plain fine / own gold (no tag)")]),
+        lab("Gold from:", srcSel, "flex:2 1 300px")]),
       el("div", { id: "ogParty" }, [
         el("div", { className: "row" }, [lab("Party name", inp("ogName", "e.g. Rohit ji", { maxLength: 60 })), lab("Mobile", inp("ogMob", "98xxxxxxxx", { maxLength: 20, inputMode: "tel" })), lab("City (optional)", inp("ogCity", "", { maxLength: 40 }))]),
         el("div", { className: "row" }, [lab("Item", inp("ogItem", "e.g. old chain + 2 rings", { maxLength: 120 }), "flex:2 1 260px"), lab("GROSS weight, g", inp("ogGross", "e.g. 10.620", { maxLength: 10, inputMode: "decimal" })), lab("ACTUAL tunch % (tested)", inp("ogTunch", "e.g. 74", { maxLength: 6, inputMode: "decimal" })),
@@ -236,8 +290,14 @@
         el("div", { id: "ogStockInfo", className: "ogbox" }),
         el("div", { id: "ogPart", hidden: true }, [
           el("div", { className: "row" }, [lab("Gold line it comes from", el("select", { id: "ogPLine" })), lab("Part GROSS g", inp("ogPGross", "e.g. 2.150", { maxLength: 10, inputMode: "decimal" })), lab("Tunch % (e.g. 75)", inp("ogPTunch", "", { maxLength: 6, inputMode: "decimal" })), lab("or fine g", inp("ogPFine", "only if no tunch", { maxLength: 10, inputMode: "decimal" }))]),
-          el("div", { className: "row" }, [lab("Diamonds taken out (optional)", el("select", { id: "ogPDLine" })), lab("Pcs", inp("ogPDPcs", "", { maxLength: 5, inputMode: "numeric" })), lab("Ct", inp("ogPDCt", "", { maxLength: 8, inputMode: "decimal" }))])])]),
+          el("p", { className: "hint", textContent: "Diamonds taken out with the part: type their pcs / ct in Diamonds below (rows on a tag line come off the tag)." })])]),
       el("div", { id: "ogPlain", hidden: true }, [el("div", { className: "row" }, [lab("Description", inp("ogOwnDesc", "e.g. own fine gold / bullion", { maxLength: 60 }), "flex:2 1 260px"), lab("Fine g", inp("ogOwnFine", "e.g. 100.000", { maxLength: 10, inputMode: "decimal" })), lab("or gross g", inp("ogOwnGross", "", { maxLength: 10, inputMode: "decimal" })), lab("+ tunch %", inp("ogOwnTunch", "e.g. 99.5", { maxLength: 6, inputMode: "decimal" }))])]),
+      el("div", { id: "ogVendor", hidden: true }, [ /* C-20261102-OGVENDOR */
+        el("div", { className: "row" }, [lab("Vendor name", Object.assign(inp("ogVName", "e.g. Shah Bullion", { maxLength: 60 }), {}), "flex:2 1 220px"), lab("Vendor invoice no.", inp("ogVInv", "", { maxLength: 30 })), lab("Description", inp("ogVDesc", "e.g. 24K bar, 995 fine", { maxLength: 60 }), "flex:2 1 200px"), el("datalist", { id: "ogVdl" })]),
+        el("div", { className: "row" }, [lab("Fine g", inp("ogVFine", "e.g. 100.000", { maxLength: 10, inputMode: "decimal" })), lab("or gross g", inp("ogVGross", "", { maxLength: 10, inputMode: "decimal" })), lab("+ tunch %", inp("ogVTunch", "e.g. 99.5", { maxLength: 6, inputMode: "decimal" })),
+          el("label", { className: "ogA", hidden: true }, ["Rate / g (optional) ", inp("ogVRate", "", { maxLength: 10, inputMode: "decimal" })]), el("label", { className: "ogA", hidden: true }, ["or amount ₹ (optional) ", inp("ogVAmt", "", { maxLength: 14, inputMode: "decimal" })])]),
+        el("p", { className: "hint", textContent: "Date above = invoice date. Counts in OG fine in hand; never offered on a Gold to Gold bill." })]),
+      stBox,
       el("div", { className: "row" }, [lab("Note (optional)", inp("ogNote", "", { maxLength: 120 }), "flex:2 1 300px")]),
       el("div", { id: "ogPrev", className: "ogprev" }),
       el("div", { className: "actions" }, [el("button", { type: "button", className: "btn", id: "ogSave", textContent: "Save OG" }), el("button", { type: "button", className: "btn ghost", id: "ogClear", textContent: "Clear" })])]);
@@ -252,7 +312,7 @@
       el("div", { className: "row", style: "align-items:center" }, [lab("Month totals for", inp("ogMon", "", { type: "month", value: today().slice(0, 7) }), "flex:0 0 auto")]),
       el("div", { className: "ogsum", id: "ogSumBox" }),
       el("div", { className: "actions" }, [el("button", { type: "button", className: "btn", id: "ogAddIn", textContent: "+ Old gold IN", hidden: true }), el("button", { type: "button", className: "btn", id: "ogAddOut", textContent: "+ Old gold OUT (issue)", hidden: true }), el("button", { type: "button", className: "btn ghost", id: "ogXl", textContent: "Excel (inward + outward)", hidden: true })]),
-      inForm, outForm, el("p", { className: "hint", id: "ogMsg" }), tabs,
+      inForm, outForm, cashForm, el("p", { className: "hint", id: "ogMsg" }), tabs,
       el("div", { className: "row", style: "align-items:center" }, [lab("Search", inp("ogQ", "OG no., party, mobile, karigar, tag", { maxLength: 40 })), lab("Month", inp("ogLMon", "", { type: "month" }), "flex:0 0 auto"),
         el("label", { id: "ogFreeL", style: "flex:0 0 auto;flex-direction:row;align-items:center;gap:6px" }, [el("input", { type: "checkbox", id: "ogFree" }), "Only free OGs (party, not on a bill)"])]),
       el("div", { id: "ogList" }));
@@ -262,9 +322,10 @@
     $("ogAddIn").addEventListener("click", () => { const f = $("ogInForm"); f.hidden = !f.hidden; if (!f.hidden && !$("ogNo").dataset.edit) clear(); });
     $("ogAddOut").addEventListener("click", () => { const f = $("ogOutForm"); f.hidden = !f.hidden; });
     $("ogXl").addEventListener("click", xl); $("ogFindB").addEventListener("click", findTag); $("ogCode").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); findTag(); } });
-    document.querySelectorAll("input[name=ogSrc]").forEach(x => x.addEventListener("change", srcSync)); document.querySelectorAll("input[name=ogTo]").forEach(x => x.addEventListener("change", toSync));
-    ["ogGross", "ogTunch", "ogFine", "ogSTunch", "ogPGross", "ogPTunch", "ogPFine", "ogOwnGross", "ogOwnTunch", "ogOwnFine"].forEach(i => $(i).addEventListener("input", prev)); $("ogMargin").addEventListener("change", prev);
-    document.querySelectorAll("input[name=ogOwn]").forEach(x => x.addEventListener("change", srcSync));
+    $("ogSrcSel").addEventListener("change", srcSync); $("ogVName").setAttribute("list", "ogVdl"); $("ogStAdd").addEventListener("click", () => { $("ogStRows").appendChild(stRow({ st: "out" })); stTot(); });
+    ["ogCRate", "ogCFine", "ogCAmt"].forEach(i => $(i).addEventListener("input", cPrev)); $("ogCSave").addEventListener("click", cSave); $("ogCClose").addEventListener("click", () => { $("ogCashForm").hidden = true; cRec = null; });
+    document.querySelectorAll("input[name=ogTo]").forEach(x => x.addEventListener("change", toSync));
+    ["ogGross", "ogTunch", "ogFine", "ogSTunch", "ogPGross", "ogPTunch", "ogPFine", "ogOwnGross", "ogOwnTunch", "ogOwnFine", "ogVFine", "ogVGross", "ogVTunch", "ogVRate", "ogVAmt"].forEach(i => $(i).addEventListener("input", prev)); $("ogMargin").addEventListener("change", prev);
     $("ogPLine").addEventListener("change", () => { const ln = stockTag && (stockTag.lines || [])[Number($("ogPLine").value) || 0]; if (ln) $("ogPTunch").value = String(Math.round(ln.p * 10000) / 100); prev(); });
     $("ogMon").addEventListener("change", summary); $("ogQ").addEventListener("input", render); $("ogLMon").addEventListener("change", render); $("ogFree").addEventListener("change", render);
     nav.addEventListener("click", e => { const x = e.target.closest("nav button"); if (!x) return; show(x.dataset.tab === "ogreg"); });
