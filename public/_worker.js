@@ -1539,9 +1539,10 @@ async function vjOg2Tables(env) { if (vjOg2T) return; await vjOgTable(env); awai
   env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_og_dia (id TEXT PRIMARY KEY, ts INTEGER, og TEXT, tag TEXT, status TEXT, data TEXT)'),
   env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_og_hist (ts INTEGER, email TEXT, kind TEXT, ref TEXT, action TEXT, data TEXT)')]); vjOg2T = true; }
 const vjOgMg = v => Math.round((Number(v) || 0) * 1000); // grams -> integer milligrams
+const vjOgTun = v => { if (v === '' || v == null) return null; let n = Number(String(v).replace(/[^0-9.]/g, '')); if (!isFinite(n) || n <= 0) return NaN; if (n <= 1.1) n = n * 100; return Math.round(n * 100) / 100; }; // tunch is always kept in PERCENT (owner 02/11 14:35): 0.76 or 76 -> 76
 function vjOgCalc(r) { // the only place the OG figures are worked out
   const gMg = vjOgMg(r.gross), t = r.tunch === '' || r.tunch == null ? NaN : Number(r.tunch);
-  if (r.src === 'stock') { const act = t > 0 ? Math.round(gMg * t / 100) : 0; return { actFine: act / 1000, credTunch: null, credFine: 0, marginFine: 0 }; }
+  if (r.src === 'stock' || r.src === 'part' || r.src === 'own') { const act = t > 0 && gMg > 0 ? Math.round(gMg * t / 100) : vjOgMg(r.fine); return { actFine: act / 1000, credTunch: null, credFine: 0, marginFine: 0 }; } // our own gold (whole piece / part of a piece / plain fine): no party, no margin
   if (!(t > 0)) { const f = vjOgMg(r.fine); return { actFine: f / 1000, credTunch: null, credFine: f / 1000, marginFine: 0 }; } // no tunch (old entries): fine as typed
   const m = Number(r.margin) >= 0 ? Number(r.margin) : 2, ct = Math.max(0, Math.round((t - m) * 100) / 100);
   const act = Math.round(gMg * t / 100), cred = Math.round(gMg * ct / 100);
@@ -1575,19 +1576,19 @@ function vjOg2Sum(reg, outs, dias) { // reg rows already carry the calc fields
 }
 async function vjOgs(env, who, url) { const all = await vjOgList(env), live = all.filter(x => !x.cancelled), { reg: raw, outs, dias } = await vjOg2Load(env), adm = who.role === 'admin';
   const useOf = no => live.find(x => x.og.toUpperCase() === String(no).toUpperCase()) || null;
-  const reg = raw.map(r => Object.assign({}, r, { src: r.src === 'stock' ? 'stock' : 'party' }, vjOgCalc(r)));
+  const reg = raw.map(r => Object.assign({}, r, { src: ['stock', 'part', 'own'].includes(r.src) ? r.src : 'party' }, vjOgCalc(r)));
   const S = vjOg2Sum(reg, outs, dias);
   const regOut = reg.map(r => { const u = useOf(r.no), c = !u && all.find(x => x.cancelled && x.og.toUpperCase() === String(r.no).toUpperCase());
     const o = { no: r.no, date: r.date || '', src: r.src, name: r.name || '', mobile: who.role === 'sales' ? '' : (r.mobile || ''), city: r.city || '', item: r.item || '', gross: r.gross || 0,
       credFine: r.credFine, fine: r.credFine, note: r.note || '', byName: r.byName || '', bill: u ? u.no : '', billName: u ? u.name : '', cancelledOn: c ? c.no : '',
-      cancelled: r.cancelled ? { at: r.cancelled.at, byName: r.cancelled.byName, why: r.cancelled.why || '' } : null, edited: r.editedAt ? { at: r.editedAt, byName: r.editedByName || '' } : null, legacy: !(Number(r.tunch) > 0) && r.src !== 'stock' };
-    if (r.src === 'stock') { o.tag = r.tag || null; o.actFine = r.actFine; o.tunch = r.tunch; } // own piece: no party, no margin - its fine is shown to all
-    if (adm) Object.assign(o, { tunch: r.tunch === '' || r.tunch == null ? null : Number(r.tunch), margin: r.src === 'stock' ? null : (Number(r.tunch) > 0 ? Number(r.margin) : null), credTunch: r.credTunch, actFine: r.actFine, marginFine: r.marginFine });
-    else if (r.src !== 'stock') o.credTunch = r.credTunch;
+      cancelled: r.cancelled ? { at: r.cancelled.at, byName: r.cancelled.byName, why: r.cancelled.why || '' } : null, edited: r.editedAt ? { at: r.editedAt, byName: r.editedByName || '' } : null, legacy: !(Number(r.tunch) > 0) && r.src === 'party', partG: r.partG || 0 };
+    if (r.src !== 'party') { o.tag = r.tag || null; o.actFine = r.actFine; o.tunch = r.tunch; o.dia = r.dia || null; } // own piece: no party, no margin - its fine is shown to all
+    if (adm) Object.assign(o, { tunch: r.tunch === '' || r.tunch == null ? null : Number(r.tunch), margin: r.src !== 'party' ? null : (Number(r.tunch) > 0 ? Number(r.margin) : null), credTunch: r.credTunch, actFine: r.actFine, marginFine: r.marginFine });
+    else if (r.src === 'party') o.credTunch = r.credTunch;
     return o; }).sort((a, b) => vjOgNum(a.no) - vjOgNum(b.no) || String(a.no).localeCompare(String(b.no)));
   const nums = [...new Set(live.map(x => x.og).concat(raw.map(r => r.no)).map(vjOgNum).filter(n => n >= 0 && n < 1e7))].sort((a, b) => a - b);
   const next = nums.length ? nums[nums.length - 1] + 1 : 0, lastB = live.slice().sort((a, b) => vjOgNum(a.og) - vjOgNum(b.og)).pop() || null;
-  const free = regOut.filter(r => !r.bill && !r.cancelled && r.src !== 'stock').map(r => ({ no: r.no, name: r.name, city: r.city, fine: r.credFine, date: r.date })); // bill prefills the PARTY CREDIT fine
+  const free = regOut.filter(r => !r.bill && !r.cancelled && r.src === 'party').map(r => ({ no: r.no, name: r.name, city: r.city, fine: r.credFine, date: r.date })); // bill prefills the PARTY CREDIT fine
   const list = (who.role === 'sales' ? all.filter(x => x.email === who.email) : all).map(x => ({ og: x.og, no: x.no, date: x.date, name: x.name, city: x.city, fine: x.fine, cancelled: x.cancelled }));
   const outOut = outs.map(o => ({ id: o.id, date: o.date, ogs: o.ogs || [], fine: o.fine, gross: o.gross || 0, to: o.to, karigar: o.karigar || '', note: o.note || '', byName: o.byName || '', cancelled: o.cancelled ? { at: o.cancelled.at, byName: o.cancelled.byName, why: o.cancelled.why || '' } : null, edited: o.editedAt ? { at: o.editedAt, byName: o.editedByName || '' } : null }))
     .sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.id).localeCompare(String(a.id)));
@@ -1599,7 +1600,7 @@ async function vjOgs(env, who, url) { const all = await vjOgList(env), live = al
   if (url && url.searchParams.get('xlsx') === '1') { if (!adm) return vjDeny(403, 'only Abhinav or Shilpiji can download the OG Excel');
     const n3 = v => v == null || v === '' ? '' : Math.round(Number(v) * 1000) / 1000;
     const xl = vjXlsx([{ name: 'OG inward', land: true, widths: [9, 11, 10, 22, 13, 26, 10, 9, 9, 10, 10, 10, 10, 12, 14, 22], head: ['OG no.', 'Date', 'Source', 'Party / piece', 'Mobile', 'Item', 'Gross g', 'Tunch %', 'Margin %', 'Credit tunch %', 'Actual fine g', 'Party credit fine g', 'Margin fine g', 'Bill', 'Status', 'Note'],
-      rows: regOut.map(r => [r.no, vjDmy(r.date), r.src === 'stock' ? 'Own stock' : 'Party', r.src === 'stock' ? (r.tag ? r.tag.label : r.name) : [r.name, r.city].filter(Boolean).join(', '), r.mobile, r.item, n3(r.gross), r.tunch == null ? '' : r.tunch, r.margin == null ? '' : r.margin, r.credTunch == null ? '' : r.credTunch, n3(r.actFine), n3(r.credFine), n3(r.marginFine), r.bill, r.cancelled ? 'Cancelled ' + vjDmy(r.cancelled.at) : 'OK', r.note]), mark: r => /^Cancelled/.test(r[14]) },
+      rows: regOut.map(r => [r.no, vjDmy(r.date), ({ stock: 'Own piece (whole)', part: 'Part of own piece', own: 'Own fine gold' })[r.src] || 'Party', r.src === 'part' ? (r.tag ? r.tag.label : '') + ' part ' + r.partG + ' g' : r.src === 'own' ? r.name : r.src === 'stock' ? (r.tag ? r.tag.label : r.name) : [r.name, r.city].filter(Boolean).join(', '), r.mobile, r.item, n3(r.gross), r.tunch == null ? '' : r.tunch, r.margin == null ? '' : r.margin, r.credTunch == null ? '' : r.credTunch, n3(r.actFine), n3(r.credFine), n3(r.marginFine), r.bill, r.cancelled ? 'Cancelled ' + vjDmy(r.cancelled.at) : 'OK', r.note]), mark: r => /^Cancelled/.test(r[14]) },
     { name: 'OG outward', land: true, widths: [11, 16, 20, 12, 10, 16, 24, 14], head: ['Date', 'OG no(s)', 'To', 'Fine g', 'Gross g', 'By', 'Note', 'Status'],
       rows: outOut.map(o => [vjDmy(o.date), o.ogs.length ? o.ogs.join(', ') : 'OG pool', o.to === 'karigar' ? 'Karigar ' + o.karigar : 'Our stock (fine)', n3(o.fine), o.gross ? n3(o.gross) : '', o.byName, o.note, o.cancelled ? 'Cancelled ' + vjDmy(o.cancelled.at) : 'OK']), mark: r => /^Cancelled/.test(r[7]) },
     { name: 'Diamonds to get back', widths: [9, 14, 20, 8, 9, 14, 12], head: ['OG no.', 'Tag', 'Shape / quality', 'Pcs', 'Ct', 'Karigar', 'Status'],
@@ -1628,6 +1629,8 @@ async function vjOgSave(request, env, who) { if (who.role === 'sales') return vj
     if (old.src === 'stock' && old.tag && old.tag.id) { await vjMarkSold(env, who, [old.tag.id], null, 'OG-' + no); await vjKoTables(env);
       await env.DB.prepare('INSERT INTO vj_moves (ts, email, tag, act, kind, name, why, note, photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(Date.now(), who.email, old.tag.id, 'ogback', 'og', 'OG ' + no, 'OG entry cancelled - back in stock', rec.cancelled.why, '').run();
       await env.DB.prepare("UPDATE vj_og_dia SET status = 'cancelled', data = json_set(data, '$.status', 'cancelled') WHERE og = ? AND status = 'pending'").bind(no).run(); }
+    if (old.src === 'part' && old.tag && old.tag.id) { const e = await vjOgPartTag(env, who, old, no, -1); if (e) return vjDeny(409, e); // the part's weight goes back on the tag
+      await env.DB.prepare("UPDATE vj_og_dia SET status = 'cancelled', data = json_set(data, '$.status', 'cancelled') WHERE og = ? AND status = 'pending'").bind(no).run(); }
     await vjOgHist(env, who, 'in', no, 'cancel', old);
     await env.DB.prepare('UPDATE vj_ogs SET data = ?, ts = ? WHERE no = ?').bind(JSON.stringify(rec), Date.now(), no).run();
     await vjAudit(env, who, 'og-cancel', 'ogs/' + no, rec.cancelled.why); return vjJson({ ok: true, cancelled: no }); }
@@ -1636,10 +1639,45 @@ async function vjOgSave(request, env, who) { if (who.role === 'sales') return vj
   if (old && !edit) return vjDeny(409, 'OG ' + no + ' is already in the register (' + (old.name || '') + ')' + (old.cancelled ? ' - cancelled; Abhinav / Shilpiji can Edit it to bring it back' : ''));
   if (edit && !old) return vjDeny(404, 'OG ' + no + ' is not in the register');
   if (old && !adm) return vjDeny(403, 'only Abhinav or Shilpiji can change a saved OG');
-  const tunchIn = b.tunch === '' || b.tunch == null ? null : Number(b.tunch), note = vjClean(b.note, 120);
-  if (tunchIn !== null && !(tunchIn > 0 && tunchIn <= 100)) return vjDeny(400, 'tunch % must be between 0 and 100');
+  const tunchIn = vjOgTun(b.tunch), note = vjClean(b.note, 120);
+  if (tunchIn !== null && !(tunchIn > 0 && tunchIn <= 100)) return vjDeny(400, 'tunch % must be between 1 and 100 (e.g. 74, 75, 91.6)');
   let rec;
-  if ((old && old.src === 'stock') || (!old && b.src === 'stock')) { // our own piece melted
+  if ((old && old.src === 'part') || (!old && b.src === 'part')) { // PART of one of our pieces (owner 02/11 14:35): the tag stays in stock, its gold weight goes down by the part
+    if (old && old.cancelled) return vjDeny(409, 'a cancelled part entry cannot be brought back - make a new OG entry');
+    if (old) rec = Object.assign({}, old, { date, note, tunch: tunchIn !== null ? tunchIn : old.tunch });
+    else { const id = String(b.tagId || ''); if (!VJ_KID.test(id)) return vjDeny(400, 'type the tag code of the piece');
+      const row = await env.DB.prepare('SELECT data FROM docs WHERE path = ?').bind('tags/' + id).first(); if (!row) return vjDeny(404, 'tag not found');
+      const t = JSON.parse(row.data); if (t.status === 'sold') return vjDeny(409, 'this piece is not in stock (' + ((t.sold && t.sold.no) || 'sold') + ')');
+      if (t.out) return vjDeny(409, 'this piece is out with ' + (t.out.name || 'someone') + ' - bring it back first');
+      const set = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first(), pur = vjQSt(set ? JSON.parse(set.data) : {}).pur, gl = Array.isArray(t.gold) ? t.gold : [];
+      const useMetal = !gl.some(g => g && Number(g.net) > 0) && t.kind === 'sample' && vjSmpNet(t) > 0;
+      const li = useMetal ? -1 : Number.isInteger(b.line) && gl[b.line] && Number(gl[b.line].net) > 0 ? b.line : gl.findIndex(g => g && Number(g.net) > 0);
+      if (!useMetal && li < 0) return vjDeny(400, 'this tag has no gold weight');
+      const lineNet = useMetal ? vjR3(vjSmpNet(t)) : vjR3(gl[li].net), totNet = useMetal ? lineNet : vjR3(gl.reduce((a, g) => a + (Number(g && g.net) || 0), 0)), k = useMetal ? '14K' : String(gl[li].k || '');
+      const pp = (x => x > 1.1 ? x / 100 : x)(useMetal ? (pur['14K'] || 0.6) : (vjLineT(gl[li]) || pur[k] || 0));
+      const partG = vjR3(b.gross), fineIn = b.fine === '' || b.fine == null ? 0 : vjR3(b.fine);
+      if (!(partG > 0 && partG <= 5000)) return vjDeny(400, 'type the gross weight of the part');
+      if (vjOgMg(partG) >= vjOgMg(totNet)) return vjDeny(400, 'the part (' + partG.toFixed(3) + ' g) must be less than the piece gold weight (' + totNet.toFixed(3) + ' g) - use Whole piece instead');
+      if (vjOgMg(partG) >= vjOgMg(lineNet)) return vjDeny(400, 'the part must be less than that gold line (' + k + ' ' + lineNet.toFixed(3) + ' g)');
+      if (tunchIn === null && fineIn > partG) return vjDeny(400, 'fine g cannot be more than the gross');
+      const tn = tunchIn !== null ? tunchIn : fineIn > 0 ? null : Math.round(pp * 10000) / 100;
+      const dl = Array.isArray(t.dias) ? t.dias : []; let dia = null;
+      if (b.dia && (Number(b.dia.pcs) > 0 || Number(b.dia.ct) > 0)) { const di = Number(b.dia.line), d = Number.isInteger(di) ? dl[di] : null; if (!d) return vjDeny(400, 'pick the diamond line');
+        const pcs = Math.round(Number(b.dia.pcs) || 0), ct = vjR3(b.dia.ct || 0);
+        if (pcs < 0 || ct < 0 || pcs > (Number(d.pcs) || 0) || vjOgMg(ct) > vjOgMg(d.ct)) return vjDeny(400, 'more diamonds than the tag has on that line (' + (d.pcs || 0) + ' pcs, ' + Number(d.ct || 0).toFixed(3) + ' ct)');
+        dia = { line: di, shape: vjClean(d.shape, 20), q: vjClean(d.q || d.code, 30), pcs, ct }; }
+      rec = { no, date, src: 'part', name: 'Part of ' + (t.label || id), item: [t.catName, t.designNo ? 'design ' + t.designNo : ''].filter(Boolean).join(' · '), gross: partG, partG, tunch: tn, fine: tn === null ? fineIn : 0, note,
+        line: { i: li, k, metal: useMetal }, dia, tag: { id, label: t.label || id, code: t.code || '', designNo: t.designNo || '', netBefore: totNet }, by: who.email, byName, at: now };
+      const e = await vjOgPartTag(env, who, rec, no, 1); if (e) return vjDeny(409, e);
+      if (dia) { const dd = { id: no + '-1', og: no, tag: id, label: t.label || id, shape: dia.shape, q: dia.q, pcs: dia.pcs, ct: dia.ct, karigar: '', status: 'pending', at: now, by: who.email };
+        await env.DB.prepare('INSERT INTO vj_og_dia (id, ts, og, tag, status, data) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data, status = excluded.status, ts = excluded.ts').bind(dd.id, Date.now(), no, id, 'pending', JSON.stringify(dd)).run(); } }
+  } else if ((old && old.src === 'own') || (!old && b.src === 'own')) { // plain fine / own gold, no tag (e.g. own fine gold, bullion)
+    const name = vjClean(b.name, 60) || 'Own fine gold', gross = b.gross === '' || b.gross == null ? 0 : vjR3(b.gross), fine = b.fine === '' || b.fine == null ? 0 : vjR3(b.fine);
+    if (!(gross >= 0 && gross <= 100000)) return vjDeny(400, 'gross (g) looks wrong');
+    if (tunchIn !== null && !(gross > 0)) return vjDeny(400, 'type the gross weight with the tunch');
+    if (tunchIn === null && !(fine > 0 && fine <= 100000)) return vjDeny(400, 'type the fine g, or gross + tunch %');
+    rec = Object.assign(old ? { by: old.by, byName: old.byName, at: old.at } : { by: who.email, byName, at: now }, { no, date, src: 'own', name, item: name, gross, tunch: tunchIn, fine: tunchIn !== null ? 0 : fine, note });
+  } else if ((old && old.src === 'stock') || (!old && b.src === 'stock')) { // our own piece melted
     if (old && old.cancelled) return vjDeny(409, 'a cancelled own-stock OG cannot be brought back - make a new OG entry');
     if (old) { rec = Object.assign({}, old, { date, note, tunch: tunchIn !== null ? tunchIn : old.tunch }); }
     else { const id = String(b.tagId || ''); if (!/^[A-Za-z0-9_\-.~]{1,60}$/.test(id)) return vjDeny(400, 'type the tag code of the piece');
@@ -1647,7 +1685,7 @@ async function vjOgSave(request, env, who) { if (who.role === 'sales') return vj
       const t = JSON.parse(row.data); if (t.status === 'sold') return vjDeny(409, 'this piece is not in stock (' + ((t.sold && t.sold.no) || 'sold') + ')');
       if (t.out) return vjDeny(409, 'this piece is out with ' + (t.out.name || 'someone') + ' - bring it back first');
       const set = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first(), pur = vjQSt(set ? JSON.parse(set.data) : {}).pur;
-      let lines = Array.isArray(t.gold) ? t.gold.filter(g => g && Number(g.net) > 0).map(g => ({ k: String(g.k || ''), net: vjR3(g.net), p: vjLineT(g) || pur[g.k] || 0 })) : [];
+      let lines = Array.isArray(t.gold) ? t.gold.filter(g => g && Number(g.net) > 0).map(g => ({ k: String(g.k || ''), net: vjR3(g.net), p: (x => x > 1.1 ? x / 100 : x)(vjLineT(g) || pur[g.k] || 0) })) : [];
       if (!lines.length && t.kind === 'sample' && vjSmpNet(t) > 0) lines = [{ k: '14K', net: vjR3(vjSmpNet(t)), p: pur['14K'] || 0.6 }];
       const gMg = lines.reduce((a, g) => a + vjOgMg(g.net), 0), fMg = lines.reduce((a, g) => a + vjOgMg(g.net) * g.p, 0); if (!(gMg > 0)) return vjDeny(400, 'this tag has no gold weight');
       const karT = Math.round(fMg / gMg * 10000) / 100, ds = (Array.isArray(t.dias) ? t.dias : []).filter(d => d && (Number(d.ct) > 0 || Number(d.pcs) > 0));
@@ -1676,10 +1714,33 @@ async function vjOgSave(request, env, who) { if (who.role === 'sales') return vj
   await env.DB.prepare('INSERT INTO vj_ogs (no, ts, email, data) VALUES (?, ?, ?, ?) ON CONFLICT(no) DO UPDATE SET data = excluded.data, ts = excluded.ts').bind(no, Date.now(), who.email, JSON.stringify(rec)).run();
   await vjAudit(env, who, old ? 'og-edit' : 'og-add', 'ogs/' + no, rec.src + ' ' + rec.name + ' gross ' + (rec.gross || 0) + ' credit ' + rec.credFine);
   const view = { no, src: rec.src, name: rec.name, gross: rec.gross, credFine: rec.credFine, fine: rec.credFine, credTunch: rec.credTunch };
-  if (adm || rec.src === 'stock') Object.assign(view, { actFine: rec.actFine, tunch: rec.tunch });
+  if (adm || rec.src !== 'party') Object.assign(view, { actFine: rec.actFine, tunch: rec.tunch });
   if (adm) Object.assign(view, { margin: rec.margin, marginFine: rec.marginFine });
   if (rec.tag) view.tag = rec.tag;
   return vjJson({ ok: true, og: view }); }
+// part of a piece (C-20261102-OGREG2, owner 02/11 14:35): take the part's gold (and any diamonds taken out) off the tag (sign 1) or put it back (sign -1, OG cancelled).
+// Same trail as a tag edit: vj_changes old -> new (gold / metal / dias) + a 'history' line, so the evening change Excel shows it; plus vj_moves and audit.
+async function vjOgPartTag(env, who, rec, no, sign) {
+  const path = 'tags/' + rec.tag.id, row = await env.DB.prepare('SELECT data, version FROM docs WHERE path = ?').bind(path).first(); if (!row) return 'tag not found';
+  const cur = JSON.parse(row.data), t = JSON.parse(row.data), g = vjOgMg(rec.partG) * sign, ln = rec.line || {};
+  if (sign < 0 && t.status === 'sold') return 'the piece is already sold (' + ((t.sold && t.sold.no) || '') + ') - its weight cannot be put back';
+  if (ln.metal) { t.metal = Object.assign({}, t.metal || {}); const n = vjOgMg(t.metal.net) - g; if (n <= 0) return 'the part is not less than the piece weight'; t.metal.net = n / 1000; }
+  else { const gl = Array.isArray(t.gold) ? t.gold : (t.gold = []); let i = gl[ln.i] && String(gl[ln.i].k || '') === ln.k ? ln.i : gl.findIndex(x => x && String(x.k || '') === ln.k);
+    if (i < 0) { if (sign > 0) return 'gold line not found'; gl.push({ k: ln.k, net: 0 }); i = gl.length - 1; }
+    const n = vjOgMg(gl[i].net) - g; if (n <= 0) return 'the part is not less than that gold line'; gl[i].net = n / 1000; }
+  if (rec.dia) { const dl = Array.isArray(t.dias) ? t.dias : [], same = x => x && vjClean(x.shape, 20) === rec.dia.shape && vjClean(x.q || x.code, 30) === rec.dia.q;
+    const d = same(dl[rec.dia.line]) ? dl[rec.dia.line] : dl.find(same);
+    if (d) { d.pcs = Math.max(0, (Number(d.pcs) || 0) - sign * rec.dia.pcs); d.ct = Math.max(0, vjOgMg(d.ct) - sign * vjOgMg(rec.dia.ct)) / 1000; } else if (sign > 0) return 'diamond line not found'; }
+  const what = 'part (' + vjR3(rec.partG).toFixed(3) + ' g' + (rec.dia ? ', ' + rec.dia.pcs + ' pcs / ' + Number(rec.dia.ct).toFixed(3) + ' ct diamonds' : '') + ')', txt = sign > 0 ? what + ' moved to OG ' + no : what + ' back from OG ' + no + ' (OG cancelled)';
+  t.ogParts = (Array.isArray(t.ogParts) ? t.ogParts : []).filter(x => x && x.og !== no).concat(sign > 0 ? [{ og: no, g: vjR3(rec.partG), at: new Date().toISOString() }] : []); if (!t.ogParts.length) delete t.ogParts;
+  const r = await env.DB.prepare('UPDATE docs SET data = ?, version = ?, updated_at = ?, updated_by = ? WHERE path = ? AND version = ?').bind(JSON.stringify(t), row.version + 1, Date.now(), who.email, path, row.version).run();
+  if (!r.meta || r.meta.changes !== 1) return 'the tag was being changed at the same moment - try again';
+  try { await vjTables(env); await vjKoTables(env); const ts = Date.now(), ch = (f, a, z) => env.DB.prepare('INSERT INTO vj_changes (ts, email, path, field, old, new) VALUES (?, ?, ?, ?, ?, ?)').bind(ts, who.email, path, f, a.slice(0, 400), z.slice(0, 400));
+    const st = ['gold', 'metal', 'dias'].filter(k => vjStr(cur[k]) !== vjStr(t[k])).map(k => ch(k, vjStr(cur[k]), vjStr(t[k])));
+    st.push(ch('history', '', JSON.stringify(txt)), env.DB.prepare('INSERT INTO vj_moves (ts, email, tag, act, kind, name, why, note, photo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(ts, who.email, rec.tag.id, sign > 0 ? 'ogpart' : 'ogpartback', 'og', 'OG ' + no, txt.slice(0, 200), vjClean(rec.note, 200), ''));
+    await env.DB.batch(st); } catch (e) {}
+  await vjAudit(env, who, 'update', path, txt);
+  return ''; }
 async function vjOgOutSave(b, env, who, adm, now, byName, op, dateOk) {
   const id = String(b.id || '');
   const oldRow = /^O[a-z0-9]{6,20}$/.test(id) ? await env.DB.prepare('SELECT data FROM vj_og_out WHERE id = ?').bind(id).first() : null, old = oldRow ? vjParse(oldRow) : null;
