@@ -2034,7 +2034,11 @@ const VJ_KO_DIAMSG = 'Diamond entries are handled by Fenil / Mihir / Abhinav onl
 const vjKoSig = l => JSON.stringify((l || []).map(r => [vjKoCode(r.pkt || '').code + '/' + (vjKoCode(r.pkt || '').lot || ''), r.shape || '', Number(r.pcs) || 0, vjR3(r.ct)]).sort());
 function vjKo3Up(o) { // records saved by the first version read the same way
   const C = { Y: 'Yellow', W: 'White', R: 'Rose' }; if (C[o.colour]) o.colour = C[o.colour]; if (/^\d+K$/.test(o.kt || '')) o.kt = o.kt.replace('K', ''); if (o.kt === 'Platinum') o.kt = 'PT';
-  if (!o.basis) o.basis = 'rate'; if (!o.id) o.id = 'K' + o.no; if (o.stage == null) o.stage = ''; return o; }
+  if (!o.basis) o.basis = 'rate'; if (!o.id) o.id = 'K' + o.no; if (o.stage == null) o.stage = '';
+  // C-20261103-KORDER6: a date with a wrong year (e.g. '01-11-06' read as 2006) is read with the order's year (or 2026); the old value is kept in dateFix and saved on the next save
+  const yr = d => /^\d{4}-\d{2}-\d{2}$/.test(String(d || '')) ? Number(String(d).slice(0, 4)) : 0, y0 = yr(o.date) >= 2020 && yr(o.date) <= 2035 ? String(o.date).slice(0, 4) : '2026';
+  ['date', 'delDate'].forEach(k => { const y = yr(o[k]); if (y && (y < 2020 || y > 2035)) { o.dateFix = Object.assign({}, o.dateFix || {}, { [k]: o[k] }); o[k] = y0 + String(o[k]).slice(4); } });
+  return o; }
 async function vjKo3Cfg(env) { const g = async (k, d) => { try { const m = await env.DB.prepare('SELECT v FROM vj_meta WHERE k = ?').bind(k).first(); return m ? JSON.parse(m.v) : d; } catch (e) { return d; } };
   const sv = await g('ko:kcfg', {}); Object.keys(sv).forEach(k => { if (sv[k] && sv[k].managed === undefined && VJ_KO3_KCFG[k] && VJ_KO3_KCFG[k].managed === false) sv[k].managed = false; }); const kcfg = Object.assign({}, VJ_KO3_KCFG, sv);
   return { kcfg, mf: Object.assign({ 9: 0.44, 14: 0.66, 18: 0.83, 22: null, PT: null }, await g('ko:mf', {})), codes: await g('ko:codes', VJ_KO3_CODES), trates: await g('ko:trates', VJ_KO3_TRATES), stages: await g('ko:stages', VJ_KO3_STAGES) }; }
@@ -2340,7 +2344,7 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
   const kList = await vjOgKarigars(env), canDia = adm || (await vjKoDiaList(env)).includes(who.email);
   const deny = e => e.startsWith('OVER:') ? vjJson({ error: e.slice(5), needConfirm: true }, 409) : vjDeny(400, e);
   const fields = async (o, old) => {
-    const date = String(b.date || ''); if (!dateOk(date)) return 'bad date'; const del = String(b.delDate || ''); if (del && !dateOk(del)) return 'bad delivery date';
+    const date = String(b.date || ''); if (!dateOk(date)) return 'bad date'; const del = String(b.delDate || ''); if (del && !dateOk(del)) return 'bad delivery date'; if (date < '2020' || date > '2036' || (del && (del < '2020' || del > '2036'))) return 'check the year of the date (2020-2035)'; // KORDER6
     const item = VJ_KO3_ITEMS.includes(b.item) ? b.item : '', itemNote = vjClean(b.itemNote, 60); if (!item && !itemNote) return 'pick the item';
     const dr = String(b.drawing || ''); if (dr && !/^[0-9a-f]{32}$/.test(dr)) return 'drawing photo not valid'; if (dr && env.PHOTOS && dr !== (old && old.drawing) && !(await vjPhotoHas(env, dr))) return 'drawing photo not found - upload it again';
     let iss = vjKo3Rows(b.iss, adm, old && old.iss); if (!iss) return 'diamond pcs / ct / rate look wrong';
@@ -2395,7 +2399,7 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
     const I = vjKoTot(o.iss), R = vjKoTot(rec), U = vjKoTot(used);
     if (I.pcs && (R.pcs + U.pcs > I.pcs || vjOgMg(R.ct) + vjOgMg(U.ct) > vjOgMg(I.ct))) return vjDeny(400, 'received back + used is more than the diamonds issued (' + I.pcs + ' pcs / ' + I.ct.toFixed(3) + ' ct)');
     const kc = vjKo3Kc(cfg, o.karigar), gG = vjR3(vjKoNum(b.gGold)), csWt = vjR3(vjKoNum(b.csWt)), dWt = b.dWt === '' || b.dWt == null ? vjR3(U.ct / 5) : vjR3(vjKoNum(b.dWt)), date = String(b.tDate || today);
-    if (!dateOk(date)) return vjDeny(400, 'bad date'); if (!(gG > 0 && gG <= 10000)) return vjDeny(400, 'type the G.GOLD (gross) weight');
+    if (!dateOk(date) || date < '2020' || date > '2036') return vjDeny(400, 'bad date (check the year)'); if (!(gG > 0 && gG <= 10000)) return vjDeny(400, 'type the G.GOLD (gross) weight');
     if (vjOgMg(csWt) + vjOgMg(dWt) >= vjOgMg(gG)) return vjDeny(400, 'stones weigh more than the gross - check CS WT (g) and D.WT (g)');
     const nAuto = vjR3((vjOgMg(gG) - vjOgMg(csWt) - vjOgMg(dWt)) / 1000), nIn = b.nGold === '' || b.nGold == null ? null : vjR3(vjKoNum(b.nGold)); if (nIn !== null && !(nIn > 0 && nIn <= gG)) return vjDeny(400, 'N GOLD looks wrong');
     const csCost = Math.round(vjKoNum(b.csCost)), csIn = b.csCharge === '' || b.csCharge == null ? null : Math.round(vjKoNum(b.csCharge));
