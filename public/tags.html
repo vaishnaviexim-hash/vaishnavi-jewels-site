@@ -64,6 +64,9 @@ input[readonly]{background:var(--sunk);color:var(--muted)}
 .ln.o{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}
 .ln.p{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.1fr)}
 .ln .val{font-family:var(--f-mono);font-size:13px;color:var(--muted);padding-bottom:9px;font-variant-numeric:tabular-nums;text-align:right}
+#priceBar{grid-column:1/-1;position:sticky;top:0;z-index:20;background:var(--gold-soft,#f6efdc);border:1px solid var(--gold,#a8842c);border-radius:var(--r);padding:8px 12px;font-variant-numeric:tabular-nums;font-size:15px;line-height:1.35}#priceBar b{font-size:19px}
+.ln.d,.ln.g{display:flex;flex-wrap:wrap}.ln.d>label{flex:1 1 118px;min-width:110px}.ln.g>label{flex:1 1 140px;min-width:120px}.ln.d>label:has([id^=dr]){flex:1 1 170px;min-width:165px}.ln.g>label[style*="visibility: hidden"]{display:none}.ln.d .val,.ln.g .val{flex:1 1 150px;color:var(--fg);font-weight:600;font-size:14px;align-self:end}
+.ln input[type=number]{-moz-appearance:textfield;appearance:textfield}.ln input[type=number]::-webkit-inner-spin-button,.ln input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0} /* C-20261103-TAGUI: every value visible, no spinner over the digits */
 .ln .x{font:inherit;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:var(--r);padding:7px 10px;cursor:pointer;margin-bottom:1px}
 button.add{align-self:flex-start;font:inherit;font-size:14px;border:1px dashed var(--line);background:transparent;color:var(--gold);border-radius:var(--r);padding:7px 12px;cursor:pointer}
 @media (max-width:640px){.ln.d{grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)}.ln.g{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.ln .val{text-align:left;padding-bottom:0}}
@@ -308,7 +311,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="/tags/shim.js?v=20261103v"></script>
+<script src="/tags/shim.js?v=20261103w"></script>
 <script src="/tags/navsel.js?v=20261103k" defer></script>
 <script src="/tags/boxes.js?v=20261029a" defer></script>
 <script src="/tags/similar.js?v=20261103pf" defer></script>
@@ -649,7 +652,7 @@ function update(){
     const tv=tb.value.trim(),tn=num(tv);
     $("gv"+i).textContent=s.gold24g&&net>0&&(!ch||tn>=0.3&&tn<=1.1)?fmt(net*s.gold24g*(ch?tn:(s.purity[k]||0)))+(ch?" · chain":""):""});
   [...$("diaLines").children].forEach(r=>{const i=r.dataset.id,qq=$("dq"+i).value==="Other"?$("dqo"+i).value.trim().toUpperCase():$("dq"+i).value,def=defRate($("ds"+i).value,qq),sp=num($("dr"+i).value),z=qq==="Party diamond"&&$("dr"+i).value.trim()!==""&&sp===0,rate=z?0:sp>0?sp:def,ct=num($("dc"+i).value);
-    $("dr"+i).placeholder=def?"default "+def.toLocaleString("en-IN"):"enter rate";
+    $("dr"+i).placeholder=def?def.toLocaleString("en-IN")+" (default)":"enter rate"; /* TAGUI: the rate number itself */
     $("dv"+i).textContent=z&&ct>0?"₹0 · no charge":(rate&&ct>0?fmt(ct*rate):"")+(sp>0?" · special":(def&&ct>0?" · default":""));});
   $("pdVal").textContent=t.pdia?`${t.pdia.ct} ct × ${fmt(t.pdia.rate)} = ${fmt(Math.round(t.pdia.ct*t.pdia.rate))}`:"";$("certNoBox").hidden=$("remark").value==="TGL";
   $("polkiPcs").value=t.polki?t.polki.pcs:"";$("polkiVal").textContent=t.polki?`${t.polki.pcs} × ${fmt(t.polki.rate)} = ${fmt(t.polki.pcs*t.polki.rate)}`:"";
@@ -666,6 +669,10 @@ function update(){
     add("Total (rounded up to ₹100)",fmt(pr.sub));add(`GST ${s.gst}%`,fmt(pr.gst));add("Price (rounded up to ₹1,000)",fmt(pr.final),"total");
     $("rateNote").textContent=`24K gold at ${fmt(s.gold24g)}/g${s.goldAt?", set "+new Date(s.goldAt).toLocaleString("en-IN",{dateStyle:"medium",timeStyle:"short"}):""}. Diamond rates on the tag are final; only gold and making move with the rate.`;
   }
+  /* C-20261103-TAGUI (owner 16:35): the price by our formula stays in view at the top while the form is edited */
+  {let bar=$("priceBar");if(!bar){bar=document.createElement("div");bar.id="priceBar";const pn=$("p-new");if(pn)pn.prepend(bar)}
+   if(bar){bar.textContent="";if(pr&&t.kind!=="sample"){const gv=pr.lines.reduce((a,l)=>a+l.net*l.kr,0),ot=(pr.pol||0)+(pr.pd||0)+(pr.oth||0),b=document.createElement("b");b.textContent="Total "+fmt(pr.final);
+     bar.append(b," incl. GST · gold "+fmt(gv)+" · making "+fmt(pr.making||0)+" · diamonds "+fmt(pr.dia||0)+" · other "+fmt(ot))}else bar.textContent=t.kind==="sample"?"Sample - not priced":"Price: set today's gold rate"}}
   const box=$("tagbox");box.textContent="";box.appendChild(tagSVG(t));
   $("tagHint").textContent=`${s.tag.w} × ${s.tag.h} mm tag, printing on the left ${s.tag.printW} mm. The price code appears when you save.`;
   const pb=problems(t);$("save").disabled=S.busy||pb.length>0||S.canWrite===false;
