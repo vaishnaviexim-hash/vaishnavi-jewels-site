@@ -308,7 +308,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="/tags/shim.js?v=20261103u"></script>
+<script src="/tags/shim.js?v=20261103v"></script>
 <script src="/tags/navsel.js?v=20261103k" defer></script>
 <script src="/tags/boxes.js?v=20261029a" defer></script>
 <script src="/tags/similar.js?v=20261103pf" defer></script>
@@ -471,7 +471,7 @@ $("addGold").addEventListener("click",()=>{addGold();firstBox("goldLines")});
 $("addDia").addEventListener("click",()=>{addDia();firstBox("diaLines")});
 ["goldLines","diaLines"].forEach(id=>{$(id).addEventListener("input",update);$(id).addEventListener("change",update)});
 $("mkPerG").addEventListener("input",()=>{$("mkPerG").dataset.own=$("mkPerG").value.trim()!==""?"1":""}); /* C-20261101-TAGMAKING: typed by hand = custom; emptied = back to the default */
-["cat","remark","otherAmt","polkiPcs","polkiRate","pdCt","pdPcs","pdRate","certNo","mkPerG"].forEach(id=>{$(id).addEventListener("input",update);$(id).addEventListener("change",update)});
+["cat","remark","otherAmt","polkiPcs","polkiRate","pdCt","pdPcs","pdRate","certNo","mkPerG","designNo"].forEach(id=>{$(id).addEventListener("input",update);$(id).addEventListener("change",update)});
 document.querySelectorAll('input[name=kind]').forEach(r=>r.addEventListener("change",update));
 ["oName","oMob","oCity","oDue","oRate"].forEach(id=>$(id).addEventListener("input",update));$("karigar").addEventListener("change",update);
 /* owner 19/10/2026 (C-20261019-TAGSNOORDER): delete every saved order tag at once - owners only; the server keeps a copy of each */
