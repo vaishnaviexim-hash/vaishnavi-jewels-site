@@ -2446,6 +2446,7 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
     const t = { date, kt: String(b.tKt || o.kt || '').replace(/[^0-9PT]/gi, '').toUpperCase().slice(0, 3), gGold: gG, csWt, dWt, dWtAuto: b.dWt === '' || b.dWt == null, nGold: nIn !== null ? nIn : nAuto, nGoldAuto: nAuto, nGoldMan: nIn !== null,
       csCost, csCharge: csIn !== null ? csIn : vjKo3Up500(csCost * 2), csChargeMan: csIn !== null, others, otherTag: vjKo3R2(others.reduce((a, x) => a + x.pcs * x.tRate, 0)), labour: vjKo3R2(others.reduce((a, x) => a + x.pcs * x.kRate, 0)),
       making: vjKo3R2(vjKoNum(b.making)), lab: vjClean(b.lab, 30), details: vjClean(b.details, 200) };
+    if (b.csUnit === 'ct' && csWt > 0) { const cv = vjKoNum(b.csVal); if (Math.abs(vjR3(cv / 5) - csWt) <= 0.001) { t.csUnit = 'ct'; t.csVal = Math.round(cv * 1000) / 1000; } } /* C-20261103-CSUNIT: CS wt typed in ct is kept as typed; csWt stays in grams (ct / 5) */
     if (kc.type === 'mounting') t.mkRate = vjKo3R2(vjKoNum(b.mkRate)) || Number(kc.making) || 0;
     if (vjKo3Grade(o) === 'B') { const mf = Number(b.mFine), mo = Number(b.mOth); if (!isFinite(mf) || Math.abs(mf) > 10000 || b.mFine === '' || b.mFine == null) return vjDeny(400, 'stock mounting: type the gold credited (fine g)'); Object.assign(t, { mFine: vjR3(mf), mLab: vjKo3R2(vjKoNum(b.mLab)), mOth: isFinite(mo) && Math.abs(mo) < 1e8 ? vjKo3R2(mo) : 0 }); }
     Object.assign(o, { tag: t, rec, used, usedMan: !!(used0 && used0.length) }); t.deliv = vjKo3Deliv(o, cfg);
