@@ -3455,6 +3455,7 @@ async function vjChatInbound(env, ctx, body, values) {
     const lastTpl = await env.DB.prepare("SELECT max(at) AS at FROM vj_chat_out WHERE number = ? AND kind = 'tpl' AND status = 'sent'").bind(from).first();
     const prevIn = (prev && prev.t) || 0, closedBefore = prevIn > 0 && t - prevIn > VJ_CHAT_WIN, afterTpl = lastTpl && lastTpl.at && lastTpl.at > prevIn;
     if (VJ_CHAT_OPTOUT.test(text.trim())) continue; // opt-out: Aashvi (A6) handles STOP as before
+    if (a && a.mode === 'human' && WA_TEAM.has(from) && now - a.since > 3600e3) continue; // test chat on a team number: expires after 60 min
     if (!WA_TEAM.has(from) || (a && a.mode === 'human')) { const cfg0 = await vjChatCfg(env); await vjAhQueue(env, from, vjClean((ct.profile || {}).name, 60), a && a.mode === 'human' && VJ_CHAT_PEOPLE[a.assigned_to] ? a.assigned_to : cfg0.def); } // after hours -> Next-day handover
     if (afterTpl && (!a || a.mode !== 'human')) {
       const cfg = await vjChatCfg(env), to = (a && VJ_CHAT_PEOPLE[a.assigned_to]) ? a.assigned_to : cfg.def;
@@ -3471,8 +3472,8 @@ async function vjChatModeHook(url, env) {
   const n = vjChatNum(url.searchParams.get('n'));
   if (!n || !(await vjChatSigOk(env, n, url.searchParams.get('ts'), url.searchParams.get('sig')))) return reply('bad request', 403);
   await vjChatT(env);
-  const a = await env.DB.prepare('SELECT mode FROM vj_chat_assign WHERE number = ?').bind(n).first();
-  return reply(a && a.mode === 'human' ? 'human' : 'bot', 200);
+  const a = await env.DB.prepare('SELECT mode, since FROM vj_chat_assign WHERE number = ?').bind(n).first();
+  return reply(a && a.mode === 'human' && !(WA_TEAM.has(n) && Date.now() - a.since > 3600e3) ? 'human' : 'bot', 200); // team-number test chats expire after 60 min
 }
 // GET /hooks/vj-chathot?n=&ts=&sig=&name=&need=&test=&al= (Make A6 after a hot-lead reply)
 async function vjChatHotHook(url, env, ctx) {
