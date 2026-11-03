@@ -1004,7 +1004,7 @@
   // owner 27/10/2026 13:14 (C-20261027-VCHAIN, replaces APPCHAIN v1): chains taken ON APPROVAL from vendors. On the bill, "+ Approval chain":
   // vendor (required), karat, weight, sale tunch -> a chain piece VCH18/n on the bill, billed as weight x tunch x gold rate (no making).
   // The purchase side (purchase tunch and 24K rate, default = the sale tunch and the bill's gold rate, both changeable) is kept only on the
-  // piece - never printed on the bill. Owner tab "Chains (vendors)": every vendor chain - vendor, date received, grams, sale / purchase tunch,
+  // piece - never printed on the bill. Owner tab "Chains (vendors)" (renamed "Sundry Creditors" 03/11 C-20261103-SUNDRY): every vendor chain - vendor, date received, grams, sale / purchase tunch,
   // purchase rate and amount, which bill it went on - with per-vendor totals; "Entered in Tally - remove" takes the ticked chains off the list.
   const VC = { on: false, arm: false };
   const vcNum = v => { const n = parseFloat(String(v || "").replace(/,/g, "")); return isFinite(n) ? n : 0; };
@@ -1030,7 +1030,7 @@
     b.addEventListener("click", () => { const on = f.style.display === "none"; f.style.display = on ? "flex" : "none"; vcVendors(); if (on) v.focus(); });
     // 2. owner tab
     if (!vcOwner()) return;
-    const nav = document.querySelector("nav"), tb = vcEl("button", { id: "t-vchain", textContent: "Chains (vendors)" }); tb.setAttribute("role", "tab"); tb.dataset.tab = "vchain"; tb.setAttribute("aria-selected", "false");
+    const nav = document.querySelector("nav"), tb = vcEl("button", { id: "t-vchain", textContent: "Sundry Creditors" }); /* C-20261103-SUNDRY (owner 17:47): was "Chains (vendors)" - vendor chains now; the purchase register (diamonds / other vendors) comes here after Diwali */ tb.setAttribute("role", "tab"); tb.dataset.tab = "vchain"; tb.setAttribute("aria-selected", "false");
     const place = () => { const after = nav.querySelector('[data-tab="bill"]'); if (after && after.nextSibling !== tb) after.after(tb); else if (!after && !tb.parentNode) nav.append(tb); };
     place(); setTimeout(place, 1600); setTimeout(place, 5200);
     const sec = vcEl("section", { id: "p-vchain", className: "card", hidden: true });
@@ -1040,7 +1040,7 @@
     const t = vcEl("table", { className: "items" }); t.style.minWidth = "900px";
     t.innerHTML = "<thead><tr><th></th><th>Chain</th><th>Vendor</th><th>Received</th><th>Gold</th><th>Sale tunch</th><th>Purchase tunch</th><th>Purchase rate 24K/g</th><th>Purchase amount</th><th>Sold on</th><th>Status</th></tr></thead>";
     t.append(vcEl("tbody", { id: "vcrows" }));
-    sec.append(vcEl("h2", { textContent: "Chains on approval - vendor account" }), vcEl("p", { className: "hint", textContent: "Every chain tagged with a vendor name (New tag > Chain > Vendor). Chains with no vendor are the karigar's / own and are not listed. Tally the vendor's bill with the totals below; after the entry in Tally, tick the chains and remove them." }),
+    sec.append(vcEl("h2", { textContent: "Sundry Creditors" }), vcEl("div", { id: "vcpay" }), vcEl("h3", { textContent: "Vendor chains", style: "margin:12px 0 4px" }), vcEl("p", { className: "hint", textContent: "Every chain tagged with a vendor name (New tag > Chain > Vendor), sold on a bill or used in a karigar piece. Chains with no vendor are the karigar's / own and are not listed. Tally the vendor's bill with the totals; after the entry in Tally, tick the chains and remove them." }),
       row, vcEl("div", { className: "list" }, [t]), vcEl("p", { className: "hint", id: "vcsum" }),
       vcEl("button", { type: "button", className: "btn", id: "vcdone", textContent: "Entered in Tally - remove ticked", onclick: vcDone }), vcEl("span", { className: "hint", id: "vcdmsg" }));
     $("p-rates").parentNode.insertBefore(sec, $("p-rates"));
@@ -1097,6 +1097,11 @@
       const st = td(done ? "Removed " + (a.settledAt ? dmy(String(a.settledAt).slice(0, 10)) : "") : sold ? (t.sold.ko ? "Used in piece" : "Sold") : "With us"); if (!done && sold) st.style.fontWeight = "600";
       if (!done) { const s = tot[a.vendor] = tot[a.vendor] || { n: 0, g: 0, f: 0, a: 0 }; s.n++; s.g += net; s.f += fine; s.a += amt; }
       body.append(tr); });
+    { const box = $("vcpay"), P = {}; if (box) { vcTags().filter(t => !t.approval.settled && t.status === "sold" && t.sold).forEach(t => { const a = t.approval, g = (t.gold || [])[0] || {}, net = Number(g.net) || 0, pt = Number(a.pTunch) || Number(g.tunch) || 0, x = P[a.vendor] = P[a.vendor] || { n: 0, f: 0, a: 0, m: 0 }; x.n++; x.f += net * pt; x.a += Math.round(net * pt * (Number(a.pRate) || 0)); if (!(Number(a.pRate) > 0)) x.m++; });
+      box.textContent = ""; const ks2 = Object.keys(P).sort(); /* C-20261103-SUNDRY: amount to pay per vendor = chains sold or used in a piece, not yet entered in Tally */
+      if (!ks2.length) box.append(vcEl("p", { className: "hint", textContent: "Nothing to pay - no vendor chain sold or used that is not yet entered in Tally." }));
+      else { const tb = vcEl("table", { className: "items" }); tb.style.cssText = "min-width:0;width:auto;max-width:100%;font-variant-numeric:tabular-nums"; tb.innerHTML = "<thead><tr><th>Vendor</th><th>Chains used / sold</th><th>Fine to pay</th><th>Amount to pay</th></tr></thead>"; const bd = vcEl("tbody");
+        ks2.forEach(v => { const tr = vcEl("tr"); [v, String(P[v].n), P[v].f.toFixed(3) + " g", P[v].m ? (P[v].a ? fmt(P[v].a) + " + " : "") + P[v].m + " without rate - type it below" : fmt(P[v].a)].forEach((x, k) => tr.append(vcEl("td", { textContent: x, style: k ? "text-align:right" + (k === 3 ? ";font-weight:700" : "") : "font-weight:600" }))); bd.append(tr); }); tb.append(bd); box.append(vcEl("div", { className: "list" }, [tb])); } } }
     const ks = Object.keys(tot); $("vcsum").textContent = !L.length ? "No vendor chains." : ks.length ? ks.map(v => `${v}: ${tot[v].n} chain${tot[v].n > 1 ? "s" : ""}, ${tot[v].g.toFixed(3)} g, fine ${tot[v].f.toFixed(3)} g, ${fmt(tot[v].a)}`).join("  |  ") : "All removed.";
     if (!quiet) { $("vcdmsg").textContent = ""; VC.arm = false; $("vcdone").textContent = "Entered in Tally - remove ticked"; }
   }
