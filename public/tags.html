@@ -311,7 +311,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="/tags/shim.js?v=20261103zg"></script>
+<script src="/tags/shim.js?v=20261103zh"></script>
 <script src="/tags/navsel.js?v=20261103k" defer></script>
 <script src="/tags/boxes.js?v=20261029a" defer></script>
 <script src="/tags/similar.js?v=20261103pf" defer></script>
@@ -334,8 +334,8 @@ const CATS=[
 ];
 const KARATS=["22K","18K","14K","9K"],KNUM={"22K":"22","18K":"18","14K":"14","9K":"9"};
 const SHAPES=["Round","Choki","Fancy","Solitaire","Polki"], /* owner 21/10/2026: Polki stones = a diamond line priced per ct (own rate); the per-piece box below is the Polki SETTING charge */QUALS=["CVD","VS GH","VVS EF","VS HI","VS IJ","Party diamond","Other"]; /* owner 26/10/2026 18:26: Party diamond (customer's own) = a quality in the list, setting Rs 3,000/ct by default, rate box editable (C-20261026-PARTYDIA) */
-const DEF_RATES={"CVD|Round":23000,"CVD|Choki":23000,"CVD|Fancy":23000,"CVD|Solitaire":23000,"VS GH|Round":46000,"VS GH|Choki":46000,"VS GH|Fancy":85000,"VS HI|Round":40000,"VS HI|Choki":40000,"VS IJ|Round":35000,"VS IJ|Choki":35000};
-function defRate(shape,q){if(q==="Party diamond")return 3000;const r=(S.settings&&S.settings.defaultRates)||DEF_RATES;const v=r[q+"|"+shape];return typeof v==="number"&&v>0?v:null}
+const DEF_RATES={"CVD|Round":23000,"CVD|Choki":23000,"CVD|Fancy":23000,"CVD|Solitaire":23000,"VS GH|Round":46000,"VS GH|Choki":46000,"VS GH|Fancy":85000,"VS HI|Round":40000,"VS HI|Choki":40000,"VS IJ|Round":35000,"VS IJ|Choki":35000,"Other|Choki":46000}; /* Other|Choki: C-20261103-CHOKI */
+function defRate(shape,q){if(q==="Party diamond")return 3000;const r=(S.settings&&S.settings.defaultRates)||DEF_RATES;const v=r[q+"|"+shape],o=QUALS.includes(q)?null:r["Other|"+shape];return typeof v==="number"&&v>0?v:typeof o==="number"&&o>0?o:null} /* C-20261103-CHOKI: a typed quality code (P-15 etc.) takes the "Other / code" row */
 const DEF={gold24g:null,goldAt:null,purity:{"22K":0.92,"18K":0.76,"14K":0.60,"9K":0.385} /* 9K = 38.5 tunch (owner 26/10 19:00) */,making:{base:650,small:750,limit:5,pct:10},gst:3,tag:{w:100,h:15,printW:70}};
 const S={sel:new Set(),subs:{},parts:{},db:null,user:null,assets:null,dl:null,me:null,owner:false,canWrite:null,settings:null,counters:{},tags:[],photo:null,busy:false};
 const fmt=n=>"₹"+Math.round(n).toLocaleString("en-IN");
@@ -1052,7 +1052,7 @@ $("ordRep").addEventListener("click",async()=>{const b=$("ordRep");b.disabled=tr
 /* ---------- settings ---------- */
 function renderDefRates(ro){
   const tb=$("defRows");tb.textContent="";const r=(S.settings&&S.settings.defaultRates)||DEF_RATES;
-  QUALS.filter(q=>q!=="Other"&&q!=="Party diamond").forEach(q=>{const tr=document.createElement("tr");const a=document.createElement("td");a.textContent=q;tr.appendChild(a);
+  QUALS.filter(q=>q!=="Party diamond").forEach(q=>{const tr=document.createElement("tr");const a=document.createElement("td");a.textContent=q==="Other"?"Other / code (P-15 …)":q;tr.appendChild(a);
     SHAPES.forEach(sh=>{const td=document.createElement("td");const i=document.createElement("input");i.type="number";i.min="0";i.step="100";i.dataset.k=q+"|"+sh;i.id="def-"+q.replace(/\W/g,"")+"-"+sh;const v=r[q+"|"+sh];i.value=typeof v==="number"&&v>0?v:"";i.placeholder="—";i.readOnly=ro;td.appendChild(i);tr.appendChild(td)});tb.appendChild(tr)});
 }
 function renderRates(){
