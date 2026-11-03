@@ -202,7 +202,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
       <table class="sum" id="sum"></table>
       <p class="hint" id="rateNote"></p>
       <div class="actions">
-        <button type="button" class="btn" id="save">Save &amp; print tag</button>
+        <button type="button" class="btn" id="save">Save &amp; print tag</button><button type="button" class="btn" id="saveBill" hidden>Save &amp; make bill</button>
         <button type="button" class="btn ghost" id="reset">Clear form</button>
       </div>
       <p class="hint" id="saveHint"></p>
@@ -311,7 +311,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="/tags/shim.js?v=20261103x"></script>
+<script src="/tags/shim.js?v=20261103y"></script>
 <script src="/tags/navsel.js?v=20261103k" defer></script>
 <script src="/tags/boxes.js?v=20261029a" defer></script>
 <script src="/tags/similar.js?v=20261103pf" defer></script>
@@ -675,7 +675,7 @@ function update(){
      bar.append(b," incl. GST · gold "+fmt(gv)+" · making "+fmt(pr.making||0)+" · diamonds "+fmt(pr.dia||0)+" · other "+fmt(ot))}else bar.textContent=t.kind==="sample"?"Sample - not priced":"Price: set today's gold rate"}}
   const box=$("tagbox");box.textContent="";box.appendChild(tagSVG(t));
   $("tagHint").textContent=`${s.tag.w} × ${s.tag.h} mm tag, printing on the left ${s.tag.printW} mm. The price code appears when you save.`;
-  const pb=problems(t);$("save").disabled=S.busy||pb.length>0||S.canWrite===false;
+  const pb=problems(t);$("save").disabled=S.busy||pb.length>0||S.canWrite===false;{const sb=$("saveBill");if(sb){sb.hidden=t.kind!=="order"||!window.VJ_BILL_NOW;sb.disabled=$("save").disabled}} /* C-20261103-SAVEBILL */
   $("saveHint").textContent=S.canWrite===false?"You can view this page but not add tags. Ask Abhinav for editor access.":(pb.length?pb[0]:"Saving gives the piece its label number. Then open the PDF and print it on the TVS LP-45 at actual size.");
 }
 
@@ -817,8 +817,8 @@ $("save").addEventListener("click",async()=>{
     let upr=null;if(S.photo)try{upr=await S.assets.upload(S.photo,{type:"image/jpeg"})}catch(e){throw {message:e&&e.code==="too_large"?"The photo is too large. Retake it.":"The photo could not be uploaded ("+(e&&e.code||"error")+"). Try again."}}
     const saved=await allocateAndSave(t,upr?upr.id:null);
     msg(`Saved ${saved.label}. Printing the tag…`,"ok");
-    await printOrPDF(saved);resetForm(true);
-  }catch(e){msg((e&&e.message)||"Could not save. Try again.","bad")}
+    await printOrPDF(saved);resetForm(true);if(S.thenBill){S.thenBill=false;billNow(saved.id)}
+  }catch(e){S.thenBill=false;msg((e&&e.message)||"Could not save. Try again.","bad")}
   S.busy=false;update();
 });
 /* 13/10/2026 owner: print straight to the tag printer. Opens the browser print box with the tag at exact size;
@@ -862,6 +862,9 @@ async function offerPDF(t){
   try{await S.dl.save({filename:(list.length===1?t.label.replace("/","-"):"VJ_tags_"+list.length)+".pdf",data:tagPDF(list)})}
   catch(e){if(e&&e.code==="declined")msg(`${t.label}: download skipped. Reprint it any time from Tagged pieces.`,"warn");else msg(`${t.label}: the PDF could not be offered (${e&&e.code||"error"}). Reprint it from Tagged pieces.`,"warn")}
 }
+/* C-20261103-SAVEBILL (owner 16:36): an order tag is saved and the existing Bill screen opens with it, as if the piece had been picked there (same format, same maths) */
+$("saveBill").addEventListener("click",()=>{if($("save").disabled)return;S.thenBill=true;$("save").click()});
+function billNow(id){let n=0;const go=()=>{const all=window.VJ_TAGS_ALL?window.VJ_TAGS_ALL():[];if(all.some(x=>x.id===id)||n++>40){if(window.VJ_BILL_NOW)window.VJ_BILL_NOW(id)}else setTimeout(go,200)};go()}
 function resetForm(keepKind){
   $("polkiRate").value="300"; /* C-20261017-POLKI: rate back to Rs 300, pcs empty */
   $("pdRate").value="3000";["pdCt","pdPcs","certNo"].forEach(id=>$(id).value=""); /* C-20261026-PARTYDIA */
