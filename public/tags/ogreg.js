@@ -94,7 +94,9 @@
   // ---------- diamonds on an OG (C-20261102-OGSTONES, owner 02/11 14:58) ----------
   function stRow(d, ro) { const s = src(), tr = el("tr"); tr.dataset.line = d.line == null ? "" : String(d.line);
     const i = (k, ph, w, mode) => { const x = el("input", { value: d[k] == null ? "" : String(d[k]), placeholder: ph, maxLength: k === "note" ? 60 : 30, disabled: !!ro }); x.dataset.k = k; x.style.width = w; if (mode) x.inputMode = mode; x.addEventListener("input", stTot); const c = el("td"); c.appendChild(x); tr.appendChild(c); };
-    i("shape", "RD", "60px"); i("q", "VVS-EF", "100px"); i("pcs", "0", "60px", "numeric"); i("ct", "0.000", "80px", "decimal"); i("note", "", "130px");
+    { const SH = ["Round", "Choki", "Fancy", "Solitaire", "Polki"], v = d.shape == null ? "" : String(d.shape), x = el("select", { disabled: !!ro }); /* KORDER8: the same shape list as New tag / bills; an old typed value stays as an extra option */
+      x.appendChild(el("option", { value: "", textContent: "-" })); SH.concat(v && !SH.includes(v) ? [v] : []).forEach(t => x.appendChild(el("option", { value: t, textContent: t }))); x.value = v; x.dataset.k = "shape"; x.style.width = "100px"; x.addEventListener("change", stTot); tr.appendChild(el("td", {}, [x])); }
+    i("q", "VVS-EF", "100px"); i("pcs", "0", "60px", "numeric"); i("ct", "0.000", "80px", "decimal"); i("note", "", "130px");
     const sc = el("td", { className: "ogStC" }); sc.hidden = s === "party"; const sel = el("select", { disabled: !!ro }); [["out", "came out"], ["missing", "missing"]].forEach(([v, t]) => sel.appendChild(el("option", { value: v, textContent: t }))); sel.value = d.st === "missing" ? "missing" : "out"; sel.dataset.k = "st"; sel.addEventListener("change", stTot); sc.appendChild(sel); tr.appendChild(sc);
     return tr; }
   function stRows(list, ro) { const tb = $("ogStRows"); tb.textContent = ""; (list || []).forEach(d => tb.appendChild(stRow(d, ro))); $("ogStAdd").disabled = !!ro; stTot(); }
