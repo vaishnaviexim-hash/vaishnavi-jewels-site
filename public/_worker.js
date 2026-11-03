@@ -378,8 +378,18 @@ async function vjMaybeRefreshGold(env) {
   } catch (e) {}
 }
 
+// C-20261103-CHOKI (owner 18:26): a Choki line of a typed / 'Other' quality code (e.g. P-15) defaults to Rs 46,000/ct - settings key 'Other|Choki', shown in
+// Gold rate & settings as the 'Other / code' row. Put in ONCE (vj_meta claim 'seed:otherChoki'); only when missing, never over a value already there; nothing else touched.
+let vjChokiDone = false;
+async function vjSeedChoki(env) { if (vjChokiDone) return; vjChokiDone = true; try { await vjMetaT(env);
+  const c = await env.DB.prepare("INSERT OR IGNORE INTO vj_meta (k, v) VALUES ('seed:otherChoki', ?)").bind(new Date().toISOString()).run(); if (!(c.meta && c.meta.changes === 1)) return;
+  const row = await env.DB.prepare("SELECT data, version FROM docs WHERE path = 'settings/main'").first(); if (!row) return; const cur = JSON.parse(row.data);
+  if (!cur.defaultRates || typeof cur.defaultRates !== 'object') return; // no saved table yet: the built-in table (with Other|Choki) is used
+  if (Number(cur.defaultRates['Other|Choki']) > 0) return; cur.defaultRates = Object.assign({}, cur.defaultRates, { 'Other|Choki': 46000 });
+  await env.DB.prepare('UPDATE docs SET data = ?, version = ?, updated_at = ?, updated_by = ? WHERE path = ? AND version = ?').bind(JSON.stringify(cur), row.version + 1, Date.now(), 'seed:otherChoki', 'settings/main', row.version).run();
+  await env.DB.prepare('INSERT INTO audit (ts, email, action, path, detail) VALUES (?, ?, ?, ?, ?)').bind(Date.now(), 'system', 'update', 'settings/main', 'default rate Other|Choki = 46000 (owner 03/11 18:26)').run(); } catch (e) {} }
 async function vjSync(request, env, who, ctx) {
-  ctx.waitUntil(vjMaybeRefreshGold(env));
+  ctx.waitUntil(vjMaybeRefreshGold(env)); await vjSeedChoki(env);
   const since = Math.max(0, Number(new URL(request.url).searchParams.get('since')) || 0);
   const now = Date.now();
   const docs = (await env.DB.prepare('SELECT path, data, version, updated_at FROM docs WHERE updated_at > ? ORDER BY updated_at').bind(since).all()).results || [];
@@ -762,7 +772,7 @@ const vjClean = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u001f<>]/
 const VJ_Q_OPT = { 'Natural VS GH': 'gh', 'Natural VS IJ': 'ij', 'Natural VVS FG': 'fg', 'Lab-grown': 'lgd' };
 const VJ_Q_NONDIA = /POL|EMR|MOZ|RUBY|PEARL|MOTI|STONE|KUNDAN/i;
 const VJ_Q_KARATS = ['14K', '18K', '22K', '9K', '24K'], VJ_Q_QUALS = ['CVD', 'VS IJ', 'VS HI', 'VS GH', 'VVS EF'], VJ_Q_SHAPES = ['Round', 'Choki', 'Fancy', 'Solitaire', 'Polki'];
-const VJ_DEF_RATES = { 'CVD|Round': 23000, 'CVD|Choki': 23000, 'CVD|Fancy': 23000, 'CVD|Solitaire': 23000, 'VS GH|Round': 46000, 'VS GH|Choki': 46000, 'VS GH|Fancy': 85000, 'VS HI|Round': 40000, 'VS HI|Choki': 40000, 'VS IJ|Round': 35000, 'VS IJ|Choki': 35000 };
+const VJ_DEF_RATES = { 'CVD|Round': 23000, 'CVD|Choki': 23000, 'CVD|Fancy': 23000, 'CVD|Solitaire': 23000, 'VS GH|Round': 46000, 'VS GH|Choki': 46000, 'VS GH|Fancy': 85000, 'VS HI|Round': 40000, 'VS HI|Choki': 40000, 'VS IJ|Round': 35000, 'VS IJ|Choki': 35000, 'Other|Choki': 46000 }; // Other|Choki: C-20261103-CHOKI
 const vjQSt = s => ({ g: Number(s.gold24g) || 0, pur: Object.assign({ '24K': 1, '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.385 }, s.purity || {}),
   mk: Object.assign({ base: 650, small: 750, limit: 5, pct: 10, min: 1000 }, s.making || {}), gst: s.gst == null ? 3 : Number(s.gst), rates: s.defaultRates && typeof s.defaultRates === 'object' ? s.defaultRates : VJ_DEF_RATES });
 const vjQUp = (n, s) => Math.ceil(Math.round(n * 100) / 100 / s) * s;
