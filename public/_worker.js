@@ -2420,6 +2420,9 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
     if ((k !== old.karigar || no !== old.no) && !adm) return vjDeny(403, 'only Abhinav or Shilpiji can change the karigar or the order no.');
     if (k !== old.karigar || no !== old.no) { const e2 = await addKarigar(k); if (e2) return vjDeny(400, e2); if (!(no >= 1 && no <= 9999999)) return vjDeny(400, 'order no. looks wrong');
       if (await env.DB.prepare('SELECT id FROM vj_kord WHERE karigar = ? AND no = ? AND id <> ?').bind(k, no, id).first()) return vjDeny(409, k + "'s order no. " + no + ' is already used'); o.karigar = k; o.no = no; post = !!o.tag; } }
+  else if (op === 'photo') { if (!live) return vjDeny(409, 'this order is cancelled'); /* C-20261103-THUMBS: a photo added from the Pending list becomes the order's drawing (only when it has none) */
+    const dr = String(b.drawing || ''); if (!/^[0-9a-f]{32}$/.test(dr)) return vjDeny(400, 'drawing photo not valid'); if (env.PHOTOS && !(await vjPhotoHas(env, dr))) return vjDeny(400, 'drawing photo not found - upload it again');
+    if (o.drawing) return vjDeny(409, 'this order already has a drawing - change it inside the order'); o.drawing = dr; o.sample = ''; }
   else if (op === 'stage') { if (!live) return vjDeny(409, 'this order is cancelled'); const s = vjClean(b.stage, 20); if (s && !cfg.stages.includes(s)) return vjDeny(400, 'pick a stage from the list'); o.stage = s; o.stageAt = now; }
   else if (op === 'cancel') { if (!adm) return vjDeny(403, 'only Abhinav or Shilpiji can cancel an order'); if (!live) return vjDeny(409, 'already cancelled');
     o.cancelled = { at: now, by: who.email, byName, why: vjClean(b.why, 120), from: old.status }; o.status = 'cancelled'; post = true; }
