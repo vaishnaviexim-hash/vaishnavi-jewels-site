@@ -14,8 +14,12 @@
   const plus = (ymd, n) => new Date(Date.parse(ymd + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
   const CLOSED = ["Bought", "Not interested", "Not relevant", "Closed"];
   const CHANNELS = ["Meta ad", "Google ad", "Website", "Broadcast", "Direct"];
-  let sec = null, data = null, busy = false, timer = 0, openComposer = "", sub = "new"; /* C-20261103-ENQTABS: New / Follow-up / Waiting */
-  const SUBS = [["new", "New"], ["followup", "Follow-up"], ["waiting", "Waiting"]];
+  /* C-20261103-ENQMERGE (owner 03/11 09:34): one "Show:" list replaces the New / Follow-up / Waiting pills and holds the chat views too
+     (Chats is no longer a separate section). The choice is remembered on this device. */
+  const VIEWS = [["new", "New leads (not contacted)"], ["talking", "Baat chal rahi hai"], ["followup", "Follow-up due"], ["waiting", "Waiting"], ["ah", "Next-day handover"], ["closed", "Closed / history"]];
+  const CHATV = ["talking", "ah"], SUBS = VIEWS.filter(v => ["new", "followup", "waiting"].includes(v[0]));
+  let sub = "new"; try { const v = localStorage.getItem("vjEnqView"); if (VIEWS.some(x => x[0] === v)) sub = v; } catch (e) {}
+  let sec = null, data = null, busy = false, timer = 0, openComposer = "", openCounts = null;
   /* quick actions (Send on WhatsApp / Call / Messaged): recorded at once, with ~10 s Undo */
   let toastT = 0;
   function toast(text, undo) {
@@ -37,7 +41,7 @@
   }
   async function load(fresh) {
     if (busy) return; busy = true; const m = $("enqMsg");
-    try { data = await api("/api/vj/enquiries?" + ($("enqClosed").checked ? "closed=1&" : "") + (fresh ? "fresh=1" : "")); if (m) m.textContent = data.sheetOk ? "" : "Could not read the Enquiries sheet just now - showing the last copy."; }
+    try { data = await api("/api/vj/enquiries?" + ($("enqClosed").checked ? "closed=1&" : "") + (fresh ? "fresh=1" : "")); if (!$("enqClosed").checked) openCounts = counts(data.enquiries); if (m) m.textContent = data.sheetOk ? "" : "Could not read the Enquiries sheet just now - showing the last copy."; }
     catch (e) { if (m) m.textContent = "Could not load: " + e.message; }
     busy = false; render();
   }
@@ -62,15 +66,31 @@
     else if (sub === "waiting") L = L.slice().sort((a, b) => a.next.localeCompare(b.next) || b.date.localeCompare(a.date));
     return L;
   }
+  function counts(list) { const c = { new: 0, followup: 0, waiting: 0, overdue: 0 }; (list || []).forEach(e => { const k = e.tab || "new"; if (k in c) c[k]++; if (k === "followup" && e.due === "overdue") c.overdue++; }); return c; }
+  function showLabels() {
+    const s = $("enqView"); if (!s) return; const ch = window.VJChats && window.VJChats.data && window.VJChats.data(), oc = openCounts;
+    const n = { new: oc ? oc.new : null, followup: oc ? oc.followup : null, waiting: oc ? oc.waiting : null, talking: ch ? ch.chats.filter(c => c.mode === "human").length : null, ah: ch ? (ch.ah || []).length : null, closed: null };
+    [...s.options].forEach(o => { const v = VIEWS.find(x => x[0] === o.value); o.textContent = v[1] + (n[o.value] != null ? " · " + n[o.value] : "") + (o.value === "followup" && oc && oc.overdue ? " (" + oc.overdue + " overdue)" : ""); });
+    s.value = sub;
+  }
+  function setView(v, quiet) {
+    if (!VIEWS.some(x => x[0] === v)) v = "new";
+    const wasClosed = $("enqClosed").checked; sub = v; openComposer = ""; try { localStorage.setItem("vjEnqView", v); } catch (e) {}
+    $("enqClosed").checked = v === "closed"; const chat = CHATV.includes(v);
+    $("enqMain").hidden = chat; $("enqChats").hidden = !chat;
+    if (chat) { if (window.VJChats) { window.VJChats.mount($("enqChats")); if (sec && !sec.hidden) window.VJChats.activate(v); } else $("enqChats").textContent = "Loading chats…"; }
+    else if (window.VJChats) window.VJChats.deactivate();
+    if (wasClosed !== (v === "closed")) { data = null; if (!quiet) load(); }
+    render(); if (!quiet && sec) window.scrollTo({ top: sec.offsetTop - 8 });
+  }
+  /* from a chat: show this customer's enquiry card (search by number, in the list it sits in) */
+  window.VJEnq = { find: num => { const d = String(num || "").replace(/\D/g, "").slice(-10); const e = data && !$("enqClosed").checked && data.enquiries.find(x => String(x.number || "").replace(/\D/g, "").slice(-10) === d);
+    $("enqQ").value = d; setView(e ? (e.tab || "new") : "closed"); } };
   function render() {
-    if (!sec || sec.hidden) return; stats();
+    if (!sec || sec.hidden) return; stats(); showLabels();
+    if (CHATV.includes(sub)) return;
     const box = $("enqList"); box.textContent = ""; if (!data) { box.append(el("p", { className: "hint", textContent: "Loading…" })); return; }
-    const L = filtered(), closedView = $("enqClosed").checked, bar = $("enqSubs");
-    bar.hidden = closedView; bar.textContent = "";
-    if (!closedView) { const A = filtered(true); SUBS.forEach(([k, label]) => { const n = A.filter(e => (e.tab || "new") === k).length, od = k === "followup" ? A.filter(e => e.tab === "followup" && e.due === "overdue").length : 0;
-      const b = el("button", { type: "button", textContent: label + " " + n + (od ? " (" + od + " overdue)" : "") }); b.setAttribute("aria-pressed", sub === k ? "true" : "false");
-      b.style.cssText = "flex:1 1 0;font:inherit;font-weight:600;font-size:14px;padding:9px 6px;border-radius:999px;cursor:pointer;border:1px solid " + (sub === k ? "var(--fg);background:var(--fg);color:var(--bg)" : "var(--line);background:var(--surface);color:" + (od ? "var(--bad)" : "var(--fg)"));
-      b.addEventListener("click", () => { sub = k; openComposer = ""; render(); window.scrollTo({ top: sec.offsetTop - 8 }); }); bar.append(b); }); }
+    const L = filtered(), closedView = $("enqClosed").checked;
     $("enqCount").textContent = L.length + (closedView ? " closed" : " " + (SUBS.find(x => x[0] === sub) || ["", ""])[1].toLowerCase()) + " shown" + (data.sheetAt ? " · sheet read " + new Date(data.sheetAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "");
     if (!L.length) box.append(el("p", { className: "hint", textContent: closedView ? "No closed enquiries match." : sub === "new" ? "No new enquiries - everyone has been contacted." : sub === "followup" ? "Nothing due. All followed up!" : "Nobody waiting." }));
     L.slice(0, 300).forEach(e => box.append(card(e)));
@@ -97,7 +117,7 @@
       call.addEventListener("click", onCall); who.append(call);
     }
     if (e.wa && data.canEdit && e.open) { const w = el("button", { type: "button", className: "btn ghost", textContent: "WhatsApp" }); w.style.padding = "6px 12px"; w.addEventListener("click", () => { openComposer = openComposer === e.id ? "" : e.id; render(); }); who.append(w); }
-    if (e.wa && data.canEdit && window.VJChats) { const ch = el("button", { type: "button", className: "btn ghost", textContent: "Chat / remind" }); ch.style.padding = "6px 12px"; ch.title = "Business-number chat: reply while the 24h window is open, otherwise call or send an approved reminder"; ch.addEventListener("click", () => window.VJChats.open(e.wa)); who.append(ch); } // C-20261103-HANDOVER
+    if (e.wa && data.canEdit && window.VJChats) { const ch = el("button", { type: "button", className: "btn ghost", textContent: "Chat / remind" }); ch.style.padding = "6px 12px"; ch.title = "Business-number chat: reply while the 24h window is open, otherwise call or send an approved reminder"; ch.addEventListener("click", () => { setView("talking"); window.VJChats.open(e.wa); }); who.append(ch); } // C-20261103-HANDOVER (ENQMERGE: opens inside Enquiries)
     c.append(who);
     const line = (k, v) => v ? el("p", { style: "margin:4px 0" }, [el("span", { className: "hint", textContent: k + ": " }), document.createTextNode(v)]) : null;
     add(c, line("Wants", [e.cat && e.cat !== "Other" ? e.cat : "", e.what].filter(Boolean).join(" - ")), line("Aashvi's last reply", e.reply.length > 220 ? e.reply.slice(0, 220) + "…" : e.reply), line("Ad / source", e.src));
@@ -169,6 +189,7 @@
   }
   function show(on) {
     if (!sec) return; sec.hidden = !on; clearInterval(timer);
+    if (window.VJChats) { if (on) { window.VJChats.mount($("enqChats")); if (CHATV.includes(sub)) window.VJChats.activate(sub); else window.VJChats.refresh(); } else window.VJChats.deactivate(); }
     if (on) { document.querySelectorAll('[id^="p-"]').forEach(p => { if (p !== sec) p.hidden = true; });
       document.querySelectorAll("nav button").forEach(y => y.setAttribute("aria-selected", y.dataset.tab === "enq" ? "true" : "false"));
       render(); load(); timer = setInterval(() => { if (document.visibilityState === "visible" && !openComposer && !(document.activeElement && sec.contains(document.activeElement) && /INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))) load(); }, 120000); window.scrollTo({ top: 0 }); }
@@ -182,19 +203,26 @@
     const lab = (txt, inp, flex) => { const l = el("label", {}, [txt + " ", inp]); if (flex) l.style.flex = flex; return l; };
     const q = el("input", { id: "enqQ", placeholder: "Name, number or what they want", autocomplete: "off", maxLength: 40 });
     const rel = el("input", { type: "checkbox", id: "enqRel" }), cl = el("input", { type: "checkbox", id: "enqClosed" });
+    const vsel = el("select", { id: "enqView" }); vsel.style.cssText = "flex:1 1 auto;min-width:0;font:inherit;font-size:16px;font-weight:600;padding:9px 12px;border-radius:999px;border:1px solid var(--fg);background:var(--surface);color:var(--fg)";
+    VIEWS.forEach(([k, t]) => vsel.append(el("option", { value: k, textContent: t }))); vsel.addEventListener("change", () => setView(vsel.value));
     const refresh = el("button", { type: "button", className: "btn ghost", textContent: "Refresh" }), xl = el("button", { type: "button", className: "btn ghost", textContent: "Excel" });
     const chk = (inp, txt) => { const l = el("label", {}, [inp, " " + txt]); l.style.cssText = "display:flex;flex-direction:row;align-items:center;gap:6px;flex:0 0 auto;white-space:nowrap;cursor:pointer"; inp.style.width = "auto"; return l; };
     sec.append(el("h2", { textContent: "Enquiries - follow up and close" }),
-      el("p", { className: "hint", textContent: "Every WhatsApp enquiry, one card per customer. Overdue and due-today follow-ups are on top. Closed ones leave this list (tick Closed / history to see them)." }),
+      el("p", { className: "hint", textContent: "Every WhatsApp enquiry, one card per customer. Overdue and due-today follow-ups are on top. Closed ones leave this list (choose Closed / history under Show:)." }),
       el("div", { id: "enqStats", style: "display:flex;flex-wrap:wrap;gap:8px;margin:8px 0" }), el("p", { className: "hint", id: "enqCh" }),
+      el("div", { id: "enqSubs", style: "position:sticky;top:0;z-index:20;display:flex;gap:8px;align-items:center;padding:8px 0;margin:6px 0;background:var(--surface);border-bottom:1px solid var(--line)" }, [el("label", { htmlFor: "enqView", textContent: "Show:", style: "font-weight:600;flex:0 0 auto" }), vsel]),
+      el("div", { id: "enqChats", hidden: true }),
+      el("div", { id: "enqMain" }, [
       el("div", { className: "row", style: "align-items:end" }, [lab("Search", q, "2 1 200px"), lab("Channel", sel("enqChan", "All", CHANNELS)), lab("Status", sel("enqSt", "All", ["New", "Messaged", "Called", "Visit booked", "Visited", "Quote", "Bought", "Not interested", "Not relevant", "Closed"])),
         lab("From", el("input", { type: "date", id: "enqFrom" })), lab("To", el("input", { type: "date", id: "enqTo" }))]),
-      el("div", { className: "row", style: "align-items:center;margin-top:8px" }, [chk(rel, "Real leads only"), chk(cl, "Closed / history"), refresh, xl]),
-      el("div", { id: "enqSubs", style: "position:sticky;top:0;z-index:20;display:flex;gap:6px;padding:8px 0;margin:6px 0;background:var(--surface);border-bottom:1px solid var(--line)" }),
-      el("p", { className: "hint", id: "enqCount" }), el("p", { className: "hint", id: "enqMsg", style: "color:var(--bad)" }), el("div", { id: "enqList" }));
+      el("div", { className: "row", style: "align-items:center;margin-top:8px" }, [chk(rel, "Real leads only"), refresh, xl]),
+      el("p", { className: "hint", id: "enqCount" }), el("p", { className: "hint", id: "enqMsg", style: "color:var(--bad)" }), el("div", { id: "enqList" })]));
+    sec.append(el("span", { hidden: true }, [cl])); /* the Closed / history switch now follows the Show: list */
     rates.parentNode.insertBefore(sec, rates);
     ["enqQ", "enqFrom", "enqTo"].forEach(id => $(id).addEventListener("input", render)); ["enqChan", "enqSt", "enqRel"].forEach(id => $(id).addEventListener("change", render));
-    cl.addEventListener("change", () => { data = null; openComposer = ""; render(); load(); });
+    window.addEventListener("vjchats-data", showLabels);
+    window.addEventListener("vjchats-ready", () => { setView(sub, true); if (sec && !sec.hidden && !CHATV.includes(sub)) { window.VJChats.mount($("enqChats")); window.VJChats.refresh(); } });
+    setView(sub, true);
     refresh.addEventListener("click", () => load(true));
     xl.addEventListener("click", () => { const a = el("a", { href: "/api/vj/enquiries.xlsx" + (cl.checked ? "?closed=1" : "") }); document.body.append(a); a.click(); a.remove(); });
     nav.addEventListener("click", e => { const x = e.target.closest("nav button"); if (!x) return; show(x.dataset.tab === "enq"); });
