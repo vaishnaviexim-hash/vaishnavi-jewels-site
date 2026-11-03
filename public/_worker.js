@@ -2462,7 +2462,7 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
       const rate = vjKo3R2(vjKoNum(x.rate)); if (!tid && !vendor && !(net > 0)) continue;
       if (tid) { if (!/^[A-Za-z0-9_\-.~]{1,60}$/.test(tid)) return vjDeny(400, 'chain tag not valid'); if (chains.some(c => c.tag === tid)) return vjDeny(400, 'the same chain tag is picked twice');
         const r0 = await env.DB.prepare('SELECT data FROM docs WHERE path = ?').bind('tags/' + tid).first(), tg = r0 ? vjParse(r0) : null;
-        if (!tg || !tg.approval || !tg.approval.vendor) return vjDeny(400, 'chain tag ' + tid + ' is not a vendor chain in Chains (vendors)');
+        if (!tg || !tg.approval || !tg.approval.vendor) return vjDeny(400, 'chain tag ' + tid + ' is not a vendor chain in Sundry Creditors');
         if (vendor && String(tg.approval.vendor).toLowerCase() !== vendor.toLowerCase()) return vjDeny(400, 'chain ' + (tg.label || tid) + ' is from ' + tg.approval.vendor + ', not ' + vendor);
         if (tg.status === 'sold' && !(tg.sold && tg.sold.ko === o.id)) return vjDeny(409, 'chain ' + (tg.label || tid) + ' is already used / sold (' + ((tg.sold && tg.sold.no) || 'sold') + ')');
         const g0 = (Array.isArray(tg.gold) ? tg.gold : []).find(g => g && g.net > 0) || {}; net = vjR3(Number(g0.net) || 0); tn = Number(g0.tunch) || 0; label = String(tg.label || tid).slice(0, 40); vendor = String(tg.approval.vendor).slice(0, 40); }
@@ -2500,7 +2500,7 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
   await vjOgHist(env, who, 'ko', id, act, old);
   await env.DB.prepare('UPDATE vj_kord SET data = ?, status = ?, karigar = ?, no = ?, ts = ? WHERE id = ?').bind(JSON.stringify(o), o.status, o.karigar, o.no, Date.now(), id).run();
   if (post) await vjKo3Post(env, who, o, now, rowsP);
-  let warn = ''; if (chNew) { const f = await vjKoChainUse(env, who, chOld.filter(x => !chNew.includes(x)), o, today, false), u = await vjKoChainUse(env, who, chNew, o, o.tag.date, true); if (u.length) warn = 'chain tag ' + u.join(', ') + ' could not be marked used - check Chains (vendors)'; } // CHAINREC
+  let warn = ''; if (chNew) { const f = await vjKoChainUse(env, who, chOld.filter(x => !chNew.includes(x)), o, today, false), u = await vjKoChainUse(env, who, chNew, o, o.tag.date, true); if (u.length) warn = 'chain tag ' + u.join(', ') + ' could not be marked used - check Sundry Creditors'; } // CHAINREC
   await vjAudit(env, who, 'ko-' + act, 'korders/' + id, o.karigar + ' ' + o.no + ' ' + o.status);
   return vjJson({ ok: true, order: vjKo3View(o, who, cfg), warn }); }
 // C-20261103-CHAINREC: a vendor-chain tag used whole in a karigar piece is marked sold with sold.ko = the order (status back to what it was when the receive is deleted / corrected)
