@@ -3179,14 +3179,25 @@ function vjEnqView(q, who, today) {
     quote: e.quote || 0, bought: e.bought || 0, billNo: e.billNo || '', lost: e.lost || '', closedBy: e.closedBy || '', closedAt: e.closedAt ? vjEnqIst(e.closedAt).slice(0, 10) : '',
     notes: e.hist.map(h => ({ at: vjEnqIst(h.at).slice(0, 16).replace('T', ' '), by: h.by_name || h.by, status: h.status || '', next: h.next_followup_date || '', note: h.note || '', amount: h.amount || 0, bill: h.bill_no || '' })).slice(-30),
     earlier: q.earlier.map(p => ({ from: vjEnqIst(p.start).slice(0, 10), status: p.status, closedAt: p.closedAt ? vjEnqIst(p.closedAt).slice(0, 10) : '' })).slice(-5) };
+  v.tab = vjEnqTab(q, today); { const lastAct = e.hist.reduce((m, h) => Math.max(m, h.at || 0), 0); v.replied = !!lastAct && l.t > lastAct; }
   if (!sales) { const d = String(l.D || ''), wa = vjEnqWa(d); v.number = d.slice(0, 20); v.wa = wa; v.tel = wa ? '+' + wa : ''; v.msg = vjEnqMsg(q, vjEnqSender(who)); }
   return v;
 }
+// Sub-tabs (owner 03/11 07:29, C-20261103-ENQTABS): New = not contacted; Follow-up = contacted and due today / overdue / no date / the
+// customer wrote again after our last action; Waiting = contacted, next follow-up still in the future (moves back on that date by itself).
+function vjEnqTab(q, today) {
+  const e = q.ep; if (VJ_ENQ_CLOSED.has(e.status)) return 'closed'; if (e.status === 'New') return 'new';
+  const lastAct = e.hist.reduce((m, h) => Math.max(m, h.at || 0), 0), lastMsg = e.rows.reduce((m, r) => Math.max(m, r.t || 0), 0);
+  if (lastAct && lastMsg > lastAct) return 'followup';
+  return e.next && e.next > today ? 'waiting' : 'followup';
+}
 function vjEnqStats(list, now) {
   const today = vjEnqIst(now).slice(0, 10), month = today.slice(0, 7), run = list.filter(q => !VJ_ENQ_CLOSED.has(q.ep.status));
+  const tabs = run.map(q => vjEnqTab(q, today)), fu = run.filter((q, i) => tabs[i] === 'followup');
   const byCh = {}; run.forEach(q => { const c = vjEnqChan(q.first.B, q.first.Q); byCh[c] = (byCh[c] || 0) + 1; });
   return { today, newToday: run.filter(q => vjEnqIst(q.ep.start).slice(0, 10) === today).length, new24: run.filter(q => now - q.ep.start <= 24 * 3600e3).length, open: run.length,
-    dueToday: run.filter(q => q.ep.next === today).length, overdue: run.filter(q => q.ep.next && q.ep.next < today).length, notStarted: run.filter(q => q.ep.status === 'New').length,
+    dueToday: fu.filter(q => !(q.ep.next && q.ep.next < today)).length, overdue: fu.filter(q => q.ep.next && q.ep.next < today).length, notStarted: run.filter(q => q.ep.status === 'New').length,
+    newUntouched24: run.filter(q => q.ep.status === 'New' && now - q.ep.start <= 24 * 3600e3).length, tabNew: tabs.filter(t => t === 'new').length, tabFollow: fu.length, tabWaiting: tabs.filter(t => t === 'waiting').length,
     boughtMonth: list.filter(q => q.ep.status === 'Bought' && q.ep.closedAt && vjEnqIst(q.ep.closedAt).slice(0, 7) === month).length,
     boughtMonthRs: list.filter(q => q.ep.status === 'Bought' && q.ep.closedAt && vjEnqIst(q.ep.closedAt).slice(0, 7) === month).reduce((a, q) => a + (q.ep.bought || 0), 0), byChannel: byCh };
 }
@@ -3214,15 +3225,23 @@ async function vjEnqSave(request, env, who, ctx) {
   if (Number(request.headers.get('content-length') || 0) > 8000) return vjDeny(413, 'too large');
   let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
   const id = String(b && b.id || ''); if (!/^r\d{1,6}$/.test(id)) return vjDeny(400, 'bad enquiry');
-  const op = ['status', 'note', 'messaged', 'reopen'].includes(b.op) ? b.op : ''; if (!op) return vjDeny(400, 'bad request');
+  const op = ['status', 'note', 'messaged', 'called', 'undo', 'reopen'].includes(b.op) ? b.op : ''; if (!op) return vjDeny(400, 'bad request');
   const { list } = await vjEnqLoad(env); const q = list.find(x => x.id === id); if (!q) return vjDeny(404, 'enquiry not found - reload');
   const today = vjEnqIst().slice(0, 10), isClosed = VJ_ENQ_CLOSED.has(q.ep.status);
   const ymd = v => v === '' || v == null ? '' : /^\d{4}-\d{2}-\d{2}$/.test(String(v)) && String(v) >= '2026-01-01' && String(v) <= '2030-12-31' ? String(v) : null;
   let status = null, next = null, note = vjClean(b.note, 300), amount = null, bill = '';
-  if (op === 'reopen') { if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji can reopen'); if (!isClosed) return vjDeny(409, 'already running'); status = VJ_ENQ_ST.includes(b.status) && !VJ_ENQ_CLOSED.has(b.status) ? b.status : 'Called'; next = ymd(b.next) || today; note = note || 'Reopened'; }
+  const stamp = vjDmy(today) + ' ' + vjEnqIst().slice(11, 16);
+  if (op === 'undo') { // C-20261103-ENQTABS: undo of an automatic Messaged / Called (within 2 minutes, same person, latest action) - a new row, nothing deleted
+    const of = Number(b.of) || 0, hist = ((await env.DB.prepare('SELECT * FROM vj_enq_followup WHERE number = ? ORDER BY id').bind(q.key).all()).results) || [], row = hist.find(h => h.id === of);
+    if (!row || !['messaged', 'called'].includes(row.kind) || row.by !== who.email || Date.now() - row.at > 120000 || hist[hist.length - 1].id !== of) return vjDeny(409, 'too late to undo - change it by hand');
+    const all = ((await env.DB.prepare('SELECT * FROM vj_enq_followup ORDER BY id').all()).results) || [], sh = await vjEnqSheet(env);
+    const before = vjEnqBuild(sh.rows || [], all.filter(h => h.id !== of)).find(x => x.key === q.key);
+    status = before ? before.ep.status : 'New'; next = before ? before.ep.next || '' : ''; note = 'Undo: ' + String(row.note || '').slice(0, 200);
+  } else if (op === 'reopen') { if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji can reopen'); if (!isClosed) return vjDeny(409, 'already running'); status = VJ_ENQ_ST.includes(b.status) && !VJ_ENQ_CLOSED.has(b.status) ? b.status : 'Called'; next = ymd(b.next) || today; note = note || 'Reopened'; }
   else {
     if (isClosed) return vjDeny(409, 'this enquiry is closed - reopen it first');
-    if (op === 'messaged') { status = q.ep.status === 'New' ? 'Messaged' : null; next = ymd(b.next) || vjAddDays(today, 2); note = ('Messaged ✓ ' + vjDmy(today) + (note ? ' - ' + note : '')).slice(0, 300); }
+    if (op === 'messaged') { status = q.ep.status === 'New' ? 'Messaged' : null; next = ymd(b.next) || vjAddDays(today, 2); note = ('Messaged ✓ ' + stamp + (note ? ' - ' + note : '')).slice(0, 300); }
+    else if (op === 'called') { status = ['New', 'Messaged', 'Called'].includes(q.ep.status) ? 'Called' : null; next = ymd(b.next) || vjAddDays(today, 2); note = ('Called ✓ ' + stamp + (note ? ' - ' + note : '')).slice(0, 300); }
     else if (op === 'note') { if (!note) return vjDeny(400, 'write the note'); if (b.next !== undefined) { next = ymd(b.next); if (next === null) return vjDeny(400, 'bad follow-up date'); } }
     else { // status
       if (!VJ_ENQ_ST.includes(b.status) || b.status === 'New') return vjDeny(400, 'choose a status'); status = b.status;
@@ -3237,9 +3256,10 @@ async function vjEnqSave(request, env, who, ctx) {
   await env.DB.prepare('INSERT INTO vj_enq_followup (number, enquiry_date, status, next_followup_date, note, amount, bill_no, kind, "by", by_name, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
     .bind(q.key, vjEnqIst(q.ep.start).slice(0, 10), status, next, note, amount, bill, op, who.email, who.role === 'admin' ? (who.email === 'vaishnavijewels@gmail.com' ? 'Shilpiji' : 'Abhinav') : vjClean(who.name, 40), Date.now()).run();
   await vjAudit(env, who, 'enquiry-' + op, 'enquiries/' + id, [status, next, amount, note].filter(x => x !== null && x !== '').join(' | '));
+  const mine = await env.DB.prepare('SELECT max(id) AS id FROM vj_enq_followup WHERE number = ? AND "by" = ?').bind(q.key, who.email).first();
   const r2 = await vjEnqLoad(env), q2 = r2.list.find(x => x.id === id);
   if (status !== null || op === 'reopen') vjEnqPush(env, ctx, q2);
-  return vjJson({ ok: true, enquiry: q2 ? vjEnqView(q2, who, today) : null, stats: vjEnqStats(r2.list, Date.now()) });
+  return vjJson({ ok: true, row: mine && mine.id || 0, enquiry: q2 ? vjEnqView(q2, who, today) : null, stats: vjEnqStats(r2.list, Date.now()) });
 }
 // 11:40 IST reminder to Abhinav only (owner-requested exception to the no-daytime-message rule). A Make schedule rings
 // GET /hooks/vj-enqbell (no data, no secret). Works only 11:25-12:59 IST and once per day, so a stranger ringing it can at most make
@@ -3253,8 +3273,8 @@ async function vjEnqBell(env) {
   if (!claim.meta || claim.meta.changes !== 1) return reply('already done today', 200);
   const { list, sheetOk } = await vjEnqLoad(env, true), s = vjEnqStats(list, Date.now());
   if (!sheetOk) { await env.DB.prepare('DELETE FROM vj_meta WHERE k = ?').bind(key).run(); return reply('sheet not read', 502); }
-  if (!s.new24 && !s.dueToday && !s.overdue) return reply('nothing to remind', 200);
-  const text = `Enquiries: ${s.new24} new since yesterday, ${s.dueToday} follow-up${s.dueToday === 1 ? '' : 's'} due today, ${s.overdue} overdue. Open: vaishnavijewels.com/tags → Enquiries`;
+  if (!s.newUntouched24 && !s.dueToday && !s.overdue) return reply('nothing to remind', 200); // C-20261103-ENQTABS: Waiting is not counted
+  const text = `Enquiries: ${s.newUntouched24} new since yesterday, ${s.dueToday} follow-up${s.dueToday === 1 ? '' : 's'} due today, ${s.overdue} overdue. Open: vaishnavijewels.com/tags → Enquiries`;
   const token = [...crypto.getRandomValues(new Uint8Array(16))].map(x => x.toString(16).padStart(2, '0')).join('');
   await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('enqdue:' + token, JSON.stringify({ text, at: Date.now() })).run();
   try { const r = await fetch(VJ_ENQ_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(20000), body: JSON.stringify({ token }) }); if (!r.ok) throw new Error('hook ' + r.status); }
@@ -3269,6 +3289,12 @@ async function vjEnqBell(env) {
 async function vjEnqBulk(env, ctx) {
   if (!env.DB) return reply('not set up', 503);
   await vjEnqT(env);
+  // Fixed one-off (owner 03/11 07:29): Anshika Gupta was messaged from his phone at 07:28 - record it once.
+  { const claim = await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('enq-fix-anshika-20261103', ?) ON CONFLICT(k) DO NOTHING").bind(new Date().toISOString()).run();
+    if (claim.meta && claim.meta.changes === 1) { const l0 = (await vjEnqLoad(env)).list, a = l0.find(q => q.key === '9753005989');
+      if (a && a.ep.status === 'New') { await env.DB.prepare('INSERT INTO vj_enq_followup (number, enquiry_date, status, next_followup_date, note, amount, bill_no, kind, "by", by_name, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+        .bind(a.key, vjEnqIst(a.ep.start).slice(0, 10), 'Messaged', '2026-11-05', 'Messaged ✓ 03-11 07:28 (from mobile)', null, '', 'messaged', 'vaishnaviexim@gmail.com', 'Abhinav', Date.UTC(2026, 10, 3, 1, 58)).run();
+        const a2 = (await vjEnqLoad(env)).list.find(q => q.key === '9753005989'); vjEnqPush(env, ctx, a2); } } }
   const { list, sheetOk } = await vjEnqLoad(env); if (!sheetOk) return reply('sheet not read', 502);
   // Two fixed, owner-approved rules only. #1 (03/11 06:57): old broadcast replies. #2 (03/11 07:10, C-20261103-ENQBULK2): old Meta-ad /
   // direct WhatsApp enquiries whose number has NOT written again on or after 20-10-2026. Both: no G = Yes, no follow-up in D1 yet.
