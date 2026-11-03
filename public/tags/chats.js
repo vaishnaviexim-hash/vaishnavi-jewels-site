@@ -1,4 +1,5 @@
-/* VJ Tags - Chats (owner Abhinav 03/11/2026 07:19-07:32, C-20261103-HANDOVER). Bot -> human handover on the SAME business number.
+/* VJ Tags - Chats (owner Abhinav 03/11/2026 07:19-07:32, C-20261103-HANDOVER). 03/11 09:34 C-20261103-ENQMERGE: no own section any more -
+   it lives INSIDE Enquiries ("Show: Baat chal rahi hai" / "Next-day handover"); Enquiries mounts it through window.VJChats. Bot -> human handover on the SAME business number.
    Loaded by shim.js for admin, staff and sales (sales: read-only, numbers hidden - the server decides). Mobile first.
    List: chats with a person first, then recent chats (last message, time, 24h window, who has it). Thread: Aashvi_Inbox +
    Aashvi's replies + our replies; reply box sends from the business number (server checks the window, login, limits, 1000 chars,
@@ -12,7 +13,7 @@
   const when = ms => { if (!ms) return ""; const d = new Date(ms + 5.5 * 3600e3), t = new Date(Date.now() + 5.5 * 3600e3);
     const hm = pad(d.getUTCHours()) + ":" + pad(d.getUTCMinutes()); return d.toISOString().slice(0, 10) === t.toISOString().slice(0, 10) ? hm : pad(d.getUTCDate()) + "/" + pad(d.getUTCMonth() + 1) + " " + hm; };
   const left = ms => ms > 0 ? Math.floor(ms / 3600e3) + "h " + pad(Math.floor(ms % 3600e3 / 60e3)) + "m left" : "Window closed";
-  let sec = null, data = null, cur = null, curId = "", busy = false, timer = 0, tTimer = 0, filter = "all", draft = {};
+  let sec = null, data = null, cur = null, curId = "", busy = false, timer = 0, tTimer = 0, filter = "human", draft = {}, view = "talking", active = false;
   async function api(path, body) {
     const r = await fetch(path, body ? { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : { credentials: "same-origin", cache: "no-store" });
     const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("server " + r.status)); return j;
@@ -24,7 +25,7 @@
   // after-hours leads waiting for the next opening (C-20261103-HANDOVER, owner 07:50)
   function ahBox() {
     const box = $("chAh"); if (!box) return; box.textContent = ""; const A = (data && data.ah) || [];
-    if (!A.length && (!data || data.open)) { box.hidden = true; return; } box.hidden = false;
+    if (view !== "ah") { box.hidden = true; return; } box.hidden = false;
     box.append(el("strong", { textContent: "Next-day handover" + (A.length ? " (" + A.length + ")" : "") }), el("p", { className: "hint", textContent: (data.open ? "Showroom open now." : "Showroom closed - opens " + when(data.nextOpen) + ".") + " Leads that wrote after hours; Aashvi told them when we will contact them. A person taps send every time." }));
     A.forEach(a => {
       const c = el("div", { className: "card" }); c.style.cssText = "margin:6px 0;padding:10px 12px" + (a.promised <= Date.now() ? ";border-left:4px solid var(--bad)" : "");
@@ -41,14 +42,14 @@
 
   async function loadList(fresh) {
     if (busy) return; busy = true;
-    try { data = await api("/api/vj/chats" + (fresh ? "?fresh=1" : "")); $("chMsg").textContent = data.sheetOk === false ? "Could not read the Aashvi sheet just now - showing what the website has." : ""; }
-    catch (e) { $("chMsg").textContent = "Could not load: " + e.message; }
-    busy = false; if (!curId) renderList();
+    try { data = await api("/api/vj/chats" + (fresh ? "?fresh=1" : "")); try { window.dispatchEvent(new CustomEvent("vjchats-data")); } catch (x) {} if ($("chMsg")) $("chMsg").textContent = data.sheetOk === false ? "Could not read the Aashvi sheet just now - showing what the website has." : ""; }
+    catch (e) { if ($("chMsg")) $("chMsg").textContent = "Could not load: " + e.message; }
+    busy = false; if (!curId && active) renderList();
   }
   function renderList() {
     const box = $("chList"); box.textContent = ""; $("chThread").hidden = true; $("chListWrap").hidden = false;
     if (!data) { box.append(el("p", { className: "hint", textContent: "Loading…" })); return; }
-    ahBox();
+    ahBox(); ["chListCtl", "chCount", "chList"].forEach(id => { const x = $(id); if (x) x.hidden = view === "ah"; }); if (view === "ah") return;
     const q = String($("chQ").value || "").trim().toLowerCase(), qd = q.replace(/\D/g, "");
     const L = data.chats.filter(c => (filter === "all" || (filter === "human" ? c.mode === "human" : c.mode === "human" && c.to === data.me.replace(/^Shilpi$/, "Shilpiji")))
       && (!q || String(c.name).toLowerCase().includes(q) || (qd.length >= 3 && String(c.number || "").replace(/\D/g, "").includes(qd)) || String(c.last).toLowerCase().includes(q)));
@@ -110,7 +111,7 @@
       const e = el("div", { className: "card" }); e.style.cssText = "margin:6px 0;padding:8px 12px;font-size:14px";
       e.append(el("div", {}, [el("span", { className: "hint", textContent: "Enquiry (" + cur.enq.status + "): " }), document.createTextNode(cur.enq.what || "-")]));
       const row = el("div"); row.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin-top:6px";
-      row.append(btn("Open in Enquiries", true, () => { const b = document.querySelector('nav button[data-tab="enq"]'); if (b) { b.click(); setTimeout(() => { const q = $("enqQ"); if (q) { q.value = String(cur && cur.number || "").replace(/\D/g, "").slice(-10); q.dispatchEvent(new Event("input")); } }, 300); } }));
+      row.append(btn("Open in Enquiries", true, () => { if (window.VJEnq) window.VJEnq.find(String(cur && cur.number || "")); }));
       if (cur.opener) row.append(btn("Personalised opener", true, () => { const o = $("chOpener"); o.hidden = !o.hidden; }));
       e.append(row);
       if (cur.opener) { const o = el("textarea", { id: "chOpener", value: cur.opener, rows: 4, readOnly: true, hidden: true }); o.style.cssText = "width:100%;box-sizing:border-box;margin-top:6px;font:inherit;font-size:14px;padding:8px;border:1px solid var(--line);border-radius:var(--r);background:var(--sunk);color:var(--fg)"; e.append(o); }
@@ -213,48 +214,47 @@
   }
   async function settings() {
     const box = $("chSet"); if (!box.hidden) { box.hidden = true; return; } box.hidden = false; box.textContent = "Loading…";
-    let staff = []; try { staff = (await api("/api/vj/chat", { op: "staffList" })).staff; } catch (e) {}
+    let users = [], access = []; try { const j = await api("/api/vj/chat", { op: "staffList" }); users = (j.staff || []).filter(u => u.role !== "admin"); access = j.access || []; } catch (e) {}
     box.textContent = "";
     const def = el("select"); data.people.forEach(p => def.append(el("option", { value: p, textContent: p, selected: p === data.def })));
     const cap = el("input", { type: "number", min: "0", max: "200", value: String(data.cap == null ? 20 : data.cap), inputMode: "numeric" }); cap.style.width = "90px";
-    const ticks = staff.map(s => { const c = el("input", { type: "checkbox", checked: (data.staff || []).includes(s.email), value: s.email }); c.style.width = "auto"; return el("label", { style: "display:flex;gap:6px;align-items:center" }, [c, " " + (s.name || s.email)]); });
-    const m = el("span", { className: "hint" });
-    const save = btn("Save", false, async () => { try { const r = await api("/api/vj/chat", { op: "settings", def: def.value, cap: Number(cap.value), staff: ticks.map(l => l.firstChild).filter(c => c.checked).map(c => c.value) }); Object.assign(data, { def: r.def, cap: r.cap, staff: r.staff }); m.textContent = "Saved."; } catch (e) { m.textContent = e.message; } });
-    box.append(el("strong", { textContent: "Chat settings (owners)" }),
+    const tick = (u, on) => { const c = el("input", { type: "checkbox", checked: on, value: String(u.email).toLowerCase() }); c.style.width = "auto"; return el("label", { style: "display:flex;gap:6px;align-items:center" }, [c, " " + (u.name || u.email) + " (" + u.email + ")"]); };
+    const acc = users.map(u => tick(u, access.includes(String(u.email).toLowerCase())));
+    const rem = users.map(u => tick(u, (data.staff || []).includes(String(u.email).toLowerCase())));
+    const m = el("span", { className: "hint" }), vals = L => L.map(l => l.firstChild).filter(c => c.checked).map(c => c.value);
+    const save = btn("Save", false, async () => { try { const r = await api("/api/vj/chat", { op: "settings", def: def.value, cap: Number(cap.value), access: vals(acc), staff: vals(rem).filter(x => vals(acc).includes(x)) }); Object.assign(data, { def: r.def, cap: r.cap, staff: r.staff }); m.textContent = "Saved."; } catch (e) { m.textContent = e.message; } });
+    const list = L => el("div", { style: "display:flex;flex-direction:column;gap:4px" }, L.length ? L : [el("span", { className: "hint", textContent: "No other logins." })]);
+    box.append(el("strong", { textContent: "Enquiry & chat settings (owners)" }),
       el("div", { style: "display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin-top:6px" }, [el("label", {}, ["Hot leads go to ", def]), el("label", {}, ["Reminders per day (all) ", cap])]),
-      el("p", { className: "hint", textContent: "Staff who may send reminders (templates):" }), el("div", { style: "display:flex;flex-direction:column;gap:4px" }, ticks.length ? ticks : [el("span", { className: "hint", textContent: "No staff logins." })]),
+      el("p", { className: "hint", textContent: "Who may open Enquiries (Abhinav and Shilpiji always can):" }), list(acc),
+      el("p", { className: "hint", textContent: "Of those, who may send reminders (templates):" }), list(rem),
       el("div", { style: "margin-top:8px;display:flex;gap:8px;align-items:center" }, [save, m]));
   }
-  function show(on) {
-    if (!sec) return; sec.hidden = !on; clearInterval(timer); if (!on) { clearInterval(tTimer); return; }
-    document.querySelectorAll('[id^="p-"]').forEach(p => { if (p !== sec) p.hidden = true; });
-    document.querySelectorAll("nav button").forEach(y => y.setAttribute("aria-selected", y.dataset.tab === "chats" ? "true" : "false"));
+  function activate(v) {
+    if (!sec) return; if (v !== view) { curId = ""; cur = null; clearInterval(tTimer); } view = v; active = true; sec.hidden = false; clearInterval(timer);
     if (curId) renderThread(); else renderList(); loadList();
-    timer = setInterval(() => { if (document.visibilityState === "visible" && !curId) loadList(); }, 60000); window.scrollTo({ top: 0 });
+    timer = setInterval(() => { if (document.visibilityState === "visible" && !curId && active) loadList(); }, 60000);
   }
-  function build() {
-    const nav = document.querySelector("nav"), rates = $("p-rates"); if (!nav || !rates || $("t-chats")) return;
-    const b = el("button", { id: "t-chats", textContent: "Chats" }); b.setAttribute("role", "tab"); b.dataset.tab = "chats"; b.setAttribute("aria-selected", "false");
-    const after = nav.querySelector('[data-tab="enq"]') || nav.querySelector('[data-tab="check"]'); nav.insertBefore(b, after ? after.nextSibling : null);
-    sec = el("section", { className: "card", id: "p-chats", hidden: true });
+  function deactivate() { active = false; clearInterval(timer); clearInterval(tTimer); curId = ""; cur = null; if (sec) sec.hidden = true; }
+  function mount(parent) {
+    if (sec) { if (sec.parentNode !== parent) parent.append(sec); return; }
+    sec = el("div", { id: "chBox", hidden: true });
     const q = el("input", { id: "chQ", placeholder: "Search name, number or text", autocomplete: "off", maxLength: 40 }); q.style.cssText = "flex:1 1 180px;font-size:16px;min-height:40px";
     const fs = el("div"); fs.style.cssText = "display:flex;gap:6px;flex-wrap:wrap";
-    [["all", "All"], ["human", "With a person"], ["mine", "Mine"]].forEach(([k, n]) => { const x = btn(n, k !== "all", () => { filter = k; [...fs.children].forEach(c => c.className = c === x ? "btn" : "btn ghost"); renderList(); }); fs.append(x); });
+    [["human", "With a person"], ["mine", "Mine"], ["all", "All recent"]].forEach(([k, n]) => { const x = btn(n, k !== filter, () => { filter = k; [...fs.children].forEach(c => c.className = c === x ? "btn" : "btn ghost"); renderList(); }); fs.append(x); });
     const head = el("div", { style: "display:flex;flex-wrap:wrap;gap:8px;align-items:center" }, [q, btn("Refresh", true, () => loadList(true))]);
-    const setB = btn("Settings", true, settings); setB.id = "chSetB";
-    sec.append(el("h2", { textContent: "Chats" }),
-      el("div", { id: "chListWrap" }, [el("p", { className: "hint", textContent: "Customer chats on the business number. Chats with a person come first — Aashvi stays silent in those until you hand back." }),
-        head, el("div", { style: "display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px" }, [fs, setB]), el("div", { id: "chSet", className: "card", hidden: true, style: "margin-top:8px;padding:10px" }), el("div", { id: "chAh", className: "card", hidden: true, style: "margin-top:8px;padding:10px;border-color:var(--gold)" }),
+    const setB = btn("Chat settings", true, settings); setB.id = "chSetB"; setB.hidden = true;
+    sec.append(
+      el("div", { id: "chListWrap" }, [el("div", { id: "chListCtl" }, [el("p", { className: "hint", textContent: "Chats on the business number. With a person = Aashvi stays silent until you hand back." }),
+        head, el("div", { style: "display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px" }, [fs])]), el("div", { style: "margin-top:8px" }, [setB]), el("div", { id: "chSet", className: "card", hidden: true, style: "margin-top:8px;padding:10px" }), el("div", { id: "chAh", className: "card", hidden: true, style: "margin-top:8px;padding:10px;border-color:var(--gold)" }),
         el("p", { className: "hint", id: "chCount" }), el("p", { className: "hint", id: "chMsg", style: "color:var(--bad)" }), el("div", { id: "chList" })]),
       el("div", { id: "chThread", hidden: true }));
-    rates.parentNode.insertBefore(sec, rates);
+    parent.append(sec);
     q.addEventListener("input", renderList);
-    nav.addEventListener("click", e => { const x = e.target.closest("nav button"); if (!x) return; show(x.dataset.tab === "chats"); });
-    setTimeout(() => { if (data && !data.isAdmin) setB.hidden = true; }, 3000);
     const hideSet = () => { if (data) setB.hidden = !data.isAdmin; else setTimeout(hideSet, 1000); }; hideSet();
   }
-  // from an Enquiries card: open this customer's chat (staff/owners only - sales never get numbers)
-  window.VJChats = { open: wa => { const b = $("t-chats"); if (!b) return; b.click(); openThread("", String(wa || "").replace(/\D/g, "")); } };
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", build); else build();
-  setTimeout(build, 800);
+  // used by Enquiries (C-20261103-ENQMERGE): mount the chat views inside it, switch view, open one customer's chat, counts for the Show: list
+  window.VJChats = { mount, activate, deactivate, refresh: () => loadList(), data: () => data,
+    open: wa => { if (!sec) return; openThread("", String(wa || "").replace(/\D/g, "")); } };
+  try { window.dispatchEvent(new CustomEvent("vjchats-ready")); } catch (x) {}
 })();
