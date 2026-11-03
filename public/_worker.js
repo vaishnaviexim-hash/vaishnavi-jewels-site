@@ -4490,12 +4490,48 @@ async function vjRepair(request, env, who) {
   return vjJson({ ok: true, repair: vjRepView({ id, no: r.no, data: JSON.stringify(d), status, version: r.version + 1 }, who) });
 }
 
+// C-20261103-PHOTOFIND (owner 03/11/2026 15:29): "Find by design photo" - the page turns each saved stock photo into a small
+// fingerprint (DINOv2-small, run in the browser, free, no key) and keeps it here; a search compares fingerprints on the phone in
+// about a second. The customer's photo never leaves the phone. vj_embeds: pid = saved photo id, m = model, v = 384 int8 as base64.
+// The set of photos without a row is the backfill cursor: any open page fills the missing ones in small batches.
+const VJ_EMB_M = 'dinov2s-cls-v1', VJ_EMB_ROW = /^[0-9a-f]{32}:[A-Za-z0-9+/]{512}$/;
+let vjEmbOk = false;
+async function vjEmbT(env) { if (!vjEmbOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_embeds (pid TEXT PRIMARY KEY, m TEXT, v TEXT, ts INTEGER, email TEXT)').run(); vjEmbOk = true; } }
+async function vjEmbedsGet(url, env, who) {
+  await vjEmbT(env);
+  const after = String(url.searchParams.get('after') || '');
+  if (after && !/^[0-9a-f]{32}$/.test(after)) return vjDeny(400, 'bad cursor');
+  if (!after) { // one full load per search screen: at most 40 per login in 10 minutes
+    const mine = await env.DB.prepare("SELECT count(*) AS n FROM audit WHERE action = 'photofind' AND email = ? AND ts > ?").bind(who.email, Date.now() - 600e3).first();
+    if (mine && mine.n >= 40) return vjDeny(429, 'too many searches - wait a few minutes');
+    await vjAudit(env, who, 'photofind', '', '');
+  }
+  const rows = (await env.DB.prepare('SELECT pid, v FROM vj_embeds WHERE m = ? AND pid > ? ORDER BY pid LIMIT 1000').bind(VJ_EMB_M, after).all()).results || [];
+  return vjJson({ m: VJ_EMB_M, rows: rows.map(r => r.pid + ':' + r.v), next: rows.length === 1000 ? rows[rows.length - 1].pid : null });
+}
+async function vjEmbedsPost(request, env, who) {
+  if (who.role === 'sales') return vjDeny(403, 'read only');
+  if (Number(request.headers.get('content-length') || 0) > 60000) return vjDeny(413, 'too large');
+  let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+  if (!b || b.m !== VJ_EMB_M || !Array.isArray(b.rows) || !b.rows.length || b.rows.length > 40 || !b.rows.every(r => typeof r === 'string' && VJ_EMB_ROW.test(r))) return vjDeny(400, 'bad request');
+  const mine = await env.DB.prepare("SELECT count(*) AS n FROM audit WHERE action = 'photoembed' AND email = ? AND ts > ?").bind(who.email, Date.now() - 3600e3).first();
+  if (mine && mine.n >= 300) return vjDeny(429, 'too many - wait a while');
+  await vjEmbT(env);
+  const now = Date.now(), stmts = [];
+  for (const r of b.rows) { const pid = r.slice(0, 32); if (!(await vjPhotoHas(env, pid))) continue; // only photos we really hold
+    stmts.push(env.DB.prepare('INSERT INTO vj_embeds (pid, m, v, ts, email) VALUES (?, ?, ?, ?, ?) ON CONFLICT(pid) DO UPDATE SET m = excluded.m, v = excluded.v, ts = excluded.ts, email = excluded.email WHERE vj_embeds.m <> excluded.m').bind(pid, VJ_EMB_M, r.slice(33), now, who.email)); }
+  if (stmts.length) await env.DB.batch(stmts);
+  await vjAudit(env, who, 'photoembed', '', String(stmts.length));
+  return vjJson({ ok: true, saved: stmts.length });
+}
+
 async function vjHandle(request, env, ctx, url) {
   const p = url.pathname;
   const dev = env.VJ_DEV === '1';
   if (!dev && url.hostname !== VJ_HOST) return new Response('Not found', { status: 404 });
   if (!env.DB || !env.PHOTOS) return vjDeny(503, 'not set up');
   const who = await vjWho(request, env);
+  if (who && p === '/api/vj/embeds') return request.method === 'GET' ? vjEmbedsGet(url, env, who) : (request.method === 'POST' && vjSameSite(request, env)) ? vjEmbedsPost(request, env, who) : vjDeny(405, 'not allowed'); // C-20261103-PHOTOFIND: every login (sales read only)
   if (!who) return p.startsWith('/api/') ? vjDeny(403, 'not allowed') : new Response('Not allowed. Ask Abhinav to add your email.', { status: 403, headers: { 'content-type': 'text/plain', 'x-robots-tag': 'noindex' } });
   if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties', '/api/vj/moves', '/api/vj/repairs', '/api/vj/estimates', '/api/vj/boxes', '/api/vj/bill/sendstatus', '/api/vj/ogs', '/api/vj/korders', '/api/vj/challans', '/api/vj/challan', '/api/vj/addrbook'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill', '/api/vj/move', '/api/vj/repair', '/api/vj/estimate/done', '/api/vj/contactshot', '/api/vj/bill/send', '/api/vj/photosearch', '/api/vj/og', '/api/vj/korder', '/api/vj/challan'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these (+ Karigar & Out, 27/10)
   // C-20261027-KARIGAROUT: stock out / back, RFID link, party repairs (JSON from our own page only)
