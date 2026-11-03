@@ -626,6 +626,9 @@
     const nj = v => String(v || "").trim().replace(/\s*ji$/i, "").toLowerCase(), same = !$("bname").value.trim() || nj($("bname").value) === nj(o.name);
     if (!same) { h.textContent = `Note: ${t.label} is an order for ${o.name}${o.mobile ? " (" + o.mobile + ")" : ""}, not ${$("bname").value.trim()}.`; return; }
     if (!$("bname").value.trim()) $("bname").value = o.name; if (!$("bmob").value.trim() && o.mobile) $("bmob").value = o.mobile; if (!$("bcity").value.trim() && o.city) $("bcity").value = o.city;
+    /* C-20261103-G2GRATE (owner 16:50): the order's gold rate is the party's fine rate for any balance fine; a Gold to Gold karigar order opens in Gold to Gold */
+    { const orr = Number(o.rate) || Number(t.gold24gAtTag) || 0; /* the order tag keeps its order rate as gold24gAtTag (same as the bill row rate) */ if (!$("bograte").value.trim() && orr >= 2000 && orr <= 50000) $("bograte").value = String(Math.round(orr)); }
+    if (((t.korder && t.korder.basis) || (window.VJ_KO_LAST && window.VJ_KO_LAST.id === t.id && window.VJ_KO_LAST.basis)) === "g2g" && B.items.length <= 1) { const r = document.querySelector('input[name=bmode][value="g2g"]'); if (r && !r.checked) { r.checked = true; r.dispatchEvent(new Event("change", { bubbles: true })); } }
     h.textContent = `Filled from order ${t.label}: ${o.name}${o.mobile ? ", " + o.mobile : ""}${o.city ? ", " + o.city : ""}.`;
     // owner 26/10 18:31 (C-20261026-ORDERTAG): no mobile on the order -> take it from the saved parties when exactly one party has this name; otherwise it is typed at billing
     if (!$("bmob").value.trim()) fetch("/api/vj/parties?q=" + encodeURIComponent(o.name), { credentials: "same-origin", cache: "no-store" }).then(r => r.ok ? r.json() : null).then(j => {
