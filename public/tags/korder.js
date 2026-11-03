@@ -17,7 +17,8 @@
   const ST = { open: "Open", karigar: "With karigar", received: "Received", tagged: "Tagged", cancelled: "Cancelled" }, NEXT = { open: "karigar", karigar: "received", received: "tagged" };
   const SHAPES = ["Round", "Baguette", "Oval", "Pear", "Marquise", "Princess", "Emerald", "Other"], SIZED = ["Ring", "Bangle", "Earring", "Bali"];
   const CATMAP = { Ring: "VLR", Earring: "VER", Bali: "VER", Bracelet: "VBR", Bangle: "VBN", Pendant: "VP", "Pendant set": "VPS", Necklace: "VNS", Mangalsutra: "VMN", Chain: "CH", "Nose pin": "VNP" };
-  let sec = null, J = null, cur = null, drawing = "", view = "pend";
+  let sec = null, J = null, cur = null, drawing = "", sample = "", view = "pend"; /* sample = code of our piece whose photo is the drawing (C-20261103-KORDER4) */
+  const bud = o => Number(o.budget) || Number(o.estimate) || 0; /* KORDER4 (owner 03/11 14:04): one field Budget - an old order's estimate shows as its budget */
   const live = o => o.status === "open" || o.status === "karigar";
   const post = async body => { const r = await fetch("/api/vj/korder", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); const j = await r.json().catch(() => ({})); if (!r.ok) { const e = new Error(j.error || r.status); e.j = j; throw e; } return j; };
   /* owner 17:04 / 17:02: over-issue needs a second explicit confirm; a quality clash can be overridden by Abhinav / Shilpiji with a reason */
@@ -32,8 +33,13 @@
 #p-korder tr.kox td{opacity:.5;text-decoration:line-through}#p-korder .kolate{color:var(--bad);font-weight:700}
 #p-korder .kodia td input{width:84px}#p-korder .kodia td select{width:110px}#p-korder .kostat{font-weight:700}#p-korder.konoadm .koRate,#p-korder.konoadm .koAdm{display:none}
 #p-korder .kotabs{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}#p-korder .kotabs .btn[aria-pressed="true"]{background:var(--gold);color:#fff;border-color:var(--gold)}
-#p-korder .kopend{display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px}#p-korder .kopend table{width:100%;font-size:15px}
-#p-korder .kopend h3{margin:0;padding:6px 8px;background:var(--gold-soft);border:1px solid var(--gold);border-radius:8px 8px 0 0;font-size:16px}
+#p-korder .kopend{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(270px,100%),1fr));gap:10px}#p-korder .kopend>div{min-width:0}
+#p-korder .kopend table.items{width:100%;min-width:0;table-layout:fixed;font-size:13px}#p-korder .kopend table.items th,#p-korder .kopend table.items td{padding:3px 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#p-korder .kopend select{font-size:12.5px;padding:2px 3px;height:28px;width:100%}#p-korder .kopend td .btn{padding:2px 6px;font-size:13px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+#p-korder .kopend h3{margin:0;padding:5px 8px;background:var(--gold-soft);border:1px solid var(--gold);border-radius:8px 8px 0 0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(min-width:1400px){#p-korder #koList{width:calc(100vw - 64px);max-width:1880px;position:relative;left:50%;transform:translateX(-50%)}} /* KORDER4: the lists use the whole wide screen (the page itself stays 1180 px) */
+#p-korder .komon table.items{font-size:12.5px;min-width:1250px}#p-korder .komon table.items th,#p-korder .komon table.items td{padding:3px 5px}#p-korder .komon table.items th{font-size:10.5px;letter-spacing:0}#p-korder .komon tr.kotot td{font-weight:700;border-top:2px solid var(--fg)}
+#p-korder .komon td:nth-child(6),#p-korder .komon td:nth-child(3){max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#p-korder .komon h3{margin:4px 0}#p-korder .komon .kobal{font-weight:700;font-size:16px;margin:4px 0}
 #p-korder .koprev{font-variant-numeric:tabular-nums;background:var(--ok-soft);border:1px solid var(--ok);border-radius:8px;padding:6px 10px;margin:6px 0}`;
 
   async function load() { const m = $("koMsg");
@@ -55,7 +61,7 @@
   function render() { document.querySelectorAll("#koTabs .btn").forEach(x => x.setAttribute("aria-pressed", x.dataset.v === view ? "true" : "false")); $("koFilt").hidden = view !== "all";
     const box = $("koList"); box.textContent = ""; if (view === "pend") return pending(box); if (view === "acct") return account(box); all(box); }
   function all(box) { const k = $("koFK").value, s = $("koFS").value, od = $("koFO").checked, q = String($("koQ").value || "").trim().toLowerCase();
-    const rows = (J.orders || []).filter(o => (!k || o.karigar === k) && (!s || o.status === s) && (!od || o.overdue) && (!q || [o.no, o.itemTxt, o.name, o.city, o.karigar, o.dq, o.stage].join(" ").toLowerCase().includes(q))).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)) || b.no - a.no);
+    const rows = (J.orders || []).filter(o => (!k || o.karigar === k) && (!s || o.status === s) && (!od || o.overdue) && (!q || [o.no, o.itemTxt, o.name, o.city, o.karigar, o.dq, o.stage, o.sample].join(" ").toLowerCase().includes(q))).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)) || b.no - a.no);
     const t = el("table", { className: "items" }), hr = el("tr"), tb = el("tbody");
     ["Karigar", "Order no.", "Date", "Item", "Party", "Del date", "Stage", "Status", "Diamonds pending", ""].forEach(h => hr.appendChild(el("th", { textContent: h })));
     rows.forEach(o => { const tr = el("tr", { className: o.status === "cancelled" ? "kox" : "" }), td = (x, cl) => tr.appendChild(el("td", { className: cl || "", textContent: x == null ? "" : x }));
@@ -68,32 +74,35 @@
     t.append(el("thead", {}, [hr]), tb); t.style.minWidth = "980px"; box.appendChild(el("div", { className: "list" }, [t])); }
   // ---------- Pending deliveries (the owner's daily sheet) ----------
   function pendBlocks() { const L = (J.orders || []).filter(live); return ks().filter(k => L.some(o => o.karigar === k)).map(k => { const rows = L.filter(o => o.karigar === k).sort((a, b) => a.no - b.no), ph = (J.pendHead || {})[k], total = ph ? ph.total : 0, due = ph ? ph.due : 0; /* worked out by the server, as on the owner's sheet */
-      return { k, rows, total, due, est: rows.reduce((a, o) => a + (Number(o.estimate) || 0), 0) }; }); }
+      return { k, rows, total, due, est: rows.reduce((a, o) => a + bud(o), 0) }; }); }
   function pending(box) { const B = pendBlocks(); if (!B.length) { box.appendChild(el("p", { className: "hint", textContent: "Nothing pending with any karigar." })); return; }
     const g = el("div", { className: "kopend" });
-    B.forEach(b => { const t = el("table", { className: "items" }), hr = el("tr"), tb = el("tbody"); ["Code", "Customer", "Item", "Stage", "Estimate"].forEach(h => hr.appendChild(el("th", { textContent: h })));
-      b.rows.forEach(o => { const tr = el("tr"), cd = el("td"), a = el("button", { type: "button", className: "btn ghost", textContent: String(o.no) }); a.style.padding = "2px 8px"; a.addEventListener("click", () => openOrder(o)); cd.appendChild(a); tr.appendChild(cd);
-        tr.appendChild(el("td", { textContent: o.name || "Stock" })); tr.appendChild(el("td", { textContent: o.itemTxt }));
-        const sc = el("td"); if (J.canAdd) { const s = el("select"); [""].concat(J.stages || []).forEach(x => s.appendChild(el("option", { value: x, textContent: x || "-" }))); s.value = o.stage || "";
-            s.addEventListener("change", async () => { s.disabled = true; try { await post({ op: "stage", id: o.id, stage: s.value }); o.stage = s.value; $("koMsg").textContent = o.karigar + " " + o.no + ": stage " + (s.value || "-") + "."; } catch (e) { $("koMsg").textContent = "Not saved: " + (e.message || e) + "."; } s.disabled = false; }); sc.appendChild(s); } else sc.textContent = o.stage || "-";
-        tr.appendChild(sc); const ec = el("td", { className: "num", textContent: o.estimate ? String(o.estimate) : "" }); if (o.overdue) { ec.title = "Overdue (del date " + dmy(o.delDate) + ")"; tr.style.color = "var(--bad)"; } tr.appendChild(ec); tb.appendChild(tr); });
-      tb.appendChild(el("tr", {}, [el("td", { colSpan: 4, textContent: b.rows.length + " pcs pending", style: "font-weight:700" }), el("td", { className: "num", textContent: String(Math.round(b.est * 100) / 100), style: "font-weight:700" })]));
-      t.append(el("thead", {}, [hr]), tb); g.appendChild(el("div", {}, [el("h3", { textContent: b.k + "   Total " + b.total.toFixed(2) + "   Due " + b.due.toFixed(2) + (J.pendHead && J.pendHead[b.k] ? "" : "   (no account)") }), el("div", { className: "list" }, [t])])); });
+    /* C-20261103-KORDER4 (owner 03/11 14:10): every karigar on ONE screen - CODE | CUSTOMER | ITEM | STAGE, compact, long text cut with … (full text on hover) */
+    B.forEach(b => { const t = el("table", { className: "items" }), hr = el("tr"), tb = el("tbody"), cg = el("colgroup"); ["19%", "31%", "22%", "28%"].forEach(w => cg.appendChild(el("col", { style: "width:" + w }))); ["Code", "Customer", "Item", "Stage"].forEach(h => hr.appendChild(el("th", { textContent: h })));
+      b.rows.forEach(o => { const tr = el("tr"), cd = el("td"), a = el("button", { type: "button", className: "btn ghost", textContent: String(o.no), title: "Open order " + o.no }); a.addEventListener("click", () => openOrder(o)); cd.appendChild(a); tr.appendChild(cd);
+        tr.appendChild(el("td", { textContent: o.name || "Stock", title: (o.name || "Stock") + (o.city ? ", " + o.city : "") + (bud(o) ? " · budget " + bud(o) : "") })); tr.appendChild(el("td", { textContent: o.itemTxt, title: o.itemTxt }));
+        const sc = el("td", { title: o.stage || "-" }); if (J.canAdd) { const s = el("select", { title: o.stage || "-" }); [""].concat(J.stages || []).forEach(x => s.appendChild(el("option", { value: x, textContent: x || "-" }))); s.value = o.stage || "";
+            s.addEventListener("change", async () => { s.disabled = true; try { await post({ op: "stage", id: o.id, stage: s.value }); o.stage = s.value; s.title = s.value || "-"; $("koMsg").textContent = o.karigar + " " + o.no + ": stage " + (s.value || "-") + "."; } catch (e) { $("koMsg").textContent = "Not saved: " + (e.message || e) + "."; } s.disabled = false; }); sc.appendChild(s); } else sc.textContent = o.stage || "-";
+        tr.appendChild(sc); if (o.overdue) { tr.title = "Overdue (del date " + dmy(o.delDate) + ")"; tr.style.color = "var(--bad)"; } tb.appendChild(tr); });
+      tb.appendChild(el("tr", {}, [el("td", { colSpan: 4, textContent: b.rows.length + " pcs pending", style: "font-weight:700" })]));
+      const hd = b.k + "  Total " + b.total.toFixed(2) + "  Due " + b.due.toFixed(2) + (J.pendHead && J.pendHead[b.k] ? "" : "  (no account)");
+      t.append(cg, el("thead", {}, [hr]), tb); g.appendChild(el("div", {}, [el("h3", { textContent: hd, title: hd }), el("div", { className: "list" }, [t])])); });
     box.append(el("p", { className: "hint", textContent: "As on the Excel sheet: Total = fine credited to the karigar (deliveries + wastage + the fine of pieces in work) minus gold given. Due = Total minus the fine of pieces still at no stage / Hold / Design / CAD. Change the stage right here." }), g); }
   async function printPending(btn, mode) { if (!window.jspdf) return; btn.disabled = true;
     try { const { jsPDF } = window.jspdf, doc = new jsPDF({ unit: "mm", format: "a4", orientation: "landscape" }), W = 297, M = 8, B = pendBlocks(), per = Math.min(3, Math.max(1, B.length)), bw = (W - 2 * M - (per - 1) * 4) / per;
       doc.setFont("helvetica", "bold"); doc.setFontSize(15); doc.text("Vaishnavi Jewels - Pending deliveries " + dmy(today()), M, 12);
       let x = M, y0 = 18, row = 0; B.forEach((b, i) => { if (i && i % per === 0) { row++; doc.addPage(); x = M; } x = M + (i % per) * (bw + 4); let y = y0;
         doc.setFontSize(11.5); doc.setFont("helvetica", "bold"); doc.text(b.k + "  Total " + b.total.toFixed(2) + "  Due " + b.due.toFixed(2), x, y); y += 3; doc.line(x, y, x + bw, y); y += 5;
-        const cw = [0.17, 0.27, 0.17, 0.22, 0.17].map(f => f * bw), hd = ["Code", "Customer", "Item", "Stage", "Estimate"]; let cx = x; doc.setFontSize(10); hd.forEach((h, j) => { doc.text(h, cx, y); cx += cw[j]; }); y += 2; doc.line(x, y, x + bw, y); y += 5; doc.setFont("helvetica", "normal");
-        b.rows.forEach(o => { cx = x; [String(o.no), o.name || "Stock", o.itemTxt, o.stage || "", o.estimate ? String(o.estimate) : ""].forEach((v, j) => { doc.text(String(v).slice(0, 16), cx, y); cx += cw[j]; }); y += 5.6; if (y > 200) { doc.addPage(); y = y0; } });
-        doc.setFont("helvetica", "bold"); doc.text(b.rows.length + " pending   Estimate " + (Math.round(b.est * 100) / 100), x, y + 2); });
+        const cw = [0.17, 0.27, 0.17, 0.22, 0.17].map(f => f * bw), hd = ["Code", "Customer", "Item", "Stage", "Budget"]; let cx = x; doc.setFontSize(10); hd.forEach((h, j) => { doc.text(h, cx, y); cx += cw[j]; }); y += 2; doc.line(x, y, x + bw, y); y += 5; doc.setFont("helvetica", "normal");
+        b.rows.forEach(o => { cx = x; [String(o.no), o.name || "Stock", o.itemTxt, o.stage || "", bud(o) ? String(bud(o)) : ""].forEach((v, j) => { doc.text(String(v).slice(0, 16), cx, y); cx += cw[j]; }); y += 5.6; if (y > 200) { doc.addPage(); y = y0; } });
+        doc.setFont("helvetica", "bold"); doc.text(b.rows.length + " pending   Budget " + (Math.round(b.est * 100) / 100), x, y + 2); });
       if (mode === "pdf") return give(doc, "Pending_deliveries_" + dmy(today()) + ".pdf", "pdf", ""); /* 18:56: PDF too */ const blob = doc.output("blob"); if (window.vjPrintBlob) window.vjPrintBlob(blob, $("koMsg")); else window.open(URL.createObjectURL(blob), "_blank", "noopener");
     } catch (e) { $("koMsg").textContent = "Print not made (" + (e.message || e) + ")."; } btn.disabled = false; }
   // ---------- Karigar account ----------
   function account(box) { (J.account || []).filter(a => a.rows.length || a.openOrders).forEach(a => { const c = el("div", { className: "kobox" });
       c.append(el("h3", { textContent: a.karigar }), el("div", { textContent: "Gold balance (fine, given \u2212 used): " + r3(a.fine) + " g" + (a.fine < 0 ? " (we owe the karigar " + r3(-a.fine) + " g)" : a.fine > 0 ? " (karigar holds " + r3(a.fine) + " g of ours)" : "") + " \u00b7 gold issued since opening " + r3(a.goldIssued) + " g \u00b7 fine used " + r3(a.fineUsed) + " g" }),
         el("div", { textContent: "Open orders: " + a.openOrders + " \u00b7 diamonds pending: " + tot(a.diaPend) + (a.opening ? " \u00b7 opening " + dmy(a.opening.date) + ": " + r3(a.opening.fine) + " g" + (a.opening.cash != null ? ", " + inr(a.opening.cash) : "") : "") }));
+      if (J.canAdd) c.append(monthBox(a)); /* C-20261103-KORDER4: month-wise statement like his Excel sheet */
       if (J.admin) { c.append(el("div", { style: "font-weight:700;font-size:18px", textContent: "Cash to pay: " + inr(a.cash) + "  (labour & charges " + inr(a.labour) + ", paid " + inr(a.paid) + ")" }));
         const amt = el("input", { placeholder: "\u20b9 paid", inputMode: "decimal", style: "width:110px" }), nt = el("input", { placeholder: "note", maxLength: 120 }), dt = el("input", { type: "date", value: today() }), pb = el("button", { type: "button", className: "btn ghost", textContent: "Enter payment" });
         pb.addEventListener("click", async () => { if (!(num(amt.value) > 0)) return; pb.disabled = true; try { await post({ op: "pay", karigar: a.karigar, cash: amt.value, date: dt.value, note: nt.value }); $("koMsg").textContent = "Payment entered for " + a.karigar + "."; await load(); } catch (e) { $("koMsg").textContent = "Not saved: " + (e.message || e) + "."; } pb.disabled = false; });
@@ -104,8 +113,53 @@
         if (J.admin) { tr.appendChild(el("td", { className: "num", textContent: r.cash ? inr(r.cash) : "" })); const x = el("td"); if (r.status === "ok" && !r.rev && (r.type === "pay" || r.type === "opening")) { const b = el("button", { type: "button", className: "btn ghost", textContent: "Reverse" });
             b.addEventListener("click", async () => { if (b.dataset.s !== "1") { b.dataset.s = "1"; b.textContent = "Sure?"; return; } try { await post({ op: "ledrev", id: r.id, why: prompt("Why? (optional)") || "" }); load(); } catch (e) { $("koMsg").textContent = "Not done: " + (e.message || e) + "."; } }); x.appendChild(b); } tr.appendChild(x); }
         tb.appendChild(tr); });
-      t.append(el("thead", {}, [hr]), tb); c.append(el("div", { className: "list" }, [t])); box.appendChild(c); });
+      t.append(el("thead", {}, [hr]), tb); c.append(el("details", {}, [el("summary", { textContent: "All account entries (" + a.rows.length + ", newest first)" }), el("div", { className: "list" }, [t])])); box.appendChild(c); });
     if (!box.children.length) box.appendChild(el("p", { className: "hint", textContent: "No karigar account entries yet (import the opening balances from the Excel under Settings)." })); }
+
+  // ---------- month-wise statement (owner 03/11 14:10, C-20261103-KORDER4), laid out like his 'Montu -4' sheet. Read only.
+  // A piece belongs to the month it was DELIVERED; the balance carries forward (opening = everything before the month). Figures come from the
+  // server's code-wise statement (the same ledger + OG OUT maths as the account and the Pending deliveries Total), nothing is worked out here.
+  const MCOLS = ["Budget ₹", "Gold rate", "Party", "Making ₹/g", "CS ₹/ct", "Item", "Code", "Date", "Gold used g", "KT", "CS wt", "Stones ₹", "Labour ₹", "Gold pure", "Fine 999.9 credited", "Gold given g", "Cash given ₹"];
+  const prevMon = m => { const y = Number(m.slice(0, 4)), n = Number(m.slice(5, 7)); return n === 1 ? (y - 1) + "-12" : y + "-" + String(n - 1).padStart(2, "0"); };
+  function monthRows(st) { const A = st.openCash != null, N = v => Number(v) || 0, f3 = v => v == null || v === "" || !N(v) ? "" : r3(v), rs = v => v == null || !N(v) ? "" : Math.round(N(v)).toLocaleString("en-IN"), rows = [], T = { used: 0, cs: 0, st: 0, lab: 0, pure: 0, cr: 0, gv: 0, cg: 0 };
+    st.codes.forEach(r => { const stn = r.rev ? 0 : N(r.stones), lab = A ? N(r.cashTot) - stn : 0, cr = N(r.net), pct = A && N(r.csCost) > 0 && N(r.csWt) > 0 ? Math.round(N(r.csCost) / (N(r.csWt) * 5)) : 0;
+      T.used += r.rev ? 0 : N(r.goldUsed); T.cs += r.rev ? 0 : N(r.csWt); T.st += stn; T.lab += lab; T.pure += r.rev ? 0 : N(r.pure); T.cr += cr;
+      rows.push({ rev: r.rev, est: r.est, cells: [rs(r.budget), rs(r.goldRate), r.party || (r.manual ? "Stock mounting" : ""), rs(r.mk), pct ? rs(pct) : "", r.item, String(r.no), dmy(r.date), f3(r.goldUsed), r.kt ? r.kt + (r.kt === "PT" ? "" : "K") : "", f3(r.csWt), A ? rs(stn) : "", A ? rs(lab) : "", f3(r.pure), f3(cr) + (r.est ? " *" : ""), "", ""] }); });
+    st.gold.forEach(r => { T.gv += N(r.fine); rows.push({ cells: ["", "", "Gold given", "", "", r.descr, "", dmy(r.date), "", "", "", "", "", "", "", f3(r.fine), ""] }); });
+    st.cash.forEach(r => { const f = N(r.fine), c = A ? N(r.cash) : 0, gv = f > 0 ? f : 0, cr = f < 0 ? -f : 0, lab = c > 0 ? c : 0, cg = c < 0 ? -c : 0; T.gv += gv; T.cr += cr; T.lab += lab; T.cg += cg;
+      rows.push({ rev: r.status === "reversed", cells: ["", "", r.type === "pay" ? "Cash given" : r.type, "", "", r.descr, String(r.no || ""), dmy(r.date), "", "", "", "", A && lab ? rs(lab) : "", "", cr ? r3(cr) : "", gv ? r3(gv) : "", A && cg ? rs(cg) : ""] }); });
+    rows.sort((a, b) => a.cells[7].split("-").reverse().join("").localeCompare(b.cells[7].split("-").reverse().join("")));
+    const tot = ["", "", "TOTAL", "", "", "", "", "", r3(T.used), "", r3(T.cs), A ? rs(T.st) : "", A ? rs(T.lab) : "", r3(T.pure), r3(T.cr), r3(T.gv), A ? rs(T.cg) : ""];
+    const gOpen = -N(st.openFine), gClose = -N(st.closeFine);
+    return { rows, tot, T, A, gOpen, gClose, gLine: "Gold balance = carried " + r3(gOpen) + " + fine credited " + r3(T.cr) + " − gold given " + r3(T.gv) + " = " + r3(gClose) + " g" + (gClose > 0 ? " (we owe the karigar)" : gClose < 0 ? " (karigar holds our gold)" : ""),
+      cLine: A ? "Cash = carried " + inr(st.openCash) + " + labour " + inr(T.lab) + " + stones " + inr(T.st) + " − cash given " + inr(T.cg) + " = " + inr(st.closeCash) + "  ·  Cash to pay (rounded down to ₹1,000): " + inr(st.cashToPay) : "Cash figures: Abhinav / Shilpiji only." }; }
+  function monthBlock(st, d) { d.textContent = ""; const M = monthRows(st), t = el("table", { className: "items" }), hr = el("tr"), tb = el("tbody");
+    MCOLS.forEach(h => hr.appendChild(el("th", { textContent: h })));
+    M.rows.forEach(r => { const tr = el("tr", { className: r.rev ? "kox" : "" }); r.cells.forEach((v, i) => tr.appendChild(el("td", { textContent: v, className: [0, 1, 3, 4, 8, 10, 11, 12, 13, 14, 15, 16].includes(i) ? "num" : "", title: i === 14 && r.est ? "est. " + r3(r.est) + " g of this piece was already in the Excel opening" : i === 2 || i === 5 ? v : "" }))); tb.appendChild(tr); });
+    if (!M.rows.length) tb.appendChild(el("tr", {}, [el("td", { colSpan: MCOLS.length, className: "hint", textContent: "Nothing delivered, given or paid in " + monTxt(st.month) + "." })]));
+    { const tr = el("tr", { className: "kotot" }); M.tot.forEach((v, i) => tr.appendChild(el("td", { textContent: v, className: i > 7 ? "num" : "" }))); tb.appendChild(tr); }
+    t.append(el("thead", {}, [hr]), tb); const [pb] = pdfBtns((b, md) => monthPdf(st, md), "PDF");
+    d.append(el("h3", { textContent: st.karigar + " · " + monTxt(st.month) }), el("div", { textContent: "Opening (carried from " + monTxt(prevMon(st.month)) + "): gold " + r3(M.gOpen) + " g" + (M.A ? " · cash " + inr(st.openCash) : "") }),
+      el("div", { className: "list" }, [t]), el("div", { className: "kobal", textContent: M.gLine }), el("div", { className: "kobal", textContent: M.cLine }),
+      el("p", { className: "hint", textContent: "Carried forward to " + monTxt(st.month === "9999-12" ? st.month : (Number(st.month.slice(5, 7)) === 12 ? (Number(st.month.slice(0, 4)) + 1) + "-01" : st.month.slice(0, 5) + String(Number(st.month.slice(5, 7)) + 1).padStart(2, "0"))) + "'s opening. * = part of this piece's fine was already in the Excel opening. The Pending deliveries Total also adds the estimated fine of pieces still in work." + (st.undated.length ? " Gold given on the old sheet without a date (inside the opening): " + st.undated.map(u => r3(u.g)).join(", ") + " g." : "") }), el("div", { className: "actions" }, [pb])); }
+  function monthBox(a) { const k = a.karigar, box = el("div", { className: "kobox" }), now = today().slice(0, 7), ms = [...new Set(a.rows.map(r => String(r.date || "").slice(0, 7)).filter(m => /^\d{4}-\d{2}$/.test(m) && m <= now).concat([now]))].sort().reverse();
+    const pick = el("input", { type: "month", value: now, max: now }), go = el("button", { type: "button", className: "btn ghost", textContent: "Show month" }), more = el("button", { type: "button", className: "btn ghost", textContent: "+ Older month" }), out = el("div"); let idx = 0;
+    const add = async m => { if (!/^\d{4}-\d{2}$/.test(m) || [...out.children].some(x => x.dataset.m === m)) return; const d = el("div", { className: "komon kobox", textContent: "Loading " + monTxt(m) + "…" }); d.dataset.m = m;
+      out.appendChild(d); [...out.children].sort((x, y) => y.dataset.m.localeCompare(x.dataset.m)).forEach(x => out.appendChild(x));
+      try { const r = await fetch("/api/vj/korders?stmt=" + encodeURIComponent(k) + "&month=" + m, { credentials: "same-origin", cache: "no-store" }), j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); monthBlock(j.stmt, d); } catch (e) { d.textContent = monTxt(m) + ": not loaded (" + (e.message || e) + ")."; } };
+    go.addEventListener("click", () => add(pick.value)); more.addEventListener("click", () => { idx++; if (ms[idx]) add(ms[idx]); else { more.disabled = true; more.textContent = "No older months"; } });
+    box.append(el("div", { className: "row", style: "align-items:center" }, [el("b", { textContent: "Month-wise statement (by delivery month, newest first) " }), pick, go, more]), out); add(ms[0]); return box; }
+  function monthPdf(st, mode) { if (!window.jspdf) { $("koMsg").textContent = "PDF maker did not load - reload the page."; return; }
+    try { const M = monthRows(st), { jsPDF } = window.jspdf, doc = new jsPDF({ unit: "mm", format: "a4", orientation: "landscape" }), W = 297, Mg = 7; let y = 13;
+      const cw = [15, 14, 24, 14, 12, 30, 13, 17, 14, 8, 11, 14, 15, 14, 18, 15, 15], fit = (s, w) => { s = String(s == null ? "" : s); while (s.length > 1 && doc.getTextWidth(s) > w - 1) s = s.slice(0, -1); return s; };
+      doc.setFont("helvetica", "bold"); doc.setFontSize(17); doc.text("Vaishnavi Jewels", Mg, y); doc.setFontSize(13); doc.text("Karigar: " + st.karigar + " - month statement " + monTxt(st.month) + " (by delivery month)", Mg + 62, y); y += 7;
+      doc.setFontSize(11); doc.text("Opening (carried from " + monTxt(prevMon(st.month)) + "): gold " + r3(M.gOpen) + " g" + (M.A ? "    cash Rs " + Math.round(Number(st.openCash) || 0).toLocaleString("en-IN") : ""), Mg, y); y += 6;
+      const head = () => { doc.setFont("helvetica", "bold"); doc.setFontSize(7.6); let x = Mg; ["Budget", "Gold rate", "Party", "Mk Rs/g", "CS Rs/ct", "Item", "Code", "Date", "Gold used", "KT", "CS wt", "Stones", "Labour", "Pure", "Fine cr.", "Gold given", "Cash given"].forEach((h, i) => { doc.text(fit(h, cw[i]), x, y); x += cw[i]; }); y += 1.8; doc.line(Mg, y, W - Mg, y); y += 4; doc.setFont("helvetica", "normal"); doc.setFontSize(8.6); };
+      head(); const line = (cells, b) => { if (y > 196) { doc.addPage(); y = 13; head(); } doc.setFont("helvetica", b ? "bold" : "normal"); let x = Mg; cells.forEach((v, i) => { doc.text(fit(v, cw[i]), x, y); x += cw[i]; }); y += 5; };
+      M.rows.forEach(r => line(r.cells)); doc.line(Mg, y - 3.5, W - Mg, y - 3.5); line(M.tot, true); y += 2;
+      doc.setFont("helvetica", "bold"); doc.setFontSize(11.5); doc.text(M.gLine.replace(/−/g, "-"), Mg, y); y += 6.5; doc.text(M.cLine.replace(/₹/g, "Rs ").replace(/−/g, "-"), Mg, y); y += 8;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.text("Opening = everything before the month, closing carried to the next month. A piece belongs to the month it was delivered.", Mg, y);
+      give(doc, st.karigar + "_Month_" + monTxt(st.month).replace(" ", "-") + ".pdf", mode, st.karigar); } catch (e) { $("koMsg").textContent = "PDF not made (" + (e.message || e) + ")."; } }
 
   // ---------- PDF / WhatsApp for karigar documents (owner 18:56): nothing is ever sent by itself - the user taps send in WhatsApp ----------
   async function give(doc, name, mode, k) { const blob = doc.output("blob"), file = new File([blob], name.replace(/[^A-Za-z0-9_.-]+/g, "_"), { type: "application/pdf" }), dl = () => { const a = el("a", { href: URL.createObjectURL(blob), download: file.name }); document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000); };
@@ -218,10 +272,30 @@
   async function upload(file) { const m = $("koDrawMsg"); m.textContent = "Making the photo smaller\u2026";
     try { const b = await shrink(file); m.textContent = "Uploading (" + Math.round(b.size / 1024) + " KB)\u2026";
       const r = await fetch("/api/vj/photo", { method: "POST", credentials: "same-origin", headers: { "content-type": "image/jpeg" }, body: b }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status);
-      drawing = j.id; $("koDrawImg").src = "/_blob/" + j.id; $("koDrawImg").hidden = false; m.textContent = "Drawing added - press Save."; } catch (e) { m.textContent = "Photo not added (" + (e.message || e) + ")."; } }
+      drawing = j.id; sample = ""; $("koSampIn").value = ""; $("koDrawImg").src = "/_blob/" + j.id; $("koDrawImg").hidden = false; m.textContent = "Drawing added - press Save."; } catch (e) { m.textContent = "Photo not added (" + (e.message || e) + ")."; } }
+  /* C-20261103-KORDER4: Sample code - one of our pieces (tag no. or design code); its VJ Tags photo becomes the drawing (only the code + photo key are saved) */
+  async function useSample() { const i = $("koSampIn"), m = $("koDrawMsg"), q = String(i.value || "").trim(); if (!q || i.disabled) return; if (q.toUpperCase() === sample.toUpperCase() && drawing) return;
+    m.textContent = "Looking for " + q + "…";
+    try { const r = await fetch("/api/vj/korders?sample=" + encodeURIComponent(q), { credentials: "same-origin", cache: "no-store" }), j = await r.json().catch(() => ({}));
+      if (!r.ok || !j.ok) { m.textContent = r.status === 404 ? (j.code ? j.error + "." : q + ": not found.") : "Not found (" + (j.error || r.status) + ")."; return; }
+      drawing = j.photo; sample = j.code; i.value = j.code; $("koDrawImg").src = "/_blob/" + j.photo; $("koDrawImg").hidden = false;
+      m.textContent = "Sample " + j.code + (j.design ? " (design " + j.design + ")" : "") + ": its photo is the drawing" + (j.more ? " (" + j.more + " more pieces have this design no.)" : "") + " - press Save."; }
+    catch (e) { m.textContent = "Not found (" + (e.message || e) + ")."; } }
+  /* C-20261103-KORDER4: Party from a screenshot (WhatsApp contact / chat, phone contact card) - the server reads name, mobile, city; nothing is saved until Save */
+  const shot = f => new Promise((ok, bad) => { const u = URL.createObjectURL(f), im = new Image(); im.onload = () => { const k = Math.min(1, 1400 / Math.max(im.naturalWidth, im.naturalHeight)), c = document.createElement("canvas"); c.width = Math.max(1, Math.round(im.naturalWidth * k)); c.height = Math.max(1, Math.round(im.naturalHeight * k)); const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(im, 0, 0, c.width, c.height); URL.revokeObjectURL(u); ok(c.toDataURL("image/jpeg", 0.82).split(",")[1]); }; im.onerror = () => { URL.revokeObjectURL(u); bad(new Error("not an image")); }; im.src = u; });
+  async function partyShot(f) { const m = $("koShotMsg"), b = $("koShotB"); if (!f || !/^image\//.test(f.type || "")) { m.textContent = "Please choose a screenshot (an image)."; return; } if ($("koName").disabled) return;
+    b.disabled = true; m.textContent = "Reading the screenshot…";
+    try { const photo = await shot(f); if (photo.length > 2.7e6) throw new Error("screenshot too large");
+      const r = await fetch("/api/vj/contactshot", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ photo, type: "image/jpeg", city: true }) }), j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status);
+      if (!j.name && !j.mobile && !j.city) { m.textContent = "Could not read a name or number - please type them."; return; }
+      const mob = String(j.mobile || "").replace(/\D/g, ""), ten = /^[6-9]\d{9}$/.test(mob);
+      if (j.name) $("koName").value = j.name; if (mob) { $("koMob").value = mob; $("koMob").dispatchEvent(new Event("input", { bubbles: true })); } if (j.city) $("koCity").value = j.city;
+      ["koName", "koMob", "koCity"].forEach(i => { $(i).style.outline = "2px solid var(--gold)"; setTimeout(() => { $(i).style.outline = ""; }, 6000); });
+      m.textContent = "From screenshot: " + (j.name || "(no name)") + " · " + (mob || "(no number)") + (mob && !ten ? " (not a 10-digit Indian mobile - check)" : "") + " · " + (j.city || "(no city)") + (j.others && j.others.length ? " · other numbers: " + j.others.join(", ") : "") + ". Check them - nothing is saved until you press Save."; }
+    catch (e) { m.textContent = "Could not read the screenshot (" + (e.message || e) + "). Please type the name, mobile and city."; } finally { b.disabled = false; } }
 
   // ---------- the order form ----------
-  const F = ["koMk", "koGrade", "koDate", "koItem", "koItemNote", "koSize", "koColour", "koGwt", "koKt", "koDq", "koDct", "koDctNote", "koName", "koMob", "koCity", "koDel", "koRate", "koBudget", "koBasis", "koOg", "koStage", "koEst", "koInstr", "koSetting", "koCs", "koKSel", "koKNew", "koNoIn"];
+  const F = ["koMk", "koGrade", "koDate", "koItem", "koItemNote", "koSize", "koColour", "koGwt", "koKt", "koDq", "koDct", "koDctNote", "koName", "koMob", "koCity", "koDel", "koRate", "koBudget", "koBasis", "koOg", "koStage", "koInstr", "koSetting", "koCs", "koKSel", "koKNew", "koNoIn"];
   function kSel(v) { const s = $("koKSel"); s.textContent = ""; s.appendChild(el("option", { value: "", textContent: "- pick the karigar -" })); const l = (J.karigars || []).slice(); if (v && !l.includes(v)) l.push(v);
     l.forEach(k => s.appendChild(el("option", { value: k, textContent: k }))); if (J.admin) s.appendChild(el("option", { value: "__new", textContent: "+ new karigar" })); s.value = v || ""; $("koKNew").hidden = true; $("koKNew").value = ""; }
   function ogSel(v) { const s = $("koOg"); s.textContent = ""; s.appendChild(el("option", { value: "", textContent: "- none -" })); const l = (J.freeOgs || []).slice(); if (v && !l.some(x => x.no === v)) l.push({ no: v, name: "(linked)" });
