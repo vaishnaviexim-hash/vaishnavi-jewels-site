@@ -2102,7 +2102,7 @@ function vjKo3Cost(o, cfg) { // owner 17:02: OUR COST of the piece (admin only) 
   const d = o.tag ? vjKo3Deliv(o, cfg) : null, fine = d ? d.fine : null, gold = fine != null && o.basis !== 'g2g' && o.goldRate > 0 ? fine * o.goldRate : null /* G2GRATE: a Gold to Gold order's rate is only for the balance fine */, lab = o.tag ? (d.cash || 0) + (o.tag.labour || 0) : null;
   return { dia: vjKo3R2(dia), diaNeedRate: need, fine, gold: gold == null ? null : vjKo3R2(gold), goldNote: fine != null && !(o.goldRate > 0) ? 'no gold rate on the order (gold to gold)' : '', labour: lab == null ? null : vjKo3R2(lab), total: vjKo3R2(dia + (gold || 0) + (lab || 0)) }; }
 function vjKo3View(o, who, cfg) { const v = Object.assign({}, o, vjKo3Calc(o, cfg)); if (who.role === 'sales') { v.mobile = ''; delete v.tagRate; delete v.makingAuto; delete v.mkOrd; } delete v.by; delete v.editedBy; if (who.role === 'admin') v.cost = vjKo3Cost(o, cfg);
-  if (who.role !== 'admin') { ['iss', 'rec', 'used', 'tagDia'].forEach(k => { v[k] = (v[k] || []).map(r => { const c = Object.assign({}, r); delete c.rate; return c; }); }); if (v.tag) { v.tag = Object.assign({}, v.tag); delete v.tag.deliv; } }
+  if (who.role !== 'admin') { ['iss', 'rec', 'used', 'tagDia'].forEach(k => { v[k] = (v[k] || []).map(r => { const c = Object.assign({}, r); delete c.rate; return c; }); }); if (v.tag) { v.tag = Object.assign({}, v.tag); delete v.tag.deliv; if (Array.isArray(v.tag.chains)) v.tag.chains = v.tag.chains.map(c => { const x = Object.assign({}, c); delete x.rate; return x; }); /* CHAINVEND: chain rate admin only */ } }
   return v; }
 async function vjKo3Ledger(env, withDel) { return ((((await env.DB.prepare('SELECT data FROM vj_karigar_ledger ORDER BY ts').all()).results) || []).map(vjParse)).filter(l => l && (withDel || l.status !== 'deleted')); } // KORDER7: a row deleted by the owner (status 'deleted', full copy kept) counts nowhere
 // C-20261103-KORDER7 (owner 15:07): edit / delete karigar account entries - ONLY the logins on vj_meta 'ko:ledowners' (default Abhinav's vaishnaviexim@gmail.com), checked here
@@ -2505,6 +2505,23 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
   return vjJson({ ok: true, order: vjKo3View(o, who, cfg), warn }); }
 // C-20261103-CHAINREC: a vendor-chain tag used whole in a karigar piece is marked sold with sold.ko = the order (status back to what it was when the receive is deleted / corrected)
 const VJ_KO_CHP = ['Chain', 'Lock', 'Hook/Kadi', 'Other'];
+// C-20261103-CHAINVEND (owner 17:54): a chain part typed by hand in the receive form (no register tag) is payable to its vendor - a light payable line worked out
+// from the order's receive (o.tag.chains), never a tag in stock: fine = net x tunch, amount = fine x the rate typed. Correct / delete / restore of the receive
+// changes / removes / brings it back by itself. 'Entered in Tally - remove' is kept in vj_pay_settle (id = order | line | figures; changed figures = a new line). Admin only.
+const vjPayId = (o, c, i) => o.id + '|' + i + '|' + [c.part, c.vendor, vjR3(c.net), c.tunch, c.rate || 0].join('|');
+async function vjPayT(env) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_pay_settle (id TEXT PRIMARY KEY, ts INTEGER, data TEXT)').run(); }
+async function vjPayables(env, who) { if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji'); await vjKo3Tables(env); await vjPayT(env);
+  const st = new Map((((await env.DB.prepare('SELECT id, data FROM vj_pay_settle').all()).results) || []).map(r => [r.id, vjParse(r) || {}])), out = [];
+  ((((await env.DB.prepare('SELECT data FROM vj_kord').all()).results) || []).map(vjParse)).forEach(o => { if (!o || !o.tag || !Array.isArray(o.tag.chains)) return;
+    o.tag.chains.forEach((c, i) => { if (!c || c.tag || !c.vendor || !(c.net > 0)) return; const id = vjPayId(o, c, i), s = st.get(id), fine = vjR3(c.net * c.tunch), rate = Number(c.rate) || 0;
+      out.push({ id, vendor: c.vendor, part: c.part, net: c.net, tunch: c.tunch, rate, fine, amt: rate > 0 ? Math.round(fine * rate) : 0, karigar: o.karigar, no: o.no, date: o.tag.date, cancelled: o.status === 'cancelled', settled: !!(s && s.settled), settledAt: (s && s.at) || '' }); }); });
+  return vjJson({ ok: true, lines: out }); }
+async function vjPaySettle(request, env, who) { if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji'); if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed');
+  const len = Number(request.headers.get('content-length') || 0); if (len > 50000) return vjDeny(413, 'too large'); let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+  const ids = (Array.isArray(b && b.ids) ? b.ids : []).map(x => String(x || '')).filter(x => x.length > 3 && x.length <= 240).slice(0, 200); if (!ids.length || b.op !== 'settle') return vjDeny(400, 'tick the lines');
+  await vjPayT(env); const now = new Date().toISOString(), ts = Date.now();
+  await env.DB.batch(ids.map(id => env.DB.prepare('INSERT INTO vj_pay_settle (id, ts, data) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET ts = excluded.ts, data = excluded.data').bind(id, ts, JSON.stringify({ settled: true, at: now, by: who.email }))));
+  await vjAudit(env, who, 'pay-settle', 'payables', ids.length + ' line(s) entered in Tally'); return vjJson({ ok: true, n: ids.length }); }
 const vjKoChIds = t => ((t && Array.isArray(t.chains)) ? t.chains : []).map(c => c && c.tag).filter(Boolean);
 async function vjKoChainUse(env, who, ids, o, date, on) { const bad = [];
   for (const id of ids) { if (!/^[A-Za-z0-9_\-.~]{1,60}$/.test(String(id))) continue; const path = 'tags/' + id, t = await env.DB.prepare('SELECT data, version FROM docs WHERE path = ?').bind(path).first(); if (!t) { if (on) bad.push(id); continue; }
@@ -4624,6 +4641,8 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/bill' && request.method === 'POST') return vjBill(request, env, who, ctx);
   if (p === '/api/vj/ogs' && request.method === 'GET') return vjOgs(env, who, url); // C-20261101-OGREG
   if (p === '/api/vj/og' && request.method === 'POST') return vjOgSave(request, env, who); // C-20261101-OGTAB
+  if (p === '/api/vj/payables' && request.method === 'GET') return vjPayables(env, who); // C-20261103-CHAINVEND
+  if (p === '/api/vj/payables' && request.method === 'POST') return vjPaySettle(request, env, who); // C-20261103-CHAINVEND
   if (p === '/api/vj/korders' && request.method === 'GET') return vjKo3List(env, who, url); // C-20261102-KORDER (v2: C-20261102-KORDER3)
   if (p === '/api/vj/korder' && request.method === 'POST') return vjKo3Save(request, env, who); // C-20261102-KORDER (v2: C-20261102-KORDER3)
   if ((p === '/api/vj/bills' || p === '/api/vj/bills.xlsx' || p === '/api/vj/bill') && request.method === 'GET') return vjBillBook(url, env, who, request.headers.get('x-vj-mob'));
