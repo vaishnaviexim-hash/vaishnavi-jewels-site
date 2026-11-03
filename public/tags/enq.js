@@ -97,6 +97,7 @@
       call.addEventListener("click", onCall); who.append(call);
     }
     if (e.wa && data.canEdit && e.open) { const w = el("button", { type: "button", className: "btn ghost", textContent: "WhatsApp" }); w.style.padding = "6px 12px"; w.addEventListener("click", () => { openComposer = openComposer === e.id ? "" : e.id; render(); }); who.append(w); }
+    if (e.wa && data.canEdit && window.VJChats) { const ch = el("button", { type: "button", className: "btn ghost", textContent: "Chat / remind" }); ch.style.padding = "6px 12px"; ch.title = "Business-number chat: reply while the 24h window is open, otherwise call or send an approved reminder"; ch.addEventListener("click", () => window.VJChats.open(e.wa)); who.append(ch); } // C-20261103-HANDOVER
     c.append(who);
     const line = (k, v) => v ? el("p", { style: "margin:4px 0" }, [el("span", { className: "hint", textContent: k + ": " }), document.createTextNode(v)]) : null;
     add(c, line("Wants", [e.cat && e.cat !== "Other" ? e.cat : "", e.what].filter(Boolean).join(" - ")), line("Aashvi's last reply", e.reply.length > 220 ? e.reply.slice(0, 220) + "…" : e.reply), line("Ad / source", e.src));
