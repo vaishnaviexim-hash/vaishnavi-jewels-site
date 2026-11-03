@@ -20,6 +20,24 @@
   function pill(text, style) { const p = el("span", { className: "pill", textContent: text }); if (style) p.style.cssText = style; return p; }
   const btn = (text, ghost, fn) => { const b = el("button", { type: "button", className: ghost ? "btn ghost" : "btn", textContent: text }); b.style.cssText = "padding:8px 12px;min-height:40px"; if (fn) b.addEventListener("click", fn); return b; };
   const winPill = ms => pill(left(ms), ms > 3 * 3600e3 ? "background:var(--gold-soft);color:var(--gold)" : ms > 0 ? "background:var(--bad);color:#fff" : "background:var(--sunk);color:var(--fg)");
+  const freeTill = ms => ms > 60e3 ? "free reply till " + when(Date.now() + ms) : "template needed";
+  // after-hours leads waiting for the next opening (C-20261103-HANDOVER, owner 07:50)
+  function ahBox() {
+    const box = $("chAh"); if (!box) return; box.textContent = ""; const A = (data && data.ah) || [];
+    if (!A.length && (!data || data.open)) { box.hidden = true; return; } box.hidden = false;
+    box.append(el("strong", { textContent: "Next-day handover" + (A.length ? " (" + A.length + ")" : "") }), el("p", { className: "hint", textContent: (data.open ? "Showroom open now." : "Showroom closed - opens " + when(data.nextOpen) + ".") + " Leads that wrote after hours; Aashvi told them when we will contact them. A person taps send every time." }));
+    A.forEach(a => {
+      const c = el("div", { className: "card" }); c.style.cssText = "margin:6px 0;padding:10px 12px" + (a.promised <= Date.now() ? ";border-left:4px solid var(--bad)" : "");
+      const top = el("div"); top.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;align-items:center";
+      top.append(el("strong", { textContent: a.name || "(no name)" }), a.number ? el("span", { className: "hint", textContent: a.number }) : null, pill("For " + a.to), pill("Promised " + when(a.promised)), pill(freeTill(a.winLeft), a.winLeft > 60e3 ? "background:var(--gold-soft);color:var(--gold)" : "background:var(--sunk);color:var(--fg)"));
+      c.append(top); if (a.topic) c.append(el("div", { textContent: a.topic, style: "margin-top:4px;font-size:14px" }));
+      if (data.canEdit) { const row = el("div"); row.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;margin-top:6px";
+        row.append(btn(a.winLeft > 60e3 ? "Send Hi (free)" : "Send Hi (template)", false, () => openThread(a.id, "", "hi")), btn("Open chat", true, () => openThread(a.id)),
+          btn("Done", true, async () => { try { await api("/api/vj/chat", { op: "ahdone", id: a.id }); await loadList(); } catch (e) { alert(e.message); } }));
+        c.append(row); }
+      box.append(c);
+    });
+  }
 
   async function loadList(fresh) {
     if (busy) return; busy = true;
@@ -30,6 +48,7 @@
   function renderList() {
     const box = $("chList"); box.textContent = ""; $("chThread").hidden = true; $("chListWrap").hidden = false;
     if (!data) { box.append(el("p", { className: "hint", textContent: "Loading…" })); return; }
+    ahBox();
     const q = String($("chQ").value || "").trim().toLowerCase(), qd = q.replace(/\D/g, "");
     const L = data.chats.filter(c => (filter === "all" || (filter === "human" ? c.mode === "human" : c.mode === "human" && c.to === data.me.replace(/^Shilpi$/, "Shilpiji")))
       && (!q || String(c.name).toLowerCase().includes(q) || (qd.length >= 3 && String(c.number || "").replace(/\D/g, "").includes(qd)) || String(c.last).toLowerCase().includes(q)));
@@ -40,7 +59,7 @@
       const top = el("div"); top.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;align-items:center";
       top.append(el("strong", { textContent: c.name || "(no name)" }), c.number ? el("span", { className: "hint", textContent: c.number }) : null);
       const tags = el("div"); tags.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin-top:4px";
-      tags.append(c.mode === "human" ? pill("With " + c.to, "background:var(--gold-soft);color:var(--gold)") : pill("Aashvi"), winPill(c.winLeft));
+      tags.append(c.mode === "human" ? pill("With " + c.to, "background:var(--gold-soft);color:var(--gold)") : pill("Aashvi"), winPill(c.winLeft), pill(freeTill(c.winLeft)));
       if (c.enq) tags.append(pill("Enquiry: " + c.enq.status));
       const last = el("div", { textContent: (c.lastDir === "in" ? "" : c.lastDir === "bot" ? "Aashvi: " : "") + c.last }); last.style.cssText = "margin-top:6px;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
       const tm = el("span", { className: "hint", textContent: when(c.lastAt) }); tm.style.cssText = "margin-left:auto";
@@ -49,14 +68,22 @@
       box.append(card);
     });
   }
-  async function openThread(id, wa) {
+  async function openThread(id, wa, action) {
     curId = id || ("wa:" + wa); cur = null; draft = {}; renderThread();
     try { cur = await api("/api/vj/chat?" + (id ? "id=" + encodeURIComponent(id) : "wa=" + encodeURIComponent(wa))); curId = cur.id; }
     catch (e) { cur = { error: e.message }; }
     renderThread(); clearInterval(tTimer);
+    if (action === "hi" && cur && !cur.error) sayHi();
     tTimer = setInterval(async () => { if (!curId || document.visibilityState !== "visible" || (document.activeElement && sec.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) return;
       try { const j = await api("/api/vj/chat?id=" + encodeURIComponent(curId)); const n = j.thread.length + ":" + (j.thread.slice(-1)[0] || {}).status; if (n !== cur.thread.length + ":" + (cur.thread.slice(-1)[0] || {}).status || j.mode !== cur.mode) { cur = j; renderThread(true); } } catch (e) {} }, 15000);
     window.scrollTo({ top: 0 });
+  }
+  // "Hi" to an after-hours lead: free text while the 24h window is open, otherwise the approved utility update template
+  function sayHi() {
+    if (!cur || cur.error || !cur.canEdit) return;
+    if (cur.winLeft > 60e3) { const ta = $("chText"); if (ta) { ta.value = cur.hiText || ""; ta.dispatchEvent(new Event("input")); ta.focus(); ta.scrollIntoView({ behavior: "smooth", block: "center" }); } }
+    else if (cur.canTpl) { if (!$("chRem")) remindBox($("chThread"), "update"); }
+    else { const m = $("chSendMsg"); if (m) m.textContent = "Window closed - a reminder template is needed (Abhinav, Shilpiji or staff the owner allows)."; }
   }
   function back() { curId = ""; cur = null; clearInterval(tTimer); renderList(); loadList(); }
   function renderThread(keepBox) {
@@ -75,6 +102,10 @@
     st.append(cur.mode === "human" ? pill("With " + cur.to + " · Aashvi silent", "background:var(--gold-soft);color:var(--gold)") : pill("Aashvi is answering"), winPill(cur.winLeft));
     if (cur.need) st.append(el("span", { className: "hint", textContent: "Hot lead: " + cur.need }));
     t.append(st);
+    if (cur.ah) { const b = el("div", { className: "card" }); b.style.cssText = "margin:6px 0;padding:8px 12px;border-color:var(--gold)";
+      b.append(el("strong", { textContent: "Next-day handover" }), el("span", { className: "hint", textContent: " · promised " + when(cur.ah.promised) + " · for " + cur.ah.to + " · " + freeTill(cur.winLeft) }));
+      if (cur.canEdit) b.append(el("div", { style: "display:flex;gap:8px;flex-wrap:wrap;margin-top:6px" }, [btn(cur.winLeft > 60e3 ? "Send Hi (free)" : "Send Hi (template)", false, sayHi), btn("Done", true, async () => { try { await api("/api/vj/chat", { op: "ahdone", id: cur.id }); await reload(); } catch (e) { alert(e.message); } })]));
+      t.append(b); }
     if (cur.enq) {
       const e = el("div", { className: "card" }); e.style.cssText = "margin:6px 0;padding:8px 12px;font-size:14px";
       e.append(el("div", {}, [el("span", { className: "hint", textContent: "Enquiry (" + cur.enq.status + "): " }), document.createTextNode(cur.enq.what || "-")]));
@@ -130,7 +161,7 @@
     if (cur.mode === "human" && cur.by) t.append(el("p", { className: "hint", textContent: "With " + cur.to + " since " + when(cur.since) + " (" + (/@/.test(cur.by) ? "set in VJ Tags" : cur.by) + ")." }));
   }
   async function reload() { try { cur = await api("/api/vj/chat?id=" + encodeURIComponent(cur.id)); } catch (e) {} renderThread(); }
-  function remindBox(t) {
+  function remindBox(t, preset) {
     if ($("chRem")) { $("chRem").remove(); return; }
     const v = cur.vars || {}, box = el("div", { id: "chRem", className: "card" }); box.style.cssText = "margin-top:10px;padding:12px";
     let lang = v.lang || "hi", pick = "";
@@ -176,7 +207,9 @@
     box.append(el("strong", { textContent: "Send reminder (window closed)" }), el("p", { className: "hint", textContent: "Max 1 per customer in 48 h, 3 per enquiry, daily limit set by the owner. STOP / “Not now” customers are never sent one." + (cur.stop ? " This customer: " + cur.stop + "." : "") }),
       choices, fields, vRow, prev, info, el("div", { style: "display:flex;gap:8px;flex-wrap:wrap" }, [send, sync]), msg);
     if (cur.stop) send.title = cur.stop;
-    t.append(box); upd(); box.scrollIntoView({ behavior: "smooth", block: "start" });
+    t.append(box);
+    if (preset) { const r = box.querySelector('input[name="chTpl"][value="' + preset + '"]'); if (r && !r.disabled) { r.checked = true; pick = preset; } }
+    upd(); box.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   async function settings() {
     const box = $("chSet"); if (!box.hidden) { box.hidden = true; return; } box.hidden = false; box.textContent = "Loading…";
@@ -211,7 +244,7 @@
     const setB = btn("Settings", true, settings); setB.id = "chSetB";
     sec.append(el("h2", { textContent: "Chats" }),
       el("div", { id: "chListWrap" }, [el("p", { className: "hint", textContent: "Customer chats on the business number. Chats with a person come first — Aashvi stays silent in those until you hand back." }),
-        head, el("div", { style: "display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px" }, [fs, setB]), el("div", { id: "chSet", className: "card", hidden: true, style: "margin-top:8px;padding:10px" }),
+        head, el("div", { style: "display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:8px" }, [fs, setB]), el("div", { id: "chSet", className: "card", hidden: true, style: "margin-top:8px;padding:10px" }), el("div", { id: "chAh", className: "card", hidden: true, style: "margin-top:8px;padding:10px;border-color:var(--gold)" }),
         el("p", { className: "hint", id: "chCount" }), el("p", { className: "hint", id: "chMsg", style: "color:var(--bad)" }), el("div", { id: "chList" })]),
       el("div", { id: "chThread", hidden: true }));
     rates.parentNode.insertBefore(sec, rates);
