@@ -14,7 +14,22 @@
   const plus = (ymd, n) => new Date(Date.parse(ymd + "T00:00:00Z") + n * 864e5).toISOString().slice(0, 10);
   const CLOSED = ["Bought", "Not interested", "Not relevant", "Closed"];
   const CHANNELS = ["Meta ad", "Google ad", "Website", "Broadcast", "Direct"];
-  let sec = null, data = null, busy = false, timer = 0, openComposer = "";
+  let sec = null, data = null, busy = false, timer = 0, openComposer = "", sub = "new"; /* C-20261103-ENQTABS: New / Follow-up / Waiting */
+  const SUBS = [["new", "New"], ["followup", "Follow-up"], ["waiting", "Waiting"]];
+  /* quick actions (Send on WhatsApp / Call / Messaged): recorded at once, with ~10 s Undo */
+  let toastT = 0;
+  function toast(text, undo) {
+    let t = $("enqToast"); if (!t) { t = el("div", { id: "enqToast" }); t.style.cssText = "position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:50;background:var(--fg);color:var(--bg);padding:10px 14px;border-radius:999px;display:flex;gap:12px;align-items:center;box-shadow:0 4px 16px rgba(0,0,0,.25);max-width:calc(100vw - 32px);font-size:14px"; document.body.append(t); }
+    t.textContent = ""; t.hidden = false; t.append(el("span", { textContent: text }));
+    if (undo) { const u = el("button", { type: "button", textContent: "Undo" }); u.style.cssText = "background:transparent;color:var(--bg);border:1px solid var(--bg);border-radius:999px;padding:4px 12px;font:inherit;font-weight:600;cursor:pointer";
+      u.addEventListener("click", async () => { u.disabled = true; try { await undo(); t.hidden = true; } catch (x) { t.firstChild.textContent = x.message; } }); t.append(u); }
+    clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 10000);
+  }
+  async function quick(e, op, label, keep) {
+    try { const r = await api("/api/vj/enquiry", { id: e.id, op }); openComposer = "";
+      toast(label + " recorded · next " + dmy(r.enquiry && r.enquiry.next || ""), r.row ? async () => { await api("/api/vj/enquiry", { id: e.id, op: "undo", of: r.row }); await load(); } : null);
+      await load(); } catch (x) { toast("Not recorded: " + x.message); }
+  }
 
   async function api(path, body) {
     const r = await fetch(path, body ? { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : { credentials: "same-origin", cache: "no-store" });
@@ -35,21 +50,29 @@
     const ch = Object.entries(s.byChannel || {}).sort((a, b) => b[1] - a[1]).map(([k, v]) => k + " " + v).join(" · ");
     $("enqCh").textContent = ch ? "Running by channel: " + ch : "";
   }
-  function filtered() {
+  function filtered(all) {
     if (!data) return [];
     const q = String($("enqQ").value || "").trim().toLowerCase(), qd = q.replace(/\D/g, ""), ch = $("enqChan").value, st = $("enqSt").value, rel = $("enqRel").checked, from = $("enqFrom").value, to = $("enqTo").value;
     const t = today();
     let L = data.enquiries.filter(e => (!ch || e.channel === ch) && (!st || e.status === st) && (!rel || /^yes/i.test(e.relevant)) && (!from || e.date.slice(0, 10) >= from) && (!to || e.date.slice(0, 10) <= to)
       && (!q || String(e.name).toLowerCase().includes(q) || (qd.length >= 3 && String(e.number || "").replace(/\D/g, "").includes(qd)) || String(e.what).toLowerCase().includes(q)));
-    if (!$("enqClosed").checked) { const rank = e => e.next && e.next < t ? 0 : e.next === t ? 1 : 2; L = L.slice().sort((a, b) => rank(a) - rank(b) || (rank(a) < 2 ? a.next.localeCompare(b.next) : 0) || b.date.localeCompare(a.date)); }
+    if (all || $("enqClosed").checked) return L;
+    L = L.filter(e => (e.tab || "new") === sub);
+    if (sub === "followup") { const rank = e => e.next && e.next < t ? 0 : e.next === t ? 1 : 2; L = L.slice().sort((a, b) => rank(a) - rank(b) || (rank(a) < 2 ? a.next.localeCompare(b.next) : 0) || b.last.localeCompare(a.last)); }
+    else if (sub === "waiting") L = L.slice().sort((a, b) => a.next.localeCompare(b.next) || b.date.localeCompare(a.date));
     return L;
   }
   function render() {
     if (!sec || sec.hidden) return; stats();
     const box = $("enqList"); box.textContent = ""; if (!data) { box.append(el("p", { className: "hint", textContent: "Loading…" })); return; }
-    const L = filtered(), closedView = $("enqClosed").checked;
-    $("enqCount").textContent = L.length + " of " + data.enquiries.length + (closedView ? " closed" : " running") + " shown" + (data.sheetAt ? " · sheet read " + new Date(data.sheetAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "");
-    if (!L.length) box.append(el("p", { className: "hint", textContent: closedView ? "No closed enquiries match." : "Nothing running matches. All followed up!" }));
+    const L = filtered(), closedView = $("enqClosed").checked, bar = $("enqSubs");
+    bar.hidden = closedView; bar.textContent = "";
+    if (!closedView) { const A = filtered(true); SUBS.forEach(([k, label]) => { const n = A.filter(e => (e.tab || "new") === k).length, od = k === "followup" ? A.filter(e => e.tab === "followup" && e.due === "overdue").length : 0;
+      const b = el("button", { type: "button", textContent: label + " " + n + (od ? " (" + od + " overdue)" : "") }); b.setAttribute("aria-pressed", sub === k ? "true" : "false");
+      b.style.cssText = "flex:1 1 0;font:inherit;font-weight:600;font-size:14px;padding:9px 6px;border-radius:999px;cursor:pointer;border:1px solid " + (sub === k ? "var(--fg);background:var(--fg);color:var(--bg)" : "var(--line);background:var(--surface);color:" + (od ? "var(--bad)" : "var(--fg)"));
+      b.addEventListener("click", () => { sub = k; openComposer = ""; render(); window.scrollTo({ top: sec.offsetTop - 8 }); }); bar.append(b); }); }
+    $("enqCount").textContent = L.length + (closedView ? " closed" : " " + (SUBS.find(x => x[0] === sub) || ["", ""])[1].toLowerCase()) + " shown" + (data.sheetAt ? " · sheet read " + new Date(data.sheetAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "");
+    if (!L.length) box.append(el("p", { className: "hint", textContent: closedView ? "No closed enquiries match." : sub === "new" ? "No new enquiries - everyone has been contacted." : sub === "followup" ? "Nothing due. All followed up!" : "Nobody waiting." }));
     L.slice(0, 300).forEach(e => box.append(card(e)));
     if (L.length > 300) box.append(el("p", { className: "hint", textContent: "Showing the first 300 - narrow with the filters or search." }));
   }
@@ -62,14 +85,16 @@
     if (/^yes/i.test(e.relevant)) top.append(pill("Real lead", "background:var(--gold-soft);color:var(--gold)")); else if (e.relevant) top.append(pill(e.relevant));
     if (e.urgent && /yes/i.test(e.urgent)) top.append(pill("Urgent", "background:var(--bad);color:#fff"));
     if (e.due) top.append(pill(e.due === "overdue" ? "Overdue since " + dmy(e.next) : "Due today", e.due === "overdue" ? "background:var(--bad);color:#fff" : "background:var(--gold-soft);color:var(--gold)"));
-    else if (e.next && e.open) top.append(pill("Next " + dmy(e.next)));
+    else if (e.next && e.open) top.append(pill("next: " + dmy(e.next), "background:var(--sunk);color:var(--fg)"));
+    if (e.replied && e.open && e.status !== "New") top.append(pill("Wrote again " + dt(e.last), "background:var(--gold-soft);color:var(--gold)"));
     c.append(top);
     const who = el("div"); who.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px";
     who.append(el("strong", { textContent: e.name || "(no name)" }));
-    if (e.number) who.append(e.tel ? el("a", { href: "tel:" + e.tel, textContent: e.number }) : el("span", { className: "hint", textContent: e.number }));
+    const onCall = () => { if (data.canEdit && e.open) quick(e, "called", "Called ✓"); }; /* C-20261103-ENQTABS: tapping Call records it (Undo for 10 s) */
+    if (e.number) { const n = e.tel ? el("a", { href: "tel:" + e.tel, textContent: e.number }) : el("span", { className: "hint", textContent: e.number }); if (e.tel) n.addEventListener("click", onCall); who.append(n); }
     if (e.tel && data.canEdit) {
       const call = el("a", { href: "tel:" + e.tel, className: "btn ghost", textContent: "Call" }); call.style.cssText = "text-decoration:none;padding:6px 12px;border:1px solid var(--line);border-radius:var(--r);color:var(--fg);font-weight:600";
-      who.append(call);
+      call.addEventListener("click", onCall); who.append(call);
     }
     if (e.wa && data.canEdit && e.open) { const w = el("button", { type: "button", className: "btn ghost", textContent: "WhatsApp" }); w.style.padding = "6px 12px"; w.addEventListener("click", () => { openComposer = openComposer === e.id ? "" : e.id; render(); }); who.append(w); }
     c.append(who);
@@ -101,9 +126,10 @@
     const cnt = el("span", { className: "hint" }), upd = () => { cnt.textContent = ta.value.length + " characters"; }; ta.addEventListener("input", upd); upd();
     const send = el("button", { type: "button", className: "btn", textContent: "Send on WhatsApp" });
     const done = el("button", { type: "button", className: "btn ghost", textContent: "Messaged ✓" });
-    send.addEventListener("click", () => { const txt = ta.value.trim(); if (!txt) return; window.open("https://wa.me/" + e.wa + "?text=" + encodeURIComponent(txt), "_blank", "noopener"); done.focus(); });
-    done.addEventListener("click", async () => { done.disabled = true; try { await api("/api/vj/enquiry", { id: e.id, op: "messaged" }); openComposer = ""; await load(); } catch (x) { alert(x.message); done.disabled = false; } });
-    w.append(el("div", { className: "hint", textContent: "Message from your own WhatsApp - change it if you like, then tap Send on WhatsApp and press send there. After sending, tap Messaged ✓ (next follow-up in 2 days)." }), ta,
+    /* C-20261103-ENQTABS: Send on WhatsApp records "Messaged ✓" at once (next follow-up +2 days, Undo for 10 s); Messaged ✓ stays as a fallback */
+    send.addEventListener("click", () => { const txt = ta.value.trim(); if (!txt) return; window.open("https://wa.me/" + e.wa + "?text=" + encodeURIComponent(txt), "_blank", "noopener"); send.disabled = done.disabled = true; quick(e, "messaged", "Messaged ✓"); });
+    done.addEventListener("click", () => { send.disabled = done.disabled = true; quick(e, "messaged", "Messaged ✓"); });
+    w.append(el("div", { className: "hint", textContent: "Opens your own WhatsApp with this message - change it if you like, then press send there. It is marked Messaged ✓ (next follow-up in 2 days); tap Undo if you did not send it." }), ta,
       el("div", { className: "actions", style: "display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px" }, [send, done, cnt]));
     return w;
   }
@@ -128,9 +154,16 @@
       save.disabled = true; msg.textContent = "Saving…";
       try { await api("/api/vj/enquiry", body); await load(); } catch (x) { msg.textContent = x.message; save.disabled = false; }
     });
+    /* C-20261103-ENQTABS: one-tap follow-up date chips (saved at once) */
+    const chips = el("div"); chips.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;align-items:center;flex:1 1 100%";
+    chips.append(el("span", { className: "hint", textContent: "Next follow-up:" }));
+    [["+1 day", 1], ["+2 days", 2], ["+1 week", 7]].forEach(([lbl, n]) => { const c = el("button", { type: "button", textContent: lbl }); c.style.cssText = "font:inherit;font-size:13px;font-weight:600;padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer";
+      c.addEventListener("click", async () => { const d = plus(t, n); c.disabled = true; try { await api("/api/vj/enquiry", { id: e.id, op: "note", note: "Next follow-up " + dmy(d), next: d }); toast("Next follow-up " + dmy(d)); await load(); } catch (x) { msg.textContent = x.message; c.disabled = false; } }); chips.append(c); });
+    const pickB = el("button", { type: "button", textContent: "Pick date" }); pickB.style.cssText = "font:inherit;font-size:13px;font-weight:600;padding:5px 12px;border-radius:999px;border:1px dashed var(--line);background:transparent;color:var(--fg);cursor:pointer";
+    pickB.addEventListener("click", () => { try { nx.showPicker(); } catch (x) { nx.focus(); } msg.textContent = "Pick the date, then Save."; }); chips.append(pickB);
     const closeB = el("button", { type: "button", className: "btn ghost", textContent: "Close…" });
     closeB.addEventListener("click", () => { st.value = "Closed"; sync(); note.focus(); msg.textContent = "Pick the result (Bought / Not interested / Not relevant / Closed), add why, then Save."; });
-    f.append(lab("Status", st, "0 1 160px"), lNx, lAmt, lBill, lab("Note", note, "2 1 220px"), save, closeB, msg);
+    f.append(chips, lab("Status", st, "0 1 160px"), lNx, lAmt, lBill, lab("Note", note, "2 1 220px"), save, closeB, msg);
     return f;
   }
   function show(on) {
@@ -156,10 +189,11 @@
       el("div", { className: "row", style: "align-items:end" }, [lab("Search", q, "2 1 200px"), lab("Channel", sel("enqChan", "All", CHANNELS)), lab("Status", sel("enqSt", "All", ["New", "Messaged", "Called", "Visit booked", "Visited", "Quote", "Bought", "Not interested", "Not relevant", "Closed"])),
         lab("From", el("input", { type: "date", id: "enqFrom" })), lab("To", el("input", { type: "date", id: "enqTo" }))]),
       el("div", { className: "row", style: "align-items:center;margin-top:8px" }, [chk(rel, "Real leads only"), chk(cl, "Closed / history"), refresh, xl]),
+      el("div", { id: "enqSubs", style: "position:sticky;top:0;z-index:20;display:flex;gap:6px;padding:8px 0;margin:6px 0;background:var(--surface);border-bottom:1px solid var(--line)" }),
       el("p", { className: "hint", id: "enqCount" }), el("p", { className: "hint", id: "enqMsg", style: "color:var(--bad)" }), el("div", { id: "enqList" }));
     rates.parentNode.insertBefore(sec, rates);
     ["enqQ", "enqFrom", "enqTo"].forEach(id => $(id).addEventListener("input", render)); ["enqChan", "enqSt", "enqRel"].forEach(id => $(id).addEventListener("change", render));
-    cl.addEventListener("change", () => { data = null; render(); load(); });
+    cl.addEventListener("change", () => { data = null; openComposer = ""; render(); load(); });
     refresh.addEventListener("click", () => load(true));
     xl.addEventListener("click", () => { const a = el("a", { href: "/api/vj/enquiries.xlsx" + (cl.checked ? "?closed=1" : "") }); document.body.append(a); a.click(); a.remove(); });
     nav.addEventListener("click", e => { const x = e.target.closest("nav button"); if (!x) return; show(x.dataset.tab === "enq"); });
