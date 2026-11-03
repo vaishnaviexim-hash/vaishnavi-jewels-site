@@ -13,7 +13,7 @@
   const el = (tag, props, kids) => { const e = document.createElement(tag); if (props) Object.assign(e, props); (kids || []).forEach(k => e.append(k)); return e; };
   const btn = (text, cls, fn) => { const b = el("button", { type: "button", className: "btn" + (cls ? " " + cls : ""), textContent: text }); if (fn) b.addEventListener("click", fn); return b; };
   const L = { cust: null, card: null, canSettle: false, wa: { bill: false, receipt: false } };
-  const MODES = [["cash", "Cash"], ["upi", "UPI"], ["card", "Card"], ["cheque", "Cheque"], ["bank", "Bank transfer"], ["gold", "Old gold"], ["adjust", "Adjustment"]];
+  const MODES = [["cash", "Cash"], ["upi", "UPI"], ["cheque", "Cheque"], ["bank", "Bank transfer (NEFT)"] /* owner rule 03/11: no card payments - old Card receipts still show as Card */, ["gold", "Old gold"], ["adjust", "Adjustment"]];
   async function api(path, body) {
     const r = await fetch(path, body ? { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : { credentials: "same-origin", cache: "no-store" });
     const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || ("server " + r.status)); return j;
