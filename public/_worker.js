@@ -660,12 +660,16 @@ async function vjContactShot(request, env, who) {
   const since = Date.now() - 24 * 3600e3;
   const used = await env.DB.prepare("SELECT count(*) AS n FROM audit WHERE action = 'contactshot' AND ts > ?").bind(since).first();
   if (used && used.n >= VJ_CS_DAY) return vjDeny(429, 'daily limit reached (' + VJ_CS_DAY + ' screenshots in 24 hours)');
-  await vjAudit(env, who, 'contactshot', '', '');
+  const mine = await env.DB.prepare("SELECT count(*) AS n FROM audit WHERE action = 'contactshot' AND email = ? AND ts > ?").bind(who.email, Date.now() - 600e3).first(); // C-20261103-KORDER4: 15 per login per 10 minutes
+  if (mine && mine.n >= 15) return vjDeny(429, 'too many screenshots - wait a few minutes');
+  const wantCity = b.city === true; // C-20261103-KORDER4: the karigar order also wants the city
+  await vjAudit(env, who, 'contactshot', '', wantCity ? 'korder' : '');
   const prompt = 'This image is a screenshot of ONE person\'s contact from a phone (contact card, call log, or WhatsApp chat / profile header) sent by a jewellery shop to fill a bill. '
     + 'Read ONLY the contact\'s display name and the phone number(s) shown for that contact, exactly as written. Never guess or invent a name or a digit; if something is not clearly readable, leave it out. '
     + 'If the name starts with a short filing code used in the shop\'s phone (for example "C Srt", "C Amd", "J Amd", "CP", "Fr", "Rl", "Dr", "Dia"), drop that code and keep only the person\'s name. '
     + 'Ignore the phone\'s own status bar, the time, the battery, other chats, buttons and any other text. '
-    + 'Answer with JSON only, no other text: {"name": "...", "mobiles": ["..."]} - mobiles as digits only, with the country code if it is shown.';
+    + (wantCity ? 'Also read the contact\'s CITY or town if it is clearly written for that contact (in the name, e.g. "Neha Surat", the address, the about / status or a label); if no city is clearly shown, leave it empty - never guess it from the number. When the city is part of the name, keep it out of the name. ' : '')
+    + 'Answer with JSON only, no other text: {"name": "...", "mobiles": ["..."]' + (wantCity ? ', "city": "..."' : '') + '} - mobiles as digits only, with the country code if it is shown.';
   let r;
   try {
     r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', signal: AbortSignal.timeout(45000),
@@ -685,7 +689,8 @@ async function vjContactShot(request, env, who) {
   const nums = (Array.isArray(o.mobiles) ? o.mobiles : []).map(x => String(x || '').replace(/\D/g, '')).filter(d => d.length >= 8 && d.length <= 15)
     .map(d => (d.length === 12 && d.startsWith('91')) ? d.slice(2) : (d.length === 11 && d.startsWith('0')) ? d.slice(1) : d);
   const uniq = [...new Set(nums)], best = uniq.find(d => /^[6-9]\d{9}$/.test(d)) || uniq[0] || '';
-  return vjJson({ ok: true, name, mobile: best, others: uniq.filter(d => d !== best).slice(0, 3) });
+  const city = wantCity ? String(o.city || '').replace(/[^\p{L}\p{M}\s.'-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 40) : undefined;
+  return vjJson({ ok: true, name, mobile: best, others: uniq.filter(d => d !== best).slice(0, 3), city });
 }
 async function vjAskClaude(env, content, ok, lim) {
   let r;
@@ -2136,7 +2141,18 @@ async function vjKo3Account(env, who, cfg, orders) { const adm = who.role === 'a
   orders.filter(o => (o.status === 'open' || o.status === 'karigar') && vjKoMg(cfg, o.karigar)).forEach(o => { const x = a(o.karigar); x.openOrders++; x.diaPend.pcs += o.diaPend.pcs; x.diaPend.ct = Math.round((x.diaPend.ct + o.diaPend.ct) * 1000) / 1000; });
   return Object.values(A).map(x => Object.assign(x, { fine: vjR3(x.fine), goldIssued: vjR3(x.goldIssued), fineUsed: vjR3(x.fineUsed), cash: adm ? vjKo3R2(x.cash) : null, labour: adm ? vjKo3R2(x.labour) : null, paid: adm ? vjKo3R2(x.paid) : null,
     opening: x.opening ? { date: x.opening.date, fine: x.opening.fine, cash: adm ? x.opening.cash : null } : null, rows: x.rows.sort((p, q) => String(p.date).localeCompare(String(q.date))) })); }
-async function vjKo3List(env, who, url) { await vjKo3Tables(env); const adm = who.role === 'admin', cfg = await vjKo3Cfg(env); if (who.role !== 'sales') await vjKoUmSweep(env, who, cfg);
+// C-20261103-KORDER4 (owner 03/11 14:04): 'Sample code' on a karigar order - the code of one of our pieces (tag no. VER/101, VER-101, VER101, or its design no.)
+// -> that piece's saved photo becomes the order's drawing (only the photo key + code are kept on the order; the photo itself is not copied). Logins except sales.
+async function vjKoSample(env, who, raw) { if (who.role === 'sales') return vjDeny(403, 'read only');
+  const q = String(raw || '').toUpperCase().replace(/\s+/g, ''); if (!/^[A-Z0-9][A-Z0-9_\-\/.~]{1,39}$/.test(q)) return vjDeny(400, 'type the tag no. or design code');
+  const id1 = q.replace(/\//g, '-'), m = id1.match(/^([A-Z]+)-?(\d+[A-Z0-9]*)$/), ids = [...new Set([id1, m ? m[1] + '-' + m[2] : id1])], hits = [];
+  for (const id of ids) { const r = await env.DB.prepare('SELECT data FROM docs WHERE path = ?').bind('tags/' + id).first(), t = r ? vjParse(r) : null; if (t) { hits.push(t); break; } }
+  if (!hits.length) ((await env.DB.prepare("SELECT data FROM docs WHERE path LIKE 'tags/%' AND upper(replace(json_extract(data, '$.designNo'), ' ', '')) IN (?, ?) LIMIT 20").bind(q, id1).all()).results || []).map(vjParse).filter(Boolean).forEach(t => hits.push(t));
+  if (!hits.length) return vjJson({ ok: false, error: 'not found' }, 404);
+  const okP = t => typeof t.photo === 'string' && /^[0-9a-f]{32}$/.test(t.photo), t = hits.find(okP) || hits[0], code = String(t.label || t.id || q).slice(0, 40);
+  if (!okP(t) || (env.PHOTOS && !(await vjPhotoHas(env, t.photo)))) return vjJson({ ok: false, error: code + ' has no photo yet', code }, 404);
+  return vjJson({ ok: true, code, design: String(t.designNo || '').slice(0, 30), photo: t.photo, more: hits.length - 1 }); }
+async function vjKo3List(env, who, url) { if (url.searchParams.has('sample')) return vjKoSample(env, who, url.searchParams.get('sample')); await vjKo3Tables(env); const adm = who.role === 'admin', cfg = await vjKo3Cfg(env); if (who.role !== 'sales') await vjKoUmSweep(env, who, cfg);
   const raw = ((((await env.DB.prepare('SELECT data FROM vj_kord ORDER BY karigar, no').all()).results) || []).map(vjParse)).filter(Boolean).map(vjKo3Up);
   const list = raw.map(o => vjKo3View(o, who, cfg)), karigars = (await vjOgKarigars(env)).filter(k => vjKoMg(cfg, k)); karigars.forEach(k => { if (!cfg.kcfg[k]) cfg.kcfg[k] = Object.assign({}, VJ_KO3_STD); });
   const nextBy = {}; Object.keys(cfg.kcfg).filter(k => vjKoMg(cfg, k)).concat(karigars).forEach(k => { const mx = raw.filter(o => o.karigar === k).reduce((a, o) => Math.max(a, Number(o.no) || 0), 0); nextBy[k] = Math.max(Number(cfg.kcfg[k] && cfg.kcfg[k].next) || 1, mx + 1); });
@@ -2169,7 +2185,7 @@ async function vjKo3List(env, who, url) { await vjKo3Tables(env); const adm = wh
           ['Pending', 'Code', 'Stage', 'Item', 'Est. gold g', 'Est. fine g']]).concat(z.pending.map(p => ['', p.no, p.stage, p.item + (p.kt ? ' ' + p.kt + (p.kt === 'PT' ? '' : 'KT') : ''), n3(p.gwt), n3(p.fine)])), mark: r => ['CLOSING', 'CASH TO PAY'].includes(r[1]) }); }
     else if (url.searchParams.get('xlsx') === 'pending') { const ks = [...new Set(list.filter(o => o.status === 'open' || o.status === 'karigar').map(o => o.karigar))];
       ks.forEach(k => { const L = list.filter(o => o.karigar === k && (o.status === 'open' || o.status === 'karigar')), ph = pendHead[k] || { total: 0, due: 0 }, tot = ph.total, due = ph.due;
-        sheets.push({ name: k.slice(0, 28), widths: [10, 20, 16, 12, 11, 11], head: ['Code', 'Customer', 'Item', 'Stage', 'Estimate', 'Del date'], rows: L.map(o => [o.no, o.name || 'Stock', o.itemTxt, o.stage || '', o.estimate || '', vjDmy(o.delDate)]).concat([['', k + '  Total ' + tot.toFixed(2) + '  Due ' + due.toFixed(2), '', '', L.reduce((a, o) => a + (Number(o.estimate) || 0), 0), '']]) }); });
+        sheets.push({ name: k.slice(0, 28), widths: [10, 20, 16, 12, 11, 11], head: ['Code', 'Customer', 'Item', 'Stage', 'Budget', 'Del date'], rows: L.map(o => [o.no, o.name || 'Stock', o.itemTxt, o.stage || '', o.budget || o.estimate || '', vjDmy(o.delDate)]).concat([['', k + '  Total ' + tot.toFixed(2) + '  Due ' + due.toFixed(2), '', '', L.reduce((a, o) => a + (Number(o.budget || o.estimate) || 0), 0), '']]) }); });
       if (!sheets.length) sheets.push({ name: 'Pending', head: ['Nothing pending'], rows: [] }); }
     else { sheets.push({ name: 'Karigar orders', land: true, widths: [12, 9, 11, 16, 8, 9, 8, 6, 9, 12, 20, 12, 13, 11, 12, 12, 16, 16, 16, 16, 9, 9, 9, 9, 11, 11, 14, 10, 10, 12, 10],
         head: ['Karigar', 'Order no.', 'Date', 'Item', 'Size', 'Gold', 'G.Wt g', 'KT', 'D.Q', 'D.Ct', 'Party', 'City', 'Mobile', 'Del date', 'Status', 'Stage', 'Diamonds issued', 'Received back', 'Used', 'Pending', 'G.Gold g', 'CS Wt g', 'D.Wt g', 'N Gold g', 'CS charge', 'Other ch. (tag)', 'Gold issued (OG OUT)', 'Basis', 'Gold rate', 'Budget', 'Estimate'],
@@ -2198,7 +2214,8 @@ async function vjKoStmt(env, who, cfg, k, month, orders) { await vjKoTkT(env); c
     const fine = g.reduce((a, l) => a + (Number(l.fine) || 0), 0), est = g.filter(l => l.type === 'excel').reduce((a, l) => a + (Number(l.fine) || 0), 0), cs = g.reduce((a, l) => a + (Number(l.cash) || 0), 0), oth = g.filter(l => l.type === 'labour').reduce((a, l) => a + (Number(l.cash) || 0), 0);
     return { key: 'D:' + ref, id: ref, no: o.no || act.no || '', date: act.date || g[0].date, item: o.itemTxt || o.item || '', party: o.name || '', kt: d.kt || (o.tag && o.tag.kt) || o.kt || '', gross: o.tag ? vjR3(o.tag.gGold) : null, goldUsed: d.goldUsed != null ? d.goldUsed : null,
       pure: d.pure != null ? d.pure : null, ws: d.ws != null ? d.ws : null, credit: vjR3(-(fine - est)), est: est ? vjR3(est) : 0, net: vjR3(-fine), labour: adm ? vjKo3R2(d.labour || 0) : null, rhodium: adm ? vjKo3R2(d.rhodium || 0) : null, stones: adm ? vjKo3R2(d.stones || 0) : null,
-      other: adm ? vjKo3R2(oth + (d.other || 0)) : null, cashTot: adm ? vjKo3R2(cs) : null, _f: fine, _c: cs, rev: !g.some(l => l.status === 'ok' && !l.rev && l.type === 'delivery'), manual: d.type === 'B' }; }).sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.no - b.no);
+      other: adm ? vjKo3R2(oth + (d.other || 0)) : null, cashTot: adm ? vjKo3R2(cs) : null, _f: fine, _c: cs, rev: !g.some(l => l.status === 'ok' && !l.rev && l.type === 'delivery'), manual: d.type === 'B',
+      budget: Number(o.budget) || Number(o.estimate) || 0, goldRate: Number(o.goldRate) || 0, mk: Number(o.tagRate) || 0, csWt: o.tag ? vjR3(o.tag.csWt || 0) : 0, csCost: adm && o.tag ? vjKo3R2(o.tag.csCost || 0) : null }; }).sort((a, b) => String(a.date).localeCompare(String(b.date)) || a.no - b.no); // C-20261103-KORDER4: month-wise statement columns (as on the karigar sheet)
   const gold = ((((await env.DB.prepare('SELECT data FROM vj_og_out ORDER BY ts').all()).results) || []).map(vjParse)).filter(g => g && !g.cancelled && g.to === 'karigar' && String(g.karigar).toLowerCase() === kl && !(ogFrom && String(g.date) < ogFrom))
     .filter(g => String(g.date) < end).map(g => ({ key: 'G:' + g.id, id: g.id, date: g.date, descr: 'Gold given (OG register OUT)' + (g.ogs && g.ogs.length ? ' OG ' + g.ogs.join(', ') : '') + (g.note ? ' - ' + g.note : ''), fine: vjR3(g.fine) }));
   gold.filter(g => String(g.date) < start).forEach(g => { openFine += g.fine; }); const goldM = gold.filter(g => inM(String(g.date)));
@@ -2334,7 +2351,7 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
     Object.assign(o, { date, delDate: del, basis: b.basis === 'g2g' ? 'g2g' : 'rate', goldRate: gr ? Math.round(gr * 100) / 100 : 0, budget: bud ? Math.round(bud) : 0, ogNo, item: item || 'Other', itemNote, size: vjClean(b.size, 20),
       colour: VJ_KO3_GOLD.includes(b.colour) ? b.colour : '', gwt, kt: VJ_KO3_KT.includes(String(b.kt)) ? String(b.kt) : '', dq: b.dq ? vjKoCode(b.dq).code : '', dct, dctNote: vjClean(b.dctNote, 30),
       name: vjClean(b.name, 60), mobile: vjPhone(b.mobile), city: vjClean(b.city, 40), drawing: dr, iss, instr: vjClean(b.instr, 300), setting: ['MICRO', 'NIL', 'MIXED'].includes(String(b.setting || '').toUpperCase()) ? String(b.setting).toUpperCase() : '',
-      cs: vjClean(b.cs, 120), mkOrd: b.basis !== 'g2g' && vjKoNum(b.mkOrd) > 0 && vjKoNum(b.mkOrd) < 1e6 ? Math.round(vjKoNum(b.mkOrd)) : 0, estimate: est ? Math.round(est * 100) / 100 : 0, stage: stage || (o.stage || ''), grade: b.grade === 'B' ? 'B' : 'A' });
+      cs: vjClean(b.cs, 120), mkOrd: b.basis !== 'g2g' && vjKoNum(b.mkOrd) > 0 && vjKoNum(b.mkOrd) < 1e6 ? Math.round(vjKoNum(b.mkOrd)) : 0, estimate: b.estimate === undefined ? (Number(o.estimate) || 0) : est ? Math.round(est * 100) / 100 : 0, sample: dr ? vjClean(b.sample, 40) : '', stage: stage || (o.stage || ''), grade: b.grade === 'B' ? 'B' : 'A' });
     return ''; };
   const addKarigar = async k => { if (!vjKoMg(cfg, k)) return k + ' is managed manually, not in VJ Tags (owner 18:18)'; if (kList.includes(k)) return ''; if (!adm) return 'pick the karigar from the list (' + kList.join(', ') + ')';
     const m = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'og:karigars2'").first(); let l = []; try { l = m ? JSON.parse(m.v) : []; } catch (e) {} l.push(k);
