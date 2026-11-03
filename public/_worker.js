@@ -441,7 +441,7 @@ async function vjWrite(request, env, who, ctx) {
     // C-20261103-KORDER10 (owner 15:55): a tag made from a karigar order always carries that order's code as its design no. (read-only on the page, enforced here)
     { const lk = (cur && cur.korder) || (next.korder && typeof next.korder === 'object' ? next.korder : null), kid = lk ? String(lk.id || '') : '';
       if (kid) { let ko = null; try { const r0 = /^[A-Za-z0-9_-]{1,60}$/.test(kid) ? await env.DB.prepare('SELECT data FROM vj_kord WHERE id = ?').bind(kid).first() : null; ko = r0 ? vjParse(r0) : null; } catch (e) {}
-        if (ko) { next.designNo = String(ko.no); next.korder = { id: kid, no: ko.no, karigar: String(ko.karigar || '') }; } else if (cur && cur.korder) { next.korder = cur.korder; next.designNo = String(cur.korder.no); } else delete next.korder; } else delete next.korder; }
+        if (ko) { next.designNo = String(ko.no); next.korder = { id: kid, no: ko.no, karigar: String(ko.karigar || ''), basis: ko.basis === 'g2g' ? 'g2g' : 'rate' }; /* G2GRATE: the bill opens a Gold to Gold order in Gold to Gold */ } else if (cur && cur.korder) { next.korder = cur.korder; next.designNo = String(cur.korder.no); } else delete next.korder; } else delete next.korder; }
     if (next.order !== undefined) { // C-20261016-ORDERS: order customer, cleaned
       const o = next.order && typeof next.order === 'object' ? next.order : null;
       if (!o || next.kind !== 'order') delete next.order;
@@ -2091,7 +2091,7 @@ function vjKo3Deliv(o, cfg) { // the karigar side of a delivery, per the workboo
 function vjKo3Cost(o, cfg) { // owner 17:02: OUR COST of the piece (admin only) - costing rates are notional, they never touch stock or tag prices
   let dia = 0; const need = []; (o.tag ? o.used : o.iss || []).forEach(r => { const c = vjKoCodeOf(cfg, r.code || r.pkt) || vjKoCodeOf(cfg, o.dq), rate = c && c.cost > 0 ? c.cost : r.rate > 0 ? r.rate : 0;
     if (rate) dia += rate * (Number(r.ct) || 0); else if (r.ct > 0) need.push((r.pkt || o.dq || 'no code') + ' ' + Number(r.ct).toFixed(3) + ' ct'); });
-  const d = o.tag ? vjKo3Deliv(o, cfg) : null, fine = d ? d.fine : null, gold = fine != null && o.goldRate > 0 ? fine * o.goldRate : null, lab = o.tag ? (d.cash || 0) + (o.tag.labour || 0) : null;
+  const d = o.tag ? vjKo3Deliv(o, cfg) : null, fine = d ? d.fine : null, gold = fine != null && o.basis !== 'g2g' && o.goldRate > 0 ? fine * o.goldRate : null /* G2GRATE: a Gold to Gold order's rate is only for the balance fine */, lab = o.tag ? (d.cash || 0) + (o.tag.labour || 0) : null;
   return { dia: vjKo3R2(dia), diaNeedRate: need, fine, gold: gold == null ? null : vjKo3R2(gold), goldNote: fine != null && !(o.goldRate > 0) ? 'no gold rate on the order (gold to gold)' : '', labour: lab == null ? null : vjKo3R2(lab), total: vjKo3R2(dia + (gold || 0) + (lab || 0)) }; }
 function vjKo3View(o, who, cfg) { const v = Object.assign({}, o, vjKo3Calc(o, cfg)); if (who.role === 'sales') { v.mobile = ''; delete v.tagRate; delete v.makingAuto; delete v.mkOrd; } delete v.by; delete v.editedBy; if (who.role === 'admin') v.cost = vjKo3Cost(o, cfg);
   if (who.role !== 'admin') { ['iss', 'rec', 'used', 'tagDia'].forEach(k => { v[k] = (v[k] || []).map(r => { const c = Object.assign({}, r); delete c.rate; return c; }); }); if (v.tag) { v.tag = Object.assign({}, v.tag); delete v.tag.deliv; } }
