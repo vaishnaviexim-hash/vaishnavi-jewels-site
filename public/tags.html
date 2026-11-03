@@ -311,7 +311,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="/tags/shim.js?v=20261103zf"></script>
+<script src="/tags/shim.js?v=20261103zg"></script>
 <script src="/tags/navsel.js?v=20261103k" defer></script>
 <script src="/tags/boxes.js?v=20261029a" defer></script>
 <script src="/tags/similar.js?v=20261103pf" defer></script>
@@ -647,12 +647,14 @@ function tagPDF(t){
 function update(){
   if(!S.settings)return;
   const t=readForm(),s=st(),pr=t.kind!=="sample"?price(t):null;{const mi=$("mkPerG"),d=mkDef(t.gold);if(mi.dataset.own!=="1"&&document.activeElement!==mi)mi.value=d;$("mkPerGNote").textContent=t.makingPerG?`Custom making ₹${t.makingPerG}/g (default ₹${d}/g)`:`Default ₹${s.making.base}/g over ${s.making.limit} g, ₹${s.making.small}/g up to ${s.making.limit} g - type another rate for Italian / special pieces`;} /* C-20261101-TAGMAKING */$("orderBox").hidden=t.kind!=="order";if(t.kind==="order"&&s.gold24g)$("oRate").placeholder="today "+Math.round(s.gold24g); /* C-20261026-ORDERTAG: the order's rate is typed, never filled in */
+  const oR=t.kind==="order"&&t.order&&t.order.rate>=2000&&t.order.rate<=50000?t.order.rate:0,gR=oR||s.gold24g; /* C-20261103-RATEMATCH: an order tag's line amounts use the order rate, the same as the PRICE block (stock tags: today's rate) */
   [...$("goldLines").children].forEach(r=>{const i=r.dataset.id,net=num($("gn"+i).value),k=$("gk"+i).value;
     const ch=k==="Chain",tb=$("gt"+i);if(!ch&&tb.value!=="")tb.value="";tb.parentNode.style.visibility=ch?"visible":"hidden";tb.placeholder="e.g. 0.920";
     const tv=tb.value.trim(),tn=num(tv);
-    $("gv"+i).textContent=s.gold24g&&net>0&&(!ch||tn>=0.3&&tn<=1.1)?fmt(net*s.gold24g*(ch?tn:(s.purity[k]||0)))+(ch?" · chain":""):""});
+    $("gv"+i).textContent=gR&&net>0&&(!ch||tn>=0.3&&tn<=1.1)?fmt(net*gR*(ch?tn:(s.purity[k]||0)))+(ch?" · chain":"")+(oR?" @ order rate "+fmt(oR):""):""});
   [...$("diaLines").children].forEach(r=>{const i=r.dataset.id,qq=$("dq"+i).value==="Other"?$("dqo"+i).value.trim().toUpperCase():$("dq"+i).value,def=defRate($("ds"+i).value,qq),sp=num($("dr"+i).value),z=qq==="Party diamond"&&$("dr"+i).value.trim()!==""&&sp===0,rate=z?0:sp>0?sp:def,ct=num($("dc"+i).value);
     $("dr"+i).placeholder=def?def.toLocaleString("en-IN")+" (default)":"enter rate"; /* TAGUI: the rate number itself */
+    {const need=t.kind!=="sample"&&!def&&!(sp>0)&&!z&&qq!=="Party diamond"&&ct>0,e=$("dr"+i);e.style.outline=need?"3px solid #c62828":"";e.style.background=need?"#fdecea":"";e.title=need?"No default rate for this quality - type the rate per ct here":"";} /* C-20261103-RATEMATCH: the box that blocks Save is marked */
     $("dv"+i).textContent=z&&ct>0?"₹0 · no charge":(rate&&ct>0?fmt(ct*rate):"")+(sp>0?" · special":(def&&ct>0?" · default":""));});
   $("pdVal").textContent=t.pdia?`${t.pdia.ct} ct × ${fmt(t.pdia.rate)} = ${fmt(Math.round(t.pdia.ct*t.pdia.rate))}`:"";$("certNoBox").hidden=$("remark").value==="TGL";
   $("polkiPcs").value=t.polki?t.polki.pcs:"";$("polkiVal").textContent=t.polki?`${t.polki.pcs} × ${fmt(t.polki.rate)} = ${fmt(t.polki.pcs*t.polki.rate)}`:"";
