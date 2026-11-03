@@ -343,7 +343,10 @@
   function pktFix(i, shapeEl) { i.setAttribute("list", "koCodesDl"); i.placeholder = "42"; const go = () => { const v = String(i.value || "").trim(); if (!v) return; if (/^p?\s*-?\s*\d+[a-z]?(?:[\/\-].*)?$/i.test(v)) i.value = normPkt(/^p/i.test(v) ? v : "P" + v);
       const c = codeOf(i.value); i.title = c ? c.desc + " · " + c.type + (c.sol ? " · solitaire" : "") : "packet not in the list - kept as typed";
       if (c && shapeEl && !shapeEl.value) { const sh = c.sol || c.type === "Solitaire" ? "Solitaire" : SHAPES.find(x => new RegExp("\\b" + x, "i").test(c.desc || "")) || (/chowki|princess/i.test(c.desc || "") ? "Choki" : c.round ? "Round" : ""); if (sh) { if (shapeEl.tagName === "SELECT" && ![...shapeEl.options].some(o => o.value === sh)) shapeEl.appendChild(el("option", { value: sh, textContent: sh })); shapeEl.value = sh; shapeEl.dispatchEvent(new Event("change", { bubbles: true })); } } };
-    i.addEventListener("change", go); i.addEventListener("blur", go); }
+    const toPcs = () => { const c = codeOf(i.value), p = i.closest("tr") && i.closest("tr").querySelector('[data-k="pcs"]'); if (c && p) { p.focus(); if (p.select) p.select(); } }; let tmr = 0;
+    i.addEventListener("change", go); i.addEventListener("blur", go);
+    i.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); go(); toPcs(); } });
+    i.addEventListener("input", e => { clearTimeout(tmr); if (!e.inputType || e.inputType === "insertReplacementText") { go(); toPcs(); return; } tmr = setTimeout(go, 700); }); }
   function usedAuto() { const m = new Map(); diaGet("koIss2").forEach(r => { const pk = normPkt(r.pkt), k = pk + "|" + r.shape, e = m.get(k) || { pkt: pk, shape: r.shape, pcs: 0, ct: 0, rate: r.rate }; e.pcs += num(r.pcs); e.ct += num(r.ct); m.set(k, e); });
     diaGet("koRec").forEach(r => { const pk = normPkt(r.pkt), e = m.get(pk + "|" + r.shape) || [...m.values()].find(x => x.pkt === pk && (x.pcs > 0 || x.ct > 0)) || [...m.values()].find(x => x.pkt.split("/")[0] === pk.split("/")[0] && (x.pcs > 0 || x.ct > 0)); if (e) { e.pcs -= num(r.pcs); e.ct -= num(r.ct); } }); /* same packet; lot / shape may be left out on the received row */
     diaRows("koUsed", [...m.values()].filter(e => e.pcs > 0 || e.ct > 0).map(e => ({ pkt: e.pkt, shape: e.shape, pcs: Math.max(0, e.pcs), ct: r3(Math.max(0, e.ct)), rate: e.rate })), false, true); rPrev(); }
@@ -451,24 +454,29 @@
     act(body, "Delivery figures saved - karigar account updated."); }
 
   // ---------- Create tag from this order: fills the New tag form (nothing saved until Save there) ----------
-  async function makeTag() { const o = cur; if (!o || !o.tag) return; const t = o.tag, nb = document.querySelector('nav button[data-tab="new"]'); if (!nb) return; nb.click(); await new Promise(r => setTimeout(r, 350)); const left = [], g = id => document.getElementById(id), fire = (e, ev) => e && e.dispatchEvent(new Event(ev || "input", { bubbles: true }));
+  async function makeTag(arg) { const o = arg && arg.tag && arg.no ? arg : cur; if (!o || !o.tag) return; mkFill = true; /* URGENT 03/11 16:36: every step on its own; refilled if the form gets cleared behind it */ const t = o.tag, nb = document.querySelector('nav button[data-tab="new"]'); if (!nb) return; nb.click(); await new Promise(r => setTimeout(r, 350)); const left = [], g = id => document.getElementById(id), fire = (e, ev) => e && e.dispatchEvent(new Event(ev || "input", { bubbles: true }));
     try { const kr = g(o.name ? "k-order" : "k-sale"); if (kr) { kr.checked = true; fire(kr, "change"); }
       if (o.name) { [["oName", o.name], ["oMob", o.mobile], ["oCity", o.city], ["oDue", o.delDate]].forEach(([i, v]) => { const e = g(i); if (e && v) { e.value = v; fire(e); } });
         if (o.basis === "rate" && o.goldRate) { g("oRate").value = String(o.goldRate); fire(g("oRate")); } else left.push("gold rate (F) for the order - this order is Gold to Gold" + (o.ogNo ? " (OG " + o.ogNo + ")" : "")); }
-      const cat = CATMAP[o.item]; if (cat && g("cat")) { g("cat").value = cat; fire(g("cat"), "change"); } else left.push("category (" + o.itemTxt + ")");
-      const gl = g("goldLines"); if (gl) { [...gl.children].slice(1).forEach(x => x.remove()); const r = gl.children[0], id = r && r.dataset.id;
-        if (id) { const k = g("gk" + id), kt = (t.kt || o.kt) + "K"; if ([...k.options].some(x => x.value === kt)) { k.value = kt; fire(k, "change"); } else left.push("karat " + (t.kt || o.kt)); g("gn" + id).value = r3(t.nGold); fire(g("gn" + id)); } }
-      const addD = typeof window.addDia === "function" ? window.addDia : g("addDia") ? () => g("addDia").click() : null, dl = g("diaLines"); if (dl && addD /* KORDER7: New tag keeps addDia private - its + button is used */) { dl.textContent = ""; (o.tagDia || []).forEach(d => { addD(); const r = dl.lastElementChild, id = r && r.dataset.id; if (!id) return;
+    } catch (e) { left.push("kind / party (" + (e.message || e) + ")"); }
+    try { const cat = CATMAP[o.item]; if (cat && g("cat")) { g("cat").value = cat; fire(g("cat"), "change"); } else left.push("category (" + o.itemTxt + ")"); } catch (e) { left.push("category"); }
+    try { const gl = g("goldLines"); if (gl) { [...gl.children].slice(1).forEach(x => x.remove()); const r = gl.children[0], id = r && r.dataset.id;
+        if (id) { const k = g("gk" + id), kt = (t.kt || o.kt) + "K"; if ([...k.options].some(x => x.value === kt)) { k.value = kt; fire(k, "change"); } else left.push("karat " + (t.kt || o.kt)); g("gn" + id).value = r3(t.nGold); fire(g("gn" + id)); } } } catch (e) { left.push("gold line (" + (e.message || e) + ")"); }
+    try { const addD = typeof window.addDia === "function" ? window.addDia : g("addDia") ? () => g("addDia").click() : null, dl = g("diaLines"); if (dl && addD /* KORDER7: New tag keeps addDia private - its + button is used */) { dl.textContent = ""; (o.tagDia || []).forEach(d => { addD(); const r = dl.lastElementChild, id = r && r.dataset.id; if (!id) return;
           const c = codeOf(d.pkt) || codeOf(o.dq), QM = { "P-2": "VS IJ", "P-3": "VS HI", "P-4": "VS GH", "P-7": "VVS EF" }, sh = Number(d.add) === 0 && d.shape !== "Polki" ? "Solitaire" : ["Choki", "Fancy", "Solitaire", "Polki"].includes(d.shape) ? d.shape : /* KORDER8 */ c && c.sol ? "Solitaire" : c && /choki/i.test(c.desc) ? "Choki" : c && /polki/i.test(c.desc) ? "Polki" : (d.shape === "Round" || (c && (c.round || /round/i.test(c.desc)))) ? "Round" : "Fancy",
             q = !c || c.type === "LGD" ? "CVD" : QM[c.code] || "Other";
           g("ds" + id).value = sh; fire(g("ds" + id), "change"); g("dq" + id).value = q; fire(g("dq" + id), "change"); if (q === "Other") { g("dqo" + id).value = (d.pkt || o.dq || "").toUpperCase(); fire(g("dqo" + id)); }
           g("dp" + id).value = String(d.pcs || 0); fire(g("dp" + id)); g("dc" + id).value = Number(d.tagCt).toFixed(2); fire(g("dc" + id)); });
-        if (!(o.tagDia || []).length) addD(); } else left.push("diamond lines");
-      if (o.itemNote && /\d/.test(o.itemNote) && false) {} /* KORDER6 item-note rule replaced by KORDER10 */ { const dn = g("designNo"); if (dn) { dn.value = String(o.no); fire(dn); dn.readOnly = true; dn.title = "from karigar order " + o.karigar + " " + o.no; let lk = g("koDnLock"); if (!lk) { lk = el("span", { id: "koDnLock", className: "hint" }); dn.after(lk); } lk.textContent = " 🔒 from karigar order " + o.karigar + " " + o.no; } } /* KORDER10: design no. = the order code, read-only (the server enforces it too) */
-      const oa = g("otherAmt"); if (oa) { oa.value = String(Math.round((t.csCharge || 0) + (t.otherTag || 0))); fire(oa); }
+        if (!(o.tagDia || []).length) addD(); } else left.push("diamond lines"); } catch (e) { left.push("diamond lines (" + (e.message || e) + ")"); }
+    try { if (o.itemNote && /\d/.test(o.itemNote) && false) {} /* KORDER6 item-note rule replaced by KORDER10 */ { const dn = g("designNo"); if (dn) { dn.value = String(o.no); fire(dn); dn.readOnly = true; dn.title = "from karigar order " + o.karigar + " " + o.no; let lk = g("koDnLock"); if (!lk) { lk = el("span", { id: "koDnLock", className: "hint" }); dn.after(lk); } lk.textContent = " 🔒 from karigar order " + o.karigar + " " + o.no; } } /* KORDER10: design no. = the order code, read-only (the server enforces it too) */
+    } catch (e) { left.push("design no. (" + (e.message || e) + ")"); }
+    try { const oa = g("otherAmt"); if (oa) { oa.value = String(Math.round((t.csCharge || 0) + (t.otherTag || 0))); fire(oa); } } catch (e) { left.push("other charges"); }
+    try {
       /* 18:19 C-20261102-ORDMAKING: the tag is priced by New tag's own formula - the order's making is not passed */
       if (o.drawing && g("photo") && window.DataTransfer) { try { const b = await (await fetch("/_blob/" + o.drawing, { credentials: "same-origin" })).blob(), dt = new DataTransfer(); dt.items.add(new File([b], "order-" + o.no + ".jpg", { type: b.type || "image/jpeg" })); g("photo").files = dt.files; fire(g("photo"), "change"); } catch (e) { left.push("photo"); } }
-    } catch (e) { left.push("some fields could not be filled (" + (e.message || e) + ")"); }
+    } catch (e) { left.push("photo"); }
+    mkFill = false; { const oa = g("otherAmt"); if (oa) fire(oa); const c0 = g("cat"); if (c0) fire(c0, "change"); } /* one last full recalculation: price, G.Wt, Save */
+    if (!arg || !arg.no) mkWatch(o);
     left.unshift("design no.", "certificate", "diamond sale rate per ct (left at the default rate - the order's rates are purchase cost)");
     const box = g("koTagCopy") || el("div", { id: "koTagCopy", className: "card", style: "border:2px dashed var(--gold);padding:10px 12px;margin:8px 0" }); box.textContent = "";
     box.append(el("b", { textContent: "From " + o.karigar + " order " + o.no + (o.name ? " (order piece for " + o.name + ")" : " (stock)") + ": filled kind, party, category, karat + net gold " + r3(t.nGold) + " g, " + (o.tagDia || []).length + " diamond line(s) with +10% tag weight, other charges " + inr((t.csCharge || 0) + (t.otherTag || 0)) + " (CS " + inr(t.csCharge) + " + " + inr(t.otherTag) + ")" + (o.drawing ? ", photo = drawing" : "") + "." }),
@@ -478,7 +486,12 @@
 
   // ---------- KORDER5 (owner 03/11 14:28): quick receive from the Pending row / order card -> delivery into that month's karigar account -> New tag
   // prefilled from the order; when that tag is saved the order is marked Tagged with the tag no. Nothing else changes; the server checks every figure.
-  let tagFor = null;
+  let tagFor = null, mkFill = false, mkObs = null;
+  /* URGENT 03/11 16:36: if the New tag form is cleared behind the generated tag (e.g. the previous tag's print finishing late), the order's figures are put back */
+  function mkWatch(o) { if (mkObs) mkObs.disconnect(); const gl = document.getElementById("goldLines"); if (!gl || !window.MutationObserver) return; let n = 0;
+    mkObs = new MutationObserver(() => { if (mkFill) return; const dn = document.getElementById("designNo"); if (!tagFor || tagFor.id !== o.id) { mkObs.disconnect(); return; }
+      if (dn && !dn.value.trim() && n < 3) { n++; setTimeout(() => { if (!mkFill && tagFor && tagFor.id === o.id && !dn.value.trim()) makeTag(o); }, 60); } });
+    mkObs.observe(gl, { childList: true }); }
   { const f0 = window.fetch.bind(window); window.fetch = async function (u, opt) {
       try { const t0 = tagFor; if (t0 && opt && opt.method === "POST" && /\/api\/vj\/write$/.test(String(u)) && Date.now() - t0.at < 3 * 3600e3) { const b0 = JSON.parse(opt.body || "{}"); if (b0.op === "set" && b0.ifVersion === 0 && /^tags\//.test(b0.path || "") && b0.data && String(b0.data.designNo || "") === String(t0.no)) { /* only the tag still showing this order code */ b0.data.korder = { id: t0.id, no: t0.no, karigar: t0.karigar }; b0.data.designNo = String(t0.no); opt = Object.assign({}, opt, { body: JSON.stringify(b0) }); } } } catch (e) {} /* KORDER10: the new tag is linked to its karigar order */
       const r = await f0(u, opt);
@@ -507,7 +520,7 @@
       const net = ngMan ? num(ng.value) : n, k = String(o.kt || "").replace(/\D/g, ""), pf = (kc.pf || {})[k], wf = (kc.wf || {})[k];
       prev.textContent = g > 0 ? "Diamonds " + r3(ct) + " ct = " + r3(ct / 5) + " g · NET GOLD " + r3(net) + " g" + (B ? " · stock mounting: fine and labour as typed" : pf != null && kc.labour != null ? " · karigar formula on NET gold " + r3(net) + " g (his 'gold used'): fine " + r3(net * pf + net * (wf || 0) * (Number(kc.ws) || 0) / 100) + " g (" + k + "KT " + pf + " + " + (wf || 0) + " × wastage " + (kc.ws || 0) + "%), labour " + inr(net * (Number(kc.labour) || 0) + net * (Number(kc.rhodium) || 0)) + " (" + inr(kc.labour) + (Number(kc.rhodium) ? " + rhodium " + inr(kc.rhodium) : "") + "/g)" : " · fine and labour worked out by the karigar formula on Save") + (num(csc.value) ? " · CS " + inr(num(csc.value)) : "") + (num(oth.value) ? " · other " + inr(num(oth.value)) : "") : "Type the gross weight."; };
     [gg, cs, csc, oth].forEach(i => i.addEventListener("input", calc)); tb.addEventListener("input", calc); tb.addEventListener("change", calc);
-    const addB = el("button", { type: "button", className: "btn ghost", textContent: "+ diamond line", disabled: !canD }); addB.addEventListener("click", () => { dRow({}); calc(); });
+    const addB = el("button", { type: "button", className: "btn ghost", textContent: "+ diamond line", disabled: !canD }); addB.addEventListener("click", () => { dRow({}); calc(); const pk = tb.lastElementChild && tb.lastElementChild.querySelector('[data-k="pkt"]'); if (pk) { pk.scrollIntoView({ block: "center", behavior: "smooth" }); pk.focus({ preventScroll: true }); } });
     const dt2 = el("table", { className: "items", style: "min-width:0;width:100%" }, [el("thead", {}, [el("tr", {}, ["Packet", "Shape", "Pcs", "Ct (actual)", "Solitaire", "Tag ct"].map(h => el("th", { textContent: h })))]), tb]);
     card.append(el("h3", { textContent: (T0 ? "Correct received figures · " : "Received from karigar · ") + o.karigar + " · order " + o.no }), el("div", { className: "hint", textContent: [o.itemTxt, o.kt ? o.kt + (o.kt === "PT" ? "" : "KT") : "", o.colour, o.name ? "party " + o.name : "stock"].filter(Boolean).join(" · ") }),
       el("div", { className: "row" }, [lb("a) Date received", dt), lb("Gross weight received g", gg)]),
@@ -705,7 +718,7 @@
     $("koGoldNew").addEventListener("click", () => { if (!cur) return; if (!(num($("koGoldFine").value) > 0)) { $("koFMsg").textContent = "Type the fine g to issue."; return; } act({ op: "gold", id: cur.id, fine: $("koGoldFine").value }, "Gold issued to the karigar from the OG pool (also in OG register > Outward list) and linked."); });
     ["koFK", "koFS", "koFO"].forEach(i => $(i).addEventListener("change", render)); $("koQ").addEventListener("input", render);
     nav.addEventListener("click", e => { const x = e.target.closest("nav button"); if (!x) return; show(x.dataset.tab === "korder"); });
-    document.addEventListener("click", e => { const x = e.target.closest && e.target.closest('[data-tab="new"]'); if (!x || !e.isTrusted || !tagFor) return; tagFor = null; const dn = $("designNo"), lk = $("koDnLock"); if (dn) { dn.readOnly = false; dn.title = ""; } if (lk) lk.remove(); }, true); /* KORDER10: opening New tag by hand = a free design no. again */
+    document.addEventListener("click", e => { const x = e.target.closest && e.target.closest('[data-tab="new"],#reset'); if (!x || !e.isTrusted || !tagFor) return; tagFor = null; if (mkObs) mkObs.disconnect(); const dn = $("designNo"), lk = $("koDnLock"); if (dn) { dn.readOnly = false; dn.title = ""; } if (lk) lk.remove(); }, true); /* KORDER10: opening New tag by hand = a free design no. again */
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", build); else build();
   setTimeout(build, 1200);
