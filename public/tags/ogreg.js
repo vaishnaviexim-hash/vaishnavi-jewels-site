@@ -24,7 +24,7 @@
   const tun = v => { const s = String(v == null ? "" : v).trim(); if (!s) return NaN; let n = parseFloat(s.replace(/[^0-9.]/g, "")); if (!isFinite(n) || n <= 0) return NaN; if (n <= 1.1) n *= 100; return Math.round(n * 100) / 100; }; // tunch always in PERCENT (owner 02/11 14:35): 0.751 or 75.1 -> 75.1
   let sec = null, J = null, view = "in", stockTag = null; /* 02/11 14:35: own stock = a. whole piece (stock), b. part of a piece (part: tag stays, its weight goes down), c. plain fine / own gold (own) */
   const post = async body => { const r = await fetch("/api/vj/og", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status); return j; };
-  const css = `#p-ogreg .ogsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:8px 0 14px}
+  const css = `#p-ogreg .ogsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:8px 0 14px}#p-ogreg .ogsum .oghand{grid-column:auto}#p-ogreg .ogsum .ogdet,#p-ogreg .ogsum .ogdiadet{grid-column:1/-1}#p-ogreg .ogsum .ogdiadet{border:1px solid var(--line);border-radius:10px;padding:8px 10px}#p-ogreg .ogsum .ogdia .v{font-size:24px;font-weight:700} /* KORDER7: hand + diamonds side by side, the rest under Details */
 #p-ogreg .ogtile{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface)}
 #p-ogreg .ogtile .k{font-size:13px;color:var(--muted)}#p-ogreg .ogtile .v{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.25}
 #p-ogreg .ogtile .s{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -49,7 +49,7 @@
   function summary() {
     const box = $("ogSumBox"); if (!box || !J) return; box.textContent = ""; const S = J.sum || {}, ym = $("ogMon").value || today().slice(0, 7), M = (S.months || {})[ym] || { n: 0, gross: 0, cred: 0, act: J.admin ? 0 : null, margin: J.admin ? 0 : null, pur: (S.all || {}).pur != null ? 0 : null }, A = S.all || {}, OM = (S.outMonths || {})[ym] || { issued: 0, stock: 0 };
     const ml = ym.split("-").reverse().join("-");
-    if (S.inHand != null) box.append(tile("OG fine in hand (actual)", big(S.inHand), "Actual fine in − issued to karigars (" + g3(S.issued) + ") − moved to our stock (" + g3(S.toStock) + ")", "oghand"));
+    if (S.inHand != null) box.append(tile("Old gold in hand · FINE", big(S.inHand), "Actual fine in − issued to karigars (" + g3(S.issued) + ") − moved to our stock (" + g3(S.toStock) + "). Gross / net weight in hand is not kept (issues are entered as fine).", "oghand"));
     box.append(tile("Gross in · " + ml, big(M.gross), "All time: " + big(A.gross) + " · " + (M.n || 0) + " / " + (A.n || 0) + " OGs"));
     if (J.admin) box.append(tile("Actual fine in · " + ml, big(M.act), "All time: " + big(A.act), "ogadm"));
     box.append(tile("Party credit fine · " + ml, big(M.cred), "All time: " + big(A.cred)));
@@ -61,9 +61,25 @@
       if (!S.perKarigar.length) k.append(el("div", { className: "s", textContent: "Nothing issued yet." }));
       S.perKarigar.forEach(x => k.append(el("div", { style: "font-size:20px;font-weight:700;font-variant-numeric:tabular-nums", textContent: x.name + ": " + big(x.fine) })));
       if (S.inHand != null) box.append(k); }
-    if (S.diaPending) { const d = S.diaPending; box.append(tile("Diamonds pending from karigars", d.pcs + " pcs · " + Number(d.ct || 0).toFixed(3) + " ct", Object.entries(d.byKarigar || {}).map(([n, v]) => n + ": " + v.pcs + " pcs / " + Number(v.ct).toFixed(3) + " ct").join(" · ") || "None pending")); }
+    if (S.diaPending) { const d = S.diaPending, t = tile("Diamonds pending from karigars", d.pcs + " pcs · " + Number(d.ct || 0).toFixed(3) + " ct", "See details ▾", "ogdia"); /* KORDER7 (owner 15:13): a button - karigar → OG no. → every line */
+      t.setAttribute("role", "button"); t.tabIndex = 0; t.style.cursor = "pointer"; const out = el("div", { className: "ogdiadet", hidden: true }); const tg = () => { out.hidden = !out.hidden; if (!out.hidden) diaDetail(out); }; t.addEventListener("click", tg); t.addEventListener("keydown", e => { if (e.key === "Enter") tg(); });
+      box.append(t, out); }
+    { /* C-20261103-KORDER7 (owner 15:11): only Old gold in hand + Diamonds pending in view; every other tile (same maths) under a closed 'Details' */
+      const det = el("details", { className: "ogdet", style: "flex:1 1 100%" }, [el("summary", { textContent: "Details ▾", style: "cursor:pointer;font-weight:600" })]), inner = el("div", { style: "display:flex;flex-wrap:wrap;gap:10px;margin-top:8px" });
+      [...box.children].filter(x => !x.classList.contains("oghand") && !x.classList.contains("ogdia")).forEach(x => inner.appendChild(x)); det.appendChild(inner); if (inner.children.length) box.appendChild(det); }
     $("ogAsOf").textContent = "As of " + (S.asOf ? S.asOf.slice(8, 10) + "-" + S.asOf.slice(5, 7) + "-" + S.asOf.slice(0, 4) + " " + S.asOf.slice(11) : new Date().toLocaleString("en-IN")) + (J.next ? " · next OG no.: " + J.next : "");
   }
+  // KORDER7: pending diamonds grouped karigar -> OG no.; an OG opens its lines (quality, shape, pcs / ct, returned or pending) + a link to the OG entry. Same J.dias rows as 'Diamonds to get back'.
+  function diaDetail(box) { box.textContent = ""; const L = (J.dias || []).filter(d => d.status !== "cancelled"), byK = {}; L.forEach(d => { const k = d.karigar || "(no karigar yet)"; (byK[k] = byK[k] || {})[d.og || "-"] = (byK[k][d.og || "-"] || []).concat([d]); });
+    const sum = l => { const p = l.filter(d => d.status === "pending"); return [p.reduce((a, d) => a + (Number(d.pcs) || 0), 0), p.reduce((a, d) => a + (Number(d.ct) || 0), 0)]; };
+    Object.entries(byK).forEach(([k, ogs]) => { const all = [].concat(...Object.values(ogs)), [kp, kc] = sum(all); if (!kp && !kc) return;
+      box.append(el("div", { style: "font-weight:700;margin-top:6px", textContent: k + " · " + kp + " pcs · " + kc.toFixed(3) + " ct pending" }));
+      Object.entries(ogs).forEach(([og, l]) => { const [p, c] = sum(l); if (!p && !c) return; const b = el("button", { type: "button", className: "btn ghost", style: "display:block;margin:3px 0;text-align:left;white-space:normal", textContent: "OG " + og + " · " + k + " · " + p + " pcs · " + c.toFixed(3) + " ct pending" }), dd = el("div", { hidden: true, style: "margin:0 0 6px 12px;font-size:14px" });
+        b.addEventListener("click", () => { dd.hidden = !dd.hidden; if (dd.hidden) return; dd.textContent = "";
+          l.forEach(d => dd.append(el("div", { textContent: [d.q || "quality not typed", d.shape].filter(Boolean).join(" · ") + " · " + (d.pcs || 0) + " pcs · " + Number(d.ct || 0).toFixed(3) + " ct · " + (d.status === "returned" ? "returned " + dmy(d.retAt) + (d.retByName ? " (" + d.retByName + ")" : "") : "PENDING") + (d.label || d.tag ? " · from tag " + (d.label || d.tag) : "") })));
+          const go = el("button", { type: "button", className: "btn ghost", textContent: "Open OG " + og + " entry →" }); go.addEventListener("click", () => { const q = $("ogQ"); if (q) q.value = String(og); const lm = $("ogLMon"); if (lm) lm.value = ""; const tb = document.querySelector('#ogTabs [data-v="in"]'); if (tb) tb.click(); else render(); const lst = $("ogList"); if (lst) lst.scrollIntoView({ behavior: "smooth" }); });
+          dd.append(go); }); box.append(b, dd); }); });
+    if (!box.children.length) box.append(el("p", { className: "hint", textContent: "No diamonds pending." })); }
   function kList() { const dl = $("ogKdl"); if (!dl || !J) return; dl.textContent = ""; (J.karigars || []).forEach(k => dl.appendChild(el("option", { value: k })));
     kSel(); /* C-20261102-OGKARIGAR: issue drop-down = the server's list (Montu, Badshah, Hiru, Priyank + names admin added); "+ new karigar" for admin only */
     const vd = $("ogVdl"); if (vd) { vd.textContent = ""; (J.vendors || []).forEach(v => vd.appendChild(el("option", { value: v }))); } }
