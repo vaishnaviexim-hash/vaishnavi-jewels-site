@@ -2161,9 +2161,14 @@ async function vjKo3List(env, who, url) { if (url.searchParams.has('sample')) re
     freeOgs = ((((await env.DB.prepare('SELECT data FROM vj_ogs').all()).results) || []).map(vjParse)).filter(r => r && !r.cancelled && !r.cash && (!r.src || r.src === 'party') && !used.includes(vjOgN(r.no))).map(r => ({ no: r.no, name: r.name || '', city: r.city || '' })); }
   const account = who.role === 'sales' ? [] : await vjKo3Account(env, who, cfg, list);
   // the Pending Deliveries header, as on the owner's sheet: Total = fine credited (incl. the estimate of pieces in work) - gold given; Due = Total - estimate of pieces at no stage / Hold / Design / CAD
+  // C-20261103-KORDER5 (owner 03/11 14:24): Due counts only pieces whose stage is PAST CAD - no stage, Hold and every stage up to CAD in the stage list
+  // (Hold, After Diwali, Design, CAD) are left out. Worked out live on every load from the current stages, deliveries and gold given (nothing stored).
+  const stL = (cfg.stages || []).map(x => String(x).trim().toLowerCase()), cadI = stL.indexOf('cad'), early = s => { const x = String(s || '').trim().toLowerCase(), i = stL.indexOf(x); return !x || ['hold', 'design', 'cad', 'after diwali'].includes(x) || (cadI >= 0 && i >= 0 && i <= cadI); };
   const pendHead = {}; account.forEach(a => { const L = list.filter(o => o.karigar === a.karigar && (o.status === 'open' || o.status === 'karigar')), al = o => o.imported ? Number(o.xlPure) || 0 : Number(o.fineNeed) || 0;
-    const total = -a.fine + L.filter(o => !o.imported).reduce((x, o) => x + al(o), 0), due = total - L.filter(o => ['', 'Hold', 'Design', 'CAD'].includes(o.stage || '')).reduce((x, o) => x + al(o), 0);
-    pendHead[a.karigar] = { total: vjKo3R2(total), due: vjKo3R2(due), est: vjKo3R2(L.reduce((x, o) => x + (Number(o.estimate) || 0), 0)) }; });
+    const inWork = L.filter(o => !o.imported).reduce((x, o) => x + al(o), 0), total = -a.fine + inWork, earlyF = L.filter(o => early(o.stage)).reduce((x, o) => x + al(o), 0), due = total - earlyF;
+    const R = a.rows || [], sumT = t => R.filter(r => t.includes(r.type)).reduce((x, r) => x + (Number(r.fine) || 0), 0), open = -sumT(['opening']), cred = -sumT(['delivery', 'excel', 'labour']), gold = Number(a.goldIssued) || 0;
+    pendHead[a.karigar] = { total: vjKo3R2(total), due: vjKo3R2(due), est: vjKo3R2(L.reduce((x, o) => x + (Number(o.estimate) || 0), 0)),
+      parts: { open: vjKo3R2(open), cred: vjKo3R2(cred), inWork: vjKo3R2(inWork), gold: vjKo3R2(gold), other: vjKo3R2(total - (open + cred + inWork - gold)), early: vjKo3R2(earlyF), nEarly: L.filter(o => early(o.stage)).length, n: L.length } }; });
   await vjKoSetT(env); const settles = adm ? ((((await env.DB.prepare('SELECT data FROM vj_karigar_settle ORDER BY karigar, month').all()).results) || []).map(vjParse)).filter(Boolean) : [];
   if (url && url.searchParams.get('stmt')) { if (who.role === 'sales') return vjDeny(403, 'not for this login'); const mon = String(url.searchParams.get('month') || ''); if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(mon)) return vjDeny(400, 'month?');
     const st = await vjKoStmt(env, who, cfg, vjClean(url.searchParams.get('stmt'), 40), mon, list);
@@ -2379,6 +2384,8 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
     const rank = s => VJ_KO_STATUS.indexOf(s); if (!live && !adm) return vjDeny(403, 'only Abhinav or Shilpiji can bring back a cancelled order');
     if (!adm && rank(to) < rank(old.status)) return vjDeny(403, 'only Abhinav or Shilpiji can move an order back');
     if ((to === 'received' || to === 'tagged') && !o.tag) return vjDeny(400, 'fill the delivery (TAG USE ONLY) figures first');
+    if (to === 'tagged' && b.tagNo) { const q = String(b.tagNo).toUpperCase().replace(/\s+/g, '').replace(/\//g, '-'); if (!/^[A-Z0-9][A-Z0-9_\-.~]{1,39}$/.test(q)) return vjDeny(400, 'tag no. looks wrong'); // C-20261103-KORDER5: the tag made from this order
+      const tr = await env.DB.prepare('SELECT data FROM docs WHERE path = ?').bind('tags/' + q).first(), tg = tr ? vjParse(tr) : null; if (!tg) return vjDeny(404, 'tag ' + b.tagNo + ' not found'); o.tagNo = String(tg.label || q).slice(0, 40); o.tagId = q; }
     o.status = to; if (!live) { delete o.cancelled; post = true; } o.statusAt = Object.assign({}, o.statusAt || {}, { [to]: now }); }
   else if (op === 'receive') { if (!live) return vjDeny(409, 'this order is cancelled'); if (old.tag && !adm) return vjDeny(403, 'already delivered - only Abhinav or Shilpiji can change the figures');
     const rec = vjKo3Rows(b.rec, adm, old.rec), used0 = b.usedAuto ? null : vjKo3Rows(b.used, adm, old.used, true); if (!rec || used0 === null && !b.usedAuto) return vjDeny(400, 'diamond pcs / ct look wrong');
