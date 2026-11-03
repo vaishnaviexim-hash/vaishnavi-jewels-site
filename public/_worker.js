@@ -2729,6 +2729,7 @@ async function vjReceipt(request, env, who) {
   if (!b || typeof b !== 'object' || Array.isArray(b)) return vjDeny(400, 'bad request');
   const mode = Object.prototype.hasOwnProperty.call(VJ_RC_MODES, b.mode) ? b.mode : '';
   if (!mode) return vjDeny(400, 'choose how the customer paid');
+  if (mode === 'card') return vjDeny(400, 'card payments are not taken - choose Cash, UPI or Bank transfer (NEFT)'); /* owner rule 03/11/2026: no credit or debit cards; old Card receipts stay readable */
   const date = String(b.date || '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(Date.parse(date)) || date < '2024-01-01' || date > vjIstDay(1)) return vjDeny(400, 'bad date');
   const note = vjClean(b.note, 120);
