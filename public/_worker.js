@@ -394,7 +394,7 @@ async function vjSync(request, env, who, ctx) {
     return { path: r.path, data, version: r.version };
   }).filter(Boolean);
   // 'now - 2000' so a write landing in the same millisecond is never missed on the next poll
-  return vjJson({ now: now - 2000, docs: out, deleted: del, me: { email: who.email, role: who.role, name: who.name } });
+  return vjJson({ now: now - 2000, docs: out, deleted: del, me: { email: who.email, role: who.role, name: who.name, enq: !!(await vjEnqWho(env, who)) } }); // enq: C-20261103-ENQMERGE
 }
 
 async function vjWrite(request, env, who, ctx) {
@@ -3012,6 +3012,12 @@ async function vjAddrBook(url, env, who) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// ENQUIRIES ACCESS (owner Abhinav 03/11/2026 09:34, C-20261103-ENQMERGE): Enquiries and every chat view/route are ONLY for Abhinav and
+// Shilpiji (OWNER_EMAILS, always) and the logins on the owner-set allow-list vj_meta 'enq-access' (default: the office login used by
+// Mihir bhai). Checked here on the server for every /api/vj/enquir* and /api/vj/chat* call; an allowed non-owner login works there as staff.
+const VJ_ENQ_ACC0 = ['vaishnavioffice@gmail.com']; // office login (Mihir bhai)
+async function vjEnqAccess(env) { try { const m = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'enq-access'").first(); const l = m ? JSON.parse(m.v) : VJ_ENQ_ACC0; return Array.isArray(l) ? l.map(x => String(x).toLowerCase()) : VJ_ENQ_ACC0; } catch (e) { return VJ_ENQ_ACC0; } }
+async function vjEnqWho(env, who) { if (!who) return null; if (who.role === 'admin') return who; return (await vjEnqAccess(env)).includes(String(who.email).toLowerCase()) ? Object.assign({}, who, { role: 'staff' }) : null; }
 // Enquiries follow-up (owner Abhinav 02/11/2026 22:57 + 22:58 + 23:00, C-20261102-ENQTAB / C-20261102-ENQREMIND).
 // Every WhatsApp enquiry Aashvi logs in VJ_Marketing_Engine > Enquiries is listed on VJ Tags > Enquiries so the team follows each one up,
 // notes what was done and closes it. The sheet is read through the existing gold relay (VJ_GOLD_HOOK + ?want=enquiries, same secret URL,
@@ -3389,7 +3395,7 @@ async function vjChatCfg(env) {
   const r = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'chat-cfg'").first(); let c = {}; try { c = r ? JSON.parse(r.v) : {}; } catch (e) {}
   return { def: VJ_CHAT_PEOPLE[c.def] ? c.def : 'Abhinav', cap: Number.isInteger(c.cap) && c.cap >= 0 && c.cap <= 200 ? c.cap : 20, staff: Array.isArray(c.staff) ? c.staff.filter(x => typeof x === 'string').slice(0, 30) : [] };
 }
-const vjChatWho = who => who.role === 'admin' ? (who.email === 'vaishnavijewels@gmail.com' ? 'Shilpiji' : 'Abhinav') : '';
+const vjChatWho = who => who.role === 'admin' ? (who.email === 'vaishnavijewels@gmail.com' ? 'Shilpiji' : 'Abhinav') : VJ_ENQ_ACC0.includes(who.email) ? 'Mihir' : '';
 const vjChatFirst = who => { const p = VJ_CHAT_PEOPLE[vjChatWho(who)]; return p ? p.first : (vjClean(who.name, 30).split(/[\s@]/)[0] || 'Team'); };
 async function vjChatSetMode(env, number, mode, to, by, note, extra) {
   const now = Date.now(), x = extra || {};
@@ -3676,13 +3682,16 @@ async function vjChatPost(request, env, who, ctx) {
   if (op === 'settings') {
     if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji');
     const def = VJ_CHAT_PEOPLE[b.def] ? b.def : cfg.def, cap = Number.isInteger(b.cap) && b.cap >= 0 && b.cap <= 200 ? b.cap : cfg.cap;
-    const staffRows = ((await env.DB.prepare("SELECT email FROM users WHERE role = 'staff'").all()).results) || [], okE = new Set(staffRows.map(r => r.email));
-    const staff = Array.isArray(b.staff) ? b.staff.map(x => String(x).toLowerCase()).filter(x => okE.has(x)).slice(0, 30) : cfg.staff;
+    const userRows = ((await env.DB.prepare("SELECT email FROM users").all()).results) || [], allE = new Set(userRows.map(r => String(r.email).toLowerCase()));
+    const access = Array.isArray(b.access) ? b.access.map(x => String(x).toLowerCase()).filter(x => allE.has(x)).slice(0, 10) : await vjEnqAccess(env); // C-20261103-ENQMERGE
+    if (Array.isArray(b.access)) await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('enq-access', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(access)).run();
+    const okE = new Set(access);
+    const staff = Array.isArray(b.staff) ? b.staff.map(x => String(x).toLowerCase()).filter(x => okE.has(x)).slice(0, 30) : cfg.staff.filter(x => okE.has(x));
     await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('chat-cfg', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(JSON.stringify({ def, cap, staff })).run();
-    await vjAudit(env, who, 'chat-settings', 'chats/settings', 'default ' + def + ' | cap ' + cap + ' | template staff ' + staff.join(','));
-    return vjJson({ ok: true, def, cap, staff, staffAll: [...okE] });
+    await vjAudit(env, who, 'chat-settings', 'chats/settings', 'default ' + def + ' | cap ' + cap + ' | template staff ' + staff.join(',') + ' | enquiries access ' + access.join(','));
+    return vjJson({ ok: true, def, cap, staff, access, staffAll: [...okE] });
   }
-  if (op === 'staffList') { if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji'); const rows = ((await env.DB.prepare("SELECT email, name FROM users WHERE role = 'staff'").all()).results) || []; return vjJson({ ok: true, staff: rows }); }
+  if (op === 'staffList') { if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji'); const rows = ((await env.DB.prepare("SELECT email, name, role FROM users").all()).results) || []; return vjJson({ ok: true, staff: rows, access: await vjEnqAccess(env) }); }
   if (op === 'tplsync') { const l = await vjChatTplState(env, ctx, true); return vjJson({ ok: true, list: l }); }
   let n = '';
   if (/^[a-f0-9]{20}$/.test(String(b.id || ''))) n = (await vjChatIdMap(env, String(b.id))).get(String(b.id)) || '';
@@ -4458,10 +4467,14 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/parties' && request.method === 'GET') return vjParties(url, env, who); // C-20261017-PARTY
   if ((p === '/api/vj/challans' || p === '/api/vj/challan') && request.method === 'GET') return vjChallanGet(url, env, who); // C-20261102-CHALLAN
   if (p === '/api/vj/addrbook' && request.method === 'GET') return vjAddrBook(url, env, who); // C-20261102-ADDRBOOK
-  if ((p === '/api/vj/enquiries' || p === '/api/vj/enquiries.xlsx') && request.method === 'GET') return vjEnqGet(url, env, who, ctx); // C-20261102-ENQTAB
-  if (p === '/api/vj/enquiry' && request.method === 'POST') return vjSameSite(request, env) ? vjEnqSave(request, env, who, ctx) : vjDeny(403, 'not allowed'); // C-20261102-ENQTAB
-  if ((p === '/api/vj/chats' || p === '/api/vj/chat') && request.method === 'GET') return vjChatsGet(url, env, who, ctx); // C-20261103-HANDOVER
-  if (p === '/api/vj/chat' && request.method === 'POST') return vjSameSite(request, env) ? vjChatPost(request, env, who, ctx) : vjDeny(403, 'not allowed'); // C-20261103-HANDOVER
+  if (/^\/api\/vj\/(enquiries|enquiries\.xlsx|enquiry|chats|chat)$/.test(p)) { // C-20261103-ENQMERGE: only Abhinav, Shilpiji, Mihir (allow-list) - checked here, not only in the page
+    const ewho = await vjEnqWho(env, who); if (!ewho) return vjDeny(403, 'Enquiries are only for Abhinav, Shilpiji and Mihir');
+    if ((p === '/api/vj/enquiries' || p === '/api/vj/enquiries.xlsx') && request.method === 'GET') return vjEnqGet(url, env, ewho, ctx); // C-20261102-ENQTAB
+    if (p === '/api/vj/enquiry' && request.method === 'POST') return vjSameSite(request, env) ? vjEnqSave(request, env, ewho, ctx) : vjDeny(403, 'not allowed'); // C-20261102-ENQTAB
+    if ((p === '/api/vj/chats' || p === '/api/vj/chat') && request.method === 'GET') return vjChatsGet(url, env, ewho, ctx); // C-20261103-HANDOVER
+    if (p === '/api/vj/chat' && request.method === 'POST') return vjSameSite(request, env) ? vjChatPost(request, env, ewho, ctx) : vjDeny(403, 'not allowed'); // C-20261103-HANDOVER
+    return vjDeny(405, 'method not allowed');
+  }
   if ((p === '/api/vj/challan' || p === '/api/vj/challan/cancel') && request.method === 'POST') { if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed'); return p === '/api/vj/challan' ? vjChallanSave(request, env, who) : vjChallanCancel(request, env, who); }
   if (['/api/vj/receipt', '/api/vj/receipt/reverse', '/api/vj/ledger/settle', '/api/vj/ledger/unsettle'].includes(p) && request.method === 'POST') {
     if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed');
