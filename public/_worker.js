@@ -3259,6 +3259,36 @@ async function vjEnqBell(env) {
   catch (e) { await env.DB.batch([env.DB.prepare('DELETE FROM vj_meta WHERE k = ?').bind(key), env.DB.prepare('DELETE FROM vj_meta WHERE k = ?').bind('enqdue:' + token)]); return reply('failed', 502); }
   return reply('sent', 200);
 }
+// Owner-approved one-off bulk close (Abhinav 03/11/2026 06:57 "yes", C-20261103-ENQBULK): every RUNNING enquiry whose first message
+// (this episode) is a 'WhatsApp - broadcast reply' from before 20-10-2026, with no G = Yes and no follow-up action in D1 yet, is
+// closed as 'Closed (old broadcast reply)' - added as D1 history rows (nothing deleted) and copied to the sheet (I = Closed, P = result)
+// through the relay. GET /hooks/vj-enqbulk does at most 15 per call (Cloudflare limits), so it is rung until 'left=0'; after that it
+// changes nothing. It can only ever do this fixed, approved closing; the answer carries counts only (x-vj-enqbulk header).
+async function vjEnqBulk(env, ctx) {
+  if (!env.DB) return reply('not set up', 503);
+  await vjEnqT(env);
+  const { list, sheetOk } = await vjEnqLoad(env); if (!sheetOk) return reply('sheet not read', 502);
+  const cut = Date.UTC(2026, 9, 20) - 5.5 * 3600e3, RESULT = 'Closed (old broadcast reply)', NOTE = 'Closed (old broadcast reply) - Bulk-closed 03-11-2026, owner approved';
+  const due = list.filter(q => !VJ_ENQ_CLOSED.has(q.ep.status) && !q.allHist.length && q.ep.start && q.ep.start < cut
+    && String(q.first.B || '').trim() === 'WhatsApp - broadcast reply' && !q.allRows.some(r => /^yes/i.test(String(r.G || '').trim())));
+  const part = due.slice(0, 15), now = Date.now();
+  if (part.length) {
+    await env.DB.batch(part.map(q => env.DB.prepare('INSERT INTO vj_enq_followup (number, enquiry_date, status, next_followup_date, note, amount, bill_no, kind, "by", by_name, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+      .bind(q.key, vjEnqIst(q.ep.start).slice(0, 10), 'Closed', '', NOTE, null, '', 'bulk', 'vaishnaviexim@gmail.com', 'Abhinav (bulk close)', now)));
+    let ok = 0;
+    if (env.VJ_GOLD_HOOK && /^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_GOLD_HOOK)) await Promise.all(part.filter(q => !q.key.startsWith('h:')).map(q =>
+      fetch(env.VJ_GOLD_HOOK + '?want=enqset', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(25000),
+        body: JSON.stringify({ rows: q.ep.rows.map(r => r.row).slice(-10).join(','), num: q.key, I: 'Closed', L: '', M: '', N: '', O: '', P: RESULT }) }).then(r => { if (r.ok) ok++; }).catch(() => {})));
+    await vjAudit(env, { email: 'vaishnaviexim@gmail.com' }, 'enquiry-bulkclose', 'enquiries/', part.length + ' closed, sheet ' + ok + ': ' + part.map(q => q.id).join(','));
+    const t0 = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'enq-bulk-20261103'").first();
+    await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('enq-bulk-20261103', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(String((parseInt(t0 ? t0.v : '0', 10) || 0) + part.length)).run();
+    var sheetOkN = ok;
+  }
+  const tot = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'enq-bulk-20261103'").first();
+  const st = vjEnqStats(list.filter(q => !part.includes(q)), now);
+  const head = 'closed=' + part.length + ';sheet=' + (part.length ? sheetOkN : 0) + ';left=' + (due.length - part.length) + ';total=' + (tot ? tot.v : 0) + ';running=' + st.open + ';' + Object.entries(st.byChannel).map(([k, v]) => k.replace(/\s/g, '') + '=' + v).join(';');
+  return new Response(head, { status: 200, headers: { 'content-type': 'text/plain', 'cache-control': 'no-store', 'x-vj-enqbulk': head } });
+}
 async function vjEnqDue(url, env) {
   const t = String(url.searchParams.get('t') || ''); if (!/^[a-f0-9]{32}$/.test(t)) return reply('not found', 404);
   await vjEnqT(env);
@@ -3971,6 +4001,7 @@ export default {
     if (p === '/hooks/rfid-demo') return (url.hostname === VJ_HOST || env.VJ_DEV === '1') ? vjRfidDemo(request, env, url) : reply('Not found', 404); // C-20261029-RFIDLIVE
     if (p === '/hooks/vj-reviewbell' || p === '/hooks/vj-reviewdue' || p === '/hooks/vj-reviewimg') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-reviewbell' ? vjReviewBell(url, env) : p === '/hooks/vj-reviewdue' ? vjReviewDue(url, env) : vjReviewImg(url, env)) : reply('Method not allowed', 405); // C-20261102-REVIEWASK
     if (p.startsWith('/r/')) return vjReviewClick(request, env, ctx, url); // C-20261102-REVIEWASK: tracked review button -> Google
+    if (p === '/hooks/vj-enqbulk') return (request.method === 'GET' && (url.hostname === VJ_HOST || env.VJ_DEV === '1')) ? vjEnqBulk(env, ctx) : reply('Method not allowed', 405); // C-20261103-ENQBULK (owner-approved one-off)
     if (p === '/hooks/vj-enqbell' || p === '/hooks/vj-enqdue') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-enqbell' ? vjEnqBell(env) : vjEnqDue(url, env)) : reply('Method not allowed', 405); // C-20261102-ENQREMIND
     if (p === '/hooks/vj-estdue') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjEstDue(url, env) : reply('Method not allowed', 405);
     if (p === '/hooks/vj-daily') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjDailyReport(env) : reply('Method not allowed', 405);
