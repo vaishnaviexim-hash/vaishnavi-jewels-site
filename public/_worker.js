@@ -438,6 +438,10 @@ async function vjWrite(request, env, who, ctx) {
     if (next.notDouble !== undefined && next.notDouble !== true) delete next.notDouble;
     if (!vjCanSettle(who)) { if (next.notDouble && !(cur && cur.notDouble)) return vjDeny(403, 'only Abhinav can mark a tag as not a double'); if (cur && cur.notDouble) next.notDouble = true; else delete next.notDouble; }
     for (const k of ['costPrice', 'cost', 'mrp', 'purchase']) delete next[k]; // F-025: never store cost prices
+    // C-20261103-KORDER10 (owner 15:55): a tag made from a karigar order always carries that order's code as its design no. (read-only on the page, enforced here)
+    { const lk = (cur && cur.korder) || (next.korder && typeof next.korder === 'object' ? next.korder : null), kid = lk ? String(lk.id || '') : '';
+      if (kid) { let ko = null; try { const r0 = /^[A-Za-z0-9_-]{1,60}$/.test(kid) ? await env.DB.prepare('SELECT data FROM vj_kord WHERE id = ?').bind(kid).first() : null; ko = r0 ? vjParse(r0) : null; } catch (e) {}
+        if (ko) { next.designNo = String(ko.no); next.korder = { id: kid, no: ko.no, karigar: String(ko.karigar || '') }; } else if (cur && cur.korder) { next.korder = cur.korder; next.designNo = String(cur.korder.no); } else delete next.korder; } else delete next.korder; }
     if (next.order !== undefined) { // C-20261016-ORDERS: order customer, cleaned
       const o = next.order && typeof next.order === 'object' ? next.order : null;
       if (!o || next.kind !== 'order') delete next.order;
