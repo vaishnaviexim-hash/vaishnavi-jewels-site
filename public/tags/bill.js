@@ -1093,8 +1093,8 @@
         i.addEventListener("change", async () => { const n = vcNum(i.value); if (!ok(n)) { i.style.borderColor = "#a12b2b"; return; } i.style.borderColor = ""; try { await vcSet(t, { [key]: key === "pTunch" ? vcR3(n) : Math.round(n * 100) / 100 }); vcList(true); } catch (e) { i.style.borderColor = "#a12b2b"; $("vcdmsg").textContent = "Could not save: " + ((e && (e.message || e.code)) || "error"); } }); return i; };
       td(ip(pt.toFixed(3), 80, n => n >= 0.3 && n <= 1.1, "pTunch")); td(ip(pr || "", 100, n => n >= 2000 && n <= 50000, "pRate"));
       td(`${fmt(amt)} (fine ${fine.toFixed(3)} g)`);
-      td(sold ? `${t.sold.no || ""} · ${t.sold.date ? dmy(t.sold.date) : ""}${t.sold.name ? " · " + t.sold.name : ""}` : "not billed yet");
-      const st = td(done ? "Removed " + (a.settledAt ? dmy(String(a.settledAt).slice(0, 10)) : "") : sold ? "Sold" : "With us"); if (!done && sold) st.style.fontWeight = "600";
+      td(sold ? (t.sold.ko ? `${t.sold.no || ""} · ${t.sold.date ? dmy(t.sold.date) : ""}` /* C-20261103-CHAINREC: used whole in a karigar piece */ : `${t.sold.no || ""} · ${t.sold.date ? dmy(t.sold.date) : ""}${t.sold.name ? " · " + t.sold.name : ""}`) : "not billed yet");
+      const st = td(done ? "Removed " + (a.settledAt ? dmy(String(a.settledAt).slice(0, 10)) : "") : sold ? (t.sold.ko ? "Used in piece" : "Sold") : "With us"); if (!done && sold) st.style.fontWeight = "600";
       if (!done) { const s = tot[a.vendor] = tot[a.vendor] || { n: 0, g: 0, f: 0, a: 0 }; s.n++; s.g += net; s.f += fine; s.a += amt; }
       body.append(tr); });
     const ks = Object.keys(tot); $("vcsum").textContent = !L.length ? "No vendor chains." : ks.length ? ks.map(v => `${v}: ${tot[v].n} chain${tot[v].n > 1 ? "s" : ""}, ${tot[v].g.toFixed(3)} g, fine ${tot[v].f.toFixed(3)} g, ${fmt(tot[v].a)}`).join("  |  ") : "All removed.";
