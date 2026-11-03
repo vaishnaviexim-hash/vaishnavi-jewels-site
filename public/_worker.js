@@ -53,7 +53,7 @@ async function onPost(request, env, ctx) {
   const hasMsg = values.some(v => Array.isArray(v.messages) && v.messages.length);
   const hasFail = values.some(v => Array.isArray(v.statuses) && v.statuses.some(s => s && s.status === 'failed'));
   // C-20261103-HANDOVER: log live inbound for VJ Tags > Chats, human-mode alerts, template verdicts (never blocks the forward to A1)
-  if (env.DB) { try { await Promise.race([vjChatInbound(env, ctx, body, values).catch(() => {}), new Promise(r => setTimeout(r, 4000))]); } catch (e) {} }
+  if (env.DB) { try { await Promise.race([Promise.all([vjChatInbound(env, ctx, body, values).catch(() => {}), hasMsg ? vjAhBrain(env).catch(() => {}) : null]), new Promise(r => setTimeout(r, 9000))]); } catch (e) {} }
   if (!hasMsg && !hasFail) return reply('OK', 200); // plain receipt: stop here, costs nothing
   // R-159: gold rate from Abhinav/Mihir saved on the website at once (no Make); the message still goes on to A1
   let fbuf = buf, fsig = sigHdr;
@@ -3429,6 +3429,7 @@ async function vjChatInbound(env, ctx, body, values) {
     const lastTpl = await env.DB.prepare("SELECT max(at) AS at FROM vj_chat_out WHERE number = ? AND kind = 'tpl' AND status = 'sent'").bind(from).first();
     const prevIn = (prev && prev.t) || 0, closedBefore = prevIn > 0 && t - prevIn > VJ_CHAT_WIN, afterTpl = lastTpl && lastTpl.at && lastTpl.at > prevIn;
     if (VJ_CHAT_OPTOUT.test(text.trim())) continue; // opt-out: Aashvi (A6) handles STOP as before
+    if (!WA_TEAM.has(from) || (a && a.mode === 'human')) { const cfg0 = await vjChatCfg(env); await vjAhQueue(env, from, vjClean((ct.profile || {}).name, 60), a && a.mode === 'human' && VJ_CHAT_PEOPLE[a.assigned_to] ? a.assigned_to : cfg0.def); } // after hours -> Next-day handover
     if (afterTpl && (!a || a.mode !== 'human')) {
       const cfg = await vjChatCfg(env), to = (a && VJ_CHAT_PEOPLE[a.assigned_to]) ? a.assigned_to : cfg.def;
       await vjChatSetMode(env, from, 'human', to, 'auto (reply to reminder)', 'customer replied to our reminder', { name: vjClean((ct.profile || {}).name, 60), lastAlert: now });
@@ -3462,7 +3463,7 @@ async function vjChatHotHook(url, env, ctx) {
   if (!claim.meta || claim.meta.changes !== 1) return reply('just done', 200);
   const cfg = await vjChatCfg(env), to = cfg.def, p = VJ_CHAT_PEOPLE[to];
   await vjChatSetMode(env, n, 'human', to, 'auto (hot lead)', 'hot lead: ' + need, { name, need, lastAlert: Date.now() });
-  const line = 'Dhanyavaad! Hamari team se ' + p.first + ' ji aapse yahin baat karenge.';
+  const hz = vjHours(), line = hz.open ? 'Dhanyavaad! Hamari team se ' + p.first + ' ji aapse yahin baat karenge.' : 'Dhanyavaad! ' + hz.whenHi.charAt(0).toUpperCase() + hz.whenHi.slice(1) + ' hamari team se ' + p.first + ' ji aapse yahin baat karenge.';
   await vjChatQueue(env, ctx, [{ number: n, kind: 'auto', text: line, body: vjChatTextBody(n, line), by: 'system', byName: 'Aashvi (handover)' }]);
   // A6 already alerted Abhinav (urgent lead_alert_v1) when al > 0: then no second alert to him
   if (!(Number(url.searchParams.get('al')) > 0 && to === 'Abhinav')) await vjChatAlert(env, ctx, to, 'Hot lead: ' + (name || 'Customer') + ' (+' + n + ')', 'Assigned to ' + to + ' - VJ Tags → Chats', need, test, n);
@@ -3593,7 +3594,12 @@ async function vjChatsGet(url, env, who, ctx) {
       list.push(v);
     }
     list.sort((x, y) => (y.mode === 'human') - (x.mode === 'human') || y.lastAt - x.lastAt);
-    return vjJson(Object.assign({ ok: true, chats: list.slice(0, 400), now }, meta));
+    await vjAhT(env);
+    const ahRows = ((await env.DB.prepare("SELECT * FROM vj_chat_ah WHERE status = 'open' ORDER BY promised_at, first_at LIMIT 200").all()).results) || [];
+    const ah = [];
+    for (const r of ahRows) { const q = enqs.get(r.number.slice(-10)), tin = TI.get(r.number) || 0, x = { id: await vjChatId(env, r.number), name: r.name || N.get(r.number) || (q && q.first.C) || '', promised: r.promised_at, firstAt: r.first_at, to: r.assignee, topic: String(q ? (q.last.F || q.first.F || '') : ((L.get(r.number) || {}).text || '')).slice(0, 120), winLeft: tin ? Math.max(0, VJ_CHAT_WIN - (now - tin)) : 0, lastIn: tin, alerted: !!r.alerted_at }; if (!sales) x.number = '+' + r.number; ah.push(x); }
+    const hz = vjHours(now);
+    return vjJson(Object.assign({ ok: true, chats: list.slice(0, 400), ah, open: hz.open, nextOpen: hz.nextMs, now }, meta));
   }
   // one thread
   let n = '';
@@ -3616,10 +3622,12 @@ async function vjChatsGet(url, env, who, ctx) {
   const assignee = a && VJ_CHAT_PEOPLE[a.assigned_to] ? a.assigned_to : (vjChatWho(who) || cfg.def);
   const tl = await vjChatTplState(env, ctx, false);
   const tpls = Object.entries(VJ_CHAT_TPL).map(([k, d]) => { const nm = d[lang] || d.en, s = tl[nm] || {}, c = s.category || d.cat0; return { key: k, label: d.label, name: nm, lang, text: VJ_CHAT_TXT[nm], status: s.status || 'PENDING', category: c, rate: VJ_CHAT_RATE[c] || VJ_CHAT_RATE.MARKETING, alt: { name: d[lang === 'hi' ? 'en' : 'hi'], text: VJ_CHAT_TXT[d[lang === 'hi' ? 'en' : 'hi']], status: (tl[d[lang === 'hi' ? 'en' : 'hi']] || {}).status || 'PENDING', category: (tl[d[lang === 'hi' ? 'en' : 'hi']] || {}).category || d.cat0 } }; });
-  const out = Object.assign({ ok: true, id: await vjChatId(env, n), name, mode: a ? a.mode : 'bot', to: a && a.mode === 'human' ? a.assigned_to : '', since: a ? a.since : 0, by: a ? a.by : '', need: a && a.need || '', lastIn: tin, winLeft: tin ? Math.max(0, VJ_CHAT_WIN - (now - tin)) : 0, now, thread,
+  await vjAhT(env); const ahRow = await env.DB.prepare("SELECT * FROM vj_chat_ah WHERE number = ? AND status = 'open'").bind(n).first();
+  const out = Object.assign({ ok: true, ah: ahRow ? { promised: ahRow.promised_at, firstAt: ahRow.first_at, to: ahRow.assignee } : null, id: await vjChatId(env, n), name, mode: a ? a.mode : 'bot', to: a && a.mode === 'human' ? a.assigned_to : '', since: a ? a.since : 0, by: a ? a.by : '', need: a && a.need || '', lastIn: tin, winLeft: tin ? Math.max(0, VJ_CHAT_WIN - (now - tin)) : 0, now, thread,
     enq: q ? { id: q.id, status: q.ep.status, what: want.slice(0, 300), visitBooked: q.ep.visitBooked || '', open: !VJ_ENQ_CLOSED.has(q.ep.status) } : null }, meta);
   if (!sales) Object.assign(out, { number: '+' + n, wa: n, opener: q ? vjEnqMsg(q, vjEnqSender(who)) : '', stop, lastTpl: lastTpl ? lastTpl.at : 0,
     vars: { v1: vjChatHi(name), v2: (VJ_CHAT_PEOPLE[assignee] || {}).full || vjChatFirst(who), v3hi: vjChatTopic(texts, want, cat, 'hi'), v3en: vjChatTopic(texts, want, cat, 'en'), lang, visit: q ? (q.ep.visitBooked || '') : '' }, tpls });
+  if (!sales) { const v = out.vars, nm2 = v.v2; out.hiText = lang === 'hi' ? 'Namaste ' + v.v1 + ', main ' + nm2 + ', Vaishnavi Jewels se. Aapne ' + v.v3hi + ' ke baare mein poocha tha — kya abhi baat kar sakte hain, ya aapke liye kaunsa samay theek rahega?' : 'Hello ' + v.v1 + ', this is ' + nm2 + ' from Vaishnavi Jewels. You had asked about ' + v.v3en + ' — is now a good time to talk, or which time suits you?'; }
   return vjJson(out);
 }
 async function vjChatStopped(env, n, q) {
@@ -3657,6 +3665,7 @@ async function vjChatPost(request, env, who, ctx) {
   const tin = (known && known.tin) || 0, a = await env.DB.prepare('SELECT * FROM vj_chat_assign WHERE number = ?').bind(n).first();
   if (!(known && known.c) && !a) return vjDeny(404, 'no chat with this number yet');
   const winOpen = tin > 0 && now - tin < VJ_CHAT_WIN - 60e3;
+  if (op === 'ahdone') { await vjAhDone(env, n, byName); await vjAudit(env, who, 'chat-ahdone', 'chats/' + n.slice(-4), ''); return vjJson({ ok: true }); }
   if (op === 'assign') {
     if (!VJ_CHAT_PEOPLE[b.to]) return vjDeny(400, 'pick Abhinav, Mihir or Shilpiji');
     await vjChatSetMode(env, n, 'human', b.to, who.email, 'assigned by ' + byName);
@@ -3690,6 +3699,7 @@ async function vjChatPost(request, env, who, ctx) {
     text += '\n— ' + me + ', Vaishnavi Jewels';
     const ids = await vjChatQueue(env, ctx, [{ number: n, kind: op, text, body: vjChatTextBody(n, text), by: who.email, byName }], true);
     if (!a || a.mode !== 'human') { const p = vjChatWho(who) || (VJ_CHAT_PEOPLE[a && a.assigned_to] ? a.assigned_to : cfg.def); await vjChatSetMode(env, n, 'human', p, who.email, 'replied from Chats'); }
+    await vjAhDone(env, n, byName);
     await vjAudit(env, who, 'chat-' + op, 'chats/' + n.slice(-4), text.length + ' chars');
     const row = await env.DB.prepare('SELECT status, err FROM vj_chat_out WHERE id = ?').bind(ids[0]).first();
     return vjJson({ ok: true, status: row ? row.status : 'queued', err: row && row.err || '' });
@@ -3721,11 +3731,79 @@ async function vjChatPost(request, env, who, ctx) {
     const ids = await vjChatQueue(env, ctx, [{ number: n, kind: 'tpl', tpl: name, cat, text, body: vjChatTplBody(n, name, lang, v), by: who.email, byName, enq: q ? q.id : '' }], true);
     if (q) { await vjEnqT(env); await env.DB.prepare('INSERT INTO vj_enq_followup (number, enquiry_date, status, next_followup_date, note, amount, bill_no, kind, "by", by_name, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
       .bind(q.key, vjEnqIst(q.ep.start).slice(0, 10), null, null, 'WhatsApp reminder sent (' + d.label + ', ' + cat.toLowerCase() + ')', 0, '', 'reminder', who.email, byName, Date.now()).run(); }
+    await vjAhDone(env, n, byName);
     await vjAudit(env, who, 'chat-remind', 'chats/' + n.slice(-4), name);
     const row = await env.DB.prepare('SELECT status, err FROM vj_chat_out WHERE id = ?').bind(ids[0]).first();
     return vjJson({ ok: true, status: row ? row.status : 'queued', err: row && row.err || '' });
   }
   return vjDeny(400, 'bad request');
+}
+
+// AFTER-HOURS HANDOVER (owner 03/11/2026 07:50, C-20261103-HANDOVER): showroom 11 AM-8 PM Mon-Sat, Sunday closed, Diwali 8-15 Nov 2026.
+// The worker works out from the real clock when the team will contact a customer, keeps Brain row R-20261103-HOURS (Aashvi reads it)
+// up to date through the relay (?want=brainhours, only column D of that one row, only when the wording changes), queues every
+// after-hours lead for the next opening (VJ Tags > Chats > Next-day handover) and at 11:00 on the next working day alerts the assignee.
+const VJ_HOLS = [['2026-11-08', '2026-11-15', 'Diwali']];
+const VJ_MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], VJ_DOW = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+function vjHours(ms) {
+  const d = new Date((ms || Date.now()) + 5.5 * 3600e3), ymd = d.toISOString().slice(0, 10), dow = d.getUTCDay(), hm = d.getUTCHours() * 60 + d.getUTCMinutes();
+  const hol = y => VJ_HOLS.find(h => y >= h[0] && y <= h[1]);
+  const working = (y, w) => w !== 0 && !hol(y);
+  const open = working(ymd, dow) && hm >= 660 && hm < 1200;
+  let k = 0, nymd = ymd, ndow = dow;
+  if (!(working(ymd, dow) && hm < 660)) for (k = 1; k < 40; k++) { const nd = new Date(Date.UTC(+ymd.slice(0, 4), +ymd.slice(5, 7) - 1, +ymd.slice(8, 10) + k)); nymd = nd.toISOString().slice(0, 10); ndow = nd.getUTCDay(); if (working(nymd, ndow)) break; }
+  const nextMs = Date.parse(nymd + 'T11:00:00Z') - 5.5 * 3600e3, h = hol(ymd), dm = +nymd.slice(8, 10) + ' ' + VJ_MON[+nymd.slice(5, 7) - 1];
+  const hn = !h && VJ_HOLS.find(x => x[0] > ymd && x[0] <= nymd), hh = h || hn;
+  const reasonHi = (h ? 'Diwali ki chhutti 8–15 Nov' : dow === 0 ? 'Sunday closed' : hm < 660 ? 'showroom 11 baje khulta hai' : 'showroom 8 baje band ho jata hai') + (hn ? ', aur Diwali ki chhutti 8–15 Nov hai' : '');
+  const reasonEn = (h ? 'Diwali holiday, 8–15 Nov' : dow === 0 ? 'closed on Sundays' : hm < 660 ? 'we open at 11 AM' : 'we close at 8 PM') + (hn ? '; Diwali holiday 8–15 Nov' : '');
+  const whenHi = k === 0 ? 'aaj subah 11 baje ke baad' : k === 1 ? 'kal subah 11 baje ke baad' : (hh || k > 6 ? dm : VJ_DOW[ndow]) + ' ko subah 11 baje ke baad';
+  const whenEn = k === 0 ? 'today after 11 AM' : k === 1 ? 'tomorrow after 11 AM' : 'on ' + (hh || k > 6 ? dm : VJ_DOW[ndow]) + ' after 11 AM';
+  const base = 'SHOWROOM HOURS (owner 03/11/2026, kept up to date by the website): 11 AM to 8 PM, Monday to Saturday; Sunday closed; Diwali holiday 8–15 Nov 2026 (open again 16 Nov).';
+  const text = open ? base + ' The showroom is OPEN right now - no after-hours line needed.'
+    : 'AFTER-HOURS - ' + base + ' RIGHT NOW the showroom is CLOSED (' + reasonEn + '). Keep qualifying the customer as usual (what they need, budget range, city). Then, once in the chat (not again if an earlier reply already said it), say clearly when our team will contact them, in the customer\'s language - Hinglish: "Abhi showroom band hai (' + reasonHi + '). ' + whenHi.charAt(0).toUpperCase() + whenHi.slice(1) + ' hamari team aapko personally message/call karegi 🙏"' + (hh ? ' (for the holiday you may say: "Diwali ki chhutti 8–15 Nov hai; 16 Nov ko hamari team aapse contact karegi 🙏")' : '') + '; English: "Our showroom is closed right now (' + reasonEn + '). Our team will personally message or call you ' + whenEn + '." If they would like a particular time that day, ask for it. Never send designs.';
+  return { open, nextMs, whenHi, whenEn, text };
+}
+let vjAhOk = false;
+async function vjAhT(env) {
+  if (vjAhOk) return;
+  await env.DB.batch([env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_chat_ah (id INTEGER PRIMARY KEY AUTOINCREMENT, number TEXT, name TEXT, first_at INTEGER, promised_at INTEGER, assignee TEXT, topic TEXT, status TEXT, alerted_at INTEGER, done_at INTEGER, done_by TEXT)'),
+    env.DB.prepare('CREATE INDEX IF NOT EXISTS vj_chat_ah_n ON vj_chat_ah (number, status)')]);
+  vjAhOk = true;
+}
+// keep Brain R-20261103-HOURS in step with the clock (called before the message goes on to A1, so Aashvi reads the right wording)
+async function vjAhBrain(env) {
+  const hz = vjHours(), r = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'hours-text'").first();
+  if (r && r.v === hz.text) return;
+  if (!env.VJ_GOLD_HOOK || !/^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_GOLD_HOOK)) return;
+  const claim = await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES (?, '1') ON CONFLICT(k) DO NOTHING").bind('hoursring:' + Math.floor(Date.now() / 60e3)).run();
+  if (!claim.meta || claim.meta.changes !== 1) return;
+  const res = await fetch(env.VJ_GOLD_HOOK + '?want=brainhours', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(9000), body: JSON.stringify({ text: hz.text }) });
+  const t = await res.text();
+  if (res.ok && /"ok":\s*true/.test(t)) await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('hours-text', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(hz.text).run();
+}
+// an after-hours message from a customer -> one open row per number until it is handled
+async function vjAhQueue(env, number, name, assignee) {
+  await vjAhT(env);
+  const hz = vjHours(); if (hz.open) return;
+  const cur = await env.DB.prepare("SELECT id FROM vj_chat_ah WHERE number = ? AND status = 'open'").bind(number).first(); if (cur) return;
+  await env.DB.prepare("INSERT INTO vj_chat_ah (number, name, first_at, promised_at, assignee, topic, status) VALUES (?, ?, ?, ?, ?, '', 'open')").bind(number, name || '', Date.now(), hz.nextMs, assignee).run();
+}
+async function vjAhDone(env, number, by) { await vjAhT(env); await env.DB.prepare("UPDATE vj_chat_ah SET status = 'done', done_at = ?, done_by = ? WHERE number = ? AND status = 'open'").bind(Date.now(), by, number).run(); }
+// GET /hooks/vj-ahbell (Make A21, Mon-Sat 11:01 IST; no data, no secret): once a working day after 10:55, one alert per assignee listing the leads
+async function vjAhBell(env, ctx) {
+  await vjChatT(env); await vjAhT(env);
+  const hz = vjHours(), ist = vjEnqIst(), hm = ist.slice(11, 16);
+  if (!hz.open && !(hm >= '10:55' && hm < '11:00' && hz.nextMs - Date.now() < 6 * 60e3)) return reply('closed now', 200);
+  if (hm > '13:00') return reply('too late', 200);
+  const claim = await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES (?, '1') ON CONFLICT(k) DO NOTHING").bind('ahbell:' + ist.slice(0, 10)).run();
+  if (!claim.meta || claim.meta.changes !== 1) return reply('already done today', 200);
+  const rows = ((await env.DB.prepare("SELECT * FROM vj_chat_ah WHERE status = 'open' AND alerted_at IS NULL AND promised_at <= ? ORDER BY first_at").bind(Date.now() + 10 * 60e3).all()).results) || [];
+  if (!rows.length) return reply('nothing waiting', 200);
+  const enqs = await vjChatEnq(env), by = {};
+  rows.forEach(r => { const q = enqs.get(r.number.slice(-10)); (by[r.assignee || 'Abhinav'] = by[r.assignee || 'Abhinav'] || []).push((r.name || 'Customer') + (q ? ' - ' + String(q.last.F || q.first.F || '').slice(0, 40) : '')); });
+  for (const [to, list] of Object.entries(by)) await vjChatAlert(env, ctx, to, 'Next-day handover: ' + list.length + ' lead' + (list.length === 1 ? '' : 's') + ' from after hours', 'Promised contact today from 11 AM', list.join('; '), false, '');
+  await env.DB.prepare(`UPDATE vj_chat_ah SET alerted_at = ? WHERE id IN (${rows.map(() => '?').join(',')})`).bind(Date.now(), ...rows.map(r => r.id)).run();
+  return reply('alerted ' + rows.length, 200);
 }
 
 // Customer recall (owner 17/10/2026 17:04, C-20261017-PARTY): type a mobile number or part of a name on New tag (order), Bill or
@@ -4436,6 +4514,7 @@ export default {
     if (p === '/hooks/vj-enqbulk') return ((request.method === 'GET' || request.method === 'HEAD') && (url.hostname === VJ_HOST || env.VJ_DEV === '1')) ? vjEnqBulk(env, ctx) : reply('Method not allowed', 405); // C-20261103-ENQBULK (owner-approved one-off)
     if (p === '/hooks/vj-enqbell' || p === '/hooks/vj-enqdue') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-enqbell' ? vjEnqBell(env) : vjEnqDue(url, env)) : reply('Method not allowed', 405); // C-20261102-ENQREMIND
     if (p === '/hooks/vj-chatmode' || p === '/hooks/vj-chathot' || p === '/hooks/vj-chatdue' || p === '/hooks/vj-chatdone') return (request.method === 'GET' && url.hostname === VJ_HOST && env.DB) ? (p === '/hooks/vj-chatmode' ? vjChatModeHook(url, env) : p === '/hooks/vj-chathot' ? vjChatHotHook(url, env, ctx) : p === '/hooks/vj-chatdue' ? vjChatDue(url, env) : vjChatDone(url, env)) : reply('Method not allowed', 405); // C-20261103-HANDOVER
+    if (p === '/hooks/vj-ahbell') return (request.method === 'GET' && url.hostname === VJ_HOST && env.DB) ? vjAhBell(env, ctx) : reply('Method not allowed', 405); // C-20261103-HANDOVER after-hours
     if (p === '/hooks/vj-chattpl') return (request.method === 'POST' && url.hostname === VJ_HOST && env.DB) ? vjChatTplHook(request, url, env) : reply('Method not allowed', 405); // C-20261103-HANDOVER
     if (p === '/hooks/vj-estdue') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjEstDue(url, env) : reply('Method not allowed', 405);
     if (p === '/hooks/vj-daily') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjDailyReport(env) : reply('Method not allowed', 405);
