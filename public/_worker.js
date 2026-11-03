@@ -3268,9 +3268,14 @@ async function vjEnqBulk(env, ctx) {
   if (!env.DB) return reply('not set up', 503);
   await vjEnqT(env);
   const { list, sheetOk } = await vjEnqLoad(env); if (!sheetOk) return reply('sheet not read', 502);
-  const cut = Date.UTC(2026, 9, 20) - 5.5 * 3600e3, RESULT = 'Closed (old broadcast reply)', NOTE = 'Closed (old broadcast reply) - Bulk-closed 03-11-2026, owner approved';
-  const due = list.filter(q => !VJ_ENQ_CLOSED.has(q.ep.status) && !q.allHist.length && q.ep.start && q.ep.start < cut
-    && String(q.first.B || '').trim() === 'WhatsApp - broadcast reply' && !q.allRows.some(r => /^yes/i.test(String(r.G || '').trim())));
+  // Two fixed, owner-approved rules only. #1 (03/11 06:57): old broadcast replies. #2 (03/11 07:10, C-20261103-ENQBULK2): old Meta-ad /
+  // direct WhatsApp enquiries whose number has NOT written again on or after 20-10-2026. Both: no G = Yes, no follow-up in D1 yet.
+  const cut = Date.UTC(2026, 9, 20) - 5.5 * 3600e3, base = q => !VJ_ENQ_CLOSED.has(q.ep.status) && !q.allHist.length && q.ep.start && q.ep.start < cut && !q.allRows.some(r => /^yes/i.test(String(r.G || '').trim()));
+  const RULES = [{ k: 'enq-bulk-20261103', result: 'Closed (old broadcast reply)', test: q => String(q.first.B || '').trim() === 'WhatsApp - broadcast reply' },
+    { k: 'enq-bulk2-20261103', result: 'Closed (old, no reply)', test: q => ['WhatsApp - Meta ad', 'WhatsApp'].includes(String(q.first.B || '').trim()) && q.allRows.every(r => r.t && r.t < cut) }];
+  const rule = RULES.find(R => list.some(q => base(q) && R.test(q))) || RULES[RULES.length - 1];
+  const RESULT = rule.result, NOTE = rule.result + ' - Bulk-closed 03-11-2026, owner approved';
+  const due = list.filter(q => base(q) && rule.test(q));
   const part = due.slice(0, 15), now = Date.now();
   if (part.length) {
     await env.DB.batch(part.map(q => env.DB.prepare('INSERT INTO vj_enq_followup (number, enquiry_date, status, next_followup_date, note, amount, bill_no, kind, "by", by_name, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
@@ -3280,13 +3285,13 @@ async function vjEnqBulk(env, ctx) {
       fetch(env.VJ_GOLD_HOOK + '?want=enqset', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(25000),
         body: JSON.stringify({ rows: q.ep.rows.map(r => r.row).slice(-10).join(','), num: q.key, I: 'Closed', L: '', M: '', N: '', O: '', P: RESULT }) }).then(r => { if (r.ok) ok++; }).catch(() => {})));
     await vjAudit(env, { email: 'vaishnaviexim@gmail.com' }, 'enquiry-bulkclose', 'enquiries/', part.length + ' closed, sheet ' + ok + ': ' + part.map(q => q.id).join(','));
-    const t0 = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'enq-bulk-20261103'").first();
-    await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('enq-bulk-20261103', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(String((parseInt(t0 ? t0.v : '0', 10) || 0) + part.length)).run();
+    const t0 = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = ?").bind(rule.k).first();
+    await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(rule.k, String((parseInt(t0 ? t0.v : '0', 10) || 0) + part.length)).run();
     var sheetOkN = ok;
   }
-  const tot = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'enq-bulk-20261103'").first();
+  const tot = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = ?").bind(rule.k).first();
   const st = vjEnqStats(list.filter(q => !part.includes(q)), now);
-  const head = 'closed=' + part.length + ';sheet=' + (part.length ? sheetOkN : 0) + ';left=' + (due.length - part.length) + ';total=' + (tot ? tot.v : 0) + ';running=' + st.open + ';' + Object.entries(st.byChannel).map(([k, v]) => k.replace(/\s/g, '') + '=' + v).join(';');
+  const head = 'rule=' + (RULES.indexOf(rule) + 1) + ';closed=' + part.length + ';sheet=' + (part.length ? sheetOkN : 0) + ';left=' + (due.length - part.length) + ';total=' + (tot ? tot.v : 0) + ';running=' + st.open + ';' + Object.entries(st.byChannel).map(([k, v]) => k.replace(/\s/g, '') + '=' + v).join(';');
   return new Response(head, { status: 200, headers: { 'content-type': 'text/plain', 'cache-control': 'no-store', 'x-vj-enqbulk': head } });
 }
 async function vjEnqDue(url, env) {
