@@ -553,7 +553,7 @@
     const csS = srcSel(T0 && T0.csSrc), othS = srcSel(T0 && T0.othSrc);
     /* C-20261103-CHAINREC (owner 03/11): chain PARTS - part, vendor (Chains (vendors) register), optional unused registered chain tag (fills g + tunch; used whole), net g, tunch, rate (recorded) */
     const CHP = ["Chain", "Lock", "Hook/Kadi", "Other"], allT = () => window.VJ_TAGS_ALL ? window.VJ_TAGS_ALL() : [], vTags = () => allT().filter(t => t && t.approval && t.approval.vendor);
-    const chVend = () => { const l = [...new Set(vTags().map(t => t.approval.vendor))].sort(); ((T0 && T0.chains) || []).forEach(c => { if (c.vendor && !l.includes(c.vendor)) l.push(c.vendor); }); return l; };
+    const chVend = () => { const l = ["Siddharth", "Arun"]; /* C-20261103-CHAINVEND (owner 17:54): always Siddharth + Arun, then every vendor already in Sundry Creditors (register chains + parts typed earlier) */ [...new Set(vTags().map(t => t.approval.vendor))].sort().concat(...(J.orders || []).map(x => ((x.tag && x.tag.chains) || []).map(c => c.vendor))).forEach(v => { if (v && !l.some(z => z.toLowerCase() === String(v).toLowerCase())) l.push(v); }); ((T0 && T0.chains) || []).forEach(c => { if (c.vendor && !l.includes(c.vendor)) l.push(c.vendor); }); return l; };
     const chFree = v => vTags().filter(t => t.approval.vendor === v && (t.status !== "sold" || (t.sold && t.sold.ko === o.id)));
     const chBox = el("div", { style: "display:flex;flex-direction:column;gap:6px" }), chMsg = el("span", { className: "hint" });
     const chRow = c => { c = c || {}; const ln = el("div", { style: "display:flex;flex-wrap:wrap;gap:6px;align-items:end;border:1px solid var(--line);border-radius:8px;padding:6px" }), sm = (t, i, w) => el("label", { style: "flex:1 1 " + w + ";min-width:0" }, [t + " ", i]);
@@ -568,7 +568,7 @@
       ln.get = () => ({ part: pt.value, vendor: vs.value, tag: ts.value, net: ng.value.trim(), tunch: tn.value.trim(), rate: rt.value.trim() });
       ln.append(sm("Part", pt, "80px"), sm("Vendor", vs, "110px"), sm("Registered chain (optional)", ts, "150px"), sm("Net g", ng, "70px"), sm("Tunch", tn, "60px"), sm("Rate ₹", rt, "70px"), x); chBox.appendChild(ln); fillT(c.tag || ""); };
     const chGet = () => [...chBox.children].map(l => l.get()).filter(c => c.tag || num(c.net) > 0);
-    const chAdd = el("button", { type: "button", className: "btn ghost", textContent: "+ chain part" }); chAdd.addEventListener("click", () => { if (!chVend().length) chMsg.textContent = " No chain vendors yet - register the vendor chain first (New tag > Chain > Vendor)."; chRow({}); });
+    const chAdd = el("button", { type: "button", className: "btn ghost", textContent: "+ chain part" }); chAdd.addEventListener("click", () => { chRow({}); });
     const dGet = () => [...tb.querySelectorAll("tr")].map(tr => { const x = {}; tr.querySelectorAll("[data-k]").forEach(i => { x[i.dataset.k] = i.type === "checkbox" ? i.checked : i.value.trim(); }); return x; }).filter(x => num(x.pcs) > 0 || num(x.ct) > 0);
     let ngMan = !!(T0 && T0.nGoldMan); ng.addEventListener("input", () => { ngMan = ng.value.trim() !== ""; calc(); });
     const calc = () => { const D = dGet(), ct = D.reduce((a, x) => a + num(x.ct), 0), g = num(gg.value), chg = chGet().reduce((a, c) => a + num(c.net), 0), n = g > 0 ? g - ct / 5 - csG(cs) - chg : 0; if (!ngMan) ng.placeholder = g > 0 ? r3(n) : "auto";
