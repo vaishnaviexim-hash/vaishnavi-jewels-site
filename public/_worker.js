@@ -1637,7 +1637,10 @@ async function vjOgs(env, who, url) { const all = await vjOgList(env), live = al
     { name: 'Summary', widths: [34, 16], head: ['Item', 'Grams'], rows: [['OG fine in hand (actual)', n3(S.inHand)], ['Gross in (all time)', n3(S.all.gross)], ['Actual fine in (all time)', n3(S.all.act)], ['Party credit fine (all time)', n3(S.all.cred)], ['Margin profit fine (all time)', n3(S.all.margin)], ['Issued to karigars', n3(S.issued)], ['Moved to our stock', n3(S.toStock)], ['Purchased fine (from vendors)', n3(S.all.pur)], ['Converted to cash (' + S.cash.n + ' OGs, Rs ' + S.cash.amt + ') fine', n3(S.cash.fine)]].concat(S.perKarigar.map(k => ['Karigar ' + k.name, n3(k.fine)])) }]);
     const bin = atob(xl), out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
     return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_OG_register.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } }); }
-  return vjJson({ ok: true, list, reg: regOut, free, orphans, next, last: lastB ? { og: lastB.og, no: lastB.no, name: lastB.name } : null, out: who.role === 'sales' ? [] : outOut, dias: (who.role === 'sales' ? [] : dias).map(d => ({ id: d.id, og: d.og, tag: d.tag, label: d.label || '', shape: d.shape || '', q: d.q || '', pcs: d.pcs || 0, ct: d.ct || 0, karigar: d.karigar || '', status: d.status, retAt: d.retAt || '', retByName: d.retByName || '' })),
+  let koParty = []; if (who.role !== 'sales') try { // C-20261103-PARTYDIA: customer's own diamonds handed to a karigar on an open order, still with him
+    koParty = ((((await env.DB.prepare('SELECT data FROM vj_kord').all()).results) || []).map(vjParse)).filter(o => o && o.status !== 'cancelled' && !o.tag && vjKoPty(o.iss).length).map(o => { const I = vjKoTot(vjKoPty(o.iss)), R = vjKoTot(vjKoPty(o.rec));
+      return { karigar: o.karigar || '', no: o.no, name: o.name || '', pcs: Math.max(0, I.pcs - R.pcs), ct: Math.max(0, vjR3(I.ct - R.ct)), lines: vjKoPty(o.iss).map(r => ({ shape: r.shape || '', pcs: r.pcs || 0, ct: r.ct || 0 })) }; }).filter(x => x.pcs > 0 || x.ct > 0); } catch (e) { koParty = []; }
+  return vjJson({ ok: true, list, reg: regOut, free, orphans, next, koParty, last: lastB ? { og: lastB.og, no: lastB.no, name: lastB.name } : null, out: who.role === 'sales' ? [] : outOut, dias: (who.role === 'sales' ? [] : dias).map(d => ({ id: d.id, og: d.og, tag: d.tag, label: d.label || '', shape: d.shape || '', q: d.q || '', pcs: d.pcs || 0, ct: d.ct || 0, karigar: d.karigar || '', status: d.status, retAt: d.retAt || '', retByName: d.retByName || '' })),
     sum, karigars: await vjOgKarigars(env), vendors: who.role === 'sales' ? [] : [...new Set(reg.filter(r => r.src === 'vendor').map(r => r.vendor || r.name).filter(Boolean))].sort((a, b) => a.localeCompare(b)), margins: [0, 1, 2], admin: adm, canDelete: adm, canAdd: who.role !== 'sales' }); }
 async function vjOgHist(env, who, kind, ref, action, old) { await env.DB.prepare('INSERT INTO vj_og_hist (ts, email, kind, ref, action, data) VALUES (?, ?, ?, ?, ?, ?)').bind(Date.now(), who.email, kind, ref, action, JSON.stringify(old || null)).run(); }
 async function vjOgSave(request, env, who) { if (who.role === 'sales') return vjDeny(403, 'read only');
@@ -2020,7 +2023,7 @@ async function vjKo3Tables(env) { if (vjKo3T) return; await vjKoOrdT(env); await
 // owner 17:02: QUALITY CLASH - a packet issued must be of the order's family (Natural / LGD); for a natural ROUND quality order a natural round packet must be the same
 // quality code (fancy / choki / polki may mix within the family). Abhinav / Shilpiji may override with a reason (kept on the order + audit).
 // owner 17:04: OVER-ISSUE - more than 25 % above the order's D.CT (requirement) needs an explicit second confirm (logged); no D.CT = no issue
-function vjKoOver(o, dct, iss, oldIss, b, who) { const I = vjKoTot(iss).ct, O = vjKoTot(oldIss).ct; if (!(I > 0) || I <= O && vjKoSig(iss) === vjKoSig(oldIss)) return '';
+function vjKoOver(o, dct, iss, oldIss, b, who) { iss = vjKoOur(iss); oldIss = vjKoOur(oldIss); const I = vjKoTot(iss).ct, O = vjKoTot(oldIss).ct; if (!(I > 0) || I <= O && vjKoSig(iss) === vjKoSig(oldIss)) return '';
   if (!(dct > 0)) return 'Type the D.CT (diamond requirement) before issuing diamonds.';
   if (vjOgMg(I) <= Math.round(vjOgMg(dct) * 1.25)) return '';
   const msg = 'You are issuing ' + I.toFixed(3) + ' ct against a requirement of ' + dct.toFixed(3) + ' ct (' + (I / dct).toFixed(2) + '×). Confirm?';
@@ -2049,10 +2052,14 @@ async function vjKo3Cfg(env) { const g = async (k, d) => { try { const m = await
 const vjKo3Kc = (cfg, k) => Object.assign({}, cfg.kcfg[k] && cfg.kcfg[k].type === 'mounting' ? {} : VJ_KO3_STD, cfg.kcfg[k] || {});
 const vjKo3Up500 = n => n > 0 ? Math.ceil(n / 500) * 500 : 0;
 const vjKo3R2 = n => Math.round((Number(n) || 0) * 100) / 100;
+// C-20261103-PARTYDIA (owner 03/11): 'Party diamond' = the customer's own diamonds (no packet). Counted in NET GOLD (ct / 5) and on the tag (quality 'Party diamond'),
+// never against our packets (issued / used / pending / over-issue / cost); party diamonds handed to the karigar are tracked as pending from him, separately.
+const VJ_KO_PARTY = 'Party diamond', vjKoParty = r => !!(r && (r.party === true || /^\s*party\b/i.test(String(r.pkt || ''))));
+const vjKoOur = l => (l || []).filter(r => !vjKoParty(r)), vjKoPty = l => (l || []).filter(vjKoParty);
 function vjKo3Rows(a, adm, old, used) { if (!Array.isArray(a)) return []; const out = [], ol = Array.isArray(old) ? old : [];
   for (const [i, x] of a.slice(0, 30).entries()) { if (!x || typeof x !== 'object') continue; const pcs = Math.round(vjKoNum(x.pcs)), ct = vjR3(vjKoNum(x.ct)), rate = Math.round(vjKoNum(x.rate));
     if (!pcs && !ct) continue; if (pcs > 100000 || ct > 10000 || rate > 10000000) return null;
-    const cl = vjKoCode(x.pkt), r = { pkt: cl.code ? cl.code + (cl.lot ? '/' + cl.lot : '') : '', code: cl.code, lot: cl.lot, shape: vjClean(x.shape, 20), pcs, ct };
+    const pty = vjKoParty(x), cl = pty ? { code: '', lot: '' } : vjKoCode(x.pkt), r = pty ? { pkt: VJ_KO_PARTY, code: '', lot: '', party: true, shape: vjClean(x.shape, 20), pcs, ct } : { pkt: cl.code ? cl.code + (cl.lot ? '/' + cl.lot : '') : '', code: cl.code, lot: cl.lot, shape: vjClean(x.shape, 20), pcs, ct }; // C-20261103-PARTYDIA
     if (adm) { if (rate) r.rate = rate; } else { const o = ol[i]; if (o && o.rate && o.shape === r.shape && o.pkt === r.pkt) r.rate = o.rate; }
     if (used && x.add !== '' && x.add != null) { const v = Number(String(x.add).replace(/[^0-9.]/g, '')); if (isFinite(v) && v >= 0 && v <= 50) r.add = Math.round(v * 100) / 100; } // tag weight + % (default 10, solitaire 0)
     out.push(r); }
@@ -2060,16 +2067,17 @@ function vjKo3Rows(a, adm, old, used) { if (!Array.isArray(a)) return []; const 
 function vjKo3Auto(iss, rec) { const m = new Map(); (iss || []).forEach(r => { const k = (r.pkt || '') + '|' + (r.shape || ''), e = m.get(k) || { pkt: r.pkt || '', shape: r.shape || '', pcs: 0, mg: 0, rate: r.rate }; e.pcs += r.pcs; e.mg += vjOgMg(r.ct); m.set(k, e); });
   (rec || []).forEach(r => { const e = m.get((r.pkt || '') + '|' + (r.shape || '')) || [...m.values()].find(x => x.pkt === (r.pkt || '') && (x.pcs > 0 || x.mg > 0)) || [...m.values()].find(x => x.pkt.split('/')[0] === String(r.pkt || '').split('/')[0] && (x.pcs > 0 || x.mg > 0)); if (e) { e.pcs -= r.pcs; e.mg -= vjOgMg(r.ct); } }); // same packet; a received row typed without the lot / shape still counts
   return [...m.values()].filter(e => e.pcs > 0 || e.mg > 0).map(e => { const o = { pkt: e.pkt, shape: e.shape, pcs: Math.max(0, e.pcs), ct: Math.max(0, e.mg) / 1000 }; if (e.rate) o.rate = e.rate; return o; }); }
-function vjKo3Calc(o, cfg) { const I = vjKoTot(o.iss), R = vjKoTot(o.rec), U = vjKoTot(o.used), t = o.tag, kc = vjKo3Kc(cfg, o.karigar);
+function vjKo3Calc(o, cfg) { const I = vjKoTot(vjKoOur(o.iss)), R = vjKoTot(vjKoOur(o.rec)), U = vjKoTot(vjKoOur(o.used)), t = o.tag, kc = vjKo3Kc(cfg, o.karigar);
+  const pI = vjKoTot(vjKoPty(o.iss)), pR = vjKoTot(vjKoPty(o.rec)), pU = vjKoTot(vjKoPty(o.used)), pP = { pcs: Math.max(0, pI.pcs - pR.pcs - (t ? pU.pcs : 0)), ct: Math.max(0, Math.round((pI.ct - pR.ct - (t ? pU.ct : 0)) * 1000) / 1000) }; // PARTYDIA
   const sol = r => { const c = vjKoCodeOf(cfg, r.code || r.pkt) || (r.pkt ? null : vjKoCodeOf(cfg, o.dq)); return !!(c && (c.sol || c.type === 'Solitaire')); };
-  const tagDia = (o.used || []).map(r => { const add = r.add != null ? r.add : sol(r) ? 0 : 10; return { pkt: r.pkt, shape: r.shape, pcs: r.pcs, ct: r.ct, add, tagCt: vjKo3R2(r.ct * (1 + add / 100)), rate: r.rate }; });
+  const tagDia = (o.used || []).map(r => { const pty = vjKoParty(r), add = r.add != null ? r.add : pty || sol(r) ? 0 : 10; const d = { pkt: r.pkt, shape: r.shape, pcs: r.pcs, ct: r.ct, add, tagCt: vjKo3R2(r.ct * (1 + add / 100)), rate: r.rate }; if (pty) d.party = true; return d; });
   const today = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10), live = o.status === 'open' || o.status === 'karigar';
   // owner 18:19 (C-20261102-ORDMAKING): order 'Making' Rs/g = ROUNDUP(order gold rate x 0.44 / 0.66 / 0.83 (9 / 14 / 18 KT; 22K / PT set by admin) + 300, -2); blank for Gold to Gold
   // or no rate; hand-editable (mkOrd). Screen only - never on the karigar print and never used for tag pricing (New tag keeps its own formula).
   const f = Number((cfg.mf || {})[o.kt]) || 0, makingAuto = o.basis === 'rate' && o.goldRate > 0 && f > 0 ? Math.ceil((o.goldRate * f + 300) / 100) * 100 : null, tagRate = o.basis === 'rate' && o.goldRate > 0 ? (o.mkOrd > 0 ? o.mkOrd : makingAuto) : null;
   const est = kc.type === 'mounting' ? null : (kc.pf || {})[o.kt] ? vjR3(vjKoNum(o.gwt) * kc.pf[o.kt]) : null; // fine needed for the pending piece (workbook 'Due')
   return { diaIss: I, diaRec: R, diaUsed: U, diaPend: t ? { pcs: I.pcs - R.pcs - U.pcs, ct: Math.round((I.ct - R.ct - U.ct) * 1000) / 1000 } : { pcs: I.pcs - R.pcs, ct: Math.round((I.ct - R.ct) * 1000) / 1000 },
-    tagDia, tagRate, makingAuto, fineNeed: est, dqTxt: vjKoDqTxt(cfg, o), overdue: !!(o.delDate && o.delDate < today && live), itemTxt: o.item === 'Other' ? (o.itemNote || 'Other') : [o.item, o.itemNote].filter(Boolean).join(' ') }; }
+    party: { iss: pI, rec: pR, used: pU, pend: pP }, tagDia, tagRate, makingAuto, fineNeed: est, dqTxt: vjKoDqTxt(cfg, o), overdue: !!(o.delDate && o.delDate < today && live), itemTxt: o.item === 'Other' ? (o.itemNote || 'Other') : [o.item, o.itemNote].filter(Boolean).join(' ') }; }
 function vjKo3Set(t, g2) { // the setter columns of 'Mounting Priyank' (used for a grade B / Stock Mounting job)
   g2 = Object.assign({}, VJ_KO3_STD.g2, g2 || {}); const given = vjKoNum(t.mGiven) || vjKoNum(t.gGold), net = vjKoNum(t.netRecd), ch = Math.round(vjKoNum(t.choki)), rd = Math.round(vjKoNum(t.round)), cs = vjKoNum(t.setCs);
   const loss = net > 0 ? given - net : 0, kGold = net * (Number(g2.kPct) || 0) / 100 + (ch + rd) * (Number(g2.sPct) || 0) / 100, nfk = kGold - loss;
@@ -2081,7 +2089,7 @@ function vjKo3Deliv(o, cfg) { // the karigar side of a delivery, per the workboo
   if (t.sheet) { const h = t.sheet; return { fine: vjR3(h.fine), cash: vjKo3R2((h.labour || 0) + (h.rhodium || 0) + (h.stones || 0)), detail: { type: 'sheet', kt: String(t.kt || o.kt || ''), goldUsed: vjR3(gw), pure: vjR3(h.pure), ws: vjR3(h.ws), labour: vjKo3R2(h.labour), rhodium: vjKo3R2(h.rhodium), stones: vjKo3R2(h.stones) } }; } // C-20261102-KHIST: Excel history row = the sheet's figures
   if (kc.type === 'mounting') { const tun = Number(kc.tunch) || 0.63, mk = Number(t.mkRate) || Number(kc.making) || 0; // 'Mounting Priyank': Fine = Given x Tunch, Amount = Making x Given
     return { fine: vjR3(gw * tun), cash: vjKo3R2(mk * gw), detail: { type: 'mounting', given: gw, tunch: tun, making: mk, makingAmt: vjKo3R2(mk * gw) } }; }
-  const k = String(t.kt || o.kt || '').replace(/\D/g, ''), pf = (kc.pf || {})[k] || 0, wf = (kc.wf || {})[k] || 0, cs = vjKoNum(t.csCost), rhR = Number(kc.rhodium) || 0;
+  const k = String(t.kt || o.kt || '').replace(/\D/g, ''), pf = (kc.pf || {})[k] || 0, wf = (kc.wf || {})[k] || 0, cs = t.csSrc ? 0 : vjKoNum(t.csCost) /* C-20261103-CSSRC: CS bought from a vendor / cash is not the karigar's */, rhR = Number(kc.rhodium) || 0;
   if (vjKo3Grade(o) === 'B') { const mf = vjR3(Number(t.mFine) || 0), ml = vjKo3R2(vjKoNum(t.mLab)), mo = vjKo3R2(Number(t.mOth) || 0); // owner 18:23 (C-20261102-STOCKMANUAL): stock mounting = typed by hand, nothing worked out, no wastage
     return { fine: mf, cash: vjKo3R2(ml + mo), detail: { type: 'B', manual: true, fine: mf, labour: ml, other: mo } }; }
   // C-20261103-KORDER7 (owner 15:06, his sheet 'Montu -4' col K 'gold used' = NET gold): fine (pure + wastage) and labour / rhodium go on the NET gold (gross - diamond ct/5 - CS g)
@@ -2089,7 +2097,7 @@ function vjKo3Deliv(o, cfg) { // the karigar side of a delivery, per the workboo
   const ws = (Number(kc.ws) || 0) / 100, pure = gw * pf, wst = gw * wf * ws, lab = gw * (Number(kc.labour) || 0), rh = gw * rhR;
   return { fine: vjR3(pure + wst), cash: vjKo3R2(lab + rh + cs), detail: { type: 'A', kt: k, goldUsed: gw, pure: vjR3(pure), ws: vjR3(wst), wsPct: kc.ws, labour: vjKo3R2(lab), labRate: kc.labour, rhodium: vjKo3R2(rh), stones: cs, pf, noPurity: !pf } }; }
 function vjKo3Cost(o, cfg) { // owner 17:02: OUR COST of the piece (admin only) - costing rates are notional, they never touch stock or tag prices
-  let dia = 0; const need = []; (o.tag ? o.used : o.iss || []).forEach(r => { const c = vjKoCodeOf(cfg, r.code || r.pkt) || vjKoCodeOf(cfg, o.dq), rate = c && c.cost > 0 ? c.cost : r.rate > 0 ? r.rate : 0;
+  let dia = 0; const need = []; vjKoOur(o.tag ? o.used : o.iss || []).forEach(r => { const c = vjKoCodeOf(cfg, r.code || r.pkt) || vjKoCodeOf(cfg, o.dq), rate = c && c.cost > 0 ? c.cost : r.rate > 0 ? r.rate : 0;
     if (rate) dia += rate * (Number(r.ct) || 0); else if (r.ct > 0) need.push((r.pkt || o.dq || 'no code') + ' ' + Number(r.ct).toFixed(3) + ' ct'); });
   const d = o.tag ? vjKo3Deliv(o, cfg) : null, fine = d ? d.fine : null, gold = fine != null && o.basis !== 'g2g' && o.goldRate > 0 ? fine * o.goldRate : null /* G2GRATE: a Gold to Gold order's rate is only for the balance fine */, lab = o.tag ? (d.cash || 0) + (o.tag.labour || 0) : null;
   return { dia: vjKo3R2(dia), diaNeedRate: need, fine, gold: gold == null ? null : vjKo3R2(gold), goldNote: fine != null && !(o.goldRate > 0) ? 'no gold rate on the order (gold to gold)' : '', labour: lab == null ? null : vjKo3R2(lab), total: vjKo3R2(dia + (gold || 0) + (lab || 0)) }; }
@@ -2141,17 +2149,17 @@ function vjKo3Rowsfor(o, cfg, today) { const xl = o.imported && o.xlPure > 0 ? o
   if (o.status === 'cancelled' || !o.tag) return o.status === 'cancelled' && xl ? [{ date: today || new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10), type: 'excel', descr: 'Order ' + o.no + ' cancelled - Excel estimate ' + vjR3(xl) + ' g fine taken back', fine: xl, cash: 0 }] : [];
   const d = vjKo3Deliv(o, cfg), t = o.tag, out = [];
   if (xl) out.push({ date: t.date, type: 'excel', descr: 'Order ' + o.no + ' estimate already in the Excel opening (' + vjR3(xl) + ' g fine)', fine: xl, cash: 0 });
-  out.push({ date: t.date, type: 'delivery', descr: 'Order ' + o.no + ' ' + (o.item || '') + ' delivered ' + vjR3(t.gGold) + ' g ' + (t.kt || o.kt || '') + (t.kt === 'PT' || o.kt === 'PT' ? '' : 'KT') + (d.detail.type === 'B' ? ' (stock mounting, typed)' : ''), fine: -d.fine, cash: d.cash, detail: d.detail });
-  (t.others || []).filter(x => x.pcs > 0 && x.kRate > 0).forEach(x => out.push({ date: t.date, type: 'labour', descr: 'Order ' + o.no + ' ' + x.desc + ' ' + x.pcs + ' pcs x Rs ' + x.kRate, fine: 0, cash: vjKo3R2(x.pcs * x.kRate) }));
+  out.push({ date: t.date, type: 'delivery', descr: 'Order ' + o.no + ' ' + (o.item || '') + ' delivered ' + vjR3(t.gGold) + ' g ' + (t.kt || o.kt || '') + (t.kt === 'PT' || o.kt === 'PT' ? '' : 'KT') + (d.detail.type === 'B' ? ' (stock mounting, typed)' : '') + (t.csSrc && t.csSrcAmt ? ' · CS Rs ' + t.csSrcAmt + ' from ' + t.csSrc + ' (not to karigar)' : '') + (t.othSrc && t.othSrcAmt ? ' · other Rs ' + t.othSrcAmt + ' from ' + t.othSrc + ' (not to karigar)' : '') + (t.chG ? ' · chain parts ' + vjR3(t.chG) + ' g not credited' : ''), fine: -d.fine, cash: d.cash, detail: d.detail });
+  (t.othSrc ? [] : t.others || []).filter(x => x.pcs > 0 && x.kRate > 0).forEach(x => out.push({ date: t.date, type: 'labour', descr: 'Order ' + o.no + ' ' + x.desc + ' ' + x.pcs + ' pcs x Rs ' + x.kRate, fine: 0, cash: vjKo3R2(x.pcs * x.kRate) }));
   return out; }
-async function vjKo3Account(env, who, cfg, orders) { const adm = who.role === 'admin', L = await vjKo3Ledger(env), A = {}, a = k => A[k] = A[k] || { karigar: k, fine: 0, cash: 0, goldIssued: 0, fineUsed: 0, labour: 0, paid: 0, opening: null, openOrders: 0, diaPend: { pcs: 0, ct: 0 }, rows: [] };
+async function vjKo3Account(env, who, cfg, orders) { const adm = who.role === 'admin', L = await vjKo3Ledger(env), A = {}, a = k => A[k] = A[k] || { karigar: k, fine: 0, cash: 0, goldIssued: 0, fineUsed: 0, labour: 0, paid: 0, opening: null, openOrders: 0, diaPend: { pcs: 0, ct: 0 }, partyPend: { pcs: 0, ct: 0 }, rows: [] };
   Object.keys(cfg.kcfg).filter(k => vjKoMg(cfg, k)).forEach(a); const openD = {};
   L.forEach(l => { if (!vjKoMg(cfg, l.karigar)) return; const x = a(l.karigar); x.fine += Number(l.fine) || 0; x.cash += Number(l.cash) || 0; if (l.type === 'opening' && !l.rev && l.status === 'ok') { x.opening = { date: l.date, fine: l.fine, cash: l.cash }; openD[l.karigar] = l.ogFrom || l.date; }
     if (l.type === 'delivery') x.fineUsed -= Number(l.fine) || 0; if (l.type === 'delivery' || l.type === 'labour') x.labour += Number(l.cash) || 0; if (l.type === 'pay') x.paid -= Number(l.cash) || 0;
     x.rows.push({ ref: l.ref || '', id: l.id, date: l.date, type: l.type, no: l.no || '', descr: l.descr, fine: l.fine, cash: adm ? l.cash : null, status: l.status, rev: !!l.rev }); });
   ((((await env.DB.prepare('SELECT data FROM vj_og_out ORDER BY ts').all()).results) || []).map(vjParse)).forEach(g => { if (!g || g.cancelled || g.to !== 'karigar' || !g.karigar || !vjKoMg(cfg, g.karigar)) return; const k = Object.keys(A).find(n => n.toLowerCase() === String(g.karigar).toLowerCase()) || g.karigar;
     if (openD[k] && String(g.date) < openD[k]) return; const x = a(k); x.goldIssued += Number(g.fine) || 0; x.fine += Number(g.fine) || 0; x.rows.push({ id: g.id, date: g.date, type: 'gold issued (OG OUT)', no: '', descr: (g.note || '') + (g.ogs && g.ogs.length ? ' OG ' + g.ogs.join(', ') : ''), fine: g.fine, cash: null, status: 'ok' }); });
-  orders.filter(o => (o.status === 'open' || o.status === 'karigar') && vjKoMg(cfg, o.karigar)).forEach(o => { const x = a(o.karigar); x.openOrders++; x.diaPend.pcs += o.diaPend.pcs; x.diaPend.ct = Math.round((x.diaPend.ct + o.diaPend.ct) * 1000) / 1000; });
+  orders.filter(o => (o.status === 'open' || o.status === 'karigar') && vjKoMg(cfg, o.karigar)).forEach(o => { const x = a(o.karigar); x.openOrders++; x.diaPend.pcs += o.diaPend.pcs; x.diaPend.ct = Math.round((x.diaPend.ct + o.diaPend.ct) * 1000) / 1000; if (o.party) { x.partyPend.pcs += o.party.pend.pcs; x.partyPend.ct = Math.round((x.partyPend.ct + o.party.pend.ct) * 1000) / 1000; } });
   return Object.values(A).map(x => Object.assign(x, { fine: vjR3(x.fine), goldIssued: vjR3(x.goldIssued), fineUsed: vjR3(x.fineUsed), cash: adm ? vjKo3R2(x.cash) : null, labour: adm ? vjKo3R2(x.labour) : null, paid: adm ? vjKo3R2(x.paid) : null,
     opening: x.opening ? { date: x.opening.date, fine: x.opening.fine, cash: adm ? x.opening.cash : null } : null, rows: x.rows.sort((p, q) => String(p.date).localeCompare(String(q.date))) })); }
 // C-20261103-KORDER4 (owner 03/11 14:04): 'Sample code' on a karigar order - the code of one of our pieces (tag no. VER/101, VER-101, VER101, or its design no.)
@@ -2285,7 +2293,9 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
         if (ord && ord.tag) return vjDeny(409, 'order ' + ord.no + ' was received again since - restore not possible (its new entry is in the account)'); }
       const st = grp.map(l => { const x = Object.assign({}, l, { status: 'ok', hist: (l.hist || []).concat([{ at: now, by: byName, act: 'restored' }]) }); delete x.delGrp; delete x.delAt; delete x.delBy; delete x.delByName; delete x.delOrder; return putL(x); });
       if (ord && grp[0].delOrder) { const d = grp[0].delOrder; Object.assign(ord, { tag: d.tag, rec: d.rec || [], used: d.used || [], status: d.status, stage: d.stage || ord.stage }); delete ord.tagDeleted; st.push(env.DB.prepare('UPDATE vj_kord SET status = ?, data = ? WHERE id = ?').bind(ord.status, JSON.stringify(ord), ord.id)); }
-      await env.DB.batch(st); await vjAudit(env, who, 'ko-ledrestore', 'kledger/' + one.id, grp.length + ' row(s): ' + one.descr); return vjJson({ ok: true }); }
+      if (ord && grp[0].delOrder && vjKoChIds(grp[0].delOrder.tag).length) { const ids = vjKoChIds(grp[0].delOrder.tag); for (const cid of ids) { const r1 = await env.DB.prepare('SELECT data FROM docs WHERE path = ?').bind('tags/' + cid).first(), d1 = r1 ? vjParse(r1) : null; if (d1 && d1.status === 'sold' && !(d1.sold && d1.sold.ko === ord.id)) return vjDeny(409, 'chain ' + (d1.label || cid) + ' was used / sold since - restore not possible'); } } // CHAINREC
+      await env.DB.batch(st); if (ord && grp[0].delOrder && vjKoChIds(grp[0].delOrder.tag).length) await vjKoChainUse(env, who, vjKoChIds(grp[0].delOrder.tag), ord, (grp[0].delOrder.tag || {}).date || today, true);
+      await vjAudit(env, who, 'ko-ledrestore', 'kledger/' + one.id, grp.length + ' row(s): ' + one.descr); return vjJson({ ok: true }); }
     if (one.status !== 'ok' || one.rev || all.some(l => l.rev === one.id && l.status !== 'deleted')) return vjDeny(409, 'this entry is part of a reversal pair - it cannot be changed here');
     if (op === 'ledit') { if (one.ref) return vjDeny(400, 'a delivery is corrected with Received on its order (Correct received figures)');
       const date = String(b.date || one.date), fine = b.fine === '' || b.fine == null ? one.fine : vjR3(Number(b.fine)), cash = b.cash === '' || b.cash == null ? one.cash : vjKo3R2(Number(b.cash)), descr = vjClean(b.descr, 120) || one.descr;
@@ -2300,9 +2310,11 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
       if (ord && (ord.tagNo || ord.status === 'tagged') && !b.tagOk) return vjJson({ error: 'Order ' + ord.no + ' already has a tag' + (ord.tagNo ? ' (' + ord.tagNo + ')' : '') + '. The tag is NOT touched - delete anyway?', needTag: true }, 409);
       if (ord && ord.tagNo) warn = 'tag ' + ord.tagNo + ' kept as it is'; }
     const g = 'DG' + Date.now().toString(36), st = grp.map((l, i) => putL(Object.assign({}, l, { status: 'deleted', delGrp: g, delAt: now, delBy: who.email, delByName: byName }, i === 0 && ord ? { delOrder: { tag: ord.tag, rec: ord.rec, used: ord.used, status: ord.status, stage: ord.stage } } : {})));
+    const chFree = ord && ord.tag ? vjKoChIds(ord.tag) : [], chLab = ord && ord.tag && ord.tag.chains ? ord.tag.chains.filter(c => c.tag).map(c => c.label || c.tag) : []; // CHAINREC
     if (ord && ord.tag) { ord.tagDeleted = (ord.tagDeleted || []).concat([{ at: now, by: byName, tag: ord.tag, rec: ord.rec, used: ord.used, status: ord.status }]).slice(-10); ord.tag = null; ord.rec = []; ord.used = []; if (ord.status !== 'cancelled') ord.status = 'karigar'; ord.stage = ord.stage === 'Ready' ? '' : ord.stage;
       st.push(env.DB.prepare('UPDATE vj_kord SET status = ?, data = ? WHERE id = ?').bind(ord.status, JSON.stringify(ord), ord.id)); }
-    await env.DB.batch(st); await vjAudit(env, who, 'ko-leddel', 'kledger/' + g, JSON.stringify(grp).slice(0, 480)); return vjJson({ ok: true, warn }); }
+    await env.DB.batch(st); if (chFree.length) { await vjKoChainUse(env, who, chFree, ord, today, false); warn = (warn ? warn + '; ' : '') + 'chain tags freed: ' + chLab.join(', '); } // CHAINREC
+    await vjAudit(env, who, 'ko-leddel', 'kledger/' + g, JSON.stringify(grp).slice(0, 480)); return vjJson({ ok: true, warn }); }
   if (op === 'ledrev') { if (!adm) return vjDeny(403, 'only Abhinav or Shilpiji can reverse a karigar entry'); const row = await env.DB.prepare('SELECT data FROM vj_karigar_ledger WHERE id = ?').bind(vjClean(b.id, 60)).first(), l = row ? vjParse(row) : null;
     if (!l || l.status !== 'ok' || l.rev || !['pay', 'opening'].includes(l.type)) return vjDeny(400, 'only a payment or opening balance row can be reversed here (an order is changed on the order)');
     { const lk = await vjKoLockMsg(env, [[l.karigar, today]]); if (lk) return vjDeny(409, lk); }
@@ -2413,7 +2425,7 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
       if (r.meta && r.meta.changes === 1) { await vjAudit(env, who, 'ko-add', 'korders/' + o.id, k + ' ' + o.no + ' ' + o.item); return vjJson({ ok: true, order: vjKo3View(o, who, cfg) }); } }
     return vjDeny(409, typed ? k + "'s order no. " + typed + ' is already used - check the slip no.' : 'could not get an order no. - try again'); }
   const id = vjClean(b && b.id, 60), row = await env.DB.prepare('SELECT data FROM vj_kord WHERE id = ?').bind(id).first(), old = row ? vjKo3Up(vjParse(row)) : null; if (!old) return vjDeny(404, 'order not found');
-  const o = JSON.parse(JSON.stringify(old)), live = old.status !== 'cancelled'; let act = op, post = false;
+  const o = JSON.parse(JSON.stringify(old)), live = old.status !== 'cancelled'; let act = op, post = false, chOld = null, chNew = null;
   if (op === 'edit') { if (!live) return vjDeny(409, 'this order is cancelled'); // 17:04: every staff login edits the order details (history kept); karigar / no. change: admin
     const e = await fields(o, old); if (e) return deny(e);
     const k = vjClean(b.karigar, 40), no = b.no !== '' && b.no != null ? Math.round(Number(b.no)) : old.no; if (!k) return vjDeny(400, 'pick the karigar');
@@ -2438,21 +2450,40 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
     let used = used0 && used0.length ? used0 : vjKo3Auto(o.iss, rec);
     if (!canDia) { const usedWas = old.tag ? old.used : vjKo3Auto(o.iss, old.rec || []); if (vjKoSig(rec) !== vjKoSig(old.rec) || vjKoSig(used) !== vjKoSig(usedWas)) return vjDeny(403, VJ_KO_DIAMSG);
       const adds = used.map(r => r.add); used = (usedWas || []).map((r, i) => adds[i] != null ? Object.assign({}, r, { add: adds[i] }) : r); } // the tag + % stays editable (pricing, not a diamond entry)
-    const I = vjKoTot(o.iss), R = vjKoTot(rec), U = vjKoTot(used);
+    const I = vjKoTot(vjKoOur(o.iss)), R = vjKoTot(vjKoOur(rec)), U = vjKoTot(vjKoOur(used)), UA = vjKoTot(used); // PARTYDIA: the guard is for our packets only; NET GOLD takes every diamond (UA)
     if (I.pcs && (R.pcs + U.pcs > I.pcs || vjOgMg(R.ct) + vjOgMg(U.ct) > vjOgMg(I.ct))) return vjDeny(400, 'received back + used is more than the diamonds issued (' + I.pcs + ' pcs / ' + I.ct.toFixed(3) + ' ct)');
-    const kc = vjKo3Kc(cfg, o.karigar), gG = vjR3(vjKoNum(b.gGold)), csWt = vjR3(vjKoNum(b.csWt)), dWt = b.dWt === '' || b.dWt == null ? vjR3(U.ct / 5) : vjR3(vjKoNum(b.dWt)), date = String(b.tDate || today);
+    const kc = vjKo3Kc(cfg, o.karigar), gG = vjR3(vjKoNum(b.gGold)), csWt = vjR3(vjKoNum(b.csWt)), dWt = b.dWt === '' || b.dWt == null ? vjR3(UA.ct / 5) : vjR3(vjKoNum(b.dWt)), date = String(b.tDate || today);
     if (!dateOk(date) || date < '2020' || date > '2036') return vjDeny(400, 'bad date (check the year)'); if (!(gG > 0 && gG <= 10000)) return vjDeny(400, 'type the G.GOLD (gross) weight');
-    if (vjOgMg(csWt) + vjOgMg(dWt) >= vjOgMg(gG)) return vjDeny(400, 'stones weigh more than the gross - check CS WT (g) and D.WT (g)');
-    const nAuto = vjR3((vjOgMg(gG) - vjOgMg(csWt) - vjOgMg(dWt)) / 1000), nIn = b.nGold === '' || b.nGold == null ? null : vjR3(vjKoNum(b.nGold)); if (nIn !== null && !(nIn > 0 && nIn <= gG)) return vjDeny(400, 'N GOLD looks wrong');
+    // C-20261103-CHAINREC (owner 03/11): chain PARTS (Chain / Lock / Hook-Kadi / Other), each with its vendor, net g, tunch and rate (rate recorded only). A registered
+    // vendor-chain tag (Chains (vendors)) may be picked whole - its weight and tunch are taken from the tag, never split; it is marked used in this order on save.
+    // Every part's grams come off NET GOLD, so the karigar is never credited for chain weight.
+    const chains = []; for (const x of (Array.isArray(b.chains) ? b.chains : []).slice(0, 10)) { if (!x || typeof x !== 'object') continue;
+      const part = VJ_KO_CHP.includes(x.part) ? x.part : 'Other', tid = String(x.tag || '').trim(); let vendor = vjClean(x.vendor, 40), net = vjR3(vjKoNum(x.net)), tn = Math.round(vjKoNum(x.tunch) * 10000) / 10000, label = '';
+      const rate = vjKo3R2(vjKoNum(x.rate)); if (!tid && !vendor && !(net > 0)) continue;
+      if (tid) { if (!/^[A-Za-z0-9_\-.~]{1,60}$/.test(tid)) return vjDeny(400, 'chain tag not valid'); if (chains.some(c => c.tag === tid)) return vjDeny(400, 'the same chain tag is picked twice');
+        const r0 = await env.DB.prepare('SELECT data FROM docs WHERE path = ?').bind('tags/' + tid).first(), tg = r0 ? vjParse(r0) : null;
+        if (!tg || !tg.approval || !tg.approval.vendor) return vjDeny(400, 'chain tag ' + tid + ' is not a vendor chain in Chains (vendors)');
+        if (vendor && String(tg.approval.vendor).toLowerCase() !== vendor.toLowerCase()) return vjDeny(400, 'chain ' + (tg.label || tid) + ' is from ' + tg.approval.vendor + ', not ' + vendor);
+        if (tg.status === 'sold' && !(tg.sold && tg.sold.ko === o.id)) return vjDeny(409, 'chain ' + (tg.label || tid) + ' is already used / sold (' + ((tg.sold && tg.sold.no) || 'sold') + ')');
+        const g0 = (Array.isArray(tg.gold) ? tg.gold : []).find(g => g && g.net > 0) || {}; net = vjR3(Number(g0.net) || 0); tn = Number(g0.tunch) || 0; label = String(tg.label || tid).slice(0, 40); vendor = String(tg.approval.vendor).slice(0, 40); }
+      if (!vendor) return vjDeny(400, 'chain part: pick the vendor'); if (!(net > 0 && net <= 500)) return vjDeny(400, 'chain part: type the net g (up to 500)');
+      if (!(tn >= 0.3 && tn <= 1.1)) return vjDeny(400, 'chain part: tunch must be from 0.300 to 1.100'); if (rate > 1e6) return vjDeny(400, 'chain part: rate looks wrong');
+      chains.push({ part, vendor, tag: tid, label, net, tunch: tn, rate }); }
+    const chG = vjR3(chains.reduce((a, c) => a + c.net, 0));
+    if (vjOgMg(csWt) + vjOgMg(dWt) + vjOgMg(chG) >= vjOgMg(gG)) return vjDeny(400, 'stones + chain parts weigh more than the gross - check CS WT (g), D.WT (g) and the chain g');
+    const nAuto = vjR3((vjOgMg(gG) - vjOgMg(csWt) - vjOgMg(dWt) - vjOgMg(chG)) / 1000), nIn = b.nGold === '' || b.nGold == null ? null : vjR3(vjKoNum(b.nGold)); if (nIn !== null && !(nIn > 0 && nIn <= gG)) return vjDeny(400, 'N GOLD looks wrong');
     const csCost = Math.round(vjKoNum(b.csCost)), csIn = b.csCharge === '' || b.csCharge == null ? null : Math.round(vjKoNum(b.csCharge));
     const others = (Array.isArray(b.others) ? b.others : []).slice(0, 20).map(x => ({ desc: vjClean(x && x.desc, 40), pcs: Math.round(vjKoNum(x && x.pcs)), kRate: vjKo3R2(vjKoNum(x && x.kRate)), tRate: x && x.tRate !== '' && x.tRate != null ? vjKo3R2(vjKoNum(x.tRate)) : ((cfg.trates || []).find(t => t.name === vjClean(x && x.desc, 40)) || {}).rate || 0 })).filter(x => x.desc && x.pcs > 0);
     const t = { date, kt: String(b.tKt || o.kt || '').replace(/[^0-9PT]/gi, '').toUpperCase().slice(0, 3), gGold: gG, csWt, dWt, dWtAuto: b.dWt === '' || b.dWt == null, nGold: nIn !== null ? nIn : nAuto, nGoldAuto: nAuto, nGoldMan: nIn !== null,
       csCost, csCharge: csIn !== null ? csIn : vjKo3Up500(csCost * 2), csChargeMan: csIn !== null, others, otherTag: vjKo3R2(others.reduce((a, x) => a + x.pcs * x.tRate, 0)), labour: vjKo3R2(others.reduce((a, x) => a + x.pcs * x.kRate, 0)),
       making: vjKo3R2(vjKoNum(b.making)), lab: vjClean(b.lab, 30), details: vjClean(b.details, 200) };
+    if (chains.length) { t.chains = chains; t.chG = chG; }
+    { const src = v => { const x = vjClean(v, 40); return !x || x.toLowerCase() === String(o.karigar).toLowerCase() ? '' : /^cash/i.test(x) ? 'Cash (self)' : x; }; // C-20261103-CSSRC: '' = this karigar (his account)
+      const cS = src(b.csSrc), oS = src(b.othSrc); if (cS) { t.csSrc = cS; t.csSrcAmt = csCost; } if (oS) { t.othSrc = oS; t.othSrcAmt = vjKo3R2(others.reduce((a, x) => a + x.pcs * x.kRate, 0)); } }
     if (b.csUnit === 'ct' && csWt > 0) { const cv = vjKoNum(b.csVal); if (Math.abs(vjR3(cv / 5) - csWt) <= 0.001) { t.csUnit = 'ct'; t.csVal = Math.round(cv * 1000) / 1000; } } /* C-20261103-CSUNIT: CS wt typed in ct is kept as typed; csWt stays in grams (ct / 5) */
     if (kc.type === 'mounting') t.mkRate = vjKo3R2(vjKoNum(b.mkRate)) || Number(kc.making) || 0;
     if (vjKo3Grade(o) === 'B') { const mf = Number(b.mFine), mo = Number(b.mOth); if (!isFinite(mf) || Math.abs(mf) > 10000 || b.mFine === '' || b.mFine == null) return vjDeny(400, 'stock mounting: type the gold credited (fine g)'); Object.assign(t, { mFine: vjR3(mf), mLab: vjKo3R2(vjKoNum(b.mLab)), mOth: isFinite(mo) && Math.abs(mo) < 1e8 ? vjKo3R2(mo) : 0 }); }
-    Object.assign(o, { tag: t, rec, used, usedMan: !!(used0 && used0.length) }); t.deliv = vjKo3Deliv(o, cfg);
+    Object.assign(o, { tag: t, rec, used, usedMan: !!(used0 && used0.length) }); t.deliv = vjKo3Deliv(o, cfg); chOld = vjKoChIds(old.tag); chNew = vjKoChIds(t);
     if (o.status === 'open' || o.status === 'karigar') { o.status = 'received'; o.stage = o.stage || 'Ready'; o.statusAt = Object.assign({}, o.statusAt || {}, { received: now }); } post = true; }
   else if (op === 'diaadd') { if (!live) return vjDeny(409, 'this order is cancelled'); if (!canDia) return vjDeny(403, VJ_KO_DIAMSG); const rows = vjKo3Rows(b.iss, adm, []); if (!rows || !rows.length) return vjDeny(400, 'type pcs / ct of the diamonds issued');
     { const e = vjKoClash(cfg, o.dq, rows, adm, b.override, o); if (e) return vjDeny(400, e); } const nIss = (o.iss || []).concat(rows).slice(0, 60);
@@ -2469,8 +2500,21 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
   await vjOgHist(env, who, 'ko', id, act, old);
   await env.DB.prepare('UPDATE vj_kord SET data = ?, status = ?, karigar = ?, no = ?, ts = ? WHERE id = ?').bind(JSON.stringify(o), o.status, o.karigar, o.no, Date.now(), id).run();
   if (post) await vjKo3Post(env, who, o, now, rowsP);
+  let warn = ''; if (chNew) { const f = await vjKoChainUse(env, who, chOld.filter(x => !chNew.includes(x)), o, today, false), u = await vjKoChainUse(env, who, chNew, o, o.tag.date, true); if (u.length) warn = 'chain tag ' + u.join(', ') + ' could not be marked used - check Chains (vendors)'; } // CHAINREC
   await vjAudit(env, who, 'ko-' + act, 'korders/' + id, o.karigar + ' ' + o.no + ' ' + o.status);
-  return vjJson({ ok: true, order: vjKo3View(o, who, cfg) }); }
+  return vjJson({ ok: true, order: vjKo3View(o, who, cfg), warn }); }
+// C-20261103-CHAINREC: a vendor-chain tag used whole in a karigar piece is marked sold with sold.ko = the order (status back to what it was when the receive is deleted / corrected)
+const VJ_KO_CHP = ['Chain', 'Lock', 'Hook/Kadi', 'Other'];
+const vjKoChIds = t => ((t && Array.isArray(t.chains)) ? t.chains : []).map(c => c && c.tag).filter(Boolean);
+async function vjKoChainUse(env, who, ids, o, date, on) { const bad = [];
+  for (const id of ids) { if (!/^[A-Za-z0-9_\-.~]{1,60}$/.test(String(id))) continue; const path = 'tags/' + id, t = await env.DB.prepare('SELECT data, version FROM docs WHERE path = ?').bind(path).first(); if (!t) { if (on) bad.push(id); continue; }
+    const d = JSON.parse(t.data), mine = d.status === 'sold' && d.sold && d.sold.ko === o.id;
+    if (on) { if (mine) continue; if (d.status === 'sold') { bad.push(d.label || id); continue; } d.soldPrev = d.status || 'in_stock'; d.status = 'sold';
+      d.sold = { no: 'Karigar order ' + o.karigar + ' ' + o.no, date, name: 'used in karigar order ' + o.karigar + ' ' + o.no + ' on ' + vjDmy(date), ko: o.id, at: new Date().toISOString() }; }
+    else { if (!mine) continue; d.koFreed = (d.koFreed || []).concat([{ ko: o.id, no: o.no, karigar: o.karigar, used: d.sold.date, freed: date }]).slice(-10); d.status = d.soldPrev || 'in_stock'; delete d.sold; delete d.soldPrev; }
+    const r = await env.DB.prepare('UPDATE docs SET data = ?, version = ?, updated_at = ?, updated_by = ? WHERE path = ? AND version = ?').bind(JSON.stringify(d), t.version + 1, Date.now(), who.email, path, t.version).run();
+    if (r.meta && r.meta.changes === 1) await vjAudit(env, who, 'update', path, on ? 'chain used in karigar order ' + o.karigar + ' ' + o.no : 'chain freed from karigar order ' + o.karigar + ' ' + o.no); else if (on) bad.push(d.label || id); }
+  return bad; }
 async function vjOgOutSave(b, env, who, adm, now, byName, op, dateOk) {
   const id = String(b.id || '');
   const oldRow = /^O[a-z0-9]{6,20}$/.test(id) ? await env.DB.prepare('SELECT data FROM vj_og_out WHERE id = ?').bind(id).first() : null, old = oldRow ? vjParse(oldRow) : null;
