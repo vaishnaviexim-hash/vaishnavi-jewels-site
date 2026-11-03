@@ -464,7 +464,7 @@
           g("ds" + id).value = sh; fire(g("ds" + id), "change"); g("dq" + id).value = q; fire(g("dq" + id), "change"); if (q === "Other") { g("dqo" + id).value = (d.pkt || o.dq || "").toUpperCase(); fire(g("dqo" + id)); }
           g("dp" + id).value = String(d.pcs || 0); fire(g("dp" + id)); g("dc" + id).value = Number(d.tagCt).toFixed(2); fire(g("dc" + id)); });
         if (!(o.tagDia || []).length) addD(); } else left.push("diamond lines");
-      if (o.itemNote && /\d/.test(o.itemNote) && g("designNo") && !g("designNo").value) { g("designNo").value = o.itemNote.slice(0, 30); fire(g("designNo")); } /* KORDER6: design no. carried over */
+      if (o.itemNote && /\d/.test(o.itemNote) && false) {} /* KORDER6 item-note rule replaced by KORDER10 */ { const dn = g("designNo"); if (dn) { dn.value = String(o.no); fire(dn); dn.readOnly = true; dn.title = "from karigar order " + o.karigar + " " + o.no; let lk = g("koDnLock"); if (!lk) { lk = el("span", { id: "koDnLock", className: "hint" }); dn.after(lk); } lk.textContent = " 🔒 from karigar order " + o.karigar + " " + o.no; } } /* KORDER10: design no. = the order code, read-only (the server enforces it too) */
       const oa = g("otherAmt"); if (oa) { oa.value = String(Math.round((t.csCharge || 0) + (t.otherTag || 0))); fire(oa); }
       /* 18:19 C-20261102-ORDMAKING: the tag is priced by New tag's own formula - the order's making is not passed */
       if (o.drawing && g("photo") && window.DataTransfer) { try { const b = await (await fetch("/_blob/" + o.drawing, { credentials: "same-origin" })).blob(), dt = new DataTransfer(); dt.items.add(new File([b], "order-" + o.no + ".jpg", { type: b.type || "image/jpeg" })); g("photo").files = dt.files; fire(g("photo"), "change"); } catch (e) { left.push("photo"); } }
@@ -479,9 +479,11 @@
   // ---------- KORDER5 (owner 03/11 14:28): quick receive from the Pending row / order card -> delivery into that month's karigar account -> New tag
   // prefilled from the order; when that tag is saved the order is marked Tagged with the tag no. Nothing else changes; the server checks every figure.
   let tagFor = null;
-  { const f0 = window.fetch.bind(window); window.fetch = async function (u, opt) { const r = await f0(u, opt);
+  { const f0 = window.fetch.bind(window); window.fetch = async function (u, opt) {
+      try { const t0 = tagFor; if (t0 && opt && opt.method === "POST" && /\/api\/vj\/write$/.test(String(u)) && Date.now() - t0.at < 3 * 3600e3) { const b0 = JSON.parse(opt.body || "{}"); if (b0.op === "set" && b0.ifVersion === 0 && /^tags\//.test(b0.path || "") && b0.data && String(b0.data.designNo || "") === String(t0.no)) { /* only the tag still showing this order code */ b0.data.korder = { id: t0.id, no: t0.no, karigar: t0.karigar }; b0.data.designNo = String(t0.no); opt = Object.assign({}, opt, { body: JSON.stringify(b0) }); } } } catch (e) {} /* KORDER10: the new tag is linked to its karigar order */
+      const r = await f0(u, opt);
       try { const t = tagFor; if (t && r.ok && opt && opt.method === "POST" && /\/api\/vj\/write$/.test(String(u)) && Date.now() - t.at < 3 * 3600e3) { const b = JSON.parse(opt.body || "{}");
-          if (b.op === "set" && b.ifVersion === 0 && /^tags\//.test(b.path || "") && b.data) { tagFor = null; const no = String(b.data.label || b.path.slice(5));
+          if (b.op === "set" && b.ifVersion === 0 && /^tags\//.test(b.path || "") && b.data && b.data.korder && b.data.korder.id === t.id) { tagFor = null; { const dn = document.getElementById("designNo"), lk = document.getElementById("koDnLock"); if (dn) { dn.readOnly = false; dn.title = ""; } if (lk) lk.remove(); } const no = String(b.data.label || b.path.slice(5));
             post({ op: "status", id: t.id, to: "tagged", tagNo: no }).then(() => { const x = document.getElementById("koTagCopy"); if (x) x.append(el("div", { style: "font-weight:700;color:var(--ok)", textContent: "Karigar order " + t.karigar + " " + t.no + " marked Tagged (tag " + no + ")." })); }).catch(e => { const x = document.getElementById("koTagCopy"); if (x) x.append(el("div", { className: "kolate", textContent: "Tag saved, but the order was not marked Tagged (" + (e.message || e) + ") - open the order and press Mark: Tagged." })); }); } } } catch (e) {}
       return r; }; }
   function recvDlg(o) { if (!J.canAdd) return; const old = document.getElementById("koRecvDlg"); if (old) old.remove(); /* KORDER6 (owner 14:42): the full 'Received from karigar' form first, the tag only after it */
@@ -703,6 +705,7 @@
     $("koGoldNew").addEventListener("click", () => { if (!cur) return; if (!(num($("koGoldFine").value) > 0)) { $("koFMsg").textContent = "Type the fine g to issue."; return; } act({ op: "gold", id: cur.id, fine: $("koGoldFine").value }, "Gold issued to the karigar from the OG pool (also in OG register > Outward list) and linked."); });
     ["koFK", "koFS", "koFO"].forEach(i => $(i).addEventListener("change", render)); $("koQ").addEventListener("input", render);
     nav.addEventListener("click", e => { const x = e.target.closest("nav button"); if (!x) return; show(x.dataset.tab === "korder"); });
+    document.addEventListener("click", e => { const x = e.target.closest && e.target.closest('[data-tab="new"]'); if (!x || !e.isTrusted || !tagFor) return; tagFor = null; const dn = $("designNo"), lk = $("koDnLock"); if (dn) { dn.readOnly = false; dn.title = ""; } if (lk) lk.remove(); }, true); /* KORDER10: opening New tag by hand = a free design no. again */
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", build); else build();
   setTimeout(build, 1200);
