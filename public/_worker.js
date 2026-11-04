@@ -404,7 +404,7 @@ async function vjSync(request, env, who, ctx) {
     return { path: r.path, data, version: r.version };
   }).filter(Boolean);
   // 'now - 2000' so a write landing in the same millisecond is never missed on the next poll
-  return vjJson({ now: now - 2000, docs: out, deleted: del, me: { email: who.email, role: who.role, name: who.name, enq: !!(await vjEnqWho(env, who)) } }); // enq: C-20261103-ENQMERGE
+  return vjJson({ now: now - 2000, docs: out, deleted: del, me: { email: who.email, role: who.role, name: who.name, enq: !!(await vjEnqWho(env, who)), cash: vjCbCan(who) } }); /* cash: C-20261104-CASHBOOK */ // enq: C-20261103-ENQMERGE
 }
 
 async function vjWrite(request, env, who, ctx) {
@@ -2738,7 +2738,8 @@ async function vjLedgerLoad(env) {
   const bills = ((((await env.DB.prepare("SELECT data FROM vj_bills WHERE no LIKE 'B-%' ORDER BY ts").all()).results) || []).map(vjParse))
     .filter(b => b && !b.cancelled && b.title !== 'Estimate'); // owner 17/10: cancelled bills appear nowhere
   const all = ((((await env.DB.prepare('SELECT data FROM vj_receipts ORDER BY ts').all()).results) || []).map(vjParse)).filter(Boolean);
-  return { bills, rcs: all.filter(r => !r.reversed), all };
+  let ob = {}; try { const m = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'ob:cust'").first(); ob = m ? JSON.parse(m.v) || {} : {}; } catch (e) {} // C-20261104-CASHBOOK: party opening balances (owner, Opening balances screen)
+  return { bills, rcs: all.filter(r => !r.reversed), all, ob, recon: await vjReconLoad(env) };
 }
 // one bill's position: rupees received (incl. old gold taken in rupees and adjustments in, less adjustments out), fine gold received
 function vjBillPos(b, rcs) {
@@ -2759,18 +2760,20 @@ function vjCustomers(L) {
     const c = C.get(key), at = String(src.at || src.date || ''); if (at >= c.last) { c.last = at; c.name = src.name || c.name; c.city = src.city || ''; c.mobile = src.mobile || ''; } return c; };
   L.bills.forEach(b => get(vjLKey(b.name, b.city, b.mobile), b).bills.push(b));
   L.rcs.forEach(r => get(r.key, r).rcs.push(r));
+  Object.entries(L.ob || {}).forEach(([k, o]) => { if (o && (Number(o.amt) || Number(o.fine))) get(k, { name: o.name, city: o.city, mobile: o.mobile, at: '' }); });
   for (const c of C.values()) {
     c.pos = c.bills.map(b => Object.assign({ no: b.no, date: b.date, total: b.total, settled: b.settled || null }, vjBillPos(b, L.rcs)));
     c.account = c.rcs.filter(r => !r.bill).reduce((a, r) => a + (r.dir === 'out' ? -1 : 1) * (Number(r.amount) || 0), 0);
     c.billed = c.pos.reduce((a, p) => a + p.orig, 0);
     c.received = c.rcs.filter(r => r.mode !== 'adjust').reduce((a, r) => a + (Number(r.amount) || 0), 0);
     c.sd = c.pos.reduce((a, p) => a + p.sd, 0);
-    c.dsc = c.pos.reduce((a, p) => a + (p.dsc || 0), 0); c.balance = c.billed - c.received - c.sd - c.dsc; // BILLDISC
-    c.fineDue = vjR3(c.pos.reduce((a, p) => a + Math.max(0, p.fineDue), 0));
+    c.dsc = c.pos.reduce((a, p) => a + (p.dsc || 0), 0); c.open = Math.round(Number(((L.ob || {})[c.key] || {}).amt) || 0); c.balance = c.open + c.billed - c.received - c.sd - c.dsc; // BILLDISC; open: C-20261104-CASHBOOK
+    c.fineOpen = vjR3(Number(((L.ob || {})[c.key] || {}).fine) || 0); c.fineDue = vjR3(c.fineOpen + c.pos.reduce((a, p) => a + Math.max(0, p.fineDue), 0)); // fineOpen: C-20261104-CASHBOOK
+    { const rr = vjReconOf(L, 'cust', c.key); if (rr.length) { c.balance -= rr.reduce((a, r) => a + r.rs, 0); c.fineDue = vjR3(c.fineDue - rr.reduce((a, r) => a + r.fine, 0)); c.reconUpto = rr[rr.length - 1].upto; } } // RECONCILE
   }
   return C;
 }
-const vjCustBrief = c => ({ key: c.key, name: c.name, city: c.city, mobile: c.mobile, bills: c.bills.length, billed: c.billed, received: c.received, settlement: c.sd, discount: c.dsc || 0, balance: c.balance, account: c.account, fineDue: c.fineDue });
+const vjCustBrief = c => ({ open: c.open || 0, fineOpen: c.fineOpen || 0, key: c.key, name: c.name, city: c.city, mobile: c.mobile, bills: c.bills.length, billed: c.billed, received: c.received, settlement: c.sd, discount: c.dsc || 0, balance: c.balance, account: c.account, fineDue: c.fineDue });
 const vjRcText = r => {
   const d = r.details || {};
   if (r.mode === 'cheque') return 'Cheque no. ' + (d.chequeNo || '') + (d.bank ? ', ' + d.bank : '');
@@ -2782,6 +2785,54 @@ const vjRcText = r => {
 };
 const vjAgainst = r => r.bill || 'on account';
 
+// one customer's running ledger (Rs + fine g), shared by the Ledger view and Reconcile (C-20261104-CASHBOOK)
+function vjCustEv(L, c) {
+    const ev = []; if (c.open || c.fineOpen) ev.push({ date: String(((L.ob || {})[c.key] || {}).date || ''), at: '', vch: 'Opening', part: 'Opening balance', dr: c.open > 0 ? c.open : 0, cr: c.open < 0 ? -c.open : 0, fdr: c.fineOpen > 0 ? c.fineOpen : 0, fcr: c.fineOpen < 0 ? -c.fineOpen : 0 }); // C-20261104-CASHBOOK
+    c.bills.forEach(b => { const ps = c.pos.find(x => x.no === b.no);
+      ev.push({ date: b.date, at: b.at || '', vch: b.no, part: 'Bill ' + b.no + (b.settle === 'fine' && b.fine ? ' (+ ' + Number(b.fine).toFixed(3) + ' g fine gold)' : '') + (b.og && b.og.no ? ' - Gold to Gold, OG ' + b.og.no + ': fine ' + Number(b.og.due).toFixed(3) + ' g due, ' + Number(b.og.recv).toFixed(3) + ' g received' + (b.og.bal ? ', difference ' + Number(b.og.bal).toFixed(3) + ' g @ ' + b.og.rate + ' in rupees' : '') : ''), dr: ps.orig, cr: 0,
+        fdr: b.settle === 'fine' ? (b.og ? vjR3(b.og.due) : vjR3(b.fine)) : 0, fcr: b.settle === 'fine' && b.og ? vjR3(b.og.recv) : 0 }); // fine columns: C-20261104-CASHBOOK (OG in = fine in, only the difference is in rupees on the bill)
+      (Array.isArray(b.discs) ? b.discs : []).forEach(d => ev.push({ date: d.date, at: d.at, part: 'Discount allowed on ' + b.no + (d.note ? ' (' + d.note + ')' : '') + ' - ' + (d.byName || ''), dr: 0, cr: Number(d.amount) || 0 })); // BILLDISC
+      if (b.settled) ev.push({ date: String(b.settled.at).slice(0, 10), at: b.settled.at, vch: b.no, part: 'Settlement discount on ' + b.no + (b.settled.fineWaived ? ', fine gold waived ' + Number(b.settled.fineWaived).toFixed(3) + ' g' : ''), dr: 0, cr: ps.sd, fcr: vjR3(b.settled.fineWaived || 0) }); });
+    c.rcs.forEach(r => { if (r.mode === 'adjust') { if (r.dir === 'in') ev.push({ date: r.date, at: r.at, part: `Adjustment ${r.no}: ${vjInr(r.amount)} moved from ${(r.details && r.details.other) || 'account'} to ${vjAgainst(r)}`, dr: 0, cr: 0 }); return; }
+      ev.push({ date: r.date, at: r.at, vch: r.no, part: `Receipt ${r.no} - ${vjRcText(r)} - against ${vjAgainst(r)}` + (r.note ? ' - ' + r.note : ''), dr: 0, cr: Number(r.amount) || 0, fcr: r.mode === 'gold' && r.details && r.details.goldAs === 'fine' ? vjR3(r.fine) : 0 }); });
+    vjReconOf(L, 'cust', c.key).forEach(r => ev.push(vjReconEv(r, 'cust')));
+    ev.sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.at).localeCompare(String(b.at)));
+    let run = 0, frun = 0; ev.forEach(e => { e.fdr = e.fdr || 0; e.fcr = e.fcr || 0; run += e.dr - e.cr; frun = vjR3(frun + e.fdr - e.fcr); e.bal = run; e.fbal = frun; });
+    return ev; }
+// RECONCILE (owner Abhinav only, 04/11 15:03): ONE adjusting entry dated X brings the party's balance as on X to 0 Rs / 0 g; its entries up to X are then
+// archived = hidden from ledgers, cash book lists, day book, receipt register and pending lists (kept in D1; owner sees them with 'Show reconciled history').
+// Money is never dropped: archived cash lines still count in the cash totals (shown as one 'reconciled entries' line). Undo = the last one, owner only.
+const VJ_RECON_T = { dgiven: 'Discount given (to party)', drecv: 'Discount received (from party)', profit: 'Extra profit / Rounded off' }, VJ_RECON_F = { wo: 'Fine difference written off', gain: 'Fine difference gained' };
+const vjReconOf = (L, kind, key) => (L.recon || []).filter(r => r.kind === kind && r.key === key && !r.undone).sort((a, b) => String(a.upto).localeCompare(String(b.upto)) || String(a.at).localeCompare(String(b.at)));
+const vjReconEv = (r, kind) => { const t = (VJ_RECON_T[r.type] || '') + (r.fine ? (r.type ? ', ' : '') + (VJ_RECON_F[r.ftype] || 'fine difference') : ''), nar = 'Reconciled up to ' + vjDmy(r.upto) + ' by ' + (r.byName || 'Abhinav') + (t ? ' (' + t + ')' : '');
+  return kind === 'cust' ? { date: r.upto, at: '\uffff' + r.at, vch: 'RECON', part: nar, dr: r.rs < 0 ? -r.rs : 0, cr: r.rs > 0 ? r.rs : 0, fdr: r.fine < 0 ? -r.fine : 0, fcr: r.fine > 0 ? r.fine : 0 }
+    : { date: r.upto, kind: 'recon', descr: nar, cr: r.rs < 0 ? -r.rs : 0, dr: r.rs > 0 ? r.rs : 0, crFine: r.fine < 0 ? -r.fine : 0, drFine: r.fine > 0 ? r.fine : 0, byName: r.byName, recon: true }; };
+async function vjReconLoad(env) { try { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_recon (id TEXT PRIMARY KEY, ts INTEGER, data TEXT)').run(); return ((((await env.DB.prepare('SELECT data FROM vj_recon ORDER BY ts').all()).results) || []).map(vjParse)).filter(Boolean); } catch (e) { return []; } }
+// the balance as on X: customers from their ledger, creditors from their account book
+async function vjReconBal(env, kind, key, upto) {
+  if (kind === 'cust') { const L = await vjLedgerLoad(env), c = vjCustomers(L).get(key); if (!c) return null; const ev = vjCustEv(L, c).filter(e => e.date <= upto), last = ev.slice(-1)[0] || { bal: 0, fbal: 0 }; return { name: c.name, rs: Math.round(last.bal), fine: vjR3(last.fbal) }; }
+  const { book } = await vjCrBook(env), b = book.find(x => x.a.id === key); if (!b) return null; const l = b.L.filter(x => x.date <= upto); let bal = Number(b.a.openAmt) || 0, fb = Number(b.a.openFine) || 0;
+  l.forEach(x => { bal += x.cr - x.dr; fb = vjR3(fb + x.crFine - x.drFine); }); return { name: b.a.name, rs: Math.round(bal), fine: fb }; }
+// GET /api/vj/recon?kind=cust|cred&key=&upto=  ;  POST /api/vj/recon {op: 'do', kind, key, upto, type, ftype, expect: {rs, fine}} | {op: 'undo', kind, key}
+async function vjRecon(request, url, env, who) {
+  if (!vjCanSettle(who)) return vjDeny(403, 'only Abhinav can reconcile');
+  const get = request.method === 'GET'; let b = {}; if (!get) { if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed'); try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); } }
+  const P = k => get ? url.searchParams.get(k) : b[k], kind = P('kind') === 'cred' ? 'cred' : P('kind') === 'cust' ? 'cust' : '', key = String(P('key') || '').slice(0, 120);
+  if (!kind || !key || (kind === 'cust' && !/^(m:\d{10}|n:[^|]{0,60}\|[^|]{0,40})$/.test(key)) || (kind === 'cred' && !/^CR[a-z0-9]{3,20}$/i.test(key))) return vjDeny(400, 'bad party');
+  const R = await vjReconLoad(env), mine = R.filter(r => r.kind === kind && r.key === key && !r.undone).sort((a, c) => String(a.at).localeCompare(String(c.at)));
+  if (!get && b.op === 'undo') { const last = mine.slice(-1)[0]; if (!last) return vjDeny(404, 'nothing to undo'); last.undone = { at: new Date().toISOString(), byName: vjByName(who) };
+    await env.DB.prepare('UPDATE vj_recon SET data = ? WHERE id = ?').bind(JSON.stringify(last), last.id).run(); await vjAudit(env, who, 'recon-undo', 'recon/' + last.id, last.name + ' up to ' + last.upto); return vjJson({ ok: true }); }
+  const upto = String(P('upto') || ''); if (!/^\d{4}-\d{2}-\d{2}$/.test(upto) || isNaN(Date.parse(upto)) || upto > vjIstDay()) return vjDeny(400, 'pick the date (today or earlier)');
+  if (mine.length && upto <= mine[mine.length - 1].upto) return vjDeny(409, 'already reconciled up to ' + vjDmy(mine[mine.length - 1].upto) + ' - pick a later date (or Undo last reconcile)');
+  const bal = await vjReconBal(env, kind, key, upto); if (!bal) return vjDeny(404, 'party not found');
+  if (get) return vjJson({ ok: true, name: bal.name, upto, rs: bal.rs, fine: bal.fine, last: mine.length ? mine[mine.length - 1].upto : '' });
+  const ex = b.expect || {}; if (Number(ex.rs) !== bal.rs || vjR3(Number(ex.fine) || 0) !== bal.fine) return vjJson({ error: 'the balance changed meanwhile - look again' }, 409);
+  const type = bal.rs ? (Object.prototype.hasOwnProperty.call(VJ_RECON_T, b.type) ? b.type : '') : '', ftype = bal.fine ? (Object.prototype.hasOwnProperty.call(VJ_RECON_F, b.ftype) ? b.ftype : '') : '';
+  if (bal.rs && !type) return vjDeny(400, 'what is the rupee difference?'); if (bal.fine && !ftype) return vjDeny(400, 'what is the fine difference?');
+  const id = 'RC' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), rec = { id, kind, key, name: bal.name, upto, rs: bal.rs, fine: bal.fine, type, ftype, by: who.email, byName: vjByName(who), at: new Date().toISOString() };
+  await env.DB.prepare('INSERT INTO vj_recon (id, ts, data) VALUES (?, ?, ?)').bind(id, Date.now(), JSON.stringify(rec)).run();
+  await vjAudit(env, who, 'recon', 'recon/' + id, `${kind} ${bal.name} up to ${upto}: Rs ${bal.rs} (${type}) fine ${bal.fine} (${ftype})`);
+  return vjJson({ ok: true, recon: rec }); }
 // GET /api/vj/ledger?q=... | ?open=1 | ?key=... ; GET /api/vj/ledger/bill?no= ; GET /api/vj/receipt?no=
 async function vjLedgerGet(url, env, who) {
   const L = await vjLedgerLoad(env), C = vjCustomers(L), p = url.pathname;
@@ -2800,7 +2851,9 @@ async function vjLedgerGet(url, env, who) {
     if (key.length > 120 || !/^(m:\d{10}|n:[^|]{0,60}\|[^|]{0,40})$/.test(key)) return vjDeny(400, 'bad customer');
     const c = C.get(key); if (!c) return vjDeny(404, 'not found');
     // running ledger: bill = debit (its original total), settlement = credit, receipts = credit; an adjustment pair is one line, no amount
-    const ev = [];
+    const ev = vjCustEv(L, c), hist = url.searchParams.get('hist') === '1' && vjCanSettle(who), lastR = vjReconOf(L, 'cust', c.key).slice(-1)[0];
+    const shown = !lastR || hist ? ev : [{ date: lastR.upto, at: '', vch: 'B/F', part: 'Balance b/f after reconcile up to ' + vjDmy(lastR.upto), dr: 0, cr: 0, fdr: 0, fcr: 0, bal: (ev.filter(x => x.date <= lastR.upto).slice(-1)[0] || { bal: 0 }).bal, fbal: (ev.filter(x => x.date <= lastR.upto).slice(-1)[0] || { fbal: 0 }).fbal }].concat(ev.filter(x => x.date > lastR.upto));
+    if (0) { const ev = [];
     c.bills.forEach(b => { const ps = c.pos.find(x => x.no === b.no);
       ev.push({ date: b.date, at: b.at || '', part: 'Bill ' + b.no + (b.settle === 'fine' && b.fine ? ' (+ ' + Number(b.fine).toFixed(3) + ' g fine gold)' : ''), dr: ps.orig, cr: 0 });
       (Array.isArray(b.discs) ? b.discs : []).forEach(d => ev.push({ date: d.date, at: d.at, part: 'Discount allowed on ' + b.no + (d.note ? ' (' + d.note + ')' : '') + ' - ' + (d.byName || ''), dr: 0, cr: Number(d.amount) || 0 })); // BILLDISC
@@ -2808,13 +2861,13 @@ async function vjLedgerGet(url, env, who) {
     c.rcs.forEach(r => { if (r.mode === 'adjust') { if (r.dir === 'in') ev.push({ date: r.date, at: r.at, part: `Adjustment ${r.no}: ${vjInr(r.amount)} moved from ${(r.details && r.details.other) || 'account'} to ${vjAgainst(r)}`, dr: 0, cr: 0 }); return; }
       ev.push({ date: r.date, at: r.at, part: `Receipt ${r.no} - ${vjRcText(r)} - against ${vjAgainst(r)}`, dr: 0, cr: Number(r.amount) || 0 }); });
     ev.sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.at).localeCompare(String(b.at)));
-    let run = 0; ev.forEach(e => { run += e.dr - e.cr; e.bal = run; });
+    let run = 0; ev.forEach(e => { run += e.dr - e.cr; e.bal = run; }); } // old inline ledger (replaced by vjCustEv above, kept off)
     await vjAudit(env, who, 'ledger-view', 'ledger/' + key.slice(0, 60), c.name);
     return vjJson({ ok: true, canSettle: vjCanSettle(who), customer: vjCustBrief(c),
       bills: c.bills.map(b => { const ps = c.pos.find(x => x.no === b.no); return { no: b.no, date: b.date, total: ps.orig, nowTotal: b.total, sub: b.sub, received: ps.recv, settlement: ps.sd, discount: ps.dsc, balance: ps.bal, fine: ps.fine, fineRecv: ps.fineRecv, fineDue: ps.fineDue, gstPct: b.gstPct,
         settled: b.settled ? { at: b.settled.at, byName: b.settled.byName, discount: b.settled.discount, gstReduction: b.settled.gstReduction, paid: b.settled.paid, fineWaived: b.settled.fineWaived || 0 } : null }; }),
       receipts: c.rcs.map(r => ({ no: r.no, date: r.date, mode: r.mode, modeName: VJ_RC_MODES[r.mode], text: vjRcText(r), amount: r.amount, fine: r.fine || 0, bill: r.bill || '', dir: r.dir || '', note: r.note || '', byName: r.byName || '' })),
-      ledger: ev });
+      ledger: shown, recon: lastR ? { upto: lastR.upto, n: vjReconOf(L, 'cust', c.key).length } : null, canRecon: vjCanSettle(who), hist });
   }
   const open = url.searchParams.get('open') === '1', q = String(url.searchParams.get('q') || '').trim().slice(0, 40);
   if (!open && q.length < 2) return vjDeny(400, 'type at least 2 letters or digits');
@@ -5179,6 +5232,11 @@ async function vjHandle(request, env, ctx, url) {
     return vjDeny(405, 'method not allowed');
   }
   if ((p === '/api/vj/challan' || p === '/api/vj/challan/cancel') && request.method === 'POST') { if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed'); return p === '/api/vj/challan' ? vjChallanSave(request, env, who) : vjChallanCancel(request, env, who); }
+  if ((p === '/api/vj/cash' || p === '/api/vj/cash.xlsx') && request.method === 'GET') return vjCashGet(url, env, who); // C-20261104-CASHBOOK (who may: checked inside)
+  if (p === '/api/vj/recon' && (request.method === 'GET' || request.method === 'POST')) return vjRecon(request, url, env, who); // RECONCILE (Abhinav only, inside)
+  if (p === '/api/vj/creditors' && request.method === 'GET') return vjCredGet(url, env, who); // C-20261104-CASHBOOK creditor accounts (admin only, inside)
+  if (p === '/api/vj/creditors' && request.method === 'POST') return vjSameSite(request, env) ? vjCredPost(request, env, who) : vjDeny(403, 'not allowed');
+  if (p === '/api/vj/cash' && request.method === 'POST') return vjSameSite(request, env) ? vjCashPost(request, env, who) : vjDeny(403, 'not allowed'); // C-20261104-CASHBOOK
   if (p === '/api/vj/bill/disc' && request.method === 'POST') return vjSameSite(request, env) ? vjBillDisc(request, env, who) : vjDeny(403, 'not allowed'); // C-20261103-BILLDISC
   if (['/api/vj/receipt', '/api/vj/receipt/reverse', '/api/vj/ledger/settle', '/api/vj/ledger/unsettle'].includes(p) && request.method === 'POST') {
     if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed');
