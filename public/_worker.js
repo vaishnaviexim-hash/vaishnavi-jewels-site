@@ -2168,6 +2168,13 @@ async function vjKo3Post(env, who, o, now, rows, dry) { // reverse what this ord
 // The ledger is running, so a month's closing is automatically the next month's opening.
 let vjKoSetOk = false;
 async function vjKoSetT(env) { if (vjKoSetOk) return; await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_karigar_settle (id TEXT PRIMARY KEY, karigar TEXT, month TEXT, status TEXT, ts INTEGER, data TEXT)').run(); vjKoSetOk = true; }
+// C-20261104-KPAYMONTH (owner 15:31): a payment made for a month account (forMonth) counts in that month even when paid later
+const vjKoEffD = l => { const d = String(l.date || ''); if (l.type !== 'pay' || !/^\d{4}-\d{2}$/.test(String(l.forMonth || '')) || d.slice(0, 7) <= l.forMonth) return d;
+  const y = Number(l.forMonth.slice(0, 4)), m = Number(l.forMonth.slice(5, 7)); return l.forMonth + '-' + String(new Date(Date.UTC(y, m, 0)).getUTCDate()).padStart(2, '0'); };
+// rupee due of a karigar's month accounts (closing cash of each month), last 6 months up to now - Abhinav / Shilpiji only
+async function vjKoMonthDues(env, who, k) { const cfg = await vjKo3Cfg(env), out = []; const now = vjIstDay().slice(0, 7); let y = Number(now.slice(0, 4)), m = Number(now.slice(5, 7));
+  for (let i = 0; i < 6; i++) { const mon = y + '-' + String(m).padStart(2, '0'), st = await vjKoStmt(env, who, cfg, k, mon, []); out.push({ month: mon, label: vjKoMonTxt(mon), due: vjKo3R2(st.closeCash || 0) }); m--; if (!m) { m = 12; y--; } }
+  return out; }
 const vjKoMonTxt = m => { const p = String(m || '').split('-'); return (['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(p[1]) - 1] || '') + ' ' + p[0]; };
 async function vjKoLockMsg(env, pairs) { await vjKoSetT(env); const L = (((await env.DB.prepare("SELECT karigar, month FROM vj_karigar_settle WHERE status = 'locked'").all()).results) || []); if (!L.length) return '';
   for (const [k, d] of pairs) { if (!k || !d) continue; const m = String(d).slice(0, 7), hit = L.find(x => String(x.karigar).toLowerCase() === String(k).toLowerCase() && x.month === m);
@@ -2177,7 +2184,7 @@ async function vjKoSnap(env, k, month, orders) { const start = month + '-01', y 
   const kl = String(k).toLowerCase(), L = (await vjKo3Ledger(env)).filter(l => String(l.karigar).toLowerCase() === kl), op = L.find(l => l.type === 'opening' && !l.rev && l.status === 'ok'), openD = op ? op.ogFrom || op.date : '';
   const G = ((((await env.DB.prepare('SELECT data FROM vj_og_out ORDER BY ts').all()).results) || []).map(vjParse)).filter(g => g && !g.cancelled && g.to === 'karigar' && String(g.karigar).toLowerCase() === kl && !(openD && String(g.date) < openD));
   const s = { openFine: 0, openCash: 0, goldIssued: 0, credited: 0, fineOther: 0, labour: 0, paid: 0, cashOther: 0 }, rows = [];
-  L.forEach(l => { const d = String(l.date || ''), f = Number(l.fine) || 0, c = Number(l.cash) || 0; if (d >= end) return;
+  L.forEach(l => { const d = vjKoEffD(l), f = Number(l.fine) || 0, c = Number(l.cash) || 0; if (d >= end) return;
     if (d < start || l.type === 'opening') { s.openFine += f; s.openCash += c; if (d >= start) rows.push({ date: d, type: 'opening', no: '', descr: l.descr, fine: f, cash: c }); return; }
     rows.push({ date: d, type: l.type === 'pay' ? 'cash given' : l.type, no: l.no || '', descr: l.descr, fine: f, cash: c });
     if (l.type === 'delivery' || l.type === 'excel') s.credited -= f; else s.fineOther += f;
@@ -2276,7 +2283,7 @@ async function vjKoStmt(env, who, cfg, k, month, orders) { await vjKoTkT(env); c
   const T = {}; ((((await env.DB.prepare('SELECT k, data FROM vj_karigar_tick WHERE karigar = ? AND month = ?').bind(k, month).all()).results) || [])).forEach(r => { const d = vjParse(r); if (d) T[r.k] = d; });
   const tk = key => T[key] && T[key].ok ? { by: T[key].byName, at: T[key].at, note: T[key].note || '' } : T[key] && T[key].note ? { note: T[key].note, open: true } : null;
   let openFine = 0, openCash = 0; const groups = new Map(), cash = []; const inM = d => d >= start && d < end;
-  L.forEach(l => { const d = String(l.date || ''), f = Number(l.fine) || 0, c = Number(l.cash) || 0; if (d >= end) return;
+  L.forEach(l => { const d = vjKoEffD(l), f = Number(l.fine) || 0, c = Number(l.cash) || 0; if (d >= end) return;
     if (d < start || l.type === 'opening') { openFine += f; openCash += c; return; }
     if (['delivery', 'labour', 'excel'].includes(l.type) && l.ref) { const g = groups.get(l.ref) || []; g.push(l); groups.set(l.ref, g); return; }
     cash.push({ key: 'C:' + l.id, id: l.id, type: l.type, date: d, no: l.no || '', descr: l.descr, fine: f, cash: adm ? c : null, _c: c }); });
@@ -4845,6 +4852,8 @@ async function vjCashGet(url, env, who) {
     needLink: adm ? S.E.filter(e => e.needLink).length : 0, pend: vjCbPend(cfg, S.E), staff: (cfg.staff || []).map(s => s.name), myStaff: vjCbMyStaff(cfg, who), canGive: vjCbGiver(who),
     toConfirm: S.E.filter(e => e.vk === 'conf' && !e.tick).length };
   if (url.searchParams.get('opening') === '1') return vjCbOpeningGet(env, who);
+  if (url.searchParams.get('kdue')) { if (!adm) return vjDeny(403, 'only Abhinav or Shilpiji'); const ks = await vjCbKarigars(env), k = ks.find(x => x.toLowerCase() === String(url.searchParams.get('kdue')).toLowerCase()); if (!k) return vjDeny(404, 'karigar not found');
+    return vjJson({ ok: true, karigar: k, months: await vjKoMonthDues(env, who, k) }); } // KPAYMONTH
   if (url.searchParams.get('reg') === '1') { // PARTY RECEIPT REGISTER: every receipt (bill '+ Pay', Ledger, Cash book) from vj_receipts, filters month / party / mode / not verified
     const qm = /^\d{4}-\d{2}$/.test(month) ? month : '', q = vjNk(String(url.searchParams.get('q') || '').slice(0, 40)), qd = String(url.searchParams.get('q') || '').replace(/\D/g, ''), md = String(url.searchParams.get('mode') || ''), st = String(url.searchParams.get('st') || '');
     const bk = st === 'bank', s0 = vjCbStart(cfg); // 'Bank pending' = every UPI / Bank line (receipts AND expenses / karigar) since the start, not yet ticked - a ticked line drops out
@@ -4880,27 +4889,28 @@ async function vjCbFields(env, who, b, cfg, cur) {
   if (!adm && !cur && date < vjIstDay(-3)) return { error: 'staff can enter only the last 3 days - ask Abhinav / Shilpiji for older entries' };
   if (cfg.openDate && date < cfg.openDate) return { error: 'the cash book starts on ' + vjDmy(cfg.openDate) };
   if (vjCbLocked(cfg, date) || (cur && vjCbLocked(cfg, cur.date))) return { error: 'that month is closed' };
-  const cat = cfg.cats.includes(b.cat) ? b.cat : ''; if (!cat) return { error: 'choose the category' };
+  const cat = cfg.cats.includes(b.cat) || b.cat === VJ_CB_KAR ? b.cat : ''; if (!cat) return { error: 'choose the category' }; // Karigars always allowed (karigar account 'Pay')
   const amount = vjMoney(b.amount); if (!(amount >= 1 && amount <= 1e8)) return { error: 'amount looks wrong' };
   const mode = Object.prototype.hasOwnProperty.call(VJ_CB_MODES, b.mode) ? b.mode : ''; if (!mode) return { error: 'cash, UPI or bank? (no cards)' };
   const ref = mode === 'cash' ? '' : vjClean(b.ref, 40), to = vjClean(b.to, 60), note = vjClean(b.note, 120);
   if (note.length < 2) return { error: 'write the narration - what was it for?' }; // owner 14:55: every expense needs a narration
   let photo = ''; if (b.photo) { photo = String(b.photo); if (!/^[0-9a-f]{32}$/.test(photo)) return { error: 'bad photo' }; if (!(cur && cur.photo === photo) && !(await vjPhotoHas(env, photo))) return { error: 'photo not found - add it again' }; }
-  let kar = ''; if (cat === VJ_CB_KAR) { const ks = await vjCbKarigars(env); kar = ks.find(k => k.toLowerCase() === String(b.kar || '').trim().toLowerCase()) || ''; if (!kar) return { error: 'choose the karigar' }; }
+  let kar = '', kmonth = ''; if (cat === VJ_CB_KAR) { const ks = await vjCbKarigars(env); kar = ks.find(k => k.toLowerCase() === String(b.kar || '').trim().toLowerCase()) || ''; if (!kar) return { error: 'choose the karigar' };
+    kmonth = String(b.kmonth || ''); if (kmonth && (!/^\d{4}-(0[1-9]|1[0-2])$/.test(kmonth) || kmonth > date.slice(0, 7))) return { error: 'month account looks wrong' }; } // KPAYMONTH
   let from = 'store'; if (mode === 'cash' && b.from && b.from !== 'store') { const s = (cfg.staff || []).find(x => x.name === b.from); if (!s) return { error: 'paid from: choose the store or a staff name' };
     if (!adm && vjCbMyStaff(cfg, who) !== s.name && !(cur && cur.from === s.name)) return { error: 'only ' + s.name + "'s own login or Abhinav / Shilpiji can enter " + s.name + "'s spending" }; from = s.name; }
-  return { f: { date, cat, amount, mode, ref, to: to || kar, note, photo, kar, from } };
+  return { f: { date, cat, amount, mode, ref, to: to || kar, note, photo, kar, from, kmonth } };
 }
 // the karigar-account row for a cash book karigar payment (same columns as Karigar order > account 'pay')
 async function vjCbKarRow(env, who, x, cbId) {
-  const lk = await vjKoLockMsg(env, [[x.kar, x.date]]); if (lk) return { error: lk };
+  const lk = await vjKoLockMsg(env, [[x.kar, x.date]].concat(x.kmonth ? [[x.kar, x.kmonth + '-01']] : [])); if (lk) return { error: lk };
   const id = 'KP' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), at = new Date().toISOString();
-  const descr = vjClean((x.note || 'Cash paid') + ' (cash book' + (x.mode !== 'cash' ? ', ' + VJ_CB_MODES[x.mode] + (x.ref ? ' ' + x.ref : '') : '') + ')', 120);
-  const r = { id, date: x.date, karigar: x.kar, ref: '', type: 'pay', descr, fine: 0, cash: -x.amount, status: 'ok', by: who.email, byName: vjByName(who), at, mode: x.mode, cb: cbId };
+  const descr = vjClean((x.note || 'Cash paid') + ' (' + VJ_CB_MODES[x.mode] + (x.ref ? ' ' + x.ref : '') + (x.kmonth ? ', for ' + vjKoMonTxt(x.kmonth) + ' account' : '') + ')', 120);
+  const r = { id, date: x.date, karigar: x.kar, ref: '', type: 'pay', descr, fine: 0, cash: -x.amount, status: 'ok', by: who.email, byName: vjByName(who), at, mode: x.mode, cb: cbId }; if (x.kmonth) r.forMonth = x.kmonth;
   return { id, stmt: env.DB.prepare('INSERT INTO vj_karigar_ledger (id, ts, date, karigar, ref, type, descr, fine, cash, status, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, Date.now(), x.date, x.kar, '', 'pay', descr, 0, r.cash, 'ok', JSON.stringify(r)) };
 }
 const vjCbPut = (env, e, was) => env.DB.prepare('UPDATE vj_cash SET date = ?, status = ?, data = ? WHERE id = ? AND data = ?').bind(e.date, e.status, JSON.stringify(e), e.id, was);
-const VJ_CB_HKEYS = ['date', 'cat', 'amount', 'mode', 'ref', 'to', 'note', 'photo', 'kar', 'from', 'staff', 'acct', 'fine', 'chq', 'bank'];
+const VJ_CB_HKEYS = ['date', 'cat', 'amount', 'mode', 'ref', 'to', 'note', 'photo', 'kar', 'from', 'staff', 'acct', 'fine', 'chq', 'bank', 'kmonth'];
 // a move of cash store <-> a staff float: 'give' (Abhinav / Shilpiji only) or 'ret' (any login; the owner confirms it with a tick)
 async function vjCbMvFields(env, who, b, cfg, S, cur) {
   const date = String(b.date || vjIstDay()); if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(Date.parse(date)) || date < '2024-01-01' || date > vjIstDay(1)) return { error: 'bad date' };
@@ -4937,7 +4947,8 @@ async function vjCashPost(request, env, who) {
     if (v.f.cat === VJ_CB_KAR && adm) { const k = await vjCbKarRow(env, who, v.f, id); if (k.error) return vjDeny(409, k.error); e.kpay = k.id; st.push(k.stmt); }
     st.push(env.DB.prepare('INSERT INTO vj_cash (id, ts, date, status, data) VALUES (?, ?, ?, ?, ?)').bind(id, Date.now(), e.date, 'ok', JSON.stringify(e)));
     await env.DB.batch(st); await vjAudit(env, who, 'cash-exp', 'cash/' + id, `${e.cat} ${VJ_CB_MODES[e.mode]} ${e.amount} ${e.to}${e.kpay ? ' karigar ' + e.kpay : ''}`);
-    return vjJson({ ok: true, id, linked: !!e.kpay, needLink: e.cat === VJ_CB_KAR && !e.kpay });
+    let kdue = null; if (e.kpay && e.kmonth) { const st = await vjKoStmt(env, who, await vjKo3Cfg(env), e.kar, e.kmonth, []); kdue = vjKo3R2(st.closeCash || 0); } // KPAYMONTH: remaining due of that month account
+    return vjJson({ ok: true, id, linked: !!e.kpay, needLink: e.cat === VJ_CB_KAR && !e.kpay, kdue, kmonth: e.kmonth || '' });
   }
   if (op === 'opening') return vjCbOpening(env, who, b, cfg);
   if (op === 'count' || op === 'cundo') { if (!vjCanSettle(who)) return vjDeny(403, 'only Abhinav can reconcile the cash');
