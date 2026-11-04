@@ -5191,6 +5191,113 @@ async function vjCredPost(request, env, who) { if (who.role !== 'admin') return 
   await env.DB.prepare('INSERT INTO vj_cred (id, ts, data) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data').bind(id, Date.now(), JSON.stringify(rec)).run();
   await vjAudit(env, who, cur ? 'cred-edit' : 'cred-new', 'cred/' + id, name + ' ' + group + (rec.active ? '' : ' (inactive)')); return vjJson({ ok: true, id }); }
 
+// ---------------------------------------------------------------------------------------------
+// PARTY GOLD ACCOUNT (G2G) - owner 04/11 16:40 (C-20261104-G2GACCOUNT): the Sundry Debtors party account laid out EXACTLY like his Excel
+// 'CUSTOMERS ACCOUNT' (sheets per party + Composite / GrpSum). Abhinav / Shilpiji only (server-checked).
+// Debit: every Bill line of the party (bill no, tag code, gr wt, KT, fine, Diamonds, CS, Making); fine = gr wt x factor of the party type
+//   (W/s 18K .83 / 14K .66 / 9K .425; Nett 18K .76 / 14K .60 / 9K .40; Gold = fine typed), factors editable; fine / amount per line editable.
+//   Amount = Diamonds + CS + Making (gold is settled in fine, not rupees), GST 3 % per line; party Amount = ROUNDUP(sum, -3).
+// Credit: OP (opening fine / Rs), OG register entries of the party (OG no., party credit fine; an OG converted to cash = rupees),
+//   receipts already in VJ Tags (+ Pay / Ledger / Cash book; rupee payments otherwise live in Tally - 'tally' hook for a later sync),
+//   discounts at payment, Gold to Cash lines (grams x rate; rate default MAX(party booked rate, today's 24K rate), editable, stays open).
+// Balance fine = debit fine - credit fine (+ = लेना from the party, - = जमा with us); Balance Rs = ROUNDUP / ROUNDDOWN to 1000 (Excel I32).
+// Nothing is a second copy of a bill: only the owner's choices (type, booked rate, overrides, manual lines, Gold to Cash) live in vj_g2g.
+// ---------------------------------------------------------------------------------------------
+const VJ_G2G_TYPES = ['W/s', 'Nett', 'Gold'], VJ_G2G_F = { ws: { 18: 0.83, 14: 0.66, 9: 0.425 }, nett: { 18: 0.76, 14: 0.6, 9: 0.4 } };
+const vjG2R2 = n => Math.round((Number(n) || 0) * 100) / 100;
+const vjG2Up = v => { v = vjG2R2(v); return v < 0 ? -Math.floor(-v / 1000 + 1e-9) * 1000 : Math.ceil(v / 1000 - 1e-9) * 1000; }; // Excel: negative ROUNDDOWN, else ROUNDUP (-3)
+let vjG2Ok = false;
+async function vjG2T(env) { if (vjG2Ok) return; await env.DB.batch([env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_g2g (key TEXT PRIMARY KEY, ts INTEGER, data TEXT)'), env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_meta (k TEXT PRIMARY KEY, v TEXT)')]); vjG2Ok = true; }
+async function vjG2Cfg(env) { let c = {}; try { const m = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'g2g:cfg'").first(); c = m ? JSON.parse(m.v) || {} : {}; } catch (e) {}
+  const f = k => Object.fromEntries([18, 14, 9].map(x => { const v = Number(c[k] && c[k][x]); return [x, v > 0 && v <= 1.1 ? v : VJ_G2G_F[k][x]]; }));
+  return { ws: f('ws'), nett: f('nett'), gst: Number(c.gst) >= 0 && Number(c.gst) <= 28 ? Number(c.gst) : 3 }; }
+async function vjG2Docs(env) { await vjG2T(env); const M = new Map(); ((((await env.DB.prepare('SELECT key, data FROM vj_g2g').all()).results) || [])).forEach(r => { const d = vjParse(r); if (d) M.set(r.key, d); }); return M; }
+async function vjG2Rate(env) { try { const r = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first(), s = r ? vjParse(r) : null; return Number(s && s.gold24g) || 0; } catch (e) { return 0; } }
+const vjG2Kt = r => { const m = String(r.gold || '').match(/(\d{1,2})K/i) || String(r.label || '').toUpperCase().match(/^S?[A-Z]+(\d{1,2})\//); return m ? Number(m[1]) : 0; };
+async function vjG2Base(env) { const L = await vjLedgerLoad(env), C = vjCustomers(L), D = await vjG2Docs(env), cfg = await vjG2Cfg(env), rate = await vjG2Rate(env); let og = [];
+  try { const { reg } = await vjOg2Load(env); og = reg.filter(r => r && !r.cancelled && (!r.src || r.src === 'party') && r.name).map(r => Object.assign({}, r, vjOgCalc(r), { key: vjLKey(r.name, r.city, vjPhone(r.mobile) || r.mobile) })); } catch (e) {}
+  return { L, C, D, cfg, rate, og }; }
+// one party's account, rows in the Excel order
+function vjG2Acct(B, key) {
+  const c = B.C.get(key), d = B.D.get(key) || {}, og = B.og.filter(o => o.key === key);
+  if (!c && !og.length && !B.D.has(key)) return null;
+  const any = c || og[0] || {}, type = VJ_G2G_TYPES.includes(d.type) ? d.type : 'W/s', fac = type === 'W/s' ? B.cfg.ws : type === 'Nett' ? B.cfg.nett : null, gp = B.cfg.gst / 100, ov = d.ov || {};
+  const fineOf = (gr, kt, given) => fac ? vjR3((Number(gr) || 0) * (fac[kt] || 0)) : vjR3(given || 0);
+  const dr = [], cr = [];
+  (c ? c.bills : []).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.no).localeCompare(String(b.no))).forEach(b => (b.rows || []).forEach((r, i) => {
+    const id = b.no + '|' + (r.id || i), o = ov[id] || {}, kt = vjG2Kt(r), gr = vjR3(r.wt != null ? r.wt : r.net), dia = Math.round((Number(r.diaAmt) || 0) + (Number(r.pd) || 0)), cs = Math.round((Number(r.polki) || 0) + (Number(r.other) || 0)), mk = Math.round((Number(r.making) || 0) - (Number(r.disc) || 0));
+    const fine = o.fine != null ? vjR3(o.fine) : fineOf(gr, kt, r.fine), amount = o.amount != null ? Math.round(o.amount) : dia + cs + mk;
+    dr.push({ id, src: 'bill', date: b.date, bill: b.no, code: r.design || r.label || '', grWt: gr, kt, fine, fineAuto: o.fine == null, dia, cs, mk, amount, amtAuto: o.amount == null, gst: vjG2R2(amount * gp) }); }));
+  (d.man || []).filter(m => m.status !== 'deleted').forEach(m => { const fine = m.fine != null && m.fine !== '' ? vjR3(m.fine) : fineOf(m.grWt, Number(m.kt) || 0, 0), amount = m.amount != null && m.amount !== '' ? Math.round(m.amount) : Math.round((Number(m.dia) || 0) + (Number(m.cs) || 0) + (Number(m.mk) || 0));
+    dr.push({ id: m.id, src: 'man', date: m.date, bill: m.bill || '', code: m.code || '', grWt: vjR3(m.grWt || 0), kt: Number(m.kt) || 0, fine, dia: Math.round(m.dia || 0), cs: Math.round(m.cs || 0), mk: Math.round(m.mk || 0), amount, gst: vjG2R2(amount * gp), note: m.note || '' }); });
+  dr.forEach(x => { x.total = vjG2R2(x.amount + x.gst); });
+  const ob = (B.L.ob || {})[key]; if (ob && (Number(ob.fine) || Number(ob.amt))) cr.push({ id: 'OP', src: 'op', date: ob.date || '', label: 'OP', fine: vjR3(-(Number(ob.fine) || 0)), amount: -(Math.round(Number(ob.amt) || 0)) });
+  og.sort((a, b) => String(a.date).localeCompare(String(b.date))).forEach(o => cr.push(o.cash ? { id: 'OG' + o.no, src: 'og', date: o.date, label: 'OG' + o.no + ' (to cash ' + vjDmy(o.cash.date) + ')', fine: 0, amount: Math.round(Number(o.cash.amount) || 0), og: o.no }
+    : { id: 'OG' + o.no, src: 'og', date: o.date, label: 'OG' + o.no, fine: vjR3(o.credFine), amount: 0, og: o.no }));
+  (c ? c.rcs : []).forEach(r => { if (r.mode === 'adjust') return; const gf = r.mode === 'gold' && r.details && r.details.goldAs === 'fine';
+    cr.push({ id: r.no, src: 'rc', date: r.date, label: r.no + ' ' + vjRcText(r) + (r.bill ? ' (' + r.bill + ')' : ''), fine: gf ? vjR3(r.fine) : 0, amount: gf ? 0 : Math.round(Number(r.amount) || 0) }); });
+  (c ? c.bills : []).forEach(b => (Array.isArray(b.discs) ? b.discs : []).forEach((x, i) => cr.push({ id: b.no + '|disc' + i, src: 'disc', date: x.date, label: 'Discount ' + b.no, fine: 0, amount: Math.round(Number(x.amount) || 0) })));
+  (d.tally || []).forEach(t => cr.push({ id: t.id, src: 'tally', date: t.date, label: 'Tally ' + (t.ref || ''), fine: 0, amount: Math.round(Number(t.amount) || 0) })); // hook: a later Tally sync writes rupee receipts here
+  const defRate = Math.max(Number(d.bookedRate) || 0, B.rate || 0);
+  (d.gtc || []).filter(g => g.status !== 'deleted').forEach(g => { const rt = Number(g.rate) || defRate, gm = vjR3(g.grams); cr.push({ id: g.id, src: 'gtc', date: g.date, label: 'Gold to Cash', grams: gm, rate: rt, fine: gm, amount: -vjG2R2(gm * rt), note: g.note || '' }); });
+  cr.sort((a, b) => (a.src === 'op' ? -1 : 0) - (b.src === 'op' ? -1 : 0) || (a.src === 'gtc' ? 1 : 0) - (b.src === 'gtc' ? 1 : 0) || String(a.date).localeCompare(String(b.date)));
+  const sum = (l, k) => l.reduce((a, x) => a + (Number(x[k]) || 0), 0);
+  const drT = { fine: vjR3(sum(dr, 'fine')), amountRaw: vjG2R2(sum(dr, 'amount')), gst: vjG2R2(sum(dr, 'gst')), total: vjG2R2(sum(dr, 'total')) }; drT.amount = vjG2Up(drT.amountRaw); // Excel I20 ROUNDUP(SUM,-3)
+  const crT = { fine: vjR3(sum(cr, 'fine')), amount: vjG2R2(sum(cr, 'amount')) };
+  const bal = { fine: vjR3(drT.fine - crT.fine), amount: vjG2Up(drT.amount - crT.amount), gst: vjG2R2(drT.gst) };
+  return { key, name: any.name || d.name || '', city: any.city || d.city || '', mobile: any.mobile || d.mobile || '', type, bookedRate: Number(d.bookedRate) || 0, todayRate: B.rate || 0, defRate, dr, cr, drT, crT, bal };
+}
+const vjG2Brief = a => ({ key: a.key, name: a.name, city: a.city, mobile: a.mobile, type: a.type, lena: a.bal.amount > 0 ? a.bal.amount : 0, jama: a.bal.amount < 0 ? -a.bal.amount : 0, fine: a.bal.fine, gst: a.bal.gst, n: a.dr.length + a.cr.length });
+async function vjG2List(B) { const keys = new Set([...B.C.keys(), ...B.og.map(o => o.key), ...B.D.keys()]); return [...keys].map(k => vjG2Acct(B, k)).filter(a => a && (a.dr.length || a.cr.length)); }
+// GET /api/vj/g2g | ?key= | /api/vj/g2g.xlsx
+async function vjG2Get(url, env, who) { if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji'); const B = await vjG2Base(env), key = String(url.searchParams.get('key') || '');
+  if (key) { const a = vjG2Acct(B, key); return a ? vjJson(Object.assign({ ok: true, types: VJ_G2G_TYPES, cfg: B.cfg }, a)) : vjDeny(404, 'party not found'); }
+  const L = (await vjG2List(B)).map(vjG2Brief), tot = L.reduce((t, p) => ({ lena: t.lena + p.lena, jama: t.jama + p.jama, fineL: vjR3(t.fineL + (p.fine > 0 ? p.fine : 0)), fineJ: vjR3(t.fineJ + (p.fine < 0 ? -p.fine : 0)), gst: vjG2R2(t.gst + p.gst) }), { lena: 0, jama: 0, fineL: 0, fineJ: 0, gst: 0 });
+  if (url.pathname === '/api/vj/g2g.xlsx') { const rows = L.slice().sort((a, b) => b.lena - a.lena || a.name.localeCompare(b.name)).map(p => [[p.name, p.city, p.mobile].filter(Boolean).join(' '), p.type, p.lena || '', p.jama || '', p.fine || '', p.gst || '']);
+    rows.unshift(['TOTAL (' + L.length + ')', '', tot.lena, tot.jama, vjR3(tot.fineL - tot.fineJ), tot.gst]);
+    const xl = vjXlsx([{ name: 'GrpSum', head: ['Party', 'Type', 'Rs lena', 'Rs jama (advance)', 'Fine g (- = jama)', 'GST due'], rows, widths: [40, 7, 14, 16, 14, 12], mark: r => String(r[0]).startsWith('TOTAL') }]);
+    const bin = atob(xl), out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); await vjAudit(env, who, 'g2g-xlsx', 'g2g', String(L.length));
+    return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_Party_Gold_Accounts.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } }); }
+  return vjJson({ ok: true, parties: L, tot, cfg: B.cfg, types: VJ_G2G_TYPES, locked: (await vjCbCfg(env)).closed.length > 0 }); }
+// POST /api/vj/g2g {op: type | rate | ov | man | mandel | gtc | gtcdel | cfg | import | tally}
+async function vjG2Post(request, env, who) { if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji'); if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed');
+  if (Number(request.headers.get('content-length') || 0) > 200000) return vjDeny(413, 'too large'); let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); } if (!b || typeof b !== 'object') return vjDeny(400, 'bad request');
+  await vjG2T(env); const op = String(b.op || ''), now = new Date().toISOString(), byName = vjByName(who), num = (v, lo, hi) => { if (v === '' || v == null) return null; const n = Number(String(v).replace(/[,\s]/g, '')); return isFinite(n) && n >= lo && n <= hi ? n : NaN; };
+  const dOk = d => /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(Date.parse(d)), newId = p => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  if (op === 'cfg') { const c = await vjG2Cfg(env), o = {}; for (const k of ['ws', 'nett']) { o[k] = {}; for (const x of [18, 14, 9]) { const v = num(b[k] && b[k][x], 0.05, 1.1); if (Number.isNaN(v)) return vjDeny(400, 'factor looks wrong'); o[k][x] = v == null ? c[k][x] : v; } }
+    o.gst = c.gst; o.hist = [{ at: now, byName, old: c }]; await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('g2g:cfg', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(o)).run(); await vjAudit(env, who, 'g2g-cfg', 'g2g', JSON.stringify(o).slice(0, 300)); return vjJson({ ok: true }); }
+  if (op === 'import') { // owner-only opening import from his Composite / GrpSum (pasted rows: name [city mobile] | Rs lena | Rs jama | fine), merged into the party openings
+    const cfg = await vjCbCfg(env); if (cfg.closed.length) return vjDeny(409, 'opening balances are locked - the first month is closed'); const date = String(b.date || ''); if (!dOk(date)) return vjDeny(400, 'type the opening date');
+    const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 2000), L = await vjLedgerLoad(env), C = vjCustomers(L); let ob = {}; try { const m = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'ob:cust'").first(); ob = m ? JSON.parse(m.v) || {} : {}; } catch (e) {}
+    const old = JSON.parse(JSON.stringify(ob)), res = { matched: 0, added: 0, skipped: [] };
+    for (const r of rows) { const txt = vjClean(r && r.name, 120).replace(/\s+/g, ' '); if (!txt) continue; const lena = num(r.lena, -1e10, 1e10), jama = num(r.jama, -1e10, 1e10), fine = num(r.fine, -1e5, 1e5);
+      if ([lena, jama, fine].some(Number.isNaN)) { res.skipped.push(txt + ': numbers not readable'); continue; } const amt = Math.round((lena || 0) - (jama || 0)), f = vjR3(fine || 0); if (!amt && !f) continue;
+      const mm = txt.match(/(?:\+?91[\s-]?)?([6-9]\d{9})/), mob = mm ? mm[1] : '', nm = txt.replace(mm ? mm[0] : '\u0000', '').replace(/\s+/g, ' ').trim();
+      let key = mob ? 'm:' + mob : ''; if (!key) { const n0 = vjNk(nm), hit = [...C.values()].filter(c => vjNk(c.name) === n0 || vjNk(c.name + ' ' + c.city) === n0); key = hit.length === 1 ? hit[0].key : vjLKey(nm, '', ''); }
+      if (C.has(key)) res.matched++; else res.added++; ob[key] = { amt, fine: f, date, name: (C.get(key) || {}).name || nm, city: (C.get(key) || {}).city || '', mobile: mob || (C.get(key) || {}).mobile || '' }; }
+    await env.DB.batch([env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('ob:cust', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(ob)),
+      env.DB.prepare('INSERT INTO vj_cash_tick (id, ts, data) VALUES (?, ?, ?)').bind('OBH:g2g:' + Date.now().toString(36), Date.now(), JSON.stringify({ at: now, byName, act: 'g2g import', oldCust: old }))]);
+    await vjAudit(env, who, 'g2g-import', 'vj_meta/ob:cust', JSON.stringify(res).slice(0, 400)); return vjJson(Object.assign({ ok: true }, res)); }
+  const key = String(b.key || ''); if (key.length > 120 || !/^(m:\d{10}|n:[^|]{0,60}\|[^|]{0,40})$/.test(key)) return vjDeny(400, 'bad party');
+  const row = await env.DB.prepare('SELECT data FROM vj_g2g WHERE key = ?').bind(key).first(), cur = row ? vjParse(row) || {} : {}, d = JSON.parse(JSON.stringify(cur)); d.hist = Array.isArray(d.hist) ? d.hist : [];
+  const snap = { type: cur.type, bookedRate: cur.bookedRate, ov: cur.ov, man: cur.man, gtc: cur.gtc };
+  if (op === 'type') { if (!VJ_G2G_TYPES.includes(b.type)) return vjDeny(400, 'W/s, Nett or Gold'); d.type = b.type; }
+  else if (op === 'rate') { const v = num(b.rate, 0, 50000); if (v == null || Number.isNaN(v)) return vjDeny(400, 'rate looks wrong'); d.bookedRate = v; }
+  else if (op === 'ov') { const id = vjClean(b.id, 80); if (!id) return vjDeny(400, 'bad line'); d.ov = d.ov || {}; const o = Object.assign({}, d.ov[id] || {});
+    for (const k of ['fine', 'amount']) if (b[k] !== undefined) { const v = num(b[k], -1e8, 1e8); if (Number.isNaN(v)) return vjDeny(400, k + ' looks wrong'); if (v == null) delete o[k]; else o[k] = k === 'fine' ? vjR3(v) : Math.round(v); }
+    if (Object.keys(o).length) d.ov[id] = o; else delete d.ov[id]; }
+  else if (op === 'man') { const date = String(b.date || vjIstDay()); if (!dOk(date)) return vjDeny(400, 'bad date'); const f = {}; for (const k of ['grWt', 'fine', 'dia', 'cs', 'mk', 'amount']) { const v = num(b[k], -1e8, 1e8); if (Number.isNaN(v)) return vjDeny(400, k + ' looks wrong'); f[k] = v; }
+    const kt = [18, 14, 9, 22, 24].includes(Number(b.kt)) ? Number(b.kt) : 0; d.man = Array.isArray(d.man) ? d.man : []; const i = b.id ? d.man.findIndex(m => m.id === b.id) : -1;
+    const m = Object.assign(i >= 0 ? d.man[i] : { id: newId('GM'), status: 'ok', by: byName, at: now }, { date, bill: vjClean(b.bill, 20), code: vjClean(b.code, 30), kt, note: vjClean(b.note, 80) }, f); if (i >= 0) d.man[i] = m; else d.man.push(m); }
+  else if (op === 'gtc') { const date = String(b.date || vjIstDay()); if (!dOk(date)) return vjDeny(400, 'bad date'); const g = num(b.grams, -1e5, 1e5), r = num(b.rate, 0, 50000); if (g == null || Number.isNaN(g) || !g || Number.isNaN(r)) return vjDeny(400, 'grams / rate look wrong');
+    d.gtc = Array.isArray(d.gtc) ? d.gtc : []; const i = b.id ? d.gtc.findIndex(x => x.id === b.id) : -1; const x = Object.assign(i >= 0 ? d.gtc[i] : { id: newId('GC'), status: 'ok', by: byName, at: now }, { date, grams: vjR3(g), rate: r || 0, note: vjClean(b.note, 80) }); if (i >= 0) d.gtc[i] = x; else d.gtc.push(x); }
+  else if (op === 'mandel' || op === 'gtcdel') { const l = op === 'mandel' ? d.man : d.gtc, x = (l || []).find(y => y.id === b.id); if (!x) return vjDeny(404, 'line not found'); x.status = x.status === 'deleted' ? 'ok' : 'deleted'; x.delAt = now; x.delBy = byName; } // soft delete / restore
+  else if (op === 'tally') { d.tally = (Array.isArray(b.lines) ? b.lines : []).slice(0, 500).map(t => ({ id: vjClean(t.id, 40) || newId('TL'), date: dOk(String(t.date)) ? t.date : vjIstDay(), amount: Math.round(Number(t.amount) || 0), ref: vjClean(t.ref, 40) })); } // future Tally sync hook
+  else return vjDeny(400, 'bad request');
+  d.hist.push({ at: now, byName, op, old: snap }); d.hist = d.hist.slice(-40);
+  await env.DB.prepare('INSERT INTO vj_g2g (key, ts, data) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET ts = excluded.ts, data = excluded.data').bind(key, Date.now(), JSON.stringify(d)).run();
+  await vjAudit(env, who, 'g2g-' + op, 'g2g/' + key, JSON.stringify(b).slice(0, 300)); const B = await vjG2Base(env), a = vjG2Acct(B, key); return vjJson(Object.assign({ ok: true, types: VJ_G2G_TYPES, cfg: B.cfg }, a || {})); }
+
 async function vjHandle(request, env, ctx, url) {
   const p = url.pathname;
   const dev = env.VJ_DEV === '1';
@@ -5245,6 +5352,8 @@ async function vjHandle(request, env, ctx, url) {
   if ((p === '/api/vj/challan' || p === '/api/vj/challan/cancel') && request.method === 'POST') { if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed'); return p === '/api/vj/challan' ? vjChallanSave(request, env, who) : vjChallanCancel(request, env, who); }
   if ((p === '/api/vj/cash' || p === '/api/vj/cash.xlsx') && request.method === 'GET') return vjCashGet(url, env, who); // C-20261104-CASHBOOK (who may: checked inside)
   if (p === '/api/vj/recon' && (request.method === 'GET' || request.method === 'POST')) return vjRecon(request, url, env, who); // RECONCILE (Abhinav only, inside)
+  if ((p === '/api/vj/g2g' || p === '/api/vj/g2g.xlsx') && request.method === 'GET') return vjG2Get(url, env, who); // C-20261104-G2GACCOUNT (admin only, inside)
+  if (p === '/api/vj/g2g' && request.method === 'POST') return vjG2Post(request, env, who);
   if (p === '/api/vj/creditors' && request.method === 'GET') return vjCredGet(url, env, who); // C-20261104-CASHBOOK creditor accounts (admin only, inside)
   if (p === '/api/vj/creditors' && request.method === 'POST') return vjSameSite(request, env) ? vjCredPost(request, env, who) : vjDeny(403, 'not allowed');
   if (p === '/api/vj/cash' && request.method === 'POST') return vjSameSite(request, env) ? vjCashPost(request, env, who) : vjDeny(403, 'not allowed'); // C-20261104-CASHBOOK
