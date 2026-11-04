@@ -2104,6 +2104,7 @@ function vjKo3Rows(a, adm, old, used) { if (!Array.isArray(a)) return []; const 
     if (!pcs && !ct) continue; if (pcs > 100000 || ct > 10000 || rate > 10000000) return null;
     const pty = vjKoParty(x), cl = pty ? { code: '', lot: '' } : vjKoCode(x.pkt), r = pty ? { pkt: VJ_KO_PARTY, code: '', lot: '', party: true, shape: vjClean(x.shape, 20), pcs, ct } : { pkt: cl.code ? cl.code + (cl.lot ? '/' + cl.lot : '') : '', code: cl.code, lot: cl.lot, shape: vjClean(x.shape, 20), pcs, ct }; // C-20261103-PARTYDIA
     if (adm) { if (rate) r.rate = rate; } else { const o = ol[i]; if (o && o.rate && o.shape === r.shape && o.pkt === r.pkt) r.rate = o.rate; }
+    if (x.cert && typeof x.cert === 'object') { const lab = ['IGI', 'GIA', 'HRD', 'SGL', 'Other'].includes(x.cert.lab) ? x.cert.lab : 'IGI', no = vjClean(x.cert.no, 30).toUpperCase(), why = vjClean(x.cert.why, 80); if (no) r.cert = { lab, no }; else if (x.cert.unk && why) r.cert = { lab, no: '', unk: why }; } // C-20261104-CERTNO
     if (used && x.add !== '' && x.add != null) { const v = Number(String(x.add).replace(/[^0-9.]/g, '')); if (isFinite(v) && v >= 0 && v <= 50) r.add = Math.round(v * 100) / 100; } // tag weight + % (default 10, solitaire 0)
     out.push(r); }
   return out; }
@@ -2113,7 +2114,7 @@ function vjKo3Auto(iss, rec) { const m = new Map(); (iss || []).forEach(r => { c
 function vjKo3Calc(o, cfg) { const I = vjKoTot(vjKoOur(o.iss)), R = vjKoTot(vjKoOur(o.rec)), U = vjKoTot(vjKoOur(o.used)), t = o.tag, kc = vjKo3Kc(cfg, o.karigar);
   const pI = vjKoTot(vjKoPty(o.iss)), pR = vjKoTot(vjKoPty(o.rec)), pU = vjKoTot(vjKoPty(o.used)), pP = { pcs: Math.max(0, pI.pcs - pR.pcs - (t ? pU.pcs : 0)), ct: Math.max(0, Math.round((pI.ct - pR.ct - (t ? pU.ct : 0)) * 1000) / 1000) }; // PARTYDIA
   const sol = r => { const c = vjKoCodeOf(cfg, r.code || r.pkt) || (r.pkt ? null : vjKoCodeOf(cfg, o.dq)); return !!(c && (c.sol || c.type === 'Solitaire')); };
-  const tagDia = (o.used || []).map(r => { const pty = vjKoParty(r), add = r.add != null ? r.add : pty || sol(r) ? 0 : 10; const d = { pkt: r.pkt, shape: r.shape, pcs: r.pcs, ct: r.ct, add, tagCt: vjKo3R2(r.ct * (1 + add / 100)), rate: r.rate }; if (pty) d.party = true; return d; });
+  const tagDia = (o.used || []).map(r => { const pty = vjKoParty(r), add = r.add != null ? r.add : pty || sol(r) ? 0 : 10; const d = { pkt: r.pkt, shape: r.shape, pcs: r.pcs, ct: r.ct, add, tagCt: vjKo3R2(r.ct * (1 + add / 100)), rate: r.rate }; if (pty) d.party = true; if (r.cert) d.cert = r.cert; return d; });
   const today = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10), live = o.status === 'open' || o.status === 'karigar';
   // owner 18:19 (C-20261102-ORDMAKING): order 'Making' Rs/g = ROUNDUP(order gold rate x 0.44 / 0.66 / 0.83 (9 / 14 / 18 KT; 22K / PT set by admin) + 300, -2); blank for Gold to Gold
   // or no rate; hand-editable (mkOrd). Screen only - never on the karigar print and never used for tag pricing (New tag keeps its own formula).
@@ -2489,6 +2490,7 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
       const tr = await env.DB.prepare('SELECT data FROM docs WHERE path = ?').bind('tags/' + q).first(), tg = tr ? vjParse(tr) : null; if (!tg) return vjDeny(404, 'tag ' + b.tagNo + ' not found'); o.tagNo = String(tg.label || q).slice(0, 40); o.tagId = q; }
     o.status = to; if (!live) { delete o.cancelled; post = true; } o.statusAt = Object.assign({}, o.statusAt || {}, { [to]: now }); }
   else if (op === 'receive') { if (!live) return vjDeny(409, 'this order is cancelled'); if (old.tag && !adm) return vjDeny(403, 'already delivered - only Abhinav or Shilpiji can change the figures');
+    if (!b.usedAuto && (Array.isArray(b.used) ? b.used : []).some(x => x && x.sol === true && (vjKoNum(x.pcs) > 0 || vjKoNum(x.ct) > 0) && !(x.cert && (vjClean(x.cert.no, 30) || (x.cert.unk && vjClean(x.cert.why, 80)))))) return vjDeny(400, 'solitaire: type the certificate no. (or tick not known and write why)'); // C-20261104-CERTNO
     const rec = vjKo3Rows(b.rec, adm, old.rec), used0 = b.usedAuto ? null : vjKo3Rows(b.used, adm, old.used, true); if (!rec || used0 === null && !b.usedAuto) return vjDeny(400, 'diamond pcs / ct look wrong');
     let used = used0 && used0.length ? used0 : vjKo3Auto(o.iss, rec);
     if (!canDia) { const usedWas = old.tag ? old.used : vjKo3Auto(o.iss, old.rec || []); if (vjKoSig(rec) !== vjKoSig(old.rec) || vjKoSig(used) !== vjKoSig(usedWas)) return vjDeny(403, VJ_KO_DIAMSG);
