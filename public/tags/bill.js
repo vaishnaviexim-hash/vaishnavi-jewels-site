@@ -303,6 +303,7 @@
   // owner 26/10/2026 (C-20261026-BILLNOW): Price check > Bill now opens a fresh bill with that piece; weights come from the tag (not editable),
   // the gold rate and diamond / polki rates can be changed for this bill only; name, mobile and city are asked first.
   window.VJ_BILL_NOW = id => { if (!$("p-bill")) return; $("bclear").click(); $("bform").hidden = false; const t = tags().find(x => x.id === id);
+    B.title = "Bill"; B.fromEst = ""; document.querySelectorAll("input[name=btitle]").forEach(x => { x.checked = x.value === "Bill"; }); /* C-20261104-SAVEBILLFIX: Bill now / Save & make bill always open a BILL (B- series) - before, an earlier Estimate left the screen in Estimate */
     document.querySelectorAll('[id^="p-"]').forEach(p => { p.hidden = p.id !== "p-bill"; });
     document.querySelectorAll("nav button").forEach(y => y.setAttribute("aria-selected", "false"));
     prefill(); numField(); if (t) add(t); loadBook();  window.scrollTo({ top: 0, behavior: "smooth" }); setTimeout(() => { const n = $("bmob"); if (n) n.focus(); }, 120); }; // owner 26/10 17:51: mobile first, the party's name and city fill in
@@ -356,6 +357,14 @@
     ps.forEach(p => { const b = document.createElement("button"); b.type = "button"; b.className = "btn ghost"; b.textContent = p.name + (p.city ? " · " + p.city : "") + (p.mob ? " · " + p.mob : "") + " (" + p.n + (p.n === 1 ? " bill)" : " bills)");
       b.addEventListener("click", () => { if (p.mob) { $("bfmob").value = p.mob; B.fcity = null; } else { $("bfmob").value = p.name; B.fcity = String(p.city).toLowerCase(); } loadBook(); }); w.appendChild(b); }); }
   // owner 28/10/2026 19:53 (C-20261028-ESTNOTBILL): estimates are not bills - only name, number and whose customer are kept, for the follow-up
+  // C-20261104-SAVEBILLFIX (owner 04/11 11:48): an estimate becomes a real bill - the Bill screen opens in BILL mode with its pieces and party (same format and
+  // formulas as any bill); Save gives the next B- number and the server marks the estimate "Converted → B-xxxx" (kept, linked both ways). Abhinav / Shilpiji only.
+  function estConv(e, m) { const all = tags().filter(t => t.status !== "sold"), ids = (Array.isArray(e.ids) && e.ids.length ? e.ids.filter(i => all.some(t => t.id === i)) : [])
+      .concat(...(Array.isArray(e.ids) && e.ids.length ? [] : String(e.items || "").split(",").map(s => s.trim().split(/\s+/)[0]).filter(Boolean).map(d => { const h = all.filter(t => String(t.designNo || "") === d || String(t.label || "").toUpperCase() === d.toUpperCase()); return h.length === 1 ? [h[0].id] : []; })));
+    const u = [...new Set(ids)]; if (!u.length) { m.textContent = "Could not find the piece(s) of " + e.no + " in stock (" + (e.items || "no list") + ") - open Bill now on the piece and press Save."; return; }
+    window.VJ_BILL_NOW(u[0]); u.slice(1).forEach(i => window.VJ_BILL_ADD(i)); B.fromEst = e.no;
+    if (!$("bname").value.trim()) $("bname").value = String(e.name || "").replace(/\s*ji$/i, ""); if (!$("bmob").value.trim() && e.mobile) $("bmob").value = e.mobile; if (!$("bcity").value.trim() && e.city) $("bcity").value = e.city;
+    { const n = $("beditnote"); if (n) { n.hidden = false; n.textContent = "Converting estimate " + e.no + " (" + fmt(e.total) + ") into a BILL - check and press Save. The bill is worked out with today's bill formulas."; } } render(); }
   async function loadEst() {
     let pn = $("estpanel"); const host = $("bbookmsg"); if (!host) return;
     if (!pn) { pn = document.createElement("div"); pn.id = "estpanel"; pn.style.marginTop = "18px";
@@ -367,17 +376,21 @@
     try { const r = await fetch("/api/vj/estimates?status=" + encodeURIComponent($("estst").value), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
       body.textContent = "";
       j.estimates.forEach(e => { const tr = document.createElement("tr"); const td = x => { const c = document.createElement("td"); c.textContent = x; tr.appendChild(c); return c; };
-        td(dmy(e.date)); td(e.no); { const c = td(e.name + (e.city ? ", " + e.city : "")); if (e.items) { const h = document.createElement("div"); h.className = "hint"; h.textContent = e.items; c.appendChild(h); } }
+        td(dmy(e.date)); { const c = td(""); if (e.convTo) { const a = document.createElement("button"); a.type = "button"; a.className = "btn ghost"; a.textContent = e.no + " → " + e.convTo; a.title = "Open bill " + e.convTo + " (PDF)"; a.addEventListener("click", () => reprint(e.convTo, a)); c.appendChild(a); } else c.textContent = e.no; } /* C-20261104-SAVEBILLFIX */ { const c = td(e.name + (e.city ? ", " + e.city : "")); if (e.items) { const h = document.createElement("div"); h.className = "hint"; h.textContent = e.items; c.appendChild(h); } }
         td(e.mobile || ""); td(fmt(e.total)); td(e.custName || "-");
-        td(e.status === "open" ? (e.reminders ? e.reminders + " sent" : e.due ? "on " + dmy(e.due) : "-") : ({ won: "Bought", lost: "Not buying", done: "Followed up" })[e.status] + (e.doneByName ? " (" + e.doneByName + ")" : "") + (e.note ? " - " + e.note : ""));
+        td(e.status === "open" ? (e.reminders ? e.reminders + " sent" : e.due ? "on " + dmy(e.due) : "-") : ({ won: "Bought", lost: "Not buying", done: "Followed up", converted: "Converted → " + (e.convTo || "bill") })[e.status] + (e.doneByName ? " (" + e.doneByName + ")" : "") + (e.note ? " - " + e.note : ""));
         const x = document.createElement("td"); x.style.whiteSpace = "nowrap";
         const btn = (label, st) => { const b = document.createElement("button"); b.type = "button"; b.className = "btn ghost"; b.textContent = label; b.addEventListener("click", async () => {
+          if (st === "won" && j.canConv && e.status === "open") { estConv(e, m); return; } /* C-20261104-SAVEBILLFIX: Bought = make the bill */
           const note = st === "open" ? "" : (prompt("Note (optional) for " + e.no + " - " + e.name, "") || "").slice(0, 120); b.disabled = true;
-          try { const r = await fetch("/api/vj/estimate/done", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ no: e.no, status: st, note }) }); const k = await r.json().catch(() => ({})); if (!r.ok) throw new Error(k.error || r.status); loadEst(); }
+          try { const r = await fetch("/api/vj/estimate/done", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ no: e.no, status: st, note }) }); const k = await r.json().catch(() => ({})); if (!r.ok) throw new Error(k.error || r.status); await loadEst(); if (st !== "open") m.textContent = e.no + " (" + e.name + ") moved to \"Followed up\" - choose Show: Followed up or All to see it. Nothing is deleted."; }
           catch (er) { b.disabled = false; m.textContent = "Not changed: " + (er.message || er); } }); x.appendChild(b); };
-        if (e.status === "open") { btn("Bought", "won"); btn("Not buying", "lost"); btn("Followed up", "done"); } else btn("Re-open", "open");
+        if (e.status === "open" && j.canConv) { const cb = document.createElement("button"); cb.type = "button"; cb.className = "btn"; cb.textContent = "Convert to bill"; cb.addEventListener("click", () => estConv(e, m)); x.appendChild(cb); } /* C-20261104-SAVEBILLFIX: Abhinav / Shilpiji */
+        if ((e.status === "won" || e.status === "done") && j.canConv) { const cb = document.createElement("button"); cb.type = "button"; cb.className = "btn"; cb.textContent = "Convert to bill"; cb.addEventListener("click", () => estConv(e, m)); x.appendChild(cb); }
+        if (e.status === "open") { btn("Bought", "won"); btn("Not buying", "lost"); btn("Followed up", "done"); } else if (e.status !== "converted") btn("Re-open", "open");
         tr.appendChild(x); body.appendChild(tr); });
       m.textContent = j.estimates.length ? j.estimates.length + " shown. " + j.open + " still to follow up." : ($("estst").value === "open" ? "Nothing to follow up." : "None.");
+      if (j.fix && !B.fixShown && ((j.fix.done || []).length || (j.fix.candidates || []).length || (j.fix.skipped || []).length)) { B.fixShown = true; m.textContent += ((j.fix.done || []).length ? " Made into bills (Save & make bill fix 04/11): " + j.fix.done.join("; ") + "." : "") + ((j.fix.candidates || []).length ? " Other estimates on Generate-tag pieces (use Convert to bill if they were bills): " + j.fix.candidates.join("; ") + "." : "") + ((j.fix.skipped || []).length ? " Not converted: " + j.fix.skipped.join("; ") + "." : ""); }
     } catch (e) { m.textContent = "Could not load the estimates (" + (e.message || e) + ")."; }
   }
   // C-20261103-BILLDISC (owner 16:29-16:30): quick entry in the Saved bills row - Received ₹ (a normal receipt) and, for Abhinav / Shilpiji, Discount ₹
@@ -868,7 +881,7 @@
   async function save() {
     const m = $("bmsg"), out = $("bout"); out.hidden = true;
     const body = { no: $("bno").value.trim(), name: (n => n && !/ji$/i.test(n) ? n + " ji" : n)($("bname").value.trim().slice(0, 57)) /* owner 26/10 18:45: 'ji' added on the bill automatically (Prachi -> Prachi ji) */, city: $("bcity").value.trim(), mobile: $("bmob").value.trim().slice(0, 20), addr: $("baddr").value.trim().slice(0, 160), area: $("barea").value.trim().slice(0, 80), state: $("bstate").value.trim().slice(0, 40), pin: $("bpin").value.replace(/\s/g, "").slice(0, 6), /* C-20261102-BILLADDR */
-      date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, g2g: B.g2g, title: B.title, nbb: !!B.nbb, ids: B.items.slice(), disc: Object.assign({}, B.disc), rates: JSON.parse(JSON.stringify(B.rates)), frates: Object.assign({}, B.frates), prates: Object.assign({}, B.prates), pdrates: Object.assign({}, B.pdrates), mkamt: Object.assign({}, B.mkamt), og: ogNow(), final: B.final || 0, edit: B.editNo || "", option: B.option || "", usd: B.usd || 0, cust: B.cust || "",
+      date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, g2g: B.g2g, title: B.title, nbb: !!B.nbb, ids: B.items.slice(), disc: Object.assign({}, B.disc), rates: JSON.parse(JSON.stringify(B.rates)), frates: Object.assign({}, B.frates), prates: Object.assign({}, B.prates), pdrates: Object.assign({}, B.pdrates), mkamt: Object.assign({}, B.mkamt), og: ogNow(), final: B.final || 0, edit: B.editNo || "", fromEst: B.title === "Bill" && !B.editNo ? B.fromEst || "" : "", option: B.option || "", usd: B.usd || 0, cust: B.cust || "",
       designs: B.designs.map(d => { const v = vtags()[B.designs.indexOf(d)]; return { desc: v.label, k: d.k, net: v.gold[0].net, tunch: v.gold[0].tunch || 0, dias: v.dias, ppcs: v.polki ? v.polki.pcs : 0, prate: v.polki ? v.polki.rate : 300, other: v.other ? v.other.amt : 0 }; }) }; // C-20261027-ESTBILL
     body.ogNo = $("bogno").value.trim().slice(0, 20); // C-20261101-OGREG (owner 15:00: optional - the party may give the gold later)
     if (!body.name) { m.textContent = "Enter the customer's name."; return; }
@@ -889,6 +902,7 @@
       const file = new File([blob], fname, { type: "application/pdf" }), url = URL.createObjectURL(file);
       loadBook(); m.textContent = j.estimate ? `Estimate ${b.no} made: ${fmt(b.total)}. It is NOT saved as a bill - download or send the PDF now (no copy is kept). Only the name and number are kept for the follow-up: ${({ mihir: "Mihir", shilpi: "Shilpi ji", abhinav: "Abhinav" })[b.cust] || "the owner"} gets a WhatsApp reminder in 2 days.` + mobNote
         : `${b.title} ${b.no} saved: ${fmt(b.total)}${b.fine ? " + " + g3(b.fine) + " fine gold" : ""}.` + mobNote; // C-20261028-ESTNOTBILL
+      if (B.fromEst && b.title === "Bill") { m.textContent += " Estimate " + B.fromEst + " marked Converted → " + b.no + "."; B.fromEst = ""; loadEst(); } /* C-20261104-SAVEBILLFIX */
       if (j.estimate) { await estSend(b, blob, m, out); $("bsave").disabled = false; return; } // owner 29/10 12:44: estimate = one button, straight to my WhatsApp
       out.textContent = ""; out.hidden = false;
       const op = document.createElement("a"); op.className = "btn"; op.href = url; op.target = "_blank"; op.rel = "noopener"; op.textContent = "Open PDF (print)";
