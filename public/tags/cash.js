@@ -458,4 +458,234 @@
       try { await api("/api/vj/cash", body); close(); $("cbMsg").textContent = "Settings saved."; load(); } catch (e) { m.textContent = "Not saved (" + (e.message || e) + ")."; } });
   }
 
-/*@P3*/
+  // ---------- voice ----------
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition; let rec = null;
+  function stopMic() { if (rec) { try { rec.abort(); } catch (e) {} rec = null; } document.querySelectorAll(".cbdlg .mic").forEach(b => b.classList.remove("on")); }
+  function mic(kind) {
+    const pre = kind === "receipt" ? "cr" : "cx", heard = $(pre + "Heard"), b = $(pre + "Mic");
+    if (rec) { stopMic(); return; }
+    if (!SR) { heard.hidden = false; heard.textContent = "Is phone/browser mein seedha bolne ki suvidha nahi hai. Note box par tap karke keyboard ka 🎤 mic button dabaiye aur bolie, phir baaki box bhariye."; $(pre === "cr" ? "crNote" : "cxNote").focus(); return; }
+    const go = lang => { const r = new SR(); rec = r; r.lang = lang; r.interimResults = false; r.maxAlternatives = 1; r.continuous = false; let got = false;
+      b.classList.add("on"); heard.hidden = false; heard.textContent = "Sun raha hai… boliye (e.g. " + (kind === "receipt" ? "\"Ramesh bhai 5000 cash\")" : "\"chai nashta 240 rupaye cash\")");
+      r.onresult = ev => { got = true; const t = Array.from(ev.results).map(x => x[0].transcript).join(" ").trim(); stopMic(); fill(kind, t); };
+      r.onerror = ev => { if (ev.error === "language-not-supported" && lang === "hi-IN") { rec = null; go("en-IN"); return; } stopMic(); heard.textContent = ev.error === "not-allowed" ? "Mic ki permission nahi mili - browser settings mein mic allow karein, ya keyboard ka mic use karein." : ev.error === "no-speech" ? "Kuch suna nahi - dobara 🎤 dabakar boliye." : "Bolna samajh nahi aaya (" + ev.error + ") - dobara try karein ya type karein."; };
+      r.onend = () => { if (!got && rec === r) { stopMic(); if (heard.textContent.startsWith("Sun raha")) heard.textContent = "Kuch suna nahi - dobara 🎤 dabakar boliye."; } };
+      try { r.start(); } catch (e) { stopMic(); heard.textContent = "Mic shuru nahi hua - keyboard ka mic use karein."; } };
+    go("hi-IN");
+  }
+  // rules: amount, mode, category (fuzzy), paid-to / note. Exposed for tests as window.vjCashParse.
+  const DEVD = s => s.replace(/[०-९]/g, d => String(d.charCodeAt(0) - 0x966));
+  const NUMW = { ek: 1, "एक": 1, do: 2, "दो": 2, teen: 3, tin: 3, "तीन": 3, char: 4, chaar: 4, "चार": 4, panch: 5, paanch: 5, "पांच": 5, "पाँच": 5, chhe: 6, che: 6, "छह": 6, "छः": 6, saat: 7, sat: 7, "सात": 7, aath: 8, ath: 8, "आठ": 8, nau: 9, "नौ": 9, das: 10, "दस": 10, bees: 20, bis: 20, "बीस": 20, pachas: 50, pachaas: 50, "पचास": 50, dhai: 2.5, "ढाई": 2.5, dedh: 1.5, derh: 1.5, "डेढ़": 1.5, "डेढ": 1.5 };
+  const MULW = { hazar: 1000, hazaar: 1000, hajar: 1000, hajaar: 1000, "हज़ार": 1000, "हजार": 1000, thousand: 1000, sau: 100, "सौ": 100, hundred: 100, lakh: 100000, lac: 100000, "लाख": 100000 };
+  const CUR = /^(rs|rs\.|rupaye|rupaiye|rupay|rupees?|rupiya|rupaya|रुपये|रुपए|रुपया|रूपये|रूपए|₹)$/;
+  const MODEW = { cash: /\b(cash|nakad|nagad|naqad)\b|कैश|नकद|नगद|कॅश/, upi: /\b(upi|gpay|g pay|google pay|phone ?pe|phonepay|paytm|bhim|online)\b|यूपीआई|यूपीआय|गूगल पे|फोन ?पे|पेटीएम|ऑनलाइन/, bank: /\b(bank|neft|rtgs|imps|transfer|cheque|check)\b|बैंक|ट्रांसफर|चेक/ };
+  // owner 14:50: heads = his Tally ledgers; Hinglish words point to them (chai / nashta -> Showroom Expenses, petrol / auto / train -> Travelling, bijli -> Electricity Bills)
+  const KW = { "showroom expenses": ["chai", "chay", "tea", "nashta", "nasta", "naashta", "snacks", "snack", "coffee", "biscuit", "pani", "water", "refreshment", "doodh", "milk", "nashte", "safai", "cleaning", "jhadu", "showroom", "चाय", "नाश्ता", "नास्ता", "नाश्ते", "पानी", "कॉफी", "बिस्कुट", "दूध", "सफाई"],
+    "salary a/c": ["salary", "pagar", "tankhwah", "tankha", "vetan", "सैलरी", "पगार", "तनख्वाह", "वेतन"], courier: ["courier", "curier", "kuriyar", "parcel", "dak", "speed post", "कूरियर", "कुरियर", "पार्सल", "डाक"],
+    travelling: ["petrol", "diesel", "auto", "rickshaw", "riksha", "taxi", "uber", "ola", "rapido", "bus", "train", "travel", "flight", "ticket", "पेट्रोल", "डीजल", "ऑटो", "रिक्शा", "टैक्सी", "ट्रेन", "बस", "टिकट"],
+    transportation: ["tempo", "transport", "bhada", "hamal", "टेम्पो", "भाड़ा"], "electricity bills": ["bijli", "electricity", "light bill", "dgvcl", "torrent", "बिजली", "लाइट"],
+    "telephone & internet charges": ["phone", "recharge", "internet", "wifi", "broadband", "jio", "airtel", "रिचार्ज", "इंटरनेट"], "display, boxes, trays etc": ["box", "dibba", "dabba", "pouch", "tray", "display", "packing", "डिब्बा", "डब्बा", "बॉक्स", "पाउच", "ट्रे"],
+    "repairing and maintainace": ["repair", "marammat", "mistri", "plumber", "electrician", "ac service", "रिपेयर", "मरम्मत", "मिस्त्री"], maintainance: ["maintenance", "society", "मेंटेनेंस"],
+    karigars: ["karigar", "kaarigar", "कारीगर"], "staff uniform": ["uniform", "यूनिफॉर्म"], "bonus diwali": ["bonus", "बोनस"], "legal charges": ["lawyer", "vakil", "legal", "वकील"],
+    "sales promotion & advertisement": ["advertisement", "ad", "banner", "promotion", "pamphlet", "विज्ञापन"], "social media & advertisement exp": ["instagram", "facebook", "social", "meta ads"], "melting tunch etc": ["melting", "tunch", "गलाई"],
+    "exhibition expenses": ["exhibition", "प्रदर्शनी"], "stall rent": ["stall"], "lic and insurances": ["lic", "insurance", "बीमा"], "miscl expenses": ["misc", "miscellaneous", "other", "baaki", "puja", "pooja", "agarbatti", "phool", "prasad", "फुटकर", "पूजा", "अगरबत्ती", "फूल", "प्रसाद"] };
+  const STOPW = new Set(["expenses", "expense", "exp", "charges", "a/c", "etc", "and", "the", "purchase", "purchased", "new", "bills"]);
+  const lev = (a, b) => { if (Math.abs(a.length - b.length) > 1) return 9; const d = Array.from({ length: a.length + 1 }, (_, i) => [i]); for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++) for (let j = 1; j <= b.length; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[a.length][b.length]; };
+  function parse(text, kind, cats, karigars) {
+    const raw = DEVD(String(text || "")).replace(/(\d),(?=\d{2,3}\b)/g, "$1").replace(/₹\s*/g, "₹ ").trim(), low = raw.toLowerCase(), out = { amount: 0, mode: "", category: "", kar: "", to: "", note: "", mobile: "", party: "" };
+    let toks = low.split(/\s+/).filter(Boolean), used = new Set();
+    // a 10-digit mobile (spoken as groups) is never the amount
+    const mm = low.match(/(?:^|\D)([6-9](?:[\s-]?\d){9})(?!\d)/); if (mm) { out.mobile = mm[1].replace(/\D/g, ""); }
+    const isMob = i => out.mobile && /\d/.test(toks[i]) && out.mobile.includes(toks[i].replace(/\D/g, "")) && toks[i].replace(/\D/g, "").length >= 3;
+    const cands = [];
+    for (let i = 0; i < toks.length; i++) { if (isMob(i)) { used.add(i); continue; }
+      const t = toks[i].replace(/^₹/, ""); let v = /^\d+(\.\d+)?$/.test(t) ? Number(t) : NUMW[t] != null ? NUMW[t] : null; if (v == null) continue; let k = i, mul = MULW[toks[i + 1]];
+      if (/^\d+(\.\d+)?k$/.test(t)) { v = Number(t.slice(0, -1)) * 1000; }
+      if (mul) { v *= mul; k = i + 1; const nx = toks[i + 2] && /^\d+$/.test(toks[i + 2]) ? Number(toks[i + 2]) : null; if (nx != null && nx < mul) { v += nx; k = i + 2; } }
+      if (NUMW[t] != null && !mul) continue; // a lone 'do' / 'ek' is a word, not money
+      const cur = CUR.test(toks[k + 1] || "") || CUR.test(toks[i - 1] || "") || /^₹/.test(toks[i]);
+      cands.push({ v: Math.round(v), i, k, cur }); }
+    if (cands.length) { const best = cands.find(c => c.cur) || cands.reduce((a, c) => c.v > a.v ? c : a, cands[0]); out.amount = best.v; for (let x = best.i; x <= best.k; x++) used.add(x);
+      if (CUR.test(toks[best.k + 1] || "")) used.add(best.k + 1); if (CUR.test(toks[best.i - 1] || "")) used.add(best.i - 1); }
+    toks.forEach((t, i) => { if (CUR.test(t)) used.add(i); });
+    for (const [m, re] of Object.entries(MODEW)) if (re.test(low)) { out.mode = m; break; }
+    toks.forEach((t, i) => { for (const re of Object.values(MODEW)) if (re.test(t)) used.add(i); });
+    if (kind === "expense") {
+      const kn = (karigars || []).find(k => low.includes(k.toLowerCase())); const karCat = (cats || []).find(c => c === (C.j && C.j.kar));
+      let best = null, score = 0;
+      (cats || []).forEach(c => { const words = (KW[c.toLowerCase()] || []).concat(c.toLowerCase().split(/[\/\s,&]+/).filter(w => w.length >= 3 && !STOPW.has(w))); let s = 0;
+        words.forEach(w => { if (w.includes(" ") ? low.includes(w) : toks.some((t, i) => { return t === w || (w.length >= 4 && t.length >= 4 && lev(t, w) <= 1) || (w.length >= 5 && t.startsWith(w)); })) s++; });
+        if (s > score) { score = s; best = c; } });
+      if (kn && karCat) { best = karCat; out.kar = kn; toks.forEach((t, i) => { if (kn.toLowerCase().split(/\s+/).includes(t)) used.add(i); }); }
+      out.category = best || "";
+      const sn = (C.j && C.j.staff || []).find(s => new RegExp("(^|\\s)" + s.toLowerCase() + "(\\s|$)").test(low)); if (sn) { out.from = sn; toks.forEach((t, i) => { if (t === sn.toLowerCase() || t === "ne" || t === "ने") used.add(i); }); }
+      const ko = raw.match(/(\S+(?:\s+(?:ji|जी|bhai|भाई|ben|बेन))?)\s+(?:ko|को)\b/i); if (ko) out.to = ko[1];
+    }
+    const filler = /^(ka|ki|ke|ko|diya|diye|di|de|dena|paid|pay|mein|me|se|का|की|के|को|दिया|दिए|दी|में|से|aur|और|liye|लिए|ka|hai|है|for|to|the|of)$/;
+    const rest = raw.split(/\s+/).filter((t, i) => !used.has(i) && !(kind === "receipt" && filler.test(t.toLowerCase())));
+    if (kind === "receipt") { out.party = out.mobile || rest.filter(t => !filler.test(t.toLowerCase())).join(" ").replace(/\s+(se|से)$/i, "").trim(); out.note = ""; }
+    else out.note = rest.join(" ").replace(/^(ka|ki|ke|का|की|के)\s+/i, "").trim();
+    return out;
+  }
+  window.vjCashParse = parse;
+  async function fill(kind, text) {
+    const j = C.j || {}, pre = kind === "receipt" ? "cr" : "cx", heard = $(pre + "Heard"); if (!heard) return;
+    heard.hidden = false; heard.textContent = "Suna: “" + text + "”";
+    let p = parse(text, kind, j.cats || [], j.karigars || []);
+    const miss = kind === "expense" ? (!p.category || !p.amount) : !p.amount;
+    if (miss) { heard.textContent += " - samajh rahe hain…";
+      try { const a = await api("/api/vj/cash", { op: "parse", kind, text }); if (!p.amount && a.amount) p.amount = a.amount; if (!p.mode && a.mode) p.mode = a.mode;
+        if (kind === "expense") { if (!p.category && a.category) p.category = a.category; if (!p.to && a.paidTo) p.to = a.paidTo; if (a.note && !p.note) p.note = a.note; } else if (!p.party && a.party) p.party = a.party;
+        heard.textContent = "Suna: “" + text + "”"; } catch (e) { heard.textContent = "Suna: “" + text + "” (" + (e.message || e) + ")"; } }
+    if (!$(pre + "Heard")) return; // closed meanwhile
+    if (kind === "expense") { if (p.category) $("cxCat").value = p.category; if (p.kar) $("cxKar").value = p.kar; if (p.amount) $("cxAmt").value = String(p.amount); if (p.mode) $("cxMode").value = p.mode;
+      if (p.to) $("cxTo").value = p.to; $("cxNote").value = p.note || text.slice(0, 120); if (p.from && [...$("cxFrom").options].some(o => o.value === p.from)) $("cxFrom").value = p.from; $("cxCat").dispatchEvent(new Event("change")); $("cxMode").dispatchEvent(new Event("change")); }
+    else { if (p.amount) $("crAmt").value = String(p.amount); if (p.mode) { $("crMode").value = p.mode; $("crMode").dispatchEvent(new Event("change")); } if (p.party && !C.rc) { $("crQ").value = p.party; suggest(); } }
+    heard.textContent += " → box check karke Save dabaiye."; // never saved by itself
+  }
+
+  // ---------- export ----------
+  async function excel() { const mon = C.view === "month" ? $("cbMonth").value : $("cbDate").value.slice(0, 7), m = $("cbMsg"); m.textContent = "Making the Excel…";
+    try { const r = await fetch("/api/vj/cash.xlsx?month=" + encodeURIComponent(mon), { credentials: "same-origin" }); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.status);
+      const a = el("a", { href: URL.createObjectURL(await r.blob()), download: "VJ_Cash_Book_" + mon + ".xlsx" }); document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 3000); m.textContent = ""; }
+    catch (e) { m.textContent = "Could not make the Excel (" + (e.message || e) + ")."; } }
+  function pdf() {
+    const j = C.j; if (!j || !window.jspdf) { $("cbMsg").textContent = "PDF maker not loaded - reload the page."; return; }
+    if (j.reg) { $("cbMsg").textContent = "For the register use Excel (month) - it lists every receipt."; return; }
+    const { jsPDF } = window.jspdf, doc = new jsPDF({ unit: "mm", format: "a4" }), W = 210, M = 14; let y = 18;
+    const line = (t, x, sz, bold, al) => { doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setFontSize(sz || 11); doc.text(String(t), x, y, al ? { align: al } : undefined); };
+    const nl = h => { y += h || 6; if (y > 280) { doc.addPage(); y = 18; } };
+    const hr = () => { doc.setDrawColor(180); doc.line(M, y - 4, W - M, y - 4); };
+    if (j.month) {
+      line("Cash book - " + j.month.split("-").reverse().join("-"), M, 16, true); nl(9);
+      const X = [M, 56, 80, 104, 128, 152, 176, W - M], H = ["Date", "Opening", "Cash in", "Expenses", "To owner", "Closing", "UPI/Bank in", "UPI/Bank out"], P = (t, i, b) => line(t, X[i], 9, b, i ? "right" : undefined);
+      H.forEach((h, i) => P(h, i, true)); nl(3); hr(); nl(3);
+      const v = x => x == null ? "-" : rs(x);
+      (j.days || []).forEach(d => { [dmy(d.date), v(d.opening), d.cashIn ? rs(d.cashIn) : "", d.cashOut ? rs(d.cashOut) : "", d.handed ? rs(d.handed) : "", v(d.closing), d.upiIn + d.bankIn ? rs(d.upiIn + d.bankIn) : "", d.upiOut + d.bankOut ? rs(d.upiOut + d.bankOut) : ""].forEach((t, i) => P(t, i)); nl(6); });
+      hr(); ["TOTAL", "", rs(j.tot.cashIn), rs(j.tot.cashOut), rs(j.tot.handed), "", rs(j.tot.upiIn + j.tot.bankIn), rs(j.tot.upiOut + j.tot.bankOut)].forEach((t, i) => P(t, i, true)); nl(8);
+    } else {
+      line("Cash book - " + dmy(j.date), M, 16, true); nl(10);
+      const kv = (k, v, b) => { line(k, M, 12, b); line(v, W - M, 12, b, "right"); nl(7); };
+      kv("Opening cash in hand", j.opening == null ? "-" : rs(j.opening), true);
+      const sec = (title, rows, f) => { nl(2); line(title, M, 12, true); nl(6); hr();
+        if (!rows.length) { line("Nothing entered.", M, 10); nl(6); }
+        rows.forEach(e => { const [a, m] = f(e), tx = doc.splitTextToSize(a, 130); doc.setFont("helvetica", "normal"); doc.setFontSize(10); doc.text(tx, M, y); line(m, 158, 10, false, "right"); line(rs(e.amount), W - M, 10, false, "right"); nl(5 * tx.length + 1); }); };
+      const ins = j.lines.filter(e => e.dir === "in" && e.src !== "mv"), outs = j.lines.filter(e => e.dir === "out" && e.src !== "mv"), mvs = j.lines.filter(e => e.src === "mv");
+      if (mvs.length) sec("Staff cash moves (not income / expense)", mvs, e => [(e.kind === "give" ? "Store -> " + e.staff : e.staff + " -> store" + (e.tick ? "" : " (to receive)")) + (e.note ? " - " + e.note : ""), "Cash"]);
+      sec("Received", ins, e => [[e.party, e.src === "rc" ? e.bill || "on account" : "", e.src === "rc" ? e.id : "", e.note].filter(Boolean).join(" - "), e.mode === "cash" ? "Cash" : e.mode === "upi" ? "UPI" : "Bank"]);
+      sec("Paid / expenses / handed to owner", outs, e => [e.src === "hand" ? "Handed to owner - " + [e.party, e.id].filter(Boolean).join(" - ") : [e.cat, e.to, e.note].filter(Boolean).join(" - "), e.mode === "cash" ? "Cash" : e.mode === "upi" ? "UPI" : "Bank"]);
+      nl(3); hr(); kv("+ Cash received", rs(j.tot.cashIn)); kv("- Cash expenses", rs(j.tot.cashOut)); kv("- Cash handed to owner", rs(j.tot.handed)); kv("= Closing cash in hand", j.closing == null ? "-" : rs(j.closing), true);
+      nl(2); kv("UPI / Bank received (not cash)", rs(j.tot.upiIn + j.tot.bankIn)); kv("UPI / Bank paid (not cash)", rs(j.tot.upiOut + j.tot.bankOut)); if (j.pend) kv("Bank pending check (all days)", rs(j.pend.bankPend) + " (" + j.pend.nBank + ")");
+    }
+    nl(6); line("Printed " + dmy(today()) + " " + new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }), M, 9);
+    doc.save("VJ_Cash_Book_" + (j.month || j.date) + ".pdf");
+  }
+
+  // ---------- RECONCILE a party (Abhinav only - the server checks /api/vj/recon) ----------
+  async function reconDlg(kind, key, name, done) {
+    const d = overlay(`<div class="hd"><h2>Reconcile - ${name}</h2></div><div class="row"><label>Reconcile up to <input id="rqD" type="date"></label></div><p class="hint" id="rqB">Pick the date to see the balance as on that day.</p>
+      <div class="row" id="rqT" hidden><label>Rupee difference is <select id="rqTy"><option value="">Choose…</option><option value="dgiven">Discount given (to party)</option><option value="drecv">Discount received (from party)</option><option value="profit">Extra profit / Rounded off</option></select></label>
+        <label id="rqFl">Fine difference is <select id="rqFt"><option value="">Choose…</option><option value="wo">Fine difference written off</option><option value="gain">Fine difference gained</option></select></label></div>
+      <div class="actions"><button type="button" class="btn" id="rqOk" disabled>Reconcile</button><button type="button" class="btn ghost" id="rqX">Cancel</button></div><p class="hint" id="rqM">One adjusting entry dated that day brings the balance to 0 ₹ and 0 g. Older entries are then hidden (kept; 'Show reconciled history'; Undo last).</p>`);
+    let P = null; $("rqD").max = today(); $("rqX").addEventListener("click", close);
+    $("rqD").addEventListener("change", async () => { P = null; $("rqOk").disabled = true; try { P = await api("/api/vj/recon?kind=" + kind + "&key=" + encodeURIComponent(key) + "&upto=" + $("rqD").value);
+        $("rqB").textContent = `Balance as on ${dmy(P.upto)}: ${inr(P.rs)}${P.fine ? " · " + Number(P.fine).toFixed(3) + " g fine" : ""}${kind === "cust" ? " (party owes us; minus = we owe)" : " (we owe; minus = they owe us)"}`;
+        $("rqT").hidden = !(P.rs || P.fine); $("rqTy").parentNode.hidden = !P.rs; $("rqFl").hidden = !P.fine; $("rqOk").disabled = false; } catch (e) { $("rqB").textContent = e.message || String(e); } });
+    $("rqOk").addEventListener("click", async () => { if (!P) return; const ty = $("rqTy").value, ft = $("rqFt").value; if (P.rs && !ty) { $("rqM").textContent = "Choose what the rupee difference is."; return; } if (P.fine && !ft) { $("rqM").textContent = "Choose what the fine difference is."; return; }
+      if (!confirm(`Post ONE entry dated ${dmy(P.upto)}: ${inr(Math.abs(P.rs))}${P.rs ? " " + $("rqTy").selectedOptions[0].textContent : ""}${P.fine ? " and " + Math.abs(P.fine).toFixed(3) + " g " + $("rqFt").selectedOptions[0].textContent : ""} - balance as on ${dmy(P.upto)} becomes 0. OK?`)) return;
+      try { await api("/api/vj/recon", { op: "do", kind, key, upto: P.upto, type: ty, ftype: ft, expect: { rs: P.rs, fine: P.fine } }); close(); if (done) done(); } catch (e) { $("rqM").textContent = "Not done (" + (e.message || e) + ")."; } }); void d; }
+  window.vjRecon = reconDlg;
+  window.vjReconUndo = async (kind, key, done) => { if (!confirm("Undo the last reconcile of this party? Its adjusting entry goes and the hidden entries come back.")) return; try { await api("/api/vj/recon", { op: "undo", kind, key }); if (done) done(); } catch (e) { alert("Not undone (" + (e.message || e) + ")."); } };
+  // ---------- CASH COUNT / RECONCILE (Abhinav only): book vs counted -> one difference line; older lines archived ----------
+  function cashCount(holder) { const j = C.j || {}, d = overlay(`<div class="hd"><h2>Cash count / Reconcile</h2></div>
+      <div class="row"><label>Whose cash <select id="ccH"></select></label><label>Date <input id="ccD" type="date"></label><label>Time <input id="ccT" type="time"></label><label>Cash counted (₹) <input id="ccA" inputmode="numeric"></label></div>
+      <p class="hint" id="ccB">Type the cash actually counted, then Check.</p>
+      <div class="actions"><button type="button" class="btn ghost" id="ccChk">Check</button><button type="button" class="btn" id="ccOk" disabled>Confirm</button><button type="button" class="btn ghost" id="ccU">Undo last count</button><button type="button" class="btn ghost" id="ccX">Cancel</button></div><p class="hint" id="ccM"></p>`);
+    opts($("ccH"), [["store", "Cash at store"]].concat((j.staff || []).map(s => [s, s + "'s float"])), holder || "store"); $("ccD").value = dayOf(); $("ccD").max = today(); $("ccT").value = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(11, 16);
+    let P = null; const body = () => ({ op: "count", holder: $("ccH").value, date: $("ccD").value, time: $("ccT").value, counted: $("ccA").value.replace(/[,\s]/g, "") });
+    ["ccH", "ccD", "ccA"].forEach(i => $(i).addEventListener("input", () => { P = null; $("ccOk").disabled = true; }));
+    $("ccChk").addEventListener("click", async () => { try { P = await api("/api/vj/cash", body()); $("ccB").textContent = `Book ${inr(P.book)} · counted ${inr(P.counted)} · difference ${P.diff > 0 ? "excess " + inr(P.diff) + " (extra income)" : P.diff < 0 ? "short " + inr(-P.diff) + " (cash shortage)" : "none"}`; $("ccOk").disabled = false; } catch (e) { $("ccB").textContent = e.message || String(e); } });
+    $("ccOk").addEventListener("click", async () => { if (!P || !confirm(`Book becomes ${inr(P.counted)} on ${dmy(P.date)} (difference ${inr(P.diff)}). Older lines are archived (kept). OK?`)) return;
+      try { await api("/api/vj/cash", Object.assign(body(), { expect: P.book })); close(); $("cbMsg").textContent = "Cash reconciled: " + inr(P.counted) + "."; load(); } catch (e) { $("ccM").textContent = "Not saved (" + (e.message || e) + ")."; } });
+    $("ccU").addEventListener("click", async () => { if (!confirm("Undo the last cash count of " + $("ccH").selectedOptions[0].textContent + "?")) return; try { await api("/api/vj/cash", { op: "cundo", holder: $("ccH").value }); close(); load(); } catch (e) { $("ccM").textContent = "Not undone (" + (e.message || e) + ")."; } });
+    $("ccX").addEventListener("click", close); void d; }
+  // ---------- STAFF SETTLEMENT 'Hisab lo' (Abhinav, Shilpiji, Mihir) ----------
+  function hisab(h) { const j = C.j || {}, s = h.sett || { given: 0, spent: 0, returned: 0 }, d = overlay(`<div class="hd"><h2>Hisab lo - ${h.name}</h2></div>
+      <p class="hint">Since the last settlement${s.since ? " (" + dmy(s.since) + ")" : ""}: given ${inr(s.given)} · already spent ${inr(s.spent)} · returned ${inr(s.returned)} · now with ${h.name}: <b>${inr(h.bal)}</b></p>
+      <div id="hsL" style="display:flex;flex-direction:column;gap:8px"></div><button type="button" class="add" id="hsAdd">+ Expense line (Hisab diya)</button>
+      <div class="row"><label>Cash returned (₹) <input id="hsR" inputmode="numeric"></label><label>Date <input id="hsD" type="date"></label></div>
+      <p class="banner ok" id="hsLive" style="margin:0"></p>
+      <div class="actions"><button type="button" class="btn" id="hsOk">Save hisab</button><button type="button" class="btn ghost" id="hsX">Cancel</button></div><p class="hint" id="hsM"></p>`);
+    $("hsD").value = dayOf(); $("hsD").max = today();
+    const live = () => { const sp = [...document.querySelectorAll(".hsA")].reduce((a, i) => a + (Number(i.value.replace(/[,\s]/g, "")) || 0), 0), r = Number($("hsR").value.replace(/[,\s]/g, "")) || 0, bal = h.bal - sp - r;
+      $("hsLive").textContent = `With ${h.name} now ${inr(h.bal)} − expenses ${inr(sp)} − returned ${inr(r)} = ${bal >= 0 ? "still with " + h.name + " " + inr(bal) : "we owe " + h.name + " " + inr(-bal) + " (spent extra)"}`; $("hsLive").className = "banner " + (bal >= 0 ? "ok" : "warn"); };
+    const add = () => { const r = el("div", { className: "row hsl" }), c = el("select", { className: "hsC" }); opts(c, [["", "Head…"]].concat((j.cats || []).map(x => [x, x])));
+      const n = el("input", { className: "hsN", placeholder: "Narration (required)", maxLength: 120 }), a = el("input", { className: "hsA", placeholder: "₹", inputMode: "numeric", maxLength: 10 }), ph = el("input", { type: "file", accept: "image/*", className: "hsP" });
+      a.addEventListener("input", live); ph.addEventListener("change", async () => { const f = ph.files[0]; if (!f) return; try { const b = await shrink(f), x = await fetch("/api/vj/photo", { method: "POST", credentials: "same-origin", headers: { "content-type": "image/jpeg" }, body: b }), jj = await x.json(); if (!x.ok) throw new Error(jj.error); ph.dataset.id = jj.id; $("hsM").textContent = "Photo added."; } catch (e) { $("hsM").textContent = "Photo not added (" + (e.message || e) + ")."; } });
+      [[c, "2 1 160px"], [n, "3 1 200px"], [a, "1 1 90px"], [ph, "1 1 120px"]].forEach(([x, fl]) => { const l = el("label"); l.style.flex = fl; l.append(x); r.append(l); }); $("hsL").append(r); };
+    add(); live(); $("hsAdd").addEventListener("click", add); $("hsR").addEventListener("input", live); $("hsX").addEventListener("click", close);
+    $("hsOk").addEventListener("click", async () => { const lines = [...document.querySelectorAll(".hsl")].map(r => ({ cat: r.querySelector(".hsC").value, note: r.querySelector(".hsN").value.trim(), amount: r.querySelector(".hsA").value.replace(/[,\s]/g, ""), photo: r.querySelector(".hsP").dataset.id || "" })).filter(l => l.cat || l.amount || l.note);
+      if (lines.some(l => !l.cat || !l.amount || l.note.length < 2)) { $("hsM").textContent = "Each line needs a head, a narration and the amount."; return; } $("hsOk").disabled = true;
+      try { const r = await api("/api/vj/cash", { op: "settle", staff: h.name, date: $("hsD").value, lines, ret: $("hsR").value.replace(/[,\s]/g, "") }); close(); $("cbMsg").textContent = `Hisab saved for ${h.name}: expenses ${inr(r.spent)}, returned ${inr(r.returned)}, balance ${r.bal >= 0 ? inr(r.bal) + " with " + h.name : "we owe " + inr(-r.bal)}.`; load(); }
+      catch (e) { $("hsM").textContent = "Not saved (" + (e.message || e) + ")."; $("hsOk").disabled = false; } }); void d; }
+  // ---------- SUNDRY DEBTORS block inside the accounts section (owner) ----------
+  async function debtInit() { const sec = $("p-vchain"), cb = $("crBox"); if (!sec || !cb || $("dbBox")) return;
+    const box = el("div", { id: "dbBox", style: "display:flex;flex-direction:column;gap:8px;margin-top:10px" }); box.innerHTML = `<div class="crbar"><h3 style="margin:0;flex:1 1 auto">Sundry debtors (customers)</h3><input id="dbQ" placeholder="Name / mobile" style="width:180px"></div>
+      <div class="list"><table class="items" style="min-width:0;width:100%"><thead><tr><th>Party</th><th>Mobile</th><th style="text-align:right">Balance ₹</th><th style="text-align:right">Fine g</th><th></th></tr></thead><tbody id="dbRows"></tbody></table></div><p class="hint" id="dbMsg">Bills, + Pay, receipts, discounts and old gold come in by themselves (same data as the Ledger tab).</p>`;
+    cb.after(box); $("dbQ").addEventListener("input", debtRows); debtLoad(); document.querySelector("nav").addEventListener("click", e => { const x = e.target.closest("button[data-tab]"); if (x && x.dataset.tab === "vchain") debtLoad(); }); }
+  async function debtLoad() { try { CR.d = await api("/api/vj/debtors"); debtRows(); } catch (e) { $("dbMsg").textContent = "Could not load debtors (" + (e.message || e) + ")."; } }
+  function debtRows() { const j = CR.d; if (!j) return; const q = $("dbQ").value.trim().toLowerCase(), tb = $("dbRows"); tb.textContent = "";
+    j.list.filter(d => !q || (d.name + " " + d.mobile).toLowerCase().includes(q)).forEach(d => { const tr = el("tr"); [[d.name + (d.city ? ", " + d.city : "")], [d.mobile || "—"], [inr(d.balance), 1], [d.fineDue ? Number(d.fineDue).toFixed(3) : "", 1]].forEach(([v, r]) => tr.append(el("td", { textContent: v, style: r ? "text-align:right" : "" })));
+      const x = el("td"); x.append(btn("Ledger", "ghost", () => debtStmt(d))); tr.append(x); tb.append(tr); });
+    const tr = el("tr", { style: "font-weight:700" }); [["TOTAL (" + j.list.length + ")"], [""], [inr(j.total), 1], [j.fine ? Number(j.fine).toFixed(3) : "", 1], [""]].forEach(([v, r]) => tr.append(el("td", { textContent: v, style: r ? "text-align:right" : "" }))); tb.append(tr); }
+  async function debtStmt(dd, hist) { let s; try { s = await api("/api/vj/ledger?key=" + encodeURIComponent(dd.key) + (hist ? "&hist=1" : "")); } catch (e) { $("dbMsg").textContent = "Could not open (" + (e.message || e) + ")."; return; }
+    const d = overlay(`<div class="hd"><h2>${s.customer.name} · ${s.customer.mobile || ""}</h2></div><p class="hint">Balance ${inr(s.customer.balance)}${s.customer.fineDue ? " · fine " + Number(s.customer.fineDue).toFixed(3) + " g" : ""}</p>
+      <div class="tblw"><table class="cbm"><thead><tr><th>Date</th><th>Voucher</th><th>Narration</th><th>Dr ₹</th><th>Cr ₹</th><th>Bal ₹</th><th>Dr g</th><th>Cr g</th><th>Fine bal g</th></tr></thead><tbody id="dsT"></tbody></table></div>
+      <div class="actions" id="dsA"><button type="button" class="btn ghost" id="dsX">Close</button></div>`); d.classList.add("wide");
+    s.ledger.forEach(l => { const tr = el("tr"); [dmy(l.date), l.vch || "", l.part, l.dr ? inr(l.dr) : "", l.cr ? inr(l.cr) : "", inr(l.bal), l.fdr ? l.fdr.toFixed(3) : "", l.fcr ? l.fcr.toFixed(3) : "", Number(l.fbal || 0).toFixed(3)].forEach((v, i) => { const td = el("td", { textContent: v }); if (i === 2) { td.style.textAlign = "left"; td.style.whiteSpace = "normal"; } tr.append(td); }); $("dsT").append(tr); });
+    const A = $("dsA"), again = () => { close(); debtLoad(); debtStmt(dd); };
+    if (s.canRecon) { A.prepend(btn("Reconcile…", "", () => reconDlg("cust", dd.key, s.customer.name, again))); if (s.recon) A.append(btn("Undo last reconcile", "ghost", () => window.vjReconUndo("cust", dd.key, again))); if (s.recon || s.hist) A.append(btn(s.hist ? "Hide reconciled history" : "Show reconciled history", "ghost", () => { close(); debtStmt(dd, !s.hist); })); }
+    $("dsX").addEventListener("click", close); }
+  // ---------- CREDITOR ACCOUNTS inside Sundry Creditors (owner 14:51; Abhinav / Shilpiji only - the server checks /api/vj/creditors) ----------
+  const CR = { j: null };
+  function credInit() { const sec = $("p-vchain"); if (!sec || $("crBox")) return; const me = (window.__vjMe || {}); void me;
+    const box = el("div", { id: "crBox", style: "display:flex;flex-direction:column;gap:8px" }); box.innerHTML = `<div class="crbar"><h3 style="margin:0;flex:1 1 auto">Creditor accounts</h3>
+      <select id="crGrp" aria-label="Group"><option value="">All groups</option></select><select id="crAct" aria-label="Show"><option value="">Active</option><option value="all">With inactive</option></select>
+      <button type="button" class="btn" id="crPay">+ Payment</button><button type="button" class="btn ghost" id="crBill">+ Bill</button><button type="button" class="btn ghost" id="crNew">+ Account</button></div>
+      <div class="list"><table class="items" style="min-width:0;width:100%"><thead><tr><th>Account</th><th>Group</th><th style="text-align:right">Balance ₹ (we owe)</th><th style="text-align:right">Fine g</th><th></th></tr></thead><tbody id="crRows"></tbody></table></div><p class="hint" id="crMsg"></p>`;
+    const h = sec.querySelector("h2"); (h || sec.firstChild).after(box);
+    $("crGrp").addEventListener("change", credRows); $("crAct").addEventListener("change", credRows);
+    $("crPay").addEventListener("click", () => window.vjCashCred("cpay")); $("crBill").addEventListener("click", () => window.vjCashCred("cbill")); $("crNew").addEventListener("click", () => credAcct(null));
+    document.querySelector("nav").addEventListener("click", e => { const x = e.target.closest("button[data-tab]"); if (x && x.dataset.tab === "vchain") credLoad(); }); credLoad(); }
+  async function credLoad() { try { CR.j = await api("/api/vj/creditors"); const g = $("crGrp"), v = g.value; opts(g, [["", "All groups"]].concat(CR.j.groups.map(x => [x, x])), v); credRows(); } catch (e) { $("crMsg").textContent = "Could not load creditor accounts (" + (e.message || e) + ")."; } }
+  window.vjCredRefresh = () => { if ($("crBox")) credLoad(); };
+  function credRows() { const j = CR.j; if (!j) return; const g = $("crGrp").value, all = $("crAct").value === "all", tb = $("crRows"); tb.textContent = ""; let tot = 0;
+    j.accts.filter(a => (!g || a.group === g) && (all || a.active)).forEach(a => { tot += a.bal; const tr = el("tr"); [[a.name + (a.active ? "" : " (inactive)") + (a.mobile ? " · " + a.mobile : "")], [a.group], [inr(a.bal), 1], [a.group === "Gold" ? Number(a.fine || 0).toFixed(3) : "", 1]].forEach(([v, r]) => tr.append(el("td", { textContent: v, style: r ? "text-align:right;font-variant-numeric:tabular-nums" : "" })));
+      const x = el("td", { style: "white-space:nowrap" }); x.append(btn("Statement", "ghost", () => credStmt(a)), " ", btn("Pay", "ghost", () => window.vjCashCred("cpay", a.id))); tr.append(x); tb.append(tr); });
+    const tr = el("tr", { style: "font-weight:700" }); [["TOTAL"], [""], [inr(tot), 1], [""], [""]].forEach(([v, r]) => tr.append(el("td", { textContent: v, style: r ? "text-align:right" : "" }))); tb.append(tr);
+    $("crMsg").textContent = j.unlinked.length ? "Vendors not linked to an account yet: " + j.unlinked.map(u => u.vendor + " (" + u.n + ", " + inr(u.amt) + ")").join(", ") + " - open the account > Edit > add the vendor name under 'Vendor names'." : "Chain purchases (vendor chains sold / used, chain parts) come in by themselves, matched by vendor name."; }
+  async function credStmt(a, hist) { let s; try { s = await api("/api/vj/creditors?id=" + encodeURIComponent(a.id) + (hist ? "&hist=1" : "")); } catch (e) { $("crMsg").textContent = "Could not open (" + (e.message || e) + ")."; return; }
+    const gold = a.group === "Gold", d = overlay(`<div class="hd"><h2>${a.name} · ${a.group}</h2></div><p class="hint">Opening ${s.opening.date ? dmy(s.opening.date) : "(no date)"}: ${inr(s.opening.amt)}${gold ? " · " + Number(s.opening.fine).toFixed(3) + " g" : ""} · Balance now <b>${inr(s.bal)}</b>${gold ? " · " + Number(s.fine).toFixed(3) + " g" : ""}</p>
+      <div class="tblw"><table class="cbm"><thead><tr><th>Date</th><th>Particulars</th><th>Bill / purchase ₹</th><th>Paid ₹</th>${gold ? "<th>Fine +/− g</th>" : ""}<th>Balance ₹</th></tr></thead><tbody id="csT"></tbody></table></div>
+      <div class="actions" id="csAct"><button type="button" class="btn" id="csP">+ Payment</button><button type="button" class="btn ghost" id="csE">Edit account</button><button type="button" class="btn ghost" id="csX">Close</button></div>`); d.classList.add("wide");
+    if (s.canRecon) { const again = () => { close(); credLoad(); credStmt(a); }, A = $("csAct"); A.append(btn("Reconcile…", "ghost", () => reconDlg("cred", a.id, a.name, again))); if (s.reconUpto) A.append(btn("Undo last reconcile", "ghost", () => window.vjReconUndo("cred", a.id, again))); if (s.reconUpto || hist) A.append(btn(hist ? "Hide reconciled history" : "Show reconciled history", "ghost", () => { close(); credStmt(a, !hist); })); }
+    const T = $("csT"); s.lines.forEach(l => { const tr = el("tr"); [dmy(l.date), l.descr + (l.byName ? " · " + l.byName : ""), l.cr ? inr(l.cr) : "", l.dr ? inr(l.dr) : ""].concat(gold ? [(l.crFine - l.drFine) ? (l.crFine - l.drFine).toFixed(3) : ""] : []).concat([inr(l.bal)]).forEach((v, i) => { const td = el("td", { textContent: v }); if (i === 1) { td.style.textAlign = "left"; td.style.whiteSpace = "normal"; } tr.append(td); }); T.append(tr); });
+    if (!s.lines.length) T.append(el("tr", null, [el("td", { textContent: "No entries yet.", colSpan: 6 })]));
+    $("csP").addEventListener("click", () => window.vjCashCred("cpay", a.id)); $("csE").addEventListener("click", () => credAcct(a)); $("csX").addEventListener("click", close); }
+  function credAcct(a) { const j = CR.j || { groups: [] }, ed = !!a;
+    overlay(`<div class="hd"><h2>${ed ? "Edit account" : "New creditor account"}</h2></div>
+      <div class="row"><label style="flex:2 1 220px">Name <input id="caN" maxlength="60"></label><label>Group <select id="caG"></select></label><label>Mobile <input id="caM" inputmode="tel" maxlength="14"></label></div>
+      <div class="row"><label>Opening ₹ (optional) <input id="caO" inputmode="numeric"></label><label id="caFl">Opening fine g <input id="caF" inputmode="decimal"></label><label>As on <input id="caD" type="date"></label></div>
+      <label>Vendor names that feed this account (comma) <input id="caL" maxlength="300" placeholder="e.g. Siddharth"></label>
+      ${ed ? '<label style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" id="caA" style="width:auto"> Active (untick = inactive; never deleted)</label>' : ""}
+      <div class="actions"><button type="button" class="btn" id="caOk">Save</button><button type="button" class="btn ghost" id="caX">Cancel</button></div><p class="hint" id="caMsg"></p>`);
+    opts($("caG"), j.groups.map(g => [g, g]), ed ? a.group : "Diamonds / chain"); const ui = () => { $("caFl").hidden = $("caG").value !== "Gold"; }; $("caG").addEventListener("change", ui);
+    if (ed) { $("caN").value = a.name; $("caM").value = a.mobile || ""; $("caO").value = a.openAmt ? String(a.openAmt) : ""; $("caF").value = a.openFine ? String(a.openFine) : ""; $("caD").value = a.openDate || ""; $("caL").value = (a.links || []).join(", "); $("caA").checked = a.active; } ui();
+    $("caX").addEventListener("click", close);
+    $("caOk").addEventListener("click", async () => { const b = { op: "acct", id: ed ? a.id : undefined, name: $("caN").value.trim(), group: $("caG").value, mobile: $("caM").value.trim(), openAmt: $("caO").value, openFine: $("caF").value, openDate: $("caD").value, links: $("caL").value.split(",").map(s => s.trim()).filter(Boolean), active: ed ? $("caA").checked : true };
+      try { await api("/api/vj/creditors", b); close(); credLoad(); } catch (e) { $("caMsg").textContent = "Not saved (" + (e.message || e) + ")."; } }); }
+  setInterval(() => { if (C.j && C.j.canEdit) { credInit(); debtInit(); } else if (!C.j && $("p-vchain") && !CR.tried) { CR.tried = true; api("/api/vj/cash?date=" + today()).then(j => { C.j = C.j || j; if (j.canEdit) credInit(); }).catch(() => {}); } }, 1500);
+
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", build); else build();
+})();
