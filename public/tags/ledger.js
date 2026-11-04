@@ -123,7 +123,7 @@
     } catch (e) { m.textContent = "Could not load sundry debtors (" + (e.message || e) + ")."; } }
   async function openCust(key) {
     const box = $("lcard"); box.hidden = false; box.textContent = "Loading…";
-    try { const j = await api("/api/vj/ledger?key=" + encodeURIComponent(key)); L.card = j; L.cust = j.customer; L.canSettle = !!j.canSettle; drawCard(); fillBills(); modeUi();
+    try { const j = await api("/api/vj/ledger?key=" + encodeURIComponent(key) + (L.hist ? "&hist=1" : "")); L.card = j; L.cust = j.customer; L.canSettle = !!j.canSettle; drawCard(); fillBills(); modeUi();
       $("rwho").textContent = `Receipt for ${j.customer.name}${j.customer.city ? ", " + j.customer.city : ""}${j.customer.mobile ? " (" + j.customer.mobile + ")" : ""}.`;
     } catch (e) { box.textContent = "Could not open the ledger (" + (e.message || e) + ")."; }
   }
@@ -155,10 +155,15 @@
     box.appendChild(rw);
     // running ledger
     box.appendChild(el("h2", { textContent: "Ledger" }));
-    const [lw, lt] = table(["Date", "Particulars", "Debit", "Credit", "Balance"], 640);
+    const fg = j.ledger.some(e => e.fdr || e.fcr || e.fbal); /* C-20261104-CASHBOOK: fine gold columns + voucher; Reconcile (Abhinav only) */
+    const [lw, lt] = table(["Date", "Voucher", "Narration", "Dr ₹", "Cr ₹", "Balance ₹"].concat(fg ? ["Dr fine g", "Cr fine g", "Fine bal g"] : []), 640);
     j.ledger.forEach(e => { const tr = el("tr"); const td = (x, cl) => tr.appendChild(el("td", { className: cl || "", textContent: x }));
-      td(dmy(e.date)); td(e.part); td(e.dr ? fmt(e.dr) : "", "num"); td(e.cr ? fmt(e.cr) : "", "num"); td(fmt(e.bal), "num"); lt.appendChild(tr); });
-    box.appendChild(lw);
+      td(dmy(e.date)); td(e.vch || ""); td(e.part); td(e.dr ? fmt(e.dr) : "", "num"); td(e.cr ? fmt(e.cr) : "", "num"); td(fmt(e.bal), "num");
+      if (fg) { td(e.fdr ? g3(e.fdr) : "", "num"); td(e.fcr ? g3(e.fcr) : "", "num"); td(g3(e.fbal || 0), "num"); } lt.appendChild(tr); });
+    if (j.canRecon && window.vjRecon) { const ra = el("div", { className: "actions" }); ra.append(btn("Reconcile…", "ghost", () => window.vjRecon("cust", j.customer.key, j.customer.name, () => openCust(j.customer.key))));
+      if (j.recon) ra.append(btn("Undo last reconcile", "ghost", () => window.vjReconUndo("cust", j.customer.key, () => openCust(j.customer.key))));
+      if (j.recon || j.hist) ra.append(btn(j.hist ? "Hide reconciled history" : "Show reconciled history", "ghost", () => { L.hist = !j.hist; openCust(j.customer.key); }));
+      box.appendChild(lw); box.appendChild(ra); } else box.appendChild(lw);
     box.appendChild(el("p", { className: "hint", id: "lcmsg" }));
   }
   const cmsg = t => { const m = $("lcmsg"); if (m) m.textContent = t; };
