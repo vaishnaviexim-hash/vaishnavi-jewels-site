@@ -208,7 +208,7 @@ async function waFlush(request, env) {
 //  5. No cost price is ever stored (F-025). Stock data lives in D1 + R2 in the owner's Cloudflare account,
 //     never in the public website files or on GitHub.
 // Bindings / variables (set in Cloudflare Pages > Settings): DB (D1), PHOTOS (KV namespace or R2 bucket), ACCESS_TEAM, ACCESS_AUD,
-// OWNER_EMAILS (comma list), GOLD_PUSH_SECRET (encrypted), VJ_GOLD_HOOK (encrypted, gold relay), ANTHROPIC_API_KEY (encrypted, photo search), VJ_QUOTE_HOOK (encrypted, quote follow-up). ACCESS_CERTS_URL / VJ_DEV only for local tests.
+// OWNER_EMAILS (comma list), GOLD_PUSH_SECRET (encrypted), VJ_GOLD_HOOK (encrypted, gold relay), ANTHROPIC_API_KEY (encrypted, photo search), VJ_TALLY_SECRET (encrypted, future Tally bridge -> /api/vj/tally-sync + /api/vj/tally-outbox; not set yet), VJ_QUOTE_HOOK (encrypted, quote follow-up). ACCESS_CERTS_URL / VJ_DEV only for local tests.
 // ---------------------------------------------------------------------------------------------
 const VJ_HOST = 'vaishnavijewels.com';
 const VJ_JSON_H = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow' };
@@ -404,7 +404,7 @@ async function vjSync(request, env, who, ctx) {
     return { path: r.path, data, version: r.version };
   }).filter(Boolean);
   // 'now - 2000' so a write landing in the same millisecond is never missed on the next poll
-  return vjJson({ now: now - 2000, docs: out, deleted: del, me: { email: who.email, role: who.role, name: who.name, enq: !!(await vjEnqWho(env, who)), cash: vjCbCan(who) } }); /* cash: C-20261104-CASHBOOK */ // enq: C-20261103-ENQMERGE
+  return vjJson({ now: now - 2000, docs: out, deleted: del, me: { email: who.email, role: who.role, name: who.name, enq: !!(await vjEnqWho(env, who)), cash: false } }); /* cash: C-20261104-CASHBOOK, off 16:55 C-20261104-CASHBOOKOFF (Tally) */ // enq: C-20261103-ENQMERGE
 }
 
 async function vjWrite(request, env, who, ctx) {
@@ -2328,10 +2328,13 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
     const l = (Array.isArray(b.emails) ? b.emails : []).map(e => String(e || '').trim().toLowerCase()).filter(e => /^[^@\s]{1,64}@[^@\s]{1,120}$/.test(e)).slice(0, 50);
     await putMeta('ko:diaperm', l); await vjOgHist(env, who, 'kocfg', 'diaperm', 'edit', old); await vjAudit(env, who, 'ko-diaperm', 'korders', l.join(',')); return vjJson({ ok: true }); }
   if (op === 'pay') { if (!adm) return vjDeny(403, 'only Abhinav or Shilpiji can enter a karigar payment'); const k = vjClean(b.karigar, 40), date = String(b.date || today), cash = vjKo3R2(vjKoNum(b.cash)), fine = vjR3(Number(b.fine) || 0);
-    if (!k || !dateOk(date) || (!(cash > 0) && !fine)) return vjDeny(400, 'karigar, date and amount are needed'); if (!vjKoMg(cfg, k)) return vjDeny(400, k + ' is managed manually, not in VJ Tags'); { const lk = await vjKoLockMsg(env, [[k, date]]); if (lk) return vjDeny(409, lk); } const id = 'KP' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    const r = { id, date, karigar: k, ref: '', type: 'pay', descr: vjClean(b.note, 120) || 'Cash paid', fine: 0, cash: -cash, status: 'ok', by: who.email, byName, at: now };
+    if (!k || !dateOk(date) || (!(cash > 0) && !fine)) return vjDeny(400, 'karigar, date and amount are needed'); if (!vjKoMg(cfg, k)) return vjDeny(400, k + ' is managed manually, not in VJ Tags');
+    const fm = String(b.forMonth || ''), md = ['cash', 'upi', 'bank'].includes(b.mode) ? b.mode : 'cash'; if (fm && (!/^\d{4}-(0[1-9]|1[0-2])$/.test(fm) || fm > date.slice(0, 7))) return vjDeny(400, 'month account looks wrong'); // C-20261104-KPAYMONTH: pay a month account (karigar account only - cash book is in Tally)
+    { const lk = await vjKoLockMsg(env, [[k, date]].concat(fm ? [[k, fm + '-01']] : [])); if (lk) return vjDeny(409, lk); } const id = 'KP' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const r = { id, date, karigar: k, ref: '', type: 'pay', descr: vjClean((vjClean(b.note, 100) || 'Paid') + ' (' + ({ cash: 'Cash', upi: 'UPI', bank: 'Bank' })[md] + (fm ? ', for ' + vjKoMonTxt(fm) + ' account' : '') + ')', 120), fine: 0, cash: -cash, status: 'ok', by: who.email, byName, at: now, mode: md }; if (fm) r.forMonth = fm;
     await env.DB.prepare('INSERT INTO vj_karigar_ledger (id, ts, date, karigar, ref, type, descr, fine, cash, status, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(id, Date.now(), date, k, '', 'pay', r.descr, 0, r.cash, 'ok', JSON.stringify(r)).run();
-    await vjAudit(env, who, 'ko-pay', 'kledger/' + id, k + ' Rs ' + cash); return vjJson({ ok: true }); }
+    await vjAudit(env, who, 'ko-pay', 'kledger/' + id, k + ' Rs ' + cash + (fm ? ' for ' + fm : ''));
+    let kdue = null; if (fm) { const st = await vjKoStmt(env, who, cfg, k, fm, []); kdue = vjKo3R2(st.closeCash || 0); } return vjJson({ ok: true, kdue, forMonth: fm }); }
   if (['ledit', 'leddel', 'ledrestore', 'ledowners'].includes(op)) { // C-20261103-KORDER7: owner-only edit / delete / restore (server-checked)
     const owners = await vjKoLedOwners(env); if (!owners.includes(String(who.email).toLowerCase())) return vjDeny(403, 'only Abhinav can edit or delete karigar account entries');
     const putL = l => env.DB.prepare('UPDATE vj_karigar_ledger SET date = ?, fine = ?, cash = ?, descr = ?, status = ?, data = ? WHERE id = ?').bind(l.date, l.fine, l.cash, l.descr, l.status, JSON.stringify(l), l.id);
@@ -2823,8 +2826,9 @@ async function vjReconBal(env, kind, key, upto) {
 // GET /api/vj/recon?kind=cust|cred&key=&upto=  ;  POST /api/vj/recon {op: 'do', kind, key, upto, type, ftype, expect: {rs, fine}} | {op: 'undo', kind, key}
 async function vjRecon(request, url, env, who) {
   if (!vjCanSettle(who)) return vjDeny(403, 'only Abhinav can reconcile');
+  if ((request.method === 'GET' ? url.searchParams.get('kind') : '') === 'cred') return vjDeny(404, 'not found'); // CASHBOOKOFF: creditors are in Tally
   const get = request.method === 'GET'; let b = {}; if (!get) { if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed'); try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); } }
-  const P = k => get ? url.searchParams.get(k) : b[k], kind = P('kind') === 'cred' ? 'cred' : P('kind') === 'cust' ? 'cust' : '', key = String(P('key') || '').slice(0, 120);
+  const P = k => get ? url.searchParams.get(k) : b[k], kind = P('kind') === 'cust' ? 'cust' : '', key = String(P('key') || '').slice(0, 120);
   if (!kind || !key || (kind === 'cust' && !/^(m:\d{10}|n:[^|]{0,60}\|[^|]{0,40})$/.test(key)) || (kind === 'cred' && !/^CR[a-z0-9]{3,20}$/i.test(key))) return vjDeny(400, 'bad party');
   const R = await vjReconLoad(env), mine = R.filter(r => r.kind === kind && r.key === key && !r.undone).sort((a, c) => String(a.at).localeCompare(String(c.at)));
   if (!get && b.op === 'undo') { const last = mine.slice(-1)[0]; if (!last) return vjDeny(404, 'nothing to undo'); last.undone = { at: new Date().toISOString(), byName: vjByName(who) };
@@ -5191,6 +5195,141 @@ async function vjCredPost(request, env, who) { if (who.role !== 'admin') return 
   await env.DB.prepare('INSERT INTO vj_cred (id, ts, data) VALUES (?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data').bind(id, Date.now(), JSON.stringify(rec)).run();
   await vjAudit(env, who, cur ? 'cred-edit' : 'cred-new', 'cred/' + id, name + ' ' + group + (rec.active ? '' : ' (inactive)')); return vjJson({ ok: true, id }); }
 
+// SUNDRY CREDITORS = two registers only (owner 17:02): ?reg=chain (below) and ?reg=cs (colour stones / malas from a vendor). No accounts, no payments (Tally).
+// CHAIN REGISTER (owner 04/11 16:55, C-20261104-CASHBOOKOFF): every vendor chain added to our items - chain tags with a vendor (New tag > Chain >
+// Vendor) and chain parts typed in karigar receives - with what is payable to the vendor (sold / used, not yet marked 'entered in Tally').
+// He enters these in Tally from here. Abhinav / Shilpiji only. Month filter = the date the chain came in (tag) / the receive date (part).
+async function vjChainReg(url, env, who) { if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji');
+  const month = String(url.searchParams.get('month') || ''), vendor = vjClean(url.searchParams.get('vendor'), 40).toLowerCase(), reg = url.searchParams.get('reg') === 'cs' ? 'cs' : 'chain', rows = [];
+  if (reg === 'cs') { // owner 17:02: register 2 = colour stones / malas bought from a vendor (CS from / Other from in Karigar receive = a vendor, not the karigar / Cash (self))
+    try { await vjKo3Tables(env); ((((await env.DB.prepare('SELECT data FROM vj_kord').all()).results) || []).map(vjParse)).forEach(o => { const t = o && o.tag; if (!t || o.status === 'cancelled') return;
+      const ref = 'Karigar ' + o.karigar + ' ' + o.no, design = o.designNo || o.itemTxt || o.item || '', sk = 'ko:' + vjNk(o.karigar) + ':' + o.no, tagNo = String(o.tagNo || '');
+      if (t.csSrc && t.csSrc !== 'Cash (self)') { const ct = t.csUnit === 'ct'; rows.push({ date: String(t.date || ''), vendor: t.csSrc, ref, design, item: 'Colour stones', wt: ct ? vjR3(t.csVal || 0) : vjR3(t.csWt || 0), unit: ct ? 'ct' : 'g', pcs: Number(t.csPcs) || '', rate: Number(t.csRate) || 0, amount: Math.round(Number(t.csSrcAmt) || 0), src: sk + ':cs', tagNo }); }
+      if (t.othSrc && t.othSrc !== 'Cash (self)') { const ot = Array.isArray(t.others) ? t.others : []; rows.push({ date: String(t.date || ''), vendor: t.othSrc, ref, design, item: ot.map(x => x.desc).filter(Boolean).join(', ').slice(0, 40) || 'Mala / other', wt: '', unit: '', pcs: ot.reduce((a, x) => a + (Number(x.pcs) || 0), 0) || '', rate: ot.length === 1 ? Number(ot[0].kRate) || 0 : 0, amount: Math.round(Number(t.othSrcAmt) || 0), src: sk + ':oth', tagNo }); } }); } catch (e) {}
+    rows.forEach(r => { r.payable = r.amount; }); }
+  else ((((await env.DB.prepare("SELECT path, data FROM docs WHERE path LIKE 'tags/%'").all()).results) || []).map(r => ({ path: r.path, d: vjParse(r) }))).forEach(({ path, d }) => {
+    if (!d || !d.approval || !d.approval.vendor) return; const a = d.approval, g = (d.gold || [])[0] || {}, net = vjR3(Number(g.net) || 0), pt = Number(a.pTunch) || Number(g.tunch) || 0, fine = vjR3(net * pt), rate = Number(a.pRate) || 0, sold = d.status === 'sold' && d.sold;
+    rows.push({ date: String(a.at || d.createdAt || '').slice(0, 10), vendor: a.vendor, ref: d.label || path.slice(5), design: d.designNo || '', kt: g.k || '', wt: net, tunch: pt, fine, rate, amount: Math.round(fine * rate),
+      used: sold ? (d.sold.no || '') + (d.sold.date ? ' ' + vjDmy(d.sold.date) : '') : '', tally: !!a.settled, payable: sold && !a.settled ? Math.round(fine * rate) : 0, kind: 'tag', src: 'vt:' + path.slice(5), tagNo: String(d.label || '') }); });
+  if (reg === 'chain') try { await vjKo3Tables(env); await vjPayT(env); const st = new Map((((await env.DB.prepare('SELECT id, data FROM vj_pay_settle').all()).results) || []).map(r => [r.id, vjParse(r) || {}]));
+    ((((await env.DB.prepare('SELECT data FROM vj_kord').all()).results) || []).map(vjParse)).forEach(o => { if (!o || !o.tag || !Array.isArray(o.tag.chains)) return;
+      o.tag.chains.forEach((c, i) => { if (!c || c.tag || !c.vendor || !(c.net > 0)) return; const s = st.get(vjPayId(o, c, i)), fine = vjR3(c.net * c.tunch), rate = Number(c.rate) || 0, done = !!(s && s.settled);
+        rows.push({ date: String(o.tag.date || ''), vendor: c.vendor, ref: 'Karigar ' + o.karigar + ' ' + o.no + (c.part ? ' · ' + c.part : ''), design: o.designNo || o.itemTxt || o.item || '', kt: o.kt ? o.kt + 'K' : '', wt: vjR3(c.net), tunch: Number(c.tunch) || 0, fine, rate, amount: rate > 0 ? Math.round(fine * rate) : 0,
+          used: o.status === 'cancelled' ? 'order cancelled' : 'used in piece', tally: done, payable: !done && o.status !== 'cancelled' && rate > 0 ? Math.round(fine * rate) : 0, noRate: !(rate > 0), kind: 'part', src: 'kp:' + (o.id || vjNk(o.karigar) + ':' + o.no) + ':' + i, tagNo: String(o.tagNo || ''), cancelled: o.status === 'cancelled' }); }); }); } catch (e) {}
+  const vendors = [...new Set(rows.map(r => r.vendor))].sort(), L = rows.filter(r => (!month || r.date.slice(0, 7) === month) && (!vendor || r.vendor.toLowerCase() === vendor)).sort((a, b) => a.vendor.localeCompare(b.vendor) || a.date.localeCompare(b.date));
+  const tot = {}; L.forEach(r => { const t = tot[r.vendor] = tot[r.vendor] || { n: 0, wt: 0, fine: 0, amount: 0, payable: 0 }; t.n++; t.wt = vjR3(t.wt + (Number(r.wt) || 0)); t.fine = vjR3(t.fine + (Number(r.fine) || 0)); t.amount += r.amount; t.payable += r.payable; });
+  if (url.pathname.endsWith('.xlsx') && reg === 'cs') { const X = L.map(r => [vjDmy(r.date), r.vendor, r.ref, r.design, r.item, r.wt === '' ? '' : r.wt + ' ' + r.unit, r.pcs, r.rate || '', r.amount || '']);
+    Object.entries(tot).forEach(([v, t]) => X.push(['TOTAL ' + v + ' (' + t.n + ')', '', '', '', '', '', '', '', t.amount]));
+    const xl = vjXlsx([{ name: 'Colour stones - malas', land: true, head: ['Date', 'Vendor', 'Karigar entry', 'Design no.', 'Item', 'Wt', 'Pcs', 'Rate', 'Amount payable'], rows: X, widths: [11, 14, 22, 12, 22, 10, 6, 10, 14], mark: r => String(r[0]).startsWith('TOTAL') }]);
+    const bin = atob(xl), out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); await vjAudit(env, who, 'csreg-xlsx', 'chainreg', (month || 'all') + ' ' + L.length);
+    return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_Colour_Stones_Register' + (month ? '_' + month : '') + '.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } }); }
+  if (url.pathname.endsWith('.xlsx')) { const X = L.map(r => [vjDmy(r.date), r.vendor, r.ref, r.design, r.kt, r.wt, r.tunch, r.fine, r.rate || '', r.amount || '', r.payable || '', r.used, r.tally ? 'entered in Tally' : '']);
+    Object.entries(tot).forEach(([v, t]) => X.push(['TOTAL ' + v + ' (' + t.n + ')', '', '', '', '', t.wt, '', t.fine, '', t.amount, t.payable, '', '']));
+    const xl = vjXlsx([{ name: 'Chain register', land: true, head: ['Date', 'Vendor', 'Karigar entry / tag', 'Design no.', 'KT', 'Chain wt g', 'Tunch', 'Fine g', 'Rate 24K/g', 'Amount', 'Payable to vendor', 'Used / sold', 'Tally'], rows: X, widths: [11, 14, 26, 12, 6, 10, 8, 10, 11, 12, 14, 18, 14], mark: r => String(r[0]).startsWith('TOTAL') }]);
+    const bin = atob(xl), out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); await vjAudit(env, who, 'chainreg-xlsx', 'chainreg', (month || 'all') + ' ' + L.length);
+    return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_Chain_Register' + (month ? '_' + month : '') + '.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } }); }
+  const T = await vjTallyPaid(env); Object.entries(tot).forEach(([v, t]) => { const p = T.paidOf(v); t.paid = p; t.balance = t.payable - p; t.ledger = T.ledgerOf(v); });
+  return vjJson({ ok: true, reg, vendors, rows: L, tot, tallyMap: T.map }); }
+// TALLY (owner 17:02 + correction 17:03): payments are entered in Tally and come BACK here (tally-sync) to reduce the vendor payable; sales bills and creditor purchases go OUT through the To-Tally outbox (bridge pulls them).
+let vjTlOk = false;
+async function vjTallyT(env) { if (vjTlOk) return; await env.DB.batch([env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_tally_pay (voucher TEXT PRIMARY KEY, ts INTEGER, ledger TEXT, date TEXT, amount REAL, data TEXT)'), env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_meta (k TEXT PRIMARY KEY, v TEXT)')]); vjTlOk = true; }
+async function vjTallyPaid(env) { await vjTallyT(env); let map = {}, bal = {}; try { const m = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'tally:map'").first(); map = m ? JSON.parse(m.v) || {} : {}; const b = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'tally:bal'").first(); bal = b ? JSON.parse(b.v) || {} : {}; } catch (e) {}
+  const P = {}; ((((await env.DB.prepare('SELECT ledger, amount FROM vj_tally_pay').all()).results) || [])).forEach(r => { const k = vjNk(r.ledger); P[k] = vjKo3R2((P[k] || 0) + (Number(r.amount) || 0)); });
+  const ledgerOf = v => map[v] || v; return { map, bal, ledgerOf, paidOf: v => P[vjNk(ledgerOf(v))] || 0, balOf: v => { const x = bal[vjNk(ledgerOf(v))]; return x == null ? null : x; } }; }
+// GET /api/vj/chainreg?view=tally : per vendor VJ Tags payable (both registers) vs paid / Tally ledger balance;  POST /api/vj/chainreg {op:'map', map:{vendor: ledger}}
+async function vjCredTally(request, url, env, who) { if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji');
+  if (request.method === 'POST') { if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed'); let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); } if (!b || b.op !== 'map' || typeof b.map !== 'object') return vjDeny(400, 'bad request');
+    await vjTallyT(env); const m = {}; Object.entries(b.map).slice(0, 200).forEach(([v, l]) => { const vv = vjClean(v, 60), ll = vjClean(l, 80); if (vv && ll) m[vv] = ll; });
+    await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('tally:map', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(m)).run(); await vjAudit(env, who, 'tally-map', 'vj_meta/tally:map', JSON.stringify(m).slice(0, 400)); return vjJson({ ok: true, map: m }); }
+  const sub = async reg => vjParse({ data: await (await vjChainReg(new URL(url.origin + '/api/vj/chainreg?reg=' + reg), env, who)).text() }) || { tot: {} };
+  const a = await sub('chain'), c = await sub('cs'), T = await vjTallyPaid(env), V = {};
+  [a, c].forEach(x => Object.entries(x.tot || {}).forEach(([v, t]) => { V[v] = (V[v] || 0) + (t.payable || 0); }));
+  const rows = Object.keys(V).sort().map(v => { const paid = T.paidOf(v), bal = V[v] - paid, tb = T.balOf(v); return { vendor: v, ledger: T.ledgerOf(v), payable: V[v], paid, balance: bal, tallyBal: tb, diff: tb == null ? null : vjKo3R2(bal - tb) }; });
+  const gold = []; try { const G = await vjOg2Load(env), S = vjOg2Sum(G.reg.filter(r => !r.cancelled).map(r => Object.assign({}, r, vjOgCalc(r))), G.outs, []), tb = l => { const x = T.bal[vjNk(l)]; return x == null ? null : x; };
+    const add = (what, key, l, vj) => { const t = tb(l); gold.push({ what, key, ledger: l, vj: vjR3(vj), tally: t, diff: t == null ? null : vjR2g(vj - t) }); }; add('Fine in hand (OG register)', 'gold:showroom', vjTgL(T.map, 'showroom'), S.inHand);
+    const cfg = await vjKo3Cfg(env), now = vjIstDay().slice(0, 7), ks = [...new Set((await vjOgKarigars(env)).concat(G.outs.filter(o => o.to === 'karigar' && o.karigar).map(o => o.karigar)))];
+    for (const k of ks) { const st = await vjKoStmt(env, { role: 'admin' }, cfg, k, now, []); add('Gold with ' + k, 'gold:k:' + k, vjTgL(T.map, k), st.closeFine || 0); } gold.ogLedger = vjTgL(T.map, 'og'); gold.ogVendors = [...new Set(G.reg.filter(r => r.src === 'vendor').map(r => String(r.vendor || r.name || '').trim()).filter(Boolean))].map(v => [v, T.map['gold:v:' + v] || vjTgV(v)]); gold.own = [T.map['gold:own'] || 'Gold Old Gold', T.map['gold:home'] || 'Gold Aa Home', T.map['gold:refinery'] || 'Gold Refinery', T.map['gold:stock'] || 'Gold Aa Home']; } catch (e) {}
+  return vjJson({ ok: true, rows, gold, ogLedger: gold.ogLedger || 'Gold Old Gold', ogVendors: gold.ogVendors || [], ownLedgers: gold.own || ['Gold Old Gold', 'Gold Aa Home', 'Gold Refinery', 'Gold Aa Home'], map: T.map, bridge: !!env.VJ_TALLY_SECRET }); }
+// POST /api/vj/tally-sync - for the FUTURE Tally bridge only (unused now): owner login (Access) + HMAC-SHA256 of the raw body with the encrypted secret
+// VJ_TALLY_SECRET in header x-vj-sig (hex) and x-vj-ts (ms, within 5 minutes, signed as ts + '.' + body). Body {ledgers:[{ledger, balance?, payments:[{date, amount, voucher}]}]}.
+// Idempotent by voucher no. (a voucher sent again only updates its row). Writes only VJ Tags' own tables.
+async function vjTallySync(request, env, who) { if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji'); if (!env.VJ_TALLY_SECRET) return vjDeny(503, 'Tally bridge not set up');
+  const raw = await request.text(); if (raw.length > 500000) return vjDeny(413, 'too large'); const ts = Number(request.headers.get('x-vj-ts') || 0), sig = String(request.headers.get('x-vj-sig') || '').toLowerCase();
+  if (!(Math.abs(Date.now() - ts) < 300000) || !/^[0-9a-f]{64}$/.test(sig)) return vjDeny(401, 'bad signature');
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(env.VJ_TALLY_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+  const sb = new Uint8Array(sig.match(/../g).map(h => parseInt(h, 16))); if (!(await crypto.subtle.verify('HMAC', key, sb, new TextEncoder().encode(ts + '.' + raw)))) return vjDeny(401, 'bad signature');
+  let b; try { b = JSON.parse(raw); } catch (e) { return vjDeny(400, 'bad json'); } await vjTallyT(env); const st = [], bal = {}; let n = 0;
+  for (const l of (Array.isArray(b && b.ledgers) ? b.ledgers : []).slice(0, 500)) { const ledger = vjClean(l && l.ledger, 80); if (!ledger) continue; if (isFinite(Number(l.balance)) && l.balance !== '' && l.balance != null) bal[vjNk(ledger)] = vjKo3R2(l.balance);
+    for (const p of (Array.isArray(l.payments) ? l.payments : []).slice(0, 5000)) { const v = vjClean(p && p.voucher, 40), d = String(p && p.date || ''), a = Number(p && p.amount); if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(d) || !isFinite(a)) continue;
+      st.push(env.DB.prepare('INSERT INTO vj_tally_pay (voucher, ts, ledger, date, amount, data) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(voucher) DO UPDATE SET ts = excluded.ts, ledger = excluded.ledger, date = excluded.date, amount = excluded.amount, data = excluded.data').bind(v, Date.now(), ledger, d, vjKo3R2(a), JSON.stringify({ ledger, date: d, amount: a, voucher: v }))); n++; } }
+  for (let i = 0; i < st.length; i += 50) await env.DB.batch(st.slice(i, i + 50));
+  if (Object.keys(bal).length) { const m = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'tally:bal'").first(); const old = m ? JSON.parse(m.v) || {} : {}; await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('tally:bal', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(Object.assign(old, bal))).run(); }
+  await vjAudit(env, who, 'tally-sync', 'vj_tally_pay', n + ' payments, ' + Object.keys(bal).length + ' balances'); return vjJson({ ok: true, payments: n }); }
+// TO-TALLY OUTBOX (owner 17:03 / 17:04, C-20261104-CASHBOOKOFF): a D1 queue of vouchers for the FUTURE Tally bridge (unused until it exists).
+// (1) every sales bill -> Sales voucher, party ledger, narration = bill no + design no(s) + tag code of every item; (2) every Sundry Creditor purchase
+// (chain register + colour stones / malas register) -> Purchase voucher, vendor ledger, narration with tag no / design no. One row per source id
+// (sale:<bill no>, cs/kp/vt:<item>): a source is queued once and, once Sent, never queued or sent again. Status pending / sent / failed + Tally voucher no.
+let vjToOk = false;
+async function vjTallyOutT(env) { if (vjToOk) return; await vjTallyT(env); await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_tally_out (src TEXT PRIMARY KEY, ts INTEGER, type TEXT, date TEXT, ledger TEXT, amount REAL, narr TEXT, status TEXT, vno TEXT, err TEXT, tries INTEGER, sent_ts INTEGER, data TEXT)').run(); vjToOk = true; }
+// C-20261104-TALLYGOLD (owner 17:23-17:24): his Tally keeps fine gold as ledgers in GRAMS (amount = grams). Default ledger names, editable in 'Tally ledger names'.
+const VJ_TG_KAR = { montu: 'Gold Montu', hiru: 'Gold Hiru', badshah: 'G Badshah' };
+const vjTgL = (map, k) => k === 'showroom' ? map['gold:showroom'] || 'Gold Fine Showroom' : k === 'og' ? map['gold:og'] || 'Gold Old Gold' : map['gold:k:' + k] || VJ_TG_KAR[vjNk(k)] || 'Gold ' + k;
+// owner 04/11 (his Tally export, Gold Fine Showroom book): Cr side of an OG receipt by the OG source - party -> Gold Old Gold; vendor NR -> Gold Nr; chain vendors' fine gold ->
+// Chain Siddharth / Chain Arun Creditor Fine Gold; own gold described 'home' -> Gold Aa Home; refinery gold -> Gold Refinery (17:33); other own gold / own pieces -> Gold Old Gold. All editable.
+const vjTgV = v => /(^|[^a-z])nr([^a-z]|$)/i.test(String(v)) ? 'Gold Nr' : /siddh?arth/i.test(v) ? 'Chain Siddharth Creditor Fine Gold' : /arun/i.test(v) ? 'Chain Arun Creditor Fine Gold' : 'Gold Old Gold';
+function vjTgOgCr(map, r) { if (r.src === 'vendor' && !/refin/i.test(String(r.vendor || r.name || ''))) { const v = String(r.vendor || r.name || '').trim(); return map['gold:v:' + v] || vjTgV(v); }
+  const tx = String(r.name || '') + ' ' + String(r.item || '') + ' ' + String(r.note || '') + ' ' + String(r.vendor || '');
+  if (/refin/i.test(tx) && (r.src === 'own' || r.src === 'vendor')) return map['gold:refinery'] || 'Gold Refinery'; // owner 17:33: refinery gold -> new ledger Gold Refinery
+  if (r.src === 'own' && /home/i.test(tx)) return map['gold:home'] || 'Gold Aa Home';
+  if (r.src === 'own' || r.src === 'stock' || r.src === 'part') return map['gold:own'] || 'Gold Old Gold';
+  return vjTgL(map, 'og'); }
+const vjR2g = x => Math.round((Number(x) || 0) * 1000) / 1000; // gold vouchers to Tally: fine grams to 3 decimals (owner 04/11 17:33 - his 2-decimal Tally entries were a mistake)
+async function vjTallyOutFill(env, who) { await vjTallyOutT(env); const T = await vjTallyPaid(env), V = [], n3 = x => Math.round((Number(x) || 0) * 1000) / 1000;
+  try { const L = await vjLedgerLoad(env); L.bills.filter(b => b.title === 'Bill' && b.no).forEach(b => { const it = (b.rows || []).map(r => (r.design ? 'design ' + r.design : String(r.cat || 'item')) + (r.label ? ' (tag ' + r.label + ')' : '')).join(', ');
+      V.push({ src: 'sale:' + b.no, type: 'Sales', vtype: 'Sales', unit: 'Rs', date: String(b.date || '').slice(0, 10), ledger: (map => map['party:' + vjLKey(b.name, b.city, b.mobile)] || [b.name, b.city].filter(Boolean).join(', '))(T.map), amount: Math.round(Number(b.original ? b.original.total : b.total) || 0), narr: (b.no + ': ' + it).slice(0, 900), ref: b.no }); }); } catch (e) {}
+  try { const G = await vjOg2Load(env), M = T.map, sh = vjTgL(M, 'showroom');
+    G.reg.filter(r => r && !r.cancelled && r.no).forEach(r => { const f = vjR2g(vjOgCalc(r).actFine); if (!(f > 0)) return; // (1) OG register entry -> Receipt, Dr Gold Fine Showroom, Cr Gold Old Gold, amount = actual fine grams
+      V.push({ src: 'og:' + r.no, type: 'gold_og', vtype: 'Receipt', unit: 'g', date: String(r.date || '').slice(0, 10), ledger: sh, dr: sh, cr: vjTgOgCr(M, r), amount: f, fine3: n3(vjOgCalc(r).actFine), narr: ('OG' + r.no + ' – ' + ((r.src === 'vendor' ? r.vendor || r.name : r.name) || '') + (r.src === 'vendor' && r.inv ? ' inv ' + r.inv : '') + (r.city ? ', ' + r.city : '')).slice(0, 900), ref: 'OG' + r.no }); });
+    G.outs.filter(o => o && !o.cancelled && o.to === 'karigar' && o.karigar).forEach(o => { const f = vjR2g(o.fine); if (!(f > 0)) return; const kl = vjTgL(M, o.karigar); // (2) gold issued to a karigar -> Payment, Dr karigar gold ledger, Cr Gold Fine Showroom
+      V.push({ src: 'gi:' + o.id, type: 'gold_issue', vtype: 'Payment', unit: 'g', date: String(o.date || '').slice(0, 10), ledger: kl, dr: kl, cr: sh, amount: f, karigar: o.karigar,
+        narr: ('Gold issued ' + vjDmy(o.date) + ' to ' + o.karigar + (o.ogs && o.ogs.length ? ', from OG ' + o.ogs.join(', ') : '') + (o.gross ? ', gross ' + n3(o.gross) + ' g' : '') + (o.note ? ' - ' + o.note : '') + ' (VJ Tags ' + o.id + ')').slice(0, 900), ref: o.id }); });
+    G.outs.filter(o => o && !o.cancelled && o.to === 'stock').forEach(o => { const f = vjR2g(o.fine); if (!(f > 0)) return; const hl = M['gold:stock'] || 'Gold Aa Home'; // (3) owner 17:33: OG gold moved to our stock -> Payment, Dr Gold Aa Home, Cr Gold Fine Showroom
+      V.push({ src: 'gs:' + o.id, type: 'gold_stock', vtype: 'Payment', unit: 'g', date: String(o.date || '').slice(0, 10), ledger: hl, dr: hl, cr: sh, amount: f,
+        narr: ('Gold moved to our stock ' + vjDmy(o.date) + (o.ogs && o.ogs.length ? ', from OG ' + o.ogs.join(', ') : '') + (o.gross ? ', gross ' + n3(o.gross) + ' g' : '') + (o.note ? ' - ' + o.note : '') + ' (VJ Tags ' + o.id + ')').slice(0, 900), ref: o.id }); }); } catch (e) {}
+  const U = new URL('https://x/api/vj/chainreg');
+  for (const reg of ['chain', 'cs']) { U.search = '?reg=' + reg; const j = vjParse({ data: await (await vjChainReg(U, env, { role: 'admin' })).text() }) || { rows: [] };
+    (j.rows || []).forEach(r => { if (!r.src || !(r.amount > 0) || r.cancelled || r.tally) return; // tally = already entered in Tally by hand (Payable screen) -> never sent again
+      const what = reg === 'cs' ? r.item + (r.wt !== '' ? ', ' + r.wt + ' ' + r.unit : '') + (r.pcs ? ', ' + r.pcs + ' pcs' : '') : 'Chain ' + (r.kt || '') + ' ' + n3(r.wt) + ' g @ tunch ' + r.tunch + ' = ' + n3(r.fine) + ' g fine';
+      V.push({ src: r.src, type: 'Purchase', vtype: 'Purchase', unit: 'Rs', date: r.date, ledger: T.ledgerOf(r.vendor), vendor: r.vendor, amount: r.amount, narr: (what + ' for ' + (r.tagNo ? 'tag ' + r.tagNo : r.ref) + (r.design ? ', design ' + r.design : '') + (r.tagNo ? ' (' + r.ref + ')' : '')).replace(/\s+/g, ' ').slice(0, 900), ref: r.ref }); }); }
+  const have = new Map((((await env.DB.prepare('SELECT src, status, data FROM vj_tally_out').all()).results) || []).map(r => [r.src, r])), st = [];
+  V.forEach(v => { const h = have.get(v.src), d = JSON.stringify(v);
+    if (!h) st.push(env.DB.prepare('INSERT OR IGNORE INTO vj_tally_out (src, ts, type, date, ledger, amount, narr, status, vno, err, tries, sent_ts, data) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').bind(v.src, Date.now(), v.type, v.date, v.ledger, v.amount, v.narr, 'pending', '', '', 0, 0, d));
+    else if (h.status !== 'sent' && (h.data !== d || h.status === 'void')) st.push(env.DB.prepare("UPDATE vj_tally_out SET date = ?, ledger = ?, amount = ?, narr = ?, data = ?, status = CASE WHEN status = 'void' THEN 'pending' ELSE status END WHERE src = ? AND status <> 'sent'").bind(v.date, v.ledger, v.amount, v.narr, d, v.src)); });
+  const live = new Set(V.map(v => v.src)); have.forEach((h, s) => { if (!live.has(s) && h.status !== 'sent' && h.status !== 'void') st.push(env.DB.prepare("UPDATE vj_tally_out SET status = 'void', err = 'cancelled in VJ Tags before sending' WHERE src = ? AND status <> 'sent'").bind(s)); });
+  for (let i = 0; i < st.length; i += 50) await env.DB.batch(st.slice(i, i + 50)); return st.length; }
+async function vjTallySig(request, env, raw) { const ts = Number(request.headers.get('x-vj-ts') || 0), sig = String(request.headers.get('x-vj-sig') || '').toLowerCase();
+  if (!(Math.abs(Date.now() - ts) < 300000) || !/^[0-9a-f]{64}$/.test(sig)) return false;
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(env.VJ_TALLY_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
+  return crypto.subtle.verify('HMAC', key, new Uint8Array(sig.match(/../g).map(h => parseInt(h, 16))), new TextEncoder().encode(ts + '.' + raw)); }
+// GET  /api/vj/tally-outbox            (bridge, signed: ts + '.' + '' )  -> pending + failed vouchers to post in Tally
+// POST /api/vj/tally-outbox {acks:[{src, ok, voucher, error}]} (bridge, signed: ts + '.' + body) -> Sent (with Tally voucher no.) / Failed
+// GET  /api/vj/tally-outbox?view=screen (owner screen, no signature)  ;  POST {op:'retry', src} (owner screen) -> a Failed voucher back to Pending
+async function vjTallyOut(request, url, env, who) { if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji'); await vjTallyOutT(env);
+  const all = async () => ((((await env.DB.prepare('SELECT src, ts, type, date, ledger, amount, narr, status, vno, err, tries, sent_ts, data FROM vj_tally_out ORDER BY date DESC, src').all()).results) || [])).map(r => { const d = vjParse(r) || {}; delete r.data; return Object.assign(r, { vtype: d.vtype || r.type, unit: d.unit || 'Rs', dr: d.dr || '', cr: d.cr || '' }); });
+  if (request.method === 'GET' && url.searchParams.get('view') === 'screen') { await vjTallyOutFill(env, who); const R = await all(), c = { pending: 0, sent: 0, failed: 0 }; R.forEach(r => { c[r.status] = (c[r.status] || 0) + 1; });
+    return vjJson({ ok: true, rows: R.slice(0, 2000), count: c, bridge: !!env.VJ_TALLY_SECRET }); }
+  if (request.method === 'POST' && !request.headers.get('x-vj-sig')) { if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed'); let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+    if (!b || b.op !== 'retry') return vjDeny(400, 'bad request'); const s = vjClean(b.src, 120); const r = await env.DB.prepare("UPDATE vj_tally_out SET status = 'pending', err = '' WHERE src = ? AND status = 'failed'").bind(s).run();
+    await vjAudit(env, who, 'tally-out-retry', 'vj_tally_out/' + s, ''); return vjJson({ ok: true, changed: (r.meta && r.meta.changes) || 0 }); }
+  if (!env.VJ_TALLY_SECRET) return vjDeny(503, 'Tally bridge not set up'); const raw = request.method === 'POST' ? await request.text() : ''; if (raw.length > 500000) return vjDeny(413, 'too large');
+  if (!(await vjTallySig(request, env, raw))) return vjDeny(401, 'bad signature');
+  if (request.method === 'GET') { await vjTallyOutFill(env, who); const R = (await all()).filter(r => r.status === 'pending' || r.status === 'failed').reverse().slice(0, 500);
+    return vjJson({ ok: true, vouchers: R.map(r => ({ src: r.src, type: r.type, voucherType: r.vtype, unit: r.unit /* 'g' = gold voucher, amount is fine grams (3 dec) */, date: r.date, ledger: r.ledger, dr: r.dr || undefined, cr: r.cr || undefined, amount: r.amount, narration: r.narr, status: r.status })) }); }
+  let b; try { b = JSON.parse(raw); } catch (e) { return vjDeny(400, 'bad json'); } const st = []; let n = 0;
+  for (const a of (Array.isArray(b && b.acks) ? b.acks : []).slice(0, 1000)) { const s = vjClean(a && a.src, 120); if (!s) continue; n++;
+    st.push(a.ok ? env.DB.prepare("UPDATE vj_tally_out SET status = 'sent', vno = ?, err = '', sent_ts = ?, tries = tries + 1 WHERE src = ? AND status <> 'sent'").bind(vjClean(a.voucher, 40), Date.now(), s)
+      : env.DB.prepare("UPDATE vj_tally_out SET status = 'failed', err = ?, tries = tries + 1 WHERE src = ? AND status <> 'sent'").bind(vjClean(a.error, 200) || 'failed', s)); }
+  for (let i = 0; i < st.length; i += 50) await env.DB.batch(st.slice(i, i + 50)); await vjAudit(env, who, 'tally-out-ack', 'vj_tally_out', n + ' acks'); return vjJson({ ok: true, acks: n }); }
 // ---------------------------------------------------------------------------------------------
 // PARTY GOLD ACCOUNT (G2G) - owner 04/11 16:40 (C-20261104-G2GACCOUNT): the Sundry Debtors party account laid out EXACTLY like his Excel
 // 'CUSTOMERS ACCOUNT' (sheets per party + Composite / GrpSum). Abhinav / Shilpiji only (server-checked).
@@ -5267,7 +5406,7 @@ async function vjG2Post(request, env, who) { if (who.role !== 'admin') return vj
   if (op === 'cfg') { const c = await vjG2Cfg(env), o = {}; for (const k of ['ws', 'nett']) { o[k] = {}; for (const x of [18, 14, 9]) { const v = num(b[k] && b[k][x], 0.05, 1.1); if (Number.isNaN(v)) return vjDeny(400, 'factor looks wrong'); o[k][x] = v == null ? c[k][x] : v; } }
     o.gst = c.gst; o.hist = [{ at: now, byName, old: c }]; await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('g2g:cfg', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(o)).run(); await vjAudit(env, who, 'g2g-cfg', 'g2g', JSON.stringify(o).slice(0, 300)); return vjJson({ ok: true }); }
   if (op === 'import') { // owner-only opening import from his Composite / GrpSum (pasted rows: name [city mobile] | Rs lena | Rs jama | fine), merged into the party openings
-    const cfg = await vjCbCfg(env); if (cfg.closed.length) return vjDeny(409, 'opening balances are locked - the first month is closed'); const date = String(b.date || ''); if (!dOk(date)) return vjDeny(400, 'type the opening date');
+    await vjCbT(env); const cfg = await vjCbCfg(env); if (cfg.closed.length) return vjDeny(409, 'opening balances are locked - the first month is closed'); const date = String(b.date || ''); if (!dOk(date)) return vjDeny(400, 'type the opening date');
     const rows = (Array.isArray(b.rows) ? b.rows : []).slice(0, 2000), L = await vjLedgerLoad(env), C = vjCustomers(L); let ob = {}; try { const m = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'ob:cust'").first(); ob = m ? JSON.parse(m.v) || {} : {}; } catch (e) {}
     const old = JSON.parse(JSON.stringify(ob)), res = { matched: 0, added: 0, skipped: [] };
     for (const r of rows) { const txt = vjClean(r && r.name, 120).replace(/\s+/g, ' '); if (!txt) continue; const lena = num(r.lena, -1e10, 1e10), jama = num(r.jama, -1e10, 1e10), fine = num(r.fine, -1e5, 1e5);
@@ -5350,7 +5489,13 @@ async function vjHandle(request, env, ctx, url) {
     return vjDeny(405, 'method not allowed');
   }
   if ((p === '/api/vj/challan' || p === '/api/vj/challan/cancel') && request.method === 'POST') { if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed'); return p === '/api/vj/challan' ? vjChallanSave(request, env, who) : vjChallanCancel(request, env, who); }
-  if ((p === '/api/vj/cash' || p === '/api/vj/cash.xlsx') && request.method === 'GET') return vjCashGet(url, env, who); // C-20261104-CASHBOOK (who may: checked inside)
+  // C-20261104-CASHBOOKOFF (owner 04/11 16:55): cash book + creditor accounts stay in TALLY - their routes are off; the D1 tables / rows are kept, unused
+  if (p === '/api/vj/cash' || p === '/api/vj/cash.xlsx' || p === '/api/vj/creditors') return vjDeny(404, 'not found');
+  if (p === '/api/vj/kdue' && request.method === 'GET') { if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji'); await vjKo3Tables(env); const ks = await vjCbKarigars(env), k = ks.find(x => x.toLowerCase() === String(url.searchParams.get('k') || '').toLowerCase()); if (!k) return vjDeny(404, 'karigar not found'); return vjJson({ ok: true, karigar: k, months: await vjKoMonthDues(env, who, k) }); } // KPAYMONTH
+  if (p === '/api/vj/chainreg' && (request.method === 'POST' || url.searchParams.get('view') === 'tally')) return vjCredTally(request, url, env, who); // Tally check + vendor -> Tally ledger names
+  if ((p === '/api/vj/chainreg' || p === '/api/vj/chainreg.xlsx') && request.method === 'GET') return vjChainReg(url, env, who); // C-20261104-CASHBOOKOFF: Sundry Creditors registers (chains / colour stones)
+  if (p === '/api/vj/tally-sync' && request.method === 'POST') return vjTallySync(request, env, who); // future Tally bridge: payments FROM Tally
+  if (p === '/api/vj/tally-outbox' && (request.method === 'GET' || request.method === 'POST')) return vjTallyOut(request, url, env, who); // future Tally bridge: sales + purchase vouchers TO Tally (owner 17:03)
   if (p === '/api/vj/recon' && (request.method === 'GET' || request.method === 'POST')) return vjRecon(request, url, env, who); // RECONCILE (Abhinav only, inside)
   if ((p === '/api/vj/g2g' || p === '/api/vj/g2g.xlsx') && request.method === 'GET') return vjG2Get(url, env, who); // C-20261104-G2GACCOUNT (admin only, inside)
   if (p === '/api/vj/g2g' && request.method === 'POST') return vjG2Post(request, env, who);
