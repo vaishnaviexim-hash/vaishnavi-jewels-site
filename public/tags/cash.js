@@ -384,7 +384,7 @@
       <div class="hd"><h2>${edit ? "Expense" + (ro ? "" : " - change") : "+ Expense (money paid)"}</h2>${edit ? "" : '<button type="button" class="btn ghost mic" id="cxMic" title="Speak">🎤 Bolein</button>'}</div>
       <p class="heard" id="cxHeard" hidden></p>
       <div class="row"><label>Category <select id="cxCat"></select></label><label>Amount (₹) <input id="cxAmt" inputmode="numeric" autocomplete="off" maxlength="12"></label><label>Mode <select id="cxMode"></select></label></div>
-      <div class="row" id="cxKarR" hidden><label>Karigar <select id="cxKar"></select></label></div>
+      <div class="row" id="cxKarR" hidden><label>Karigar <select id="cxKar"></select></label><label id="cxKmL" hidden style="flex:2 1 220px">Month account (due) <select id="cxKm"></select></label></div>
       <div class="row" id="cxFromR"><label>Paid from <select id="cxFrom"></select></label></div>
       <div class="row"><label>Paid to <input id="cxTo" autocomplete="off" maxlength="60" placeholder="person / shop"></label><label id="cxRefL" hidden>Ref. / UTR <input id="cxRef" autocomplete="off" maxlength="40"></label><label>Date <input id="cxDate" type="date"></label></div>
       <label>Narration - what was it for? (required) <input id="cxNote" autocomplete="off" maxlength="120" placeholder="e.g. printer paper + pens, puja samaan"></label>
@@ -398,8 +398,14 @@
     { const fl = [["store", "Store cash"]].concat((j.staff || []).filter(s => adm || s === j.myStaff || (edit && e.from === s)).map(s => [s, s + "'s float"])); opts($("cxFrom"), fl, edit ? e.from || "store" : j.myStaff || "store"); }
     const kui = () => { $("cxKarR").hidden = $("cxCat").value !== j.kar; $("cxRefL").hidden = $("cxMode").value === "cash"; $("cxFromR").hidden = $("cxMode").value !== "cash" || $("cxFrom").options.length < 2; };
     $("cxCat").addEventListener("change", kui); $("cxMode").addEventListener("change", kui);
+    /* C-20261104-KPAYMONTH (owner 15:31): karigar -> month account with its rupee due; picking a month fills the due (part payment allowed) */
+    const kmLoad = async () => { const k = $("cxKar").value, s = $("cxKm"); $("cxKmL").hidden = !(adm && k && !lk); if ($("cxKmL").hidden) return; opts(s, [["", "Loading dues…"]]);
+      try { const r = await api("/api/vj/cash?kdue=" + encodeURIComponent(k)); C.kdue = r.months; opts(s, [["", "No month (general payment)"]].concat(r.months.map(m => [m.month, m.label + " — due " + inr(m.due)])), edit ? e.kmonth || "" : "");
+        if (!edit) { const first = r.months.slice().reverse().find(m => m.due > 0); if (first) { s.value = first.month; if (!$("cxAmt").value) $("cxAmt").value = String(Math.round(first.due)); } } } catch (x) { opts(s, [["", "No month (dues not loaded)"]]); } };
+    $("cxKar").addEventListener("change", kmLoad); $("cxCat").addEventListener("change", () => { if ($("cxCat").value === j.kar) kmLoad(); });
+    $("cxKm").addEventListener("change", () => { const m = (C.kdue || []).find(x => x.month === $("cxKm").value); if (m && m.due > 0) $("cxAmt").value = String(Math.round(m.due)); });
     if (edit) { $("cxCat").value = e.cat; $("cxAmt").value = String(e.amount); $("cxMode").value = e.mode; $("cxKar").value = e.kar || ""; $("cxTo").value = e.to || ""; $("cxRef").value = e.ref || ""; $("cxDate").value = e.date; $("cxNote").value = e.note || ""; }
-    kui(); phUi();
+    kui(); phUi(); if (edit && e.kar) kmLoad();
     if (ro || lk) { ["cxCat", "cxAmt", "cxMode", "cxKar", "cxDate", "cxFrom"].forEach(i => { $(i).disabled = true; }); }
     if (ro) { ["cxTo", "cxRef", "cxNote"].forEach(i => { $(i).disabled = true; }); $("cxSave").hidden = true; $("cxPhB").hidden = true; }
     if (lk) $("cxMsg").textContent = "This payment is in the karigar account - date / amount / mode are changed there (Karigar order > Karigar account).";
@@ -429,11 +435,11 @@
     if (!/^\d{1,9}$/.test(amt) || !(Number(amt) > 0)) { m.textContent = "Type the amount in rupees."; $("cxAmt").focus(); return; }
     if ($("cxNote").value.trim().length < 2) { m.textContent = "Write the narration - what was it for?"; $("cxNote").focus(); return; }
     if (cat === (C.j && C.j.kar) && !$("cxKar").value) { m.textContent = "Choose the karigar."; $("cxKar").focus(); return; }
-    const body = { op: e ? "edit" : "exp", cat, amount: amt, mode, ref: mode === "cash" ? "" : $("cxRef").value.trim(), to: $("cxTo").value.trim(), note: $("cxNote").value.trim(), date: $("cxDate").value, photo: C.photo, kar: $("cxKar").value, from: mode === "cash" ? $("cxFrom").value : "store" };
+    const body = { op: e ? "edit" : "exp", cat, amount: amt, mode, ref: mode === "cash" ? "" : $("cxRef").value.trim(), to: $("cxTo").value.trim(), note: $("cxNote").value.trim(), date: $("cxDate").value, photo: C.photo, kar: $("cxKar").value, kmonth: cat === (C.j && C.j.kar) && !$("cxKmL").hidden ? $("cxKm").value : "", from: mode === "cash" ? $("cxFrom").value : "store" };
     if (e) { body.id = e.id; if (e.kpay) { body.date = e.date; body.amount = String(e.amount); body.mode = e.mode; body.cat = e.cat; body.kar = e.kar; body.from = e.from; } }
     const b = $("cxSave"); b.disabled = true; m.textContent = "Saving…";
     try { const j = await api("/api/vj/cash", body); close();
-      $("cbMsg").textContent = e ? (j.same ? "Nothing changed." : "Changed - history kept.") : `Saved: ${cat} ${rs(amt)} ${mode === "cash" ? "cash" : mode.toUpperCase()}` + (j.linked ? " - also in the karigar account." : j.needLink ? " - Abhinav / Shilpiji will link it to the karigar account." : ".");
+      $("cbMsg").textContent = e ? (j.same ? "Nothing changed." : "Changed - history kept.") : `Saved: ${cat} ${rs(amt)} ${mode === "cash" ? "cash" : mode.toUpperCase()}` + (j.linked ? " - also in the karigar account" + (j.kmonth && j.kdue != null ? " (" + ((C.kdue || []).find(x => x.month === j.kmonth) || { label: j.kmonth }).label + " account: remaining due " + inr(j.kdue) + ")" : "") + "." : j.needLink ? " - Abhinav / Shilpiji will link it to the karigar account." : ".");
       if (!e && $("cxDate") == null && C.view === "day" && body.date !== $("cbDate").value) $("cbDate").value = body.date; load(); }
     catch (x) { m.textContent = "Not saved (" + (x.message || x) + ")."; b.disabled = false; }
   }
