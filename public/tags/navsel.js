@@ -4,7 +4,7 @@
    and role rule (hidden buttons) keeps working exactly as before. Opens on New tag (nothing remembered). */
 (function () {
   "use strict";
-  const ORDER = ["new", "ogreg", "korder" /* 03/11 C-20261103-ENQMERGE: Karigar order next to OG, before Bill */, "check", "orders", "enq" /* C-20261102-ENQTAB */, "kdues", "list", "find", "bill", "vchain", "ledger", "cash" /* C-20261104-CASHBOOK */, "quote", "karigar", "rates"];
+  const ORDER = ["new", "ogreg", "korder" /* 03/11 C-20261103-ENQMERGE: Karigar order next to OG, before Bill */, "check", "orders", "enq" /* C-20261102-ENQTAB */, "kdues", "list", "find", "bill", "vchain", "ledger", "g2g" /* C-20261104-G2GACCOUNT (cash book off 16:55) */, "quote", "karigar", "rates"];
   const rank = b => { const i = ORDER.indexOf(b.dataset.tab); return i >= 0 ? i : ORDER.indexOf("rates") - 0.5; };
   let nav = null, sel = null, ph = null, queued = false;
 
