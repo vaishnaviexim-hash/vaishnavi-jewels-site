@@ -47,7 +47,7 @@
 /* VJ Tags - Tally-style keys (owner Abhinav 04/11/2026 11:41, C-20261104-HOTKEYS).
    Alt + C = small calculator from any screen (+ − × ÷ % brackets; Enter = result, Ctrl + Enter or "Use ↵" = put it in the box that was
    in use and recalculate, Esc = close; last 5 sums kept until the page is closed). No eval - a small parser of its own.
-   Alt + A = Save, like Tally's accept: presses the open form's own Save / Save to karigar account / Save & print tag button - only when it
+   Ctrl + A (or Alt + A) = Save, like Tally's accept: presses the open form's own Save / Save to karigar account / Save & print tag button - only when it
    is on; when it is off, the form's own warning is shown. Never Delete / Cancel / Clear. Phones: the 🧮 button at the bottom of the page. */
 (function () {
   "use strict";
@@ -152,13 +152,15 @@
       else if (e.key === "Enter") { e.preventDefault(); cbox._enter(); }
       else if (e.altKey && e.code === "KeyC") { e.preventDefault(); closeCalc(true); }
       return; }
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.code === "KeyA") { /* owner 04/11 12:05: Ctrl + A = Save on every screen, like Tally (select-all stays only in the calculator and in multi-line notes) */
+      if (window.VJ_KEYS_BUSY && window.VJ_KEYS_BUSY()) return; e.stopPropagation(); if (e.target && e.target.tagName === "TEXTAREA") return; e.preventDefault(); if (!e.repeat) altSave(); return; }
     if (!e.altKey || e.ctrlKey || e.metaKey || e.repeat) return;
     if (e.code === "KeyC") { e.preventDefault(); e.stopPropagation(); openCalc(); }
     else if (e.code === "KeyA") { e.preventDefault(); e.stopPropagation(); if (!(window.VJ_KEYS_BUSY && window.VJ_KEYS_BUSY())) altSave(); }
   }, true);
   // ---------- hint at the foot of the page (+ 🧮 for phones) ----------
   function hint() { if ($("vjKeyHint")) return; const w = document.querySelector(".wrap") || document.body, p = document.createElement("p"); p.id = "vjKeyHint"; p.className = "hint";
-    p.style.cssText = "margin:18px 0 8px;font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"; const t = document.createElement("span"); t.textContent = "Alt+C calculator · Alt+A save";
+    p.style.cssText = "margin:18px 0 8px;font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"; const t = document.createElement("span"); t.textContent = "Alt+C calculator · Ctrl+A save";
     const b = document.createElement("button"); b.type = "button"; b.className = "btn ghost"; b.textContent = "🧮"; b.title = "Calculator (Alt + C)"; b.setAttribute("aria-label", "Calculator"); b.style.cssText = "padding:2px 10px;font-size:16px";
     b.addEventListener("mousedown", e => e.preventDefault()); b.addEventListener("click", openCalc); p.append(t, b); w.appendChild(p); }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", hint); else hint();
