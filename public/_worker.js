@@ -542,12 +542,13 @@ async function vjPhotoGet(env, id) {
 async function vjPhotoUpload(request, env, who) {
   if (who.role === 'sales' && !VJ_KO_EXTRA.includes(who.email)) return vjDeny(403, 'read only'); // office login may add repair / out photos (27/10)
   const type = (request.headers.get('content-type') || '').split(';')[0].trim();
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(type)) return vjDeny(415, 'jpg, png or webp only');
-  const buf = await request.arrayBuffer();
+  const slipPdf = type === 'application/pdf' && request.headers.get('x-vj-kind') === 'slip'; // C-20261105-KSLIP: a karigar's computer slip (Hiru) may be a PDF - only on the slip button
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(type) && !slipPdf) return vjDeny(415, 'jpg, png or webp only');
+  const buf = await request.arrayBuffer(); if (slipPdf && buf.byteLength > 3e6) return vjDeny(413, 'PDF too large (3 MB max)');
   if (!buf.byteLength || buf.byteLength > 6e6) return vjDeny(413, 'photo too large');
   { // C-20261017-PHOTOIMPORT: the bytes must match the declared type (magic bytes), so no other file can be stored as a photo
     const h = new Uint8Array(buf, 0, Math.min(12, buf.byteLength)), a = (i, s) => String.fromCharCode(...h.slice(i, i + s.length)) === s;
-    const real = h[0] === 0xff && h[1] === 0xd8 && h[2] === 0xff ? 'image/jpeg' : h[0] === 0x89 && a(1, 'PNG') ? 'image/png' : a(0, 'RIFF') && a(8, 'WEBP') ? 'image/webp' : '';
+    const real = h[0] === 0xff && h[1] === 0xd8 && h[2] === 0xff ? 'image/jpeg' : h[0] === 0x89 && a(1, 'PNG') ? 'image/png' : a(0, 'RIFF') && a(8, 'WEBP') ? 'image/webp' : slipPdf && a(0, '%PDF-') ? 'application/pdf' : '';
     if (real !== type) return vjDeny(415, 'not a real jpg, png or webp photo');
   }
   const id = [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
@@ -560,6 +561,7 @@ async function vjBlob(id, env) {
   if (!/^[0-9a-f]{32}$/.test(id)) return vjDeny(404, 'not found');
   const o = await vjPhotoGet(env, id);
   if (!o) return vjDeny(404, 'not found');
+  if (o.type === 'application/pdf') return new Response(o.body, { headers: { 'content-type': 'application/pdf', 'content-disposition': 'inline; filename="karigar-slip.pdf"', 'cache-control': 'private, max-age=86400', 'x-robots-tag': 'noindex', 'x-content-type-options': 'nosniff', 'content-security-policy': "sandbox; default-src 'none'" } }); // KSLIP
   return new Response(o.body, { headers: { 'content-type': /^image\/(jpeg|png|webp)$/.test(o.type || '') ? o.type : 'image/jpeg', 'cache-control': 'private, max-age=86400', 'x-robots-tag': 'noindex', 'x-content-type-options': 'nosniff' } });
 }
 
@@ -719,7 +721,10 @@ const VJ_KSLIP_HOW = {
   badshah: 'Badshah\'s slip (samples 04/11/2026, designs 40496 and 40497): a printed pad page with "DATE:" and a page no.; the design no. in square brackets e.g. [40497]; karat written as "18Kt" over "76" (76 = his purity, ignore it). '
     + 'Then the item and its GROSS weight on the right, e.g. "Ring white g 4.820" or "Ring 2 Pcs 5.860". Each diamond line is "<what> <pcs>/<ct> ct" with the USED figures only (no issued / returned), e.g. "CVD 2/0.31 ct", "Heart 2/0.70 ct", "EM 1/2.26 ct", "Dia 16/0.22" - '
     + 'CVD = lab-grown round, EM = emerald cut, Heart = heart shape. The right column is GROSS - DIAMOND g = NET (e.g. 4.820 - 0.654 = 4.166, diamond g = total ct / 5). The diamond packets and the IGI / GIA certificate box are often photographed above the slip: '
-    + 'they are the packets we issued (Gujarati labels: નામ name, લોટ નં. lot no., ક્વોલિટી quality, વજન weight = pcs over ct). Use them only to confirm the lines and to read a solitaire\'s certificate (e.g. "IGI#LG833640098" -> lab IGI, no. LG833640098) into that line\'s "cert".'
+    + 'they are the packets we issued (Gujarati labels: નામ name, લોટ નં. lot no., ક્વોલિટી quality, વજન weight = pcs over ct). Use them only to confirm the lines and to read a solitaire\'s certificate (e.g. "IGI#LG833640098" -> lab IGI, no. LG833640098) into that line\'s "cert".',
+  hiru: 'Hiru sends a computer PDF "JEWELLERY PACKAGING LIST" (samples JS4959 04/11/2026 and JS4976 05/11/2026), one row per piece: Item column "ORDER NO-<our order no.>" (the number may wrap onto the next line, e.g. "ORDER NO-6131" + "2" = 61312) then his own code like "1/7723" - '
+    + 'put the order no. in "design". Diamond block: one line per Code with Pcs and Wt (ct) = USED figures, e.g. "ROUND MIX MIX 972 10.040"; "PARTY DIAMOND MIX" = the customer\'s own diamonds (say "party" in "what"). Metal block: Quality (e.g. GOLD 14K ROSE), Gross Wt = GROSS, '
+    + 'Net Wt = NET (= gross - diamond ct/5 - stone ct/5), "Loss Wt 6.500 %" = his wastage (ignore). Stone & Misc block: COLOURSTONE pcs / Wt (ct) / Rate / Amount -> "cs" (an amount of 0 = no charge). Labour & Other Charges (Labour, RODIUM) = his making - put the total in "making", it is not used. Ignore the Summary box duplicates and the design photo.'
 };
 async function vjKslip(request, env, who) {
   if (who.role === 'sales') return vjDeny(403, 'read only');
@@ -734,7 +739,7 @@ async function vjKslip(request, env, who) {
   const ph = await vjPhotoGet(env, pid); if (!ph) return vjDeny(404, 'slip photo not found - upload it again');
   const buf = new Uint8Array(await new Response(ph.body).arrayBuffer()); if (buf.length > 2.2e6) return vjDeny(413, 'slip photo too large');
   let bin = ''; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
-  const type = /^image\/(jpeg|png|webp)$/.test(ph.type || '') ? ph.type : 'image/jpeg';
+  const isPdf = ph.type === 'application/pdf', type = /^image\/(jpeg|png|webp)$/.test(ph.type || '') ? ph.type : 'image/jpeg';
   await vjAudit(env, who, 'kslip', 'korders/' + oid, String(o.karigar || ''));
   const iss = (Array.isArray(o.iss) ? o.iss : []).slice(0, 30).map((r, i) => (i + 1) + ') ' + [r.pkt, r.shape].filter(Boolean).join(' ') + ' ' + (Number(r.pcs) || 0) + ' pcs ' + (Number(r.ct) || 0).toFixed(3) + ' ct').join('; ');
   const how = VJ_KSLIP_HOW[String(o.karigar || '').trim().toLowerCase()] || 'No sample of this karigar\'s slip has been studied yet - read it carefully; diamond lines are usually issued - returned = used, in pieces and carats.';
@@ -748,7 +753,7 @@ async function vjKslip(request, env, who) {
     + 'and his charge (rate and / or rupee amount as written); never put diamonds in "cs". If the slip deducts the colour stone weight in the gross - diamond = net column, keep that in mind for "net".';
   let r; try { r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', signal: AbortSignal.timeout(60000),
       headers: { 'content-type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: VJ_PS_MODEL, max_tokens: 900, messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: type, data: btoa(bin) } }, { type: 'text', text: prompt }] }] }) });
+      body: JSON.stringify({ model: VJ_PS_MODEL, max_tokens: 900, messages: [{ role: 'user', content: [isPdf ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: btoa(bin) } } : { type: 'image', source: { type: 'base64', media_type: type, data: btoa(bin) } }, { type: 'text', text: prompt }] }] }) });
   } catch (e) { return vjDeny(502, 'the slip reader did not answer, try again'); }
   if (!r.ok) { const t = await r.text().catch(() => ''); if (r.status === 400 && /credit|balance/i.test(t)) return vjDeny(402, 'reading credit is used up for this month'); if (r.status === 429) return vjDeny(429, 'busy, wait a minute'); return vjDeny(502, 'slip reader error ' + r.status); }
   const j = await r.json(), txt = ((j.content || []).find(c => c.type === 'text') || {}).text || '';
@@ -2590,7 +2595,7 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
     const dr = String(b.drawing || ''); if (!/^[0-9a-f]{32}$/.test(dr)) return vjDeny(400, 'drawing photo not valid'); if (env.PHOTOS && !(await vjPhotoHas(env, dr))) return vjDeny(400, 'drawing photo not found - upload it again');
     if (o.drawing) return vjDeny(409, 'this order already has a drawing - change it inside the order'); o.drawing = dr; o.sample = ''; }
   else if (op === 'slip') { const sl = String(b.slip || ''); if (!/^[0-9a-f]{32}$/.test(sl)) return vjDeny(400, 'slip photo not valid'); if (env.PHOTOS && !(await vjPhotoHas(env, sl))) return vjDeny(400, 'slip photo not found - upload it again'); // C-20261105-KSLIP: attach the slip to an order already received / tagged
-    o.slips = [...new Set((old.slips || []).concat(sl))].slice(-10); if (o.tag) o.tag = Object.assign({}, o.tag, { slip: sl }); }
+    o.slips = [...new Set((old.slips || []).concat(sl))].slice(-10); if (o.tag) o.tag = Object.assign({}, o.tag, { slip: sl, slipPdf: b.slipPdf === true }); }
   else if (op === 'stage') { if (!live) return vjDeny(409, 'this order is cancelled'); const s = vjClean(b.stage, 20); if (s && !cfg.stages.includes(s)) return vjDeny(400, 'pick a stage from the list'); o.stage = s; o.stageAt = now; }
   else if (op === 'cancel') { if (!adm) return vjDeny(403, 'only Abhinav or Shilpiji can cancel an order'); if (!live) return vjDeny(409, 'already cancelled');
     o.cancelled = { at: now, by: who.email, byName, why: vjClean(b.why, 120), from: old.status }; o.status = 'cancelled'; post = true; }
@@ -2642,7 +2647,7 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
     if (kc.type === 'mounting') t.mkRate = vjKo3R2(vjKoNum(b.mkRate)) || Number(kc.making) || 0;
     if (vjKo3Grade(o) === 'B') { const mf = Number(b.mFine), mo = Number(b.mOth); if (!isFinite(mf) || Math.abs(mf) > 10000 || b.mFine === '' || b.mFine == null) return vjDeny(400, 'stock mounting: type the gold credited (fine g)'); Object.assign(t, { mFine: vjR3(mf), mLab: vjKo3R2(vjKoNum(b.mLab)), mOth: isFinite(mo) && Math.abs(mo) < 1e8 ? vjKo3R2(mo) : 0 }); }
     { const sl = String(b.slip || ''); if (sl) { if (!/^[0-9a-f]{32}$/.test(sl)) return vjDeny(400, 'slip photo not valid'); if (env.PHOTOS && !(await vjPhotoHas(env, sl))) return vjDeny(400, 'slip photo not found - upload it again');
-        t.slip = sl; o.slips = [...new Set((old.slips || []).concat(sl))].slice(-10); } else if (old.tag && old.tag.slip) t.slip = old.tag.slip; } // C-20261105-KSLIP: the karigar's hisaab slip stays on the order
+        t.slip = sl; t.slipPdf = b.slipPdf === true; o.slips = [...new Set((old.slips || []).concat(sl))].slice(-10); } else if (old.tag && old.tag.slip) { t.slip = old.tag.slip; t.slipPdf = !!old.tag.slipPdf; } } // C-20261105-KSLIP: the karigar's hisaab slip stays on the order
     Object.assign(o, { tag: t, rec, used, usedMan: !!(used0 && used0.length) }); t.deliv = vjKo3Deliv(o, cfg); chOld = vjKoChIds(old.tag); chNew = vjKoChIds(t);
     if (o.status === 'open' || o.status === 'karigar') { o.status = 'received'; o.stage = o.stage || 'Ready'; o.statusAt = Object.assign({}, o.statusAt || {}, { received: now }); } post = true; }
   else if (op === 'diaadd') { if (!live) return vjDeny(409, 'this order is cancelled'); if (!canDia) return vjDeny(403, VJ_KO_DIAMSG); const rows = vjKo3Rows(b.iss, adm, []); if (!rows || !rows.length) return vjDeny(400, 'type pcs / ct of the diamonds issued');
