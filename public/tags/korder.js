@@ -612,6 +612,7 @@
       try { slMsg.textContent = "Uploading the slip…"; const pdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name || ""), bl = pdf ? f : await shrink(f), up = await fetch("/api/vj/photo", { method: "POST", credentials: "same-origin", headers: pdf ? { "content-type": "application/pdf", "x-vj-kind": "slip" } : { "content-type": "image/jpeg" }, body: bl }), uj = await up.json().catch(() => ({})); if (!up.ok) throw new Error(uj.error || up.status);
         slipId = uj.id; slipPdf = pdf; slV.hidden = false; slMsg.textContent = "Reading the slip… (10-20 sec)";
         const r = await fetch("/api/vj/kslip", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: o.id, photo: slipId }) }), x = await r.json().catch(() => ({})); if (!r.ok) throw new Error(x.error || r.status);
+        if (!(x.gross > 0) && !(x.dia || []).length && !(x.cs || []).length) throw new Error("nothing could be read from this slip" + (x.raw ? " - reader said: " + x.raw : "") + (x.stop && x.stop !== "end_turn" ? " [" + x.stop + "]" : ""));
         const L = []; if (x.gross > 0) { gg.value = r3(x.gross); L.push("Gross " + r3(x.gross) + " g"); }
         const rows = [...tb.querySelectorAll("tr.kodr")], usedR = new Set(), left = [];
         (x.dia || []).forEach(d => { const q = (tr, k) => tr.querySelector('[data-k="' + k + '"]'); let tr = null;
