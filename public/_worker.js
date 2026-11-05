@@ -738,8 +738,10 @@ async function vjKslip(request, env, who) {
     + 'Diamonds the shop issued for this order: ' + (iss || 'none recorded') + '. How this karigar writes: ' + how + ' '
     + 'Read ONLY what is written - never guess or invent a digit; if a figure is not clearly readable, put it in "unsure" and leave it null. Ignore drawings, the faint writing showing through from the other page, fingers and anything outside the slip. '
     + 'Answer with JSON only: {"design": "", "kt": "", "date": "", "gross": number|null, "diaG": number|null, "net": number|null, "making": number|null, '
-    + '"dia": [{"what": "e.g. round / MQ / centre", "issPcs": number|null, "retPcs": number|null, "pcs": number|null, "issCt": number|null, "retCt": number|null, "ct": number|null}], "unsure": ["..."]} '
-    + '- pcs and ct in "dia" are the USED figures; carats as full decimals (0.01 not 1).';
+    + '"dia": [{"what": "e.g. round / MQ / centre", "issPcs": number|null, "retPcs": number|null, "pcs": number|null, "issCt": number|null, "retCt": number|null, "ct": number|null}], '
+    + '"cs": [{"what": "e.g. ruby / emerald / pearl / CZ", "pcs": number|null, "ct": number|null, "g": number|null, "rate": number|null, "amount": number|null}], "unsure": ["..."]} '
+    + '- pcs and ct in "dia" are the USED diamond figures; carats as full decimals (0.01 not 1). "cs" = COLOUR STONES (ruby, emerald, pearl, CZ, polki-look stones, beads...) the KARIGAR put in from his side, with their weight (ct and / or g as written) '
+    + 'and his charge (rate and / or rupee amount as written); never put diamonds in "cs". If the slip deducts the colour stone weight in the gross - diamond = net column, keep that in mind for "net".';
   let r; try { r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', signal: AbortSignal.timeout(60000),
       headers: { 'content-type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({ model: VJ_PS_MODEL, max_tokens: 900, messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: type, data: btoa(bin) } }, { type: 'text', text: prompt }] }] }) });
@@ -749,9 +751,11 @@ async function vjKslip(request, env, who) {
   let x = {}; try { const m = txt.match(/\{[\s\S]*\}/); x = JSON.parse(m ? m[0] : '{}') || {}; } catch (e) {}
   const N = (v, mx) => { const n = Number(v); return v === null || v === '' || !isFinite(n) || n < 0 || n > mx ? null : Math.round(n * 1000) / 1000; };
   const dia = (Array.isArray(x.dia) ? x.dia : []).slice(0, 20).map(d => ({ what: vjClean(d && d.what, 30), issPcs: N(d && d.issPcs, 9999), retPcs: N(d && d.retPcs, 9999), pcs: N(d && d.pcs, 9999), issCt: N(d && d.issCt, 500), retCt: N(d && d.retCt, 500), ct: N(d && d.ct, 500) })).filter(d => d.pcs != null || d.ct != null);
-  const out = { ok: true, design: vjClean(x.design, 20), kt: vjClean(x.kt, 6), date: vjClean(x.date, 12), gross: N(x.gross, 10000), diaG: N(x.diaG, 1000), net: N(x.net, 10000), making: N(x.making, 1e7), dia, unsure: (Array.isArray(x.unsure) ? x.unsure : []).slice(0, 8).map(s => vjClean(s, 80)).filter(Boolean) };
-  const ct = dia.reduce((a, d) => a + (d.ct || 0), 0); out.check = { ct: Math.round(ct * 1000) / 1000, diaG: Math.round(ct / 5 * 1000) / 1000, net: out.gross != null ? Math.round((out.gross - ct / 5) * 1000) / 1000 : null };
-  out.check.ok = out.net == null || out.check.net == null || Math.abs(out.check.net - out.net) <= 0.002;
+  const cs = (Array.isArray(x.cs) ? x.cs : []).slice(0, 10).map(d => ({ what: vjClean(d && d.what, 30), pcs: N(d && d.pcs, 9999), ct: N(d && d.ct, 5000), g: N(d && d.g, 1000), rate: N(d && d.rate, 1e6), amount: N(d && d.amount, 1e7) })).filter(d => d.ct != null || d.g != null || d.amount != null);
+  const out = { ok: true, cs, design: vjClean(x.design, 20), kt: vjClean(x.kt, 6), date: vjClean(x.date, 12), gross: N(x.gross, 10000), diaG: N(x.diaG, 1000), net: N(x.net, 10000), making: N(x.making, 1e7), dia, unsure: (Array.isArray(x.unsure) ? x.unsure : []).slice(0, 8).map(s => vjClean(s, 80)).filter(Boolean) };
+  const ct = dia.reduce((a, d) => a + (d.ct || 0), 0); const csG = cs.reduce((a, d) => a + (d.g != null ? d.g : (d.ct || 0) / 5), 0); out.check = { ct: Math.round(ct * 1000) / 1000, diaG: Math.round(ct / 5 * 1000) / 1000, csG: Math.round(csG * 1000) / 1000, net: out.gross != null ? Math.round((out.gross - ct / 5 - csG) * 1000) / 1000 : null };
+  if (out.net != null && out.check.net != null && Math.abs(out.check.net - out.net) > 0.002 && csG > 0 && Math.abs(out.gross - ct / 5 - out.net) <= 0.002) out.check.csOut = true; // slip's net did not take the CS off
+  out.check.ok = out.net == null || out.check.net == null || Math.abs(out.check.net - out.net) <= 0.002 || !!out.check.csOut;
   return vjJson(out);
 }
 async function vjAskClaude(env, content, ok, lim) {
