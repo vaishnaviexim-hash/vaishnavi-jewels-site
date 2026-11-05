@@ -1041,7 +1041,7 @@ async function vjBill(request, env, who, ctx) { // every login may make bills (o
     const n = Number(b.prates[id]); if (!Number.isInteger(n) || n < 1 || n > 100000) return vjDeny(400, 'polki rate per pc must be a whole number Rs 1-1,00,000'); prates[id] = n; }
   const pdrates = {}; if (b && b.pdrates && typeof b.pdrates === 'object') for (const id of allIds) if (b.pdrates[id] != null && b.pdrates[id] !== '') { // party diamond setting rate per ct for this bill only (C-20261026-PARTYDIA)
     const n = Number(b.pdrates[id]); if (!Number.isInteger(n) || n < 1 || n > 100000) return vjDeny(400, 'party diamond setting rate per ct must be a whole number Rs 1-1,00,000'); pdrates[id] = n; }
-  const mkamt = {}; if (b && b.edit && b.mkamt && typeof b.mkamt === 'object') for (const id of allIds) if (b.mkamt[id] != null && b.mkamt[id] !== '') { // C-20261029-BILLFROZEN: billed making kept on Edit (edits only)
+  const mkamt = {}; if (b && (b.edit || (b.rev && title === 'Estimate')) && b.mkamt && typeof b.mkamt === 'object') for (const id of allIds) if (b.mkamt[id] != null && b.mkamt[id] !== '') { // C-20261029-BILLFROZEN: billed making kept on Edit (edits only)
     const n = Number(b.mkamt[id]); if (!(n >= 0 && n <= 10000000)) return vjDeny(400, 'making must be Rs 0-1,00,00,000'); mkamt[id] = Math.round(n); }
   // owner 16/10/2026 20:03 'Bill no should be automatic. Every month starts with number 1': bills are numbered by the server too
   if (!name) return vjDeny(400, 'customer name is required');
@@ -1103,9 +1103,9 @@ async function vjBill(request, env, who, ctx) { // every login may make bills (o
       await vjMarkSold(env, who, oldIds.filter(i => !ids.includes(i)), null, editNo); await vjMarkSold(env, who, ids, { no: editNo, date, name, at: bill.at }); } // C-20261026-SOLD
     return vjJson({ ok: true, bill, edited: true });
   }
-  let estFrom = ''; if (title === 'Bill' && b && b.fromEst) { const n = String(b.fromEst).trim().toUpperCase(); if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji can convert an estimate to a bill'); if (!/^E-\d{4}-\d{2,3}$/.test(n)) return vjDeny(400, 'estimate number');
-    await vjEstAll(env); const er = await env.DB.prepare('SELECT data FROM vj_estimates WHERE no = ?').bind(n).first(), e = er ? vjParse(er) : null; if (!e) return vjDeny(404, 'estimate ' + n + ' not found'); if (e.status === 'converted') return vjDeny(409, n + ' is already converted to bill ' + (e.convTo || '')); estFrom = n; bill.fromEst = n; } // C-20261104-SAVEBILLFIX
-  if (title === 'Estimate') return vjEstimateKeep(env, ctx, who, bill, ids); // owner 28/10/2026 19:53 (C-20261028-ESTNOTBILL): an estimate is NOT saved as a bill
+  let estFrom = ''; if (title === 'Bill' && b && b.fromEst) { const n = String(b.fromEst).trim().toUpperCase(); if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji can convert an estimate to a bill'); if (!VJ_EST_NO.test(n)) return vjDeny(400, 'estimate number');
+    await vjEstAll(env); const er = await env.DB.prepare('SELECT data FROM vj_estimates WHERE no = ?').bind(n).first(), e = er ? vjParse(er) : null; if (!e) return vjDeny(404, 'estimate ' + n + ' not found'); if (e.status === 'converted') return vjDeny(409, n + ' is already converted to bill ' + (e.convTo || '')); if (e.status === 'revised') return vjDeny(409, n + ' was revised - convert the latest version ' + (e.revTo || '')); estFrom = n; bill.fromEst = n; } // C-20261104-SAVEBILLFIX
+  if (title === 'Estimate') return vjEstimateKeep(env, ctx, who, bill, ids, String(b && b.rev || '').trim().toUpperCase().slice(0, 20)); // C-20261105-ESTREOPEN: rev = the estimate being revised // owner 28/10/2026 19:53 (C-20261028-ESTNOTBILL): an estimate is NOT saved as a bill
   // C-20261016-BILLBOOK / BILLAUTO: bills B-YYMM-NN and estimates E-YYMM-NN are numbered automatically, from 01 every month (by the date)
   for (let i = 0; ; i++) {
     {
@@ -1228,7 +1228,7 @@ async function vjBillSend(request, env, who) {
   const team = !!(b && b.team === true);
   if (who.role === 'tagger' && !team) return vjDeny(403, 'not allowed');
   if (team) {
-    if (!/^E-\d{4}-\d{2,4}$/.test(no)) return vjDeny(400, 'only an estimate goes to the team');
+    if (!VJ_EST_NO.test(no)) return vjDeny(400, 'only an estimate goes to the team');
     await vjEstT(env); const er = await env.DB.prepare('SELECT data FROM vj_estimates WHERE no = ?').bind(no).first(); if (!er) return vjDeny(404, 'not found');
     const est = JSON.parse(er.data), tg = VJ_EST_TO[est.cust]; if (!tg) return vjJson({ error: 'choose whose customer this is first' }, 400);
     if ((who.role === 'sales' || who.role === 'tagger') && est.by !== who.email) return vjDeny(404, 'not found');
@@ -1324,10 +1324,22 @@ const vjAddDays = (ymd, n) => new Date(Date.parse(ymd + 'T00:00:00Z') + n * 864e
 function vjEstRec(b) { // the only things kept about an estimate
   const pcs = (b.rows || []).map(r => [r.design || '', r.cat || r.label || ''].filter(Boolean).join(' ')).filter(Boolean).slice(0, 12).join(', ').slice(0, 200);
   return { no: b.no, date: b.date, name: b.name, city: b.city || '', mobile: b.mobile || '', total: Number(b.total) || 0, ...(b.usd ? { usd: b.usd } : {}), cust: b.cust || '',
-    items: pcs, ids: (b.rows || []).map(r => String(r.id || '')).filter(i => /^[A-Za-z0-9_\-.~]{1,60}$/.test(i)).slice(0, 30) /* C-20261104-SAVEBILLFIX: for Convert to bill */, by: b.by, byName: b.byName, at: b.at, due: vjAddDays(b.date, 2), status: 'open', reminders: [] };
+    items: pcs, ids: (b.rows || []).map(r => String(r.id || '')).filter(i => /^[A-Za-z0-9_\-.~]{1,60}$/.test(i)).slice(0, 30) /* C-20261104-SAVEBILLFIX: for Convert to bill */, by: b.by, byName: b.byName, at: b.at, due: vjAddDays(b.date, 2), status: 'open', reminders: [], doc: vjEstDoc(b) /* C-20261105-ESTREOPEN */ };
 }
-async function vjEstimateKeep(env, ctx, who, bill, ids) {
+// C-20261105-ESTREOPEN (owner Abhinav 05/11/2026 10:23): "I need to REOPEN an estimate, edit something in it and send it again. Keep that option ON for everyone."
+// From today the whole worked-out estimate is kept with its follow-up record (party, pieces = stock ids + new-design lines with every field, gold rate,
+// per-piece rates, making, discounts, mode) so 'Reopen / Edit' on the Estimates list fills the Bill screen in Estimate mode exactly as it was saved.
+// Saving it makes a REVISION: the same number + -R2, -R3 … (E-2611-09 -> E-2611-09-R2); the old version is never deleted, it is marked
+// 'revised -> R2' and its follow-up reminder moves to the new version. Every login that sees the Estimates list may reopen (sales: its own ones only).
+// Estimates made before today have no stored pieces: they open with the party filled and a note to add the items again (estimates
+// saved as bills before 28/10 open from that saved bill).
+const VJ_EST_NO = /^E-\d{4}-\d{2,4}(?:-R\d{1,2})?$/;
+function vjEstDoc(b) { const d = {}; ['no', 'title', 'date', 'name', 'city', 'mobile', 'addr', 'area', 'state', 'pin', 'F', 'nbb', 'mode', 'settle', 'g2g', 'option', 'usd', 'cust', 'final', 'og', 'roundIn', 'total'].forEach(k => { if (b[k] !== undefined) d[k] = b[k]; });
+  d.rows = (b.rows || []).slice(0, 30).map(r => { const x = {}; ['id', 'label', 'design', 'cat', 'F', 'making', 'amount', 'amt0', 'net', 'chain', 'disc', 'discTxt', 'polkiPcs', 'polkiRate', 'pdCt', 'pdRate', 'src'].forEach(k => { if (r[k] !== undefined) x[k] = r[k]; });
+    x.dias = (r.dias || []).map((q, k) => ({ idx: q.idx != null ? q.idx : k, rate: q.rate })); return x; }); return d; }
+async function vjEstimateKeep(env, ctx, who, bill, ids, rev) {
   await vjEstT(env); if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
+  if (rev) return vjEstRevise(env, ctx, who, bill, ids, rev); // C-20261105-ESTREOPEN
   const date = bill.date, px = 'E-' + date.slice(2, 4) + date.slice(5, 7) + '-';
   for (let i = 0; ; i++) { // same E-YYMM-NN numbers as before, from 01 every month; old estimates in vj_bills are counted so no number repeats
     const a = ((await env.DB.prepare('SELECT no FROM vj_estimates WHERE no LIKE ?').bind(px + '%').all()).results) || [];
@@ -1340,6 +1352,37 @@ async function vjEstimateKeep(env, ctx, who, bill, ids) {
   await vjAudit(env, who, 'estimate', 'estimates/' + bill.no, `${bill.name} ${bill.mobile || ''} ${bill.total} | ${ids.join(',')}`);
   await vjContactPush(env, ctx, { name: bill.name, mobile: bill.mobile, city: bill.city, type: 'Visitor', src: 'VJ Tags Estimate ' + bill.no }); // C-20261026-CONTACTS
   return vjJson({ ok: true, bill, estimate: true });
+}
+async function vjEstRevise(env, ctx, who, bill, ids, rev) { // C-20261105-ESTREOPEN: save a reopened estimate as the next revision
+  if (!VJ_EST_NO.test(rev)) return vjDeny(400, 'estimate number');
+  await vjEstAll(env); const row = await env.DB.prepare('SELECT data FROM vj_estimates WHERE no = ?').bind(rev).first(); if (!row) return vjDeny(404, 'estimate ' + rev + ' not found');
+  const e = JSON.parse(row.data); if (who.role === 'sales' && e.by !== who.email) return vjDeny(404, 'estimate ' + rev + ' not found');
+  if (e.status === 'revised') return vjDeny(409, rev + ' was already revised to ' + (e.revTo || 'a newer version') + ' - reopen the latest one');
+  if (e.status === 'converted') return vjDeny(409, rev + ' is already converted to bill ' + (e.convTo || ''));
+  const base = rev.replace(/-R\d+$/, '');
+  for (let i = 0; ; i++) {
+    const a = ((await env.DB.prepare('SELECT no FROM vj_estimates WHERE no LIKE ?').bind(base + '-R%').all()).results) || [];
+    const n = a.reduce((m, r) => Math.max(m, parseInt(String(r.no).slice(base.length + 2), 10) || 0), 1) + 1; if (n > 99) return vjDeny(409, 'too many revisions of ' + base);
+    bill.no = base + '-R' + n; bill.revOf = rev; bill.rev = n;
+    const rec = Object.assign(vjEstRec(bill), { base, rev: n, revOf: rev, firstDate: e.firstDate || e.date, ...(bill.cust ? {} : { cust: e.cust || '' }) });
+    const res = await env.DB.prepare('INSERT INTO vj_estimates (no, ts, email, data) VALUES (?, ?, ?, ?) ON CONFLICT(no) DO NOTHING').bind(bill.no, Date.now(), who.email, JSON.stringify(rec)).run();
+    if (res.meta && res.meta.changes === 1) { if (!bill.cust) bill.cust = rec.cust; break; }
+    if (i >= 5) return vjJson({ error: 'could not give a number, try again' }, 409);
+  }
+  // the old version is kept, marked revised; its reminder stops (the new version carries the follow-up). Only if nobody changed it meanwhile.
+  const old = Object.assign({}, e, { status: 'revised', revTo: bill.no, due: '', revAt: bill.at, revBy: who.email, revByName: who.name });
+  const up = await env.DB.prepare('UPDATE vj_estimates SET data = ? WHERE no = ? AND data = ?').bind(JSON.stringify(old), rev, row.data).run();
+  if (!(up.meta && up.meta.changes === 1)) { await env.DB.prepare('DELETE FROM vj_estimates WHERE no = ?').bind(bill.no).run(); return vjJson({ error: rev + ' was changed by someone else just now - reload the list and try again' }, 409); }
+  await vjAudit(env, who, 'estimate-revise', 'estimates/' + bill.no, `${rev} -> ${bill.no} ${bill.name} ${bill.mobile || ''} ${e.total} -> ${bill.total} | ${ids.join(',')}`);
+  await vjContactPush(env, ctx, { name: bill.name, mobile: bill.mobile, city: bill.city, type: 'Visitor', src: 'VJ Tags Estimate ' + bill.no });
+  return vjJson({ ok: true, bill, estimate: true, revised: rev });
+}
+async function vjEstGet(url, env, who) { // C-20261105-ESTREOPEN: one estimate with its saved pieces, for Reopen / Edit
+  const no = String(url.searchParams.get('no') || '').trim().toUpperCase(); if (!VJ_EST_NO.test(no)) return vjDeny(400, 'estimate number');
+  await vjEstAll(env); const row = await env.DB.prepare('SELECT data FROM vj_estimates WHERE no = ?').bind(no).first(); if (!row) return vjDeny(404, 'not found');
+  const e = JSON.parse(row.data); if (who.role === 'sales' && e.by !== who.email) return vjDeny(404, 'not found');
+  let doc = e.doc || null; if (!doc && e.legacy) { const r = await env.DB.prepare('SELECT data FROM vj_bills WHERE no = ?').bind(no).first(); try { const d = r ? JSON.parse(r.data) : null; if (d && Array.isArray(d.rows) && d.rows.length) doc = vjEstDoc(d); } catch (x) {} }
+  return vjJson({ ok: true, est: { no: e.no, date: e.date, name: e.name || '', city: e.city || '', mobile: e.mobile || '', cust: e.cust || '', total: e.total, ids: Array.isArray(e.ids) ? e.ids : [], status: e.status, revTo: e.revTo || '', convTo: e.convTo || '' }, doc });
 }
 async function vjEstAll(env) { // follow-up records + a one-time copy of the old estimates that were saved as bills
   await vjEstT(env); if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
@@ -1380,16 +1423,17 @@ async function vjEstList(url, env, who, ctx) { if (who.role !== 'sales' && ctx) 
   const all = [...(await vjEstAll(env)).values()].filter(e => who.role !== 'sales' || e.by === who.email);
   const st = String(url.searchParams.get('status') || 'open');
   const list = all.filter(e => st === 'all' || (st === 'done' ? e.status !== 'open' : e.status === 'open')).sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(b.no).localeCompare(String(a.no))).slice(0, 300);
-  return vjJson({ ok: true, estimates: list.map(e => ({ no: e.no, date: e.date, name: e.name, city: e.city, mobile: e.mobile, total: e.total, usd: e.usd || 0, cust: e.cust, custName: (VJ_EST_TO[e.cust] || [, ''])[1], items: e.items || '', ids: Array.isArray(e.ids) ? e.ids : [], convTo: e.convTo || '', byName: e.byName || '', due: e.due, status: e.status, note: e.note || '', reminders: (e.reminders || []).length, doneByName: e.doneByName || '' })), open: all.filter(e => e.status === 'open').length, canConv: who.role === 'admin', fix: who.role === 'admin' ? await (async () => { try { const m = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'job:savebillfix1:result'").first(); return m ? JSON.parse(m.v) : null; } catch (e) { return null; } })() : null });
+  return vjJson({ ok: true, estimates: list.map(e => ({ no: e.no, date: e.date, name: e.name, city: e.city, mobile: e.mobile, total: e.total, usd: e.usd || 0, cust: e.cust, custName: (VJ_EST_TO[e.cust] || [, ''])[1], items: e.items || '', ids: Array.isArray(e.ids) ? e.ids : [], convTo: e.convTo || '', byName: e.byName || '', due: e.due, status: e.status, note: e.note || '', reminders: (e.reminders || []).length, doneByName: (e.status === 'revised' ? e.revByName : e.doneByName) || '', revTo: e.revTo || '', revOf: e.revOf || '', stored: !!(e.doc || e.legacy) })), open: all.filter(e => e.status === 'open').length, canConv: who.role === 'admin', fix: who.role === 'admin' ? await (async () => { try { const m = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'job:savebillfix1:result'").first(); return m ? JSON.parse(m.v) : null; } catch (e) { return null; } })() : null });
 }
 async function vjEstDone(request, env, who) {
   let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
-  const no = String(b && b.no || '').trim().toUpperCase(); if (!/^E-\d{4}-\d{2,3}$/.test(no)) return vjDeny(400, 'estimate number');
+  const no = String(b && b.no || '').trim().toUpperCase(); if (!VJ_EST_NO.test(no)) return vjDeny(400, 'estimate number');
   const status = ['won', 'lost', 'done', 'open'].includes(b && b.status) ? b.status : 'done', note = vjClean(b && b.note, 120);
   await vjEstAll(env);
   const row = await env.DB.prepare('SELECT data FROM vj_estimates WHERE no = ?').bind(no).first(); if (!row) return vjDeny(404, 'not found');
   const e = JSON.parse(row.data); if (who.role === 'sales' && e.by !== who.email) return vjDeny(404, 'not found');
   if (e.status === 'converted') return vjDeny(409, 'this estimate is already converted to bill ' + (e.convTo || '')); // C-20261104-SAVEBILLFIX
+  if (e.status === 'revised') return vjDeny(409, 'this estimate was revised - use the latest version ' + (e.revTo || '')); // C-20261105-ESTREOPEN
   Object.assign(e, { status, note, doneAt: new Date().toISOString(), doneBy: who.email, doneByName: who.name });
   await env.DB.prepare('UPDATE vj_estimates SET data = ? WHERE no = ?').bind(JSON.stringify(e), no).run();
   await vjAudit(env, who, 'estimate-' + status, 'estimates/' + no, note);
@@ -5445,7 +5489,7 @@ async function vjHandle(request, env, ctx, url) {
   const who = await vjWho(request, env);
   if (who && p === '/api/vj/embeds') return request.method === 'GET' ? vjEmbedsGet(url, env, who) : (request.method === 'POST' && vjSameSite(request, env)) ? vjEmbedsPost(request, env, who) : vjDeny(405, 'not allowed'); // C-20261103-PHOTOFIND: every login (sales read only)
   if (!who) return p.startsWith('/api/') ? vjDeny(403, 'not allowed') : new Response('Not allowed. Ask Abhinav to add your email.', { status: 403, headers: { 'content-type': 'text/plain', 'x-robots-tag': 'noindex' } });
-  if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties', '/api/vj/moves', '/api/vj/repairs', '/api/vj/estimates', '/api/vj/boxes', '/api/vj/bill/sendstatus', '/api/vj/ogs', '/api/vj/korders', '/api/vj/challans', '/api/vj/challan', '/api/vj/addrbook'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill', '/api/vj/move', '/api/vj/repair', '/api/vj/estimate/done', '/api/vj/contactshot', '/api/vj/bill/send', '/api/vj/photosearch', '/api/vj/og', '/api/vj/korder', '/api/vj/challan'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these (+ Karigar & Out, 27/10)
+  if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties', '/api/vj/moves', '/api/vj/repairs', '/api/vj/estimates', '/api/vj/estimate', '/api/vj/boxes', '/api/vj/bill/sendstatus', '/api/vj/ogs', '/api/vj/korders', '/api/vj/challans', '/api/vj/challan', '/api/vj/addrbook'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill', '/api/vj/move', '/api/vj/repair', '/api/vj/estimate/done', '/api/vj/contactshot', '/api/vj/bill/send', '/api/vj/photosearch', '/api/vj/og', '/api/vj/korder', '/api/vj/challan'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these (+ Karigar & Out, 27/10)
   // C-20261027-KARIGAROUT: stock out / back, RFID link, party repairs (JSON from our own page only)
   if ((p === '/api/vj/move' || p === '/api/vj/repair') && request.method === 'POST') { if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed'); return p === '/api/vj/move' ? vjMove(request, env, who) : vjRepair(request, env, who); }
   if (p === '/api/vj/moves' && request.method === 'GET') return vjMovesGet(url, env, who);
@@ -5468,6 +5512,7 @@ async function vjHandle(request, env, ctx, url) {
   if ((p === '/api/vj/bills' || p === '/api/vj/bills.xlsx' || p === '/api/vj/bill') && request.method === 'GET') return vjBillBook(url, env, who, request.headers.get('x-vj-mob'));
   if (p === '/api/vj/bill/cancel' && request.method === 'POST') return vjBillCancel(request, env, who);
   if (p === '/api/vj/estimates' && request.method === 'GET') return vjEstList(url, env, who, ctx); // C-20261028-ESTNOTBILL
+  if (p === '/api/vj/estimate' && request.method === 'GET') return vjEstGet(url, env, who); // C-20261105-ESTREOPEN: every login that sees the list
   if (p === '/api/vj/estimate/done' && request.method === 'POST') return vjSameSite(request, env) ? vjEstDone(request, env, who) : vjDeny(403, 'not allowed');
   if (p === '/api/vj/bill/send' && request.method === 'POST') return vjBillSend(request, env, who); // C-20261017-BILLWA
   if (p === '/api/vj/bill/sendstatus' && request.method === 'GET') return vjBillSendStatus(url, env);
