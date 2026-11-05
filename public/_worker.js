@@ -715,7 +715,11 @@ const VJ_KSLIP_HOW = {
   montu: 'Montu\'s slip (sample 04/11/2026, design 4892, 14K ring): top line = karat (e.g. "14k") and the date. Each diamond line is written as ISSUED - RETURNED = USED, pieces on one line and carats on the next, '
     + 'e.g. "84 - 1 = 83" then "0.48 - 1 = 0.47" (the carat return is written short: "-1" means 0.01 ct, "-6" means 0.06, "-10" means 0.10). His "=" sign often looks like the digit "2" - read "84-1 2 83" as 84 - 1 = 83. '
     + '"MQ" = marquise. A lone "1" written above a carat figure (e.g. 1 over 0.72) = one centre stone of that carat. The column on the right is GROSS g - DIAMOND g = NET gold g (e.g. 8.035 - 0.382 = 7.653; diamond g = total used ct / 5). '
-    + 'A circled 4-digit number = the design no. "M <number>" or "Mk <number>" = his making charge - read it into making but it is not used.'
+    + 'A circled 4-digit number = the design no. "M <number>" or "Mk <number>" = his making charge - read it into making but it is not used.',
+  badshah: 'Badshah\'s slip (samples 04/11/2026, designs 40496 and 40497): a printed pad page with "DATE:" and a page no.; the design no. in square brackets e.g. [40497]; karat written as "18Kt" over "76" (76 = his purity, ignore it). '
+    + 'Then the item and its GROSS weight on the right, e.g. "Ring white g 4.820" or "Ring 2 Pcs 5.860". Each diamond line is "<what> <pcs>/<ct> ct" with the USED figures only (no issued / returned), e.g. "CVD 2/0.31 ct", "Heart 2/0.70 ct", "EM 1/2.26 ct", "Dia 16/0.22" - '
+    + 'CVD = lab-grown round, EM = emerald cut, Heart = heart shape. The right column is GROSS - DIAMOND g = NET (e.g. 4.820 - 0.654 = 4.166, diamond g = total ct / 5). The diamond packets and the IGI / GIA certificate box are often photographed above the slip: '
+    + 'they are the packets we issued (Gujarati labels: નામ name, લોટ નં. lot no., ક્વોલિટી quality, વજન weight = pcs over ct). Use them only to confirm the lines and to read a solitaire\'s certificate (e.g. "IGI#LG833640098" -> lab IGI, no. LG833640098) into that line\'s "cert".'
 };
 async function vjKslip(request, env, who) {
   if (who.role === 'sales') return vjDeny(403, 'read only');
@@ -738,7 +742,7 @@ async function vjKslip(request, env, who) {
     + 'Diamonds the shop issued for this order: ' + (iss || 'none recorded') + '. How this karigar writes: ' + how + ' '
     + 'Read ONLY what is written - never guess or invent a digit; if a figure is not clearly readable, put it in "unsure" and leave it null. Ignore drawings, the faint writing showing through from the other page, fingers and anything outside the slip. '
     + 'Answer with JSON only: {"design": "", "kt": "", "date": "", "gross": number|null, "diaG": number|null, "net": number|null, "making": number|null, '
-    + '"dia": [{"what": "e.g. round / MQ / centre", "issPcs": number|null, "retPcs": number|null, "pcs": number|null, "issCt": number|null, "retCt": number|null, "ct": number|null}], '
+    + '"dia": [{"what": "e.g. round / MQ / centre", "issPcs": number|null, "retPcs": number|null, "pcs": number|null, "issCt": number|null, "retCt": number|null, "ct": number|null, "cert": {"lab": "IGI / GIA / HRD / SGL", "no": ""} or null}], '
     + '"cs": [{"what": "e.g. ruby / emerald / pearl / CZ", "pcs": number|null, "ct": number|null, "g": number|null, "rate": number|null, "amount": number|null}], "unsure": ["..."]} '
     + '- pcs and ct in "dia" are the USED diamond figures; carats as full decimals (0.01 not 1). "cs" = COLOUR STONES (ruby, emerald, pearl, CZ, polki-look stones, beads...) the KARIGAR put in from his side, with their weight (ct and / or g as written) '
     + 'and his charge (rate and / or rupee amount as written); never put diamonds in "cs". If the slip deducts the colour stone weight in the gross - diamond = net column, keep that in mind for "net".';
@@ -750,7 +754,7 @@ async function vjKslip(request, env, who) {
   const j = await r.json(), txt = ((j.content || []).find(c => c.type === 'text') || {}).text || '';
   let x = {}; try { const m = txt.match(/\{[\s\S]*\}/); x = JSON.parse(m ? m[0] : '{}') || {}; } catch (e) {}
   const N = (v, mx) => { const n = Number(v); return v === null || v === '' || !isFinite(n) || n < 0 || n > mx ? null : Math.round(n * 1000) / 1000; };
-  const dia = (Array.isArray(x.dia) ? x.dia : []).slice(0, 20).map(d => ({ what: vjClean(d && d.what, 30), issPcs: N(d && d.issPcs, 9999), retPcs: N(d && d.retPcs, 9999), pcs: N(d && d.pcs, 9999), issCt: N(d && d.issCt, 500), retCt: N(d && d.retCt, 500), ct: N(d && d.ct, 500) })).filter(d => d.pcs != null || d.ct != null);
+  const dia = (Array.isArray(x.dia) ? x.dia : []).slice(0, 20).map(d => ({ what: vjClean(d && d.what, 30), issPcs: N(d && d.issPcs, 9999), retPcs: N(d && d.retPcs, 9999), pcs: N(d && d.pcs, 9999), issCt: N(d && d.issCt, 500), retCt: N(d && d.retCt, 500), ct: N(d && d.ct, 500), cert: d && d.cert && /^[A-Za-z0-9-]{5,30}$/.test(String(d.cert.no || '').trim()) ? { lab: ['IGI', 'GIA', 'HRD', 'SGL'].includes(String(d.cert.lab || '').toUpperCase()) ? String(d.cert.lab).toUpperCase() : 'Other', no: String(d.cert.no).trim().toUpperCase() } : null })).filter(d => d.pcs != null || d.ct != null);
   const cs = (Array.isArray(x.cs) ? x.cs : []).slice(0, 10).map(d => ({ what: vjClean(d && d.what, 30), pcs: N(d && d.pcs, 9999), ct: N(d && d.ct, 5000), g: N(d && d.g, 1000), rate: N(d && d.rate, 1e6), amount: N(d && d.amount, 1e7) })).filter(d => d.ct != null || d.g != null || d.amount != null);
   const out = { ok: true, cs, design: vjClean(x.design, 20), kt: vjClean(x.kt, 6), date: vjClean(x.date, 12), gross: N(x.gross, 10000), diaG: N(x.diaG, 1000), net: N(x.net, 10000), making: N(x.making, 1e7), dia, unsure: (Array.isArray(x.unsure) ? x.unsure : []).slice(0, 8).map(s => vjClean(s, 80)).filter(Boolean) };
   const ct = dia.reduce((a, d) => a + (d.ct || 0), 0); const csG = cs.reduce((a, d) => a + (d.g != null ? d.g : (d.ct || 0) / 5), 0); out.check = { ct: Math.round(ct * 1000) / 1000, diaG: Math.round(ct / 5 * 1000) / 1000, csG: Math.round(csG * 1000) / 1000, net: out.gross != null ? Math.round((out.gross - ct / 5 - csG) * 1000) / 1000 : null };
