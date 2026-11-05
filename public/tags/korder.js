@@ -638,6 +638,9 @@
           if (!tr && /round|rd/i.test(d.what)) tr = rows.find(t => !usedR.has(t) && q(t, "shape").value === "Round");
           const txt = (d.what || "line") + ": " + (d.pcs != null ? d.pcs + " pcs " : "") + (d.ct != null ? Number(d.ct).toFixed(3) + " ct" : "");
           if (!tr && rows.filter(t => !usedR.has(t)).length === 1 && (x.dia || []).length === rows.length) tr = rows.find(t => !usedR.has(t)); /* the one line left goes to the one packet left */
+          if (!tr && canD && !iss.length) { /* order had no diamonds issued in VJ Tags: each slip line becomes a diamond line (shape from the slip; party = customer's) */
+            const w = String(d.what || ""), sol = !!d.cert || /centre|center|sol/i.test(w), shp = sol ? "Solitaire" : /polki/i.test(w) ? "Polki" : /choki/i.test(w) ? "Choki" : /mq|marq|tri|pear|oval|heart|\bem\b|emerald|princess|cushion|radiant|asscher|baguette|fancy/i.test(w) ? "Fancy" : "Round";
+            dRow({ pkt: /party/i.test(w) ? "party" : "", shape: shp, pcs: d.pcs != null ? d.pcs : "", ct: d.ct != null ? d.ct : "", sol, cert: d.cert ? { lab: d.cert.lab, no: d.cert.no } : undefined }); tr = [...tb.querySelectorAll("tr.kodr")].pop(); rows.push(tr); }
           if (tr && canD) { usedR.add(tr); if (d.pcs != null) q(tr, "pcs").value = String(d.pcs); if (d.ct != null) q(tr, "ct").value = Number(d.ct).toFixed(3);
             if (d.cert && tr._c) { const so = q(tr, "sol"); if (so && !so.checked) { so.checked = true; so.dispatchEvent(new Event("change")); } const cq = k => tr._c.querySelector('[data-c="' + k + '"]'); if (cq("lab")) cq("lab").value = d.cert.lab; if (cq("no") && !cq("no").value) cq("no").value = d.cert.no; }
             L.push(txt + (d.cert ? " · cert " + d.cert.lab + " " + d.cert.no : "") + " ✓"); } else left.push(txt + (d.cert ? " (cert " + d.cert.lab + " " + d.cert.no + ")" : "")); });
