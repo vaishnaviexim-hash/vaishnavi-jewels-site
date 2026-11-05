@@ -561,7 +561,7 @@ async function vjBlob(id, env) {
   if (!/^[0-9a-f]{32}$/.test(id)) return vjDeny(404, 'not found');
   const o = await vjPhotoGet(env, id);
   if (!o) return vjDeny(404, 'not found');
-  if (o.type === 'application/pdf') return new Response(o.body, { headers: { 'content-type': 'application/pdf', 'content-disposition': 'inline; filename="karigar-slip.pdf"', 'cache-control': 'private, max-age=86400', 'x-robots-tag': 'noindex', 'x-content-type-options': 'nosniff', 'content-security-policy': "sandbox; default-src 'none'" } }); // KSLIP
+  if (o.type === 'application/pdf') return new Response(o.body, { headers: { 'content-type': 'application/pdf', 'content-disposition': 'inline; filename="karigar-slip.pdf"', 'cache-control': 'private, max-age=86400', 'x-robots-tag': 'noindex', 'x-content-type-options': 'nosniff' } }); // KSLIP (no CSP sandbox: Chrome's PDF viewer refuses sandboxed PDFs)
   return new Response(o.body, { headers: { 'content-type': /^image\/(jpeg|png|webp)$/.test(o.type || '') ? o.type : 'image/jpeg', 'cache-control': 'private, max-age=86400', 'x-robots-tag': 'noindex', 'x-content-type-options': 'nosniff' } });
 }
 
