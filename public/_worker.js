@@ -706,6 +706,54 @@ async function vjContactShot(request, env, who) {
   const city = wantCity ? String(o.city || '').replace(/[^\p{L}\p{M}\s.'-]/gu, ' ').replace(/\s+/g, ' ').trim().slice(0, 40) : undefined;
   return vjJson({ ok: true, name, mobile: best, others: uniq.filter(d => d !== best).slice(0, 3), city });
 }
+// C-20261105-KSLIP (owner Abhinav 05/11/2026 19:44): the karigar's handwritten hisaab slip (photo) is read on the Received-from-karigar form and fills it;
+// the slip photo stays on that karigar order (tag.slip / slips) so it can be shown back to the karigar later. Every karigar writes his slip his own way
+// (Montu / Badshah / Hiru differ) - VJ_KSLIP_HOW holds what we have learnt per karigar (more samples from the owner -> more notes). Nothing is saved
+// from the reading itself: it only FILLS the form, staff check it and press Save as before. Making on the slip is ignored (the karigar formula decides).
+const VJ_KSLIP_DAY = 100;
+const VJ_KSLIP_HOW = {
+  montu: 'Montu\'s slip (sample 04/11/2026, design 4892, 14K ring): top line = karat (e.g. "14k") and the date. Each diamond line is written as ISSUED - RETURNED = USED, pieces on one line and carats on the next, '
+    + 'e.g. "84 - 1 = 83" then "0.48 - 1 = 0.47" (the carat return is written short: "-1" means 0.01 ct, "-6" means 0.06, "-10" means 0.10). His "=" sign often looks like the digit "2" - read "84-1 2 83" as 84 - 1 = 83. '
+    + '"MQ" = marquise. A lone "1" written above a carat figure (e.g. 1 over 0.72) = one centre stone of that carat. The column on the right is GROSS g - DIAMOND g = NET gold g (e.g. 8.035 - 0.382 = 7.653; diamond g = total used ct / 5). '
+    + 'A circled 4-digit number = the design no. "M <number>" or "Mk <number>" = his making charge - read it into making but it is not used.'
+};
+async function vjKslip(request, env, who) {
+  if (who.role === 'sales') return vjDeny(403, 'read only');
+  if (!env.ANTHROPIC_API_KEY || !env.PHOTOS) return vjDeny(503, 'slip reading is not set up');
+  let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+  const pid = String(b && b.photo || ''), oid = vjClean(b && b.id, 60); if (!/^[0-9a-f]{32}$/.test(pid) || !oid) return vjDeny(400, 'bad request');
+  const used = await env.DB.prepare("SELECT count(*) AS n FROM audit WHERE action = 'kslip' AND ts > ?").bind(Date.now() - 24 * 3600e3).first();
+  if (used && used.n >= VJ_KSLIP_DAY) return vjDeny(429, 'daily limit reached (' + VJ_KSLIP_DAY + ' slips in 24 hours)');
+  const mine = await env.DB.prepare("SELECT count(*) AS n FROM audit WHERE action = 'kslip' AND email = ? AND ts > ?").bind(who.email, Date.now() - 600e3).first();
+  if (mine && mine.n >= 15) return vjDeny(429, 'too many slips - wait a few minutes');
+  const row = await env.DB.prepare('SELECT data FROM vj_kord WHERE id = ?').bind(oid).first(), o = row ? vjParse(row) : null; if (!o) return vjDeny(404, 'order not found');
+  const ph = await vjPhotoGet(env, pid); if (!ph) return vjDeny(404, 'slip photo not found - upload it again');
+  const buf = new Uint8Array(await new Response(ph.body).arrayBuffer()); if (buf.length > 2.2e6) return vjDeny(413, 'slip photo too large');
+  let bin = ''; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+  const type = /^image\/(jpeg|png|webp)$/.test(ph.type || '') ? ph.type : 'image/jpeg';
+  await vjAudit(env, who, 'kslip', 'korders/' + oid, String(o.karigar || ''));
+  const iss = (Array.isArray(o.iss) ? o.iss : []).slice(0, 30).map((r, i) => (i + 1) + ') ' + [r.pkt, r.shape].filter(Boolean).join(' ') + ' ' + (Number(r.pcs) || 0) + ' pcs ' + (Number(r.ct) || 0).toFixed(3) + ' ct').join('; ');
+  const how = VJ_KSLIP_HOW[String(o.karigar || '').trim().toLowerCase()] || 'No sample of this karigar\'s slip has been studied yet - read it carefully; diamond lines are usually issued - returned = used, in pieces and carats.';
+  const prompt = 'This photo is a jewellery karigar\'s handwritten hisaab slip for ONE piece he delivered to a jewellery shop. Karigar: ' + vjClean(o.karigar, 40) + '. Order ' + o.no + ', ' + vjClean(o.item, 30) + ', ' + vjClean(o.kt, 4) + 'KT. '
+    + 'Diamonds the shop issued for this order: ' + (iss || 'none recorded') + '. How this karigar writes: ' + how + ' '
+    + 'Read ONLY what is written - never guess or invent a digit; if a figure is not clearly readable, put it in "unsure" and leave it null. Ignore drawings, the faint writing showing through from the other page, fingers and anything outside the slip. '
+    + 'Answer with JSON only: {"design": "", "kt": "", "date": "", "gross": number|null, "diaG": number|null, "net": number|null, "making": number|null, '
+    + '"dia": [{"what": "e.g. round / MQ / centre", "issPcs": number|null, "retPcs": number|null, "pcs": number|null, "issCt": number|null, "retCt": number|null, "ct": number|null}], "unsure": ["..."]} '
+    + '- pcs and ct in "dia" are the USED figures; carats as full decimals (0.01 not 1).';
+  let r; try { r = await fetch('https://api.anthropic.com/v1/messages', { method: 'POST', signal: AbortSignal.timeout(60000),
+      headers: { 'content-type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: VJ_PS_MODEL, max_tokens: 900, messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: type, data: btoa(bin) } }, { type: 'text', text: prompt }] }] }) });
+  } catch (e) { return vjDeny(502, 'the slip reader did not answer, try again'); }
+  if (!r.ok) { const t = await r.text().catch(() => ''); if (r.status === 400 && /credit|balance/i.test(t)) return vjDeny(402, 'reading credit is used up for this month'); if (r.status === 429) return vjDeny(429, 'busy, wait a minute'); return vjDeny(502, 'slip reader error ' + r.status); }
+  const j = await r.json(), txt = ((j.content || []).find(c => c.type === 'text') || {}).text || '';
+  let x = {}; try { const m = txt.match(/\{[\s\S]*\}/); x = JSON.parse(m ? m[0] : '{}') || {}; } catch (e) {}
+  const N = (v, mx) => { const n = Number(v); return v === null || v === '' || !isFinite(n) || n < 0 || n > mx ? null : Math.round(n * 1000) / 1000; };
+  const dia = (Array.isArray(x.dia) ? x.dia : []).slice(0, 20).map(d => ({ what: vjClean(d && d.what, 30), issPcs: N(d && d.issPcs, 9999), retPcs: N(d && d.retPcs, 9999), pcs: N(d && d.pcs, 9999), issCt: N(d && d.issCt, 500), retCt: N(d && d.retCt, 500), ct: N(d && d.ct, 500) })).filter(d => d.pcs != null || d.ct != null);
+  const out = { ok: true, design: vjClean(x.design, 20), kt: vjClean(x.kt, 6), date: vjClean(x.date, 12), gross: N(x.gross, 10000), diaG: N(x.diaG, 1000), net: N(x.net, 10000), making: N(x.making, 1e7), dia, unsure: (Array.isArray(x.unsure) ? x.unsure : []).slice(0, 8).map(s => vjClean(s, 80)).filter(Boolean) };
+  const ct = dia.reduce((a, d) => a + (d.ct || 0), 0); out.check = { ct: Math.round(ct * 1000) / 1000, diaG: Math.round(ct / 5 * 1000) / 1000, net: out.gross != null ? Math.round((out.gross - ct / 5) * 1000) / 1000 : null };
+  out.check.ok = out.net == null || out.check.net == null || Math.abs(out.check.net - out.net) <= 0.002;
+  return vjJson(out);
+}
 async function vjAskClaude(env, content, ok, lim) {
   let r;
   try {
@@ -2533,6 +2581,8 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
   else if (op === 'photo') { if (!live) return vjDeny(409, 'this order is cancelled'); /* C-20261103-THUMBS: a photo added from the Pending list becomes the order's drawing (only when it has none) */
     const dr = String(b.drawing || ''); if (!/^[0-9a-f]{32}$/.test(dr)) return vjDeny(400, 'drawing photo not valid'); if (env.PHOTOS && !(await vjPhotoHas(env, dr))) return vjDeny(400, 'drawing photo not found - upload it again');
     if (o.drawing) return vjDeny(409, 'this order already has a drawing - change it inside the order'); o.drawing = dr; o.sample = ''; }
+  else if (op === 'slip') { const sl = String(b.slip || ''); if (!/^[0-9a-f]{32}$/.test(sl)) return vjDeny(400, 'slip photo not valid'); if (env.PHOTOS && !(await vjPhotoHas(env, sl))) return vjDeny(400, 'slip photo not found - upload it again'); // C-20261105-KSLIP: attach the slip to an order already received / tagged
+    o.slips = [...new Set((old.slips || []).concat(sl))].slice(-10); if (o.tag) o.tag = Object.assign({}, o.tag, { slip: sl }); }
   else if (op === 'stage') { if (!live) return vjDeny(409, 'this order is cancelled'); const s = vjClean(b.stage, 20); if (s && !cfg.stages.includes(s)) return vjDeny(400, 'pick a stage from the list'); o.stage = s; o.stageAt = now; }
   else if (op === 'cancel') { if (!adm) return vjDeny(403, 'only Abhinav or Shilpiji can cancel an order'); if (!live) return vjDeny(409, 'already cancelled');
     o.cancelled = { at: now, by: who.email, byName, why: vjClean(b.why, 120), from: old.status }; o.status = 'cancelled'; post = true; }
@@ -2583,6 +2633,8 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
     if (b.csUnit === 'ct' && csWt > 0) { const cv = vjKoNum(b.csVal); if (Math.abs(vjR3(cv / 5) - csWt) <= 0.001) { t.csUnit = 'ct'; t.csVal = Math.round(cv * 1000) / 1000; } } /* C-20261103-CSUNIT: CS wt typed in ct is kept as typed; csWt stays in grams (ct / 5) */
     if (kc.type === 'mounting') t.mkRate = vjKo3R2(vjKoNum(b.mkRate)) || Number(kc.making) || 0;
     if (vjKo3Grade(o) === 'B') { const mf = Number(b.mFine), mo = Number(b.mOth); if (!isFinite(mf) || Math.abs(mf) > 10000 || b.mFine === '' || b.mFine == null) return vjDeny(400, 'stock mounting: type the gold credited (fine g)'); Object.assign(t, { mFine: vjR3(mf), mLab: vjKo3R2(vjKoNum(b.mLab)), mOth: isFinite(mo) && Math.abs(mo) < 1e8 ? vjKo3R2(mo) : 0 }); }
+    { const sl = String(b.slip || ''); if (sl) { if (!/^[0-9a-f]{32}$/.test(sl)) return vjDeny(400, 'slip photo not valid'); if (env.PHOTOS && !(await vjPhotoHas(env, sl))) return vjDeny(400, 'slip photo not found - upload it again');
+        t.slip = sl; o.slips = [...new Set((old.slips || []).concat(sl))].slice(-10); } else if (old.tag && old.tag.slip) t.slip = old.tag.slip; } // C-20261105-KSLIP: the karigar's hisaab slip stays on the order
     Object.assign(o, { tag: t, rec, used, usedMan: !!(used0 && used0.length) }); t.deliv = vjKo3Deliv(o, cfg); chOld = vjKoChIds(old.tag); chNew = vjKoChIds(t);
     if (o.status === 'open' || o.status === 'karigar') { o.status = 'received'; o.stage = o.stage || 'Ready'; o.statusAt = Object.assign({}, o.statusAt || {}, { received: now }); } post = true; }
   else if (op === 'diaadd') { if (!live) return vjDeny(409, 'this order is cancelled'); if (!canDia) return vjDeny(403, VJ_KO_DIAMSG); const rows = vjKo3Rows(b.iss, adm, []); if (!rows || !rows.length) return vjDeny(400, 'type pcs / ct of the diamonds issued');
@@ -5489,7 +5541,7 @@ async function vjHandle(request, env, ctx, url) {
   const who = await vjWho(request, env);
   if (who && p === '/api/vj/embeds') return request.method === 'GET' ? vjEmbedsGet(url, env, who) : (request.method === 'POST' && vjSameSite(request, env)) ? vjEmbedsPost(request, env, who) : vjDeny(405, 'not allowed'); // C-20261103-PHOTOFIND: every login (sales read only)
   if (!who) return p.startsWith('/api/') ? vjDeny(403, 'not allowed') : new Response('Not allowed. Ask Abhinav to add your email.', { status: 403, headers: { 'content-type': 'text/plain', 'x-robots-tag': 'noindex' } });
-  if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties', '/api/vj/moves', '/api/vj/repairs', '/api/vj/estimates', '/api/vj/estimate', '/api/vj/boxes', '/api/vj/bill/sendstatus', '/api/vj/ogs', '/api/vj/korders', '/api/vj/challans', '/api/vj/challan', '/api/vj/addrbook'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill', '/api/vj/move', '/api/vj/repair', '/api/vj/estimate/done', '/api/vj/contactshot', '/api/vj/bill/send', '/api/vj/photosearch', '/api/vj/og', '/api/vj/korder', '/api/vj/challan'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these (+ Karigar & Out, 27/10)
+  if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties', '/api/vj/moves', '/api/vj/repairs', '/api/vj/estimates', '/api/vj/estimate', '/api/vj/boxes', '/api/vj/bill/sendstatus', '/api/vj/ogs', '/api/vj/korders', '/api/vj/challans', '/api/vj/challan', '/api/vj/addrbook'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill', '/api/vj/move', '/api/vj/repair', '/api/vj/estimate/done', '/api/vj/contactshot', '/api/vj/bill/send', '/api/vj/photosearch', '/api/vj/og', '/api/vj/korder', '/api/vj/kslip', '/api/vj/challan'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these (+ Karigar & Out, 27/10)
   // C-20261027-KARIGAROUT: stock out / back, RFID link, party repairs (JSON from our own page only)
   if ((p === '/api/vj/move' || p === '/api/vj/repair') && request.method === 'POST') { if (!vjSameSite(request, env)) return vjDeny(403, 'not allowed'); return p === '/api/vj/move' ? vjMove(request, env, who) : vjRepair(request, env, who); }
   if (p === '/api/vj/moves' && request.method === 'GET') return vjMovesGet(url, env, who);
@@ -5508,6 +5560,7 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/payables' && request.method === 'GET') return vjPayables(env, who); // C-20261103-CHAINVEND
   if (p === '/api/vj/payables' && request.method === 'POST') return vjPaySettle(request, env, who); // C-20261103-CHAINVEND
   if (p === '/api/vj/korders' && request.method === 'GET') return vjKo3List(env, who, url); // C-20261102-KORDER (v2: C-20261102-KORDER3)
+  if (p === '/api/vj/kslip' && request.method === 'POST') return vjSameSite(request, env) ? vjKslip(request, env, who) : vjDeny(403, 'not allowed'); // C-20261105-KSLIP
   if (p === '/api/vj/korder' && request.method === 'POST') return vjKo3Save(request, env, who); // C-20261102-KORDER (v2: C-20261102-KORDER3)
   if ((p === '/api/vj/bills' || p === '/api/vj/bills.xlsx' || p === '/api/vj/bill') && request.method === 'GET') return vjBillBook(url, env, who, request.headers.get('x-vj-mob'));
   if (p === '/api/vj/bill/cancel' && request.method === 'POST') return vjBillCancel(request, env, who);

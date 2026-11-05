@@ -439,6 +439,13 @@
     $("koDiaInfo").textContent = "Issued " + tot(o.diaIss) + " \u00b7 received back " + tot(o.diaRec) + " \u00b7 used " + tot(o.diaUsed) + " \u00b7 PENDING " + tot(o.diaPend) + (o.party && (o.party.iss.pcs || o.party.iss.ct || o.party.used.ct) ? " · PARTY diamonds (customer's): issued " + tot(o.party.iss) + ", pending " + tot(o.party.pend) : "") + (o.tagRate ? " \u00b7 order making " + inr(o.tagRate) + "/g" + (o.mkOrd > 0 ? " (typed)" : "") : "");
     const sb = $("koStatusBtns"); sb.textContent = ""; if (can && lv && NEXT[o.status]) { const n = NEXT[o.status]; const b = el("button", { type: "button", className: "btn", textContent: n === "received" ? "Received ✓" : "Mark: " + ST[n] });
         b.addEventListener("click", async () => { if (n === "received") { recvDlg(o); return; } /* KORDER5: quick receive -> karigar account -> New tag */ await act({ op: "status", id: o.id, to: n }, "Now: " + ST[n] + "."); }); sb.appendChild(b); }
+    { const sl = (o.tag && o.tag.slip) || (o.slips || []).slice(-1)[0]; /* C-20261105-KSLIP: the karigar's hisaab slip - see it, or attach one to an order already received */
+      if (sl) { const vb = el("button", { type: "button", className: "btn ghost", textContent: "🧾 Karigar slip" }); vb.addEventListener("click", () => bigImg(Object.assign({}, o, { drawing: sl, sample: "karigar slip" }))); sb.appendChild(vb); }
+      if (can && lv && o.tag) { const fi = el("input", { type: "file", accept: "image/*", hidden: true }), ab = el("button", { type: "button", className: "btn ghost", textContent: sl ? "🧾 Replace slip" : "🧾 + Karigar slip photo" });
+        ab.addEventListener("click", () => fi.click()); fi.addEventListener("change", async () => { const f = fi.files && fi.files[0]; fi.value = ""; if (!f) return; ab.disabled = true;
+          try { const bl = await shrink(f), up = await fetch("/api/vj/photo", { method: "POST", credentials: "same-origin", headers: { "content-type": "image/jpeg" }, body: bl }), uj = await up.json().catch(() => ({})); if (!up.ok) throw new Error(uj.error || up.status);
+            await act({ op: "slip", id: o.id, slip: uj.id }, "Karigar slip saved with order " + o.no + "."); } catch (e) { $("koMsg").textContent = "Slip not saved (" + (e.message || e) + ")."; ab.disabled = false; } });
+        sb.append(ab, fi); } }
     if (J.admin && lv && o.tag) { const cb = el("button", { type: "button", className: "btn ghost", textContent: "✏️ Correct received figures" }); cb.addEventListener("click", () => recvDlg(o)); sb.appendChild(cb); } /* KORDER7 */
     if (J.admin) { if (lv) { const c = el("button", { type: "button", className: "btn ghost", textContent: "Cancel order" }); c.style.color = "var(--bad)"; c.addEventListener("click", async () => { if (c.dataset.s !== "1") { c.dataset.s = "1"; c.textContent = "Sure? Cancel " + o.karigar + " " + o.no; return; } const why = prompt("Why cancel? (optional)") || ""; await act({ op: "cancel", id: o.id, why }, "Order cancelled (kept, struck through; its karigar account entries reversed)."); }); sb.appendChild(c); }
       else { const r = el("button", { type: "button", className: "btn ghost", textContent: "Bring back (Open)" }); r.addEventListener("click", () => act({ op: "status", id: o.id, to: "open" }, "Order is open again.")); sb.appendChild(r); }
@@ -597,7 +604,31 @@
     [gg, cs, csc, oth].forEach(i => i.addEventListener("input", calc)); tb.addEventListener("input", calc); tb.addEventListener("change", calc);
     const addB = el("button", { type: "button", className: "btn ghost", textContent: "+ diamond line", disabled: !canD }); addB.addEventListener("click", () => { dRow({}); calc(); const pk = tb.lastElementChild && tb.lastElementChild.querySelector('[data-k="pkt"]'); if (pk) { pk.scrollIntoView({ block: "center", behavior: "smooth" }); pk.focus({ preventScroll: true }); } });
     const dt2 = el("table", { className: "items", style: "min-width:0;width:100%" }, [el("thead", {}, [el("tr", {}, ["Packet", "Shape", "Pcs", "Ct (actual)", "Solitaire", "Tag ct"].map(h => el("th", { textContent: h })))]), tb]);
-    card.append(el("h3", { textContent: (T0 ? "Correct received figures · " : "Received from karigar · ") + o.karigar + " · order " + o.no }), el("div", { className: "hint", textContent: [o.itemTxt, o.kt ? o.kt + (o.kt === "PT" ? "" : "KT") : "", o.colour, o.name ? "party " + o.name : "stock"].filter(Boolean).join(" · ") }),
+    /* C-20261105-KSLIP (owner 05/11 19:44): photo of the karigar's hisaab slip -> read -> fills gross + diamonds used (check, then Save as before); the slip stays on the order */
+    let slipId = (T0 && T0.slip) || ""; const slMsg = el("div", { className: "hint", style: "white-space:pre-wrap" }), slF = el("input", { type: "file", accept: "image/*", hidden: true }), slB = el("button", { type: "button", className: "btn", textContent: "📷 Karigar ki parchi (photo) - auto fill" }), slV = el("button", { type: "button", className: "btn ghost", textContent: "🧾 See slip", hidden: !slipId });
+    slV.addEventListener("click", () => { if (slipId) bigImg(Object.assign({}, o, { drawing: slipId, sample: "karigar slip" })); });
+    slB.addEventListener("click", () => slF.click());
+    slF.addEventListener("change", async () => { const f = slF.files && slF.files[0]; slF.value = ""; if (!f) return; slB.disabled = true; slMsg.style.color = "";
+      try { slMsg.textContent = "Uploading the slip…"; const bl = await shrink(f), up = await fetch("/api/vj/photo", { method: "POST", credentials: "same-origin", headers: { "content-type": "image/jpeg" }, body: bl }), uj = await up.json().catch(() => ({})); if (!up.ok) throw new Error(uj.error || up.status);
+        slipId = uj.id; slV.hidden = false; slMsg.textContent = "Reading the slip… (10-20 sec)";
+        const r = await fetch("/api/vj/kslip", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: o.id, photo: slipId }) }), x = await r.json().catch(() => ({})); if (!r.ok) throw new Error(x.error || r.status);
+        const L = []; if (x.gross > 0) { gg.value = r3(x.gross); L.push("Gross " + r3(x.gross) + " g"); }
+        const rows = [...tb.querySelectorAll("tr.kodr")], usedR = new Set(), left = [];
+        (x.dia || []).forEach(d => { const q = (tr, k) => tr.querySelector('[data-k="' + k + '"]'); let tr = null;
+          if (d.issCt != null) tr = rows.find(t => !usedR.has(t) && Math.abs(iss.filter(y => (y.pkt || "") === q(t, "pkt").value && (y.shape || "") === q(t, "shape").value).reduce((a2, y) => a2 + num(y.ct), 0) - d.issCt) <= 0.015);
+          if (!tr && /mq|marq|fancy|tri|pear|oval|centre|center|sol/i.test(d.what)) tr = rows.find(t => !usedR.has(t) && /fancy|sol/i.test(q(t, "shape").value) && (/centre|center|sol/i.test(d.what) === (q(t, "shape").value === "Solitaire")));
+          if (!tr && /round|rd/i.test(d.what)) tr = rows.find(t => !usedR.has(t) && q(t, "shape").value === "Round");
+          const txt = (d.what || "line") + ": " + (d.pcs != null ? d.pcs + " pcs " : "") + (d.ct != null ? Number(d.ct).toFixed(3) + " ct" : "");
+          if (tr && canD) { usedR.add(tr); if (d.pcs != null) q(tr, "pcs").value = String(d.pcs); if (d.ct != null) q(tr, "ct").value = Number(d.ct).toFixed(3); L.push(txt + " ✓"); } else left.push(txt); });
+        const c = x.check || {}; calc();
+        slMsg.textContent = "Slip read" + (x.design ? " · design " + x.design : "") + (x.kt ? " · " + x.kt : "") + ":\n" + L.join("\n") + (left.length ? "\n" + (canD ? "Not matched to an issued packet - type it in yourself: " : "Diamonds (only Fenil / Mihir / Abhinav can change): ") + left.join("; ") : "")
+          + "\nCheck: diamonds " + r3(c.ct || 0) + " ct = " + r3(c.diaG || 0) + " g" + (c.net != null ? " · gross − diamonds = " + r3(c.net) + " g" : "") + (x.net != null ? " · slip says net " + r3(x.net) + " g" : "") + (c.ok ? "" : "  ⚠ does not match - check the slip")
+          + ((x.unsure || []).length ? "\n⚠ Not clear on the slip: " + x.unsure.join("; ") : "") + "\nCheck every figure, then press Save. Making is from our karigar formula (slip making ignored).";
+        if (!c.ok || (x.unsure || []).length) slMsg.style.color = "var(--bad,#a12b2b)"; }
+      catch (e) { slMsg.textContent = "Slip not read (" + (e.message || e) + ") - fill by hand" + (slipId ? "; the slip photo is still kept with this order on Save." : "."); }
+      slB.disabled = false; });
+    const slRow = el("div", { style: "border:1px dashed var(--line);border-radius:8px;padding:8px;margin:6px 0" }, [el("div", { className: "actions", style: "margin:0" }, [slB, slV, slF]), slMsg]);
+    card.append(el("h3", { textContent: (T0 ? "Correct received figures · " : "Received from karigar · ") + o.karigar + " · order " + o.no }), el("div", { className: "hint", textContent: [o.itemTxt, o.kt ? o.kt + (o.kt === "PT" ? "" : "KT") : "", o.colour, o.name ? "party " + o.name : "stock"].filter(Boolean).join(" · ") }), slRow,
       el("div", { className: "row" }, [lb("a) Date received", dt), lb("Gross weight received g", gg)]),
       el("b", { textContent: "b) Actual diamonds in the piece" + (canD ? " (from the packets issued - change pcs / ct to what is in the piece)" : " - only Fenil / Mihir / Abhinav can change these") }), el("div", { className: "list" }, [dt2]), addB,
       el("div", { className: "row" }, [lb("c) Colour stone wt", cs), lb("d) NET GOLD g (gross − ct÷5 − CS g)", ng)]), nNeg,
@@ -613,7 +644,7 @@
       D.forEach(x => { const e = left.get((x.pkt || "") + "|" + (x.shape || "")) || [...left.values()].find(y => y.pkt === x.pkt); if (e) { e.pcs -= num(x.pcs); e.ct -= num(x.ct); } });
       const rec = [...left.values()].filter(e => e.pcs > 0 || e.ct > 0.0005).map(e => ({ pkt: e.pkt, shape: e.shape, pcs: String(Math.max(0, e.pcs)), ct: r3(Math.max(0, e.ct)), rate: e.rate == null ? "" : String(e.rate) }));
       const body = { op: "receive", id: o.id, tDate: dt.value, tKt: o.kt || "", gGold: gg.value, ...csBody(cs), dWt: "", nGold: ngMan ? ng.value.trim() : "", csCost: csc.value, csCharge: "", making: "", lab: "", details: det.value.trim(),
-        others: num(oth.value) > 0 ? [{ desc: othD.value.trim() || "Other charges", pcs: 1, kRate: oth.value, tRate: "" }] : [], csSrc: csS.get(), othSrc: othS.get(), chains: chGet() };
+        others: num(oth.value) > 0 ? [{ desc: othD.value.trim() || "Other charges", pcs: 1, kRate: oth.value, tRate: "" }] : [], csSrc: csS.get(), othSrc: othS.get(), chains: chGet(), slip: slipId };
       if (canD && D.some(x => x.sol && !(x.cert && (x.cert.no || (x.cert.unk && x.cert.why))))) { msg.textContent = "Solitaire: type the certificate no. (or tick not known and write why)."; ok.disabled = false; return; } /* CERTNO */
       if (D.some(x => isParty(x.pkt) && !x.shape)) { msg.textContent = "Party diamond: pick the shape."; ok.disabled = false; return; }
       if (canD) Object.assign(body, { rec, used }); else Object.assign(body, { rec: o.rec || [], used: [], usedAuto: true });
