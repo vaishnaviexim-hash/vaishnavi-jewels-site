@@ -35,7 +35,7 @@ const recentPosts = posts.slice(0, limit);
         <div class="ig-grid">
           {recentPosts.map((post) => (
             <a href={post.permalink} target="_blank" rel="noopener" class="ig-item">
-              <img src={post.mediaUrl} alt={post.caption?.slice(0, 80) || 'Instagram post'} />
+              <img src={post.mediaUrl} alt={post.caption?.slice(0, 80) || 'Instagram post'} width="600" height="600" loading="lazy" decoding="async" />
             </a>
           ))}
         </div>
@@ -53,30 +53,33 @@ const recentPosts = posts.slice(0, limit);
 
 <style>
   .ig-section {
-    padding: 72px 0;
+    padding: var(--section-pad, 72px) 0;
     border-top: 1px solid var(--color-line);
     text-align: center;
   }
   .ig-section h2 {
     font-size: clamp(28px, 4vw, 38px);
-    margin: 10px 0 32px;
+    margin: 10px 0 36px;
+    color: var(--color-maroon);
   }
   .ig-grid {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
-    gap: 8px;
-    margin-bottom: 32px;
+    gap: 12px;
+    margin-bottom: 40px;
   }
   .ig-item {
     display: block;
     aspect-ratio: 1;
     overflow: hidden;
+    box-shadow: 0 8px 22px rgba(58, 15, 26, 0.12);
+    background: var(--color-ivory-deep);
   }
   .ig-item img {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.3s ease;
+    transition: transform 0.6s ease;
   }
   .ig-item:hover img { transform: scale(1.05); }
   .ig-empty {
@@ -86,6 +89,6 @@ const recentPosts = posts.slice(0, limit);
   }
 
   @media (max-width: 720px) {
-    .ig-grid { grid-template-columns: repeat(3, 1fr); }
+    .ig-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
   }
 </style>

@@ -12,3 +12,14 @@ export function img(publicId, width, ar = '4:5') {
 export function srcset(publicId, widths = [400, 640, 900, 1200], ar = '4:5') {
   return widths.map((w) => `${img(publicId, w, ar)} ${w}w`).join(', ');
 }
+
+/** Light Cloudinary URL: only f_auto,q_auto,w_ (redesign 05/11/2026). Cropping is done in CSS. */
+export function plain(publicId, width) {
+  return `${CLOUD}f_auto,q_auto,w_${width}/${publicId}`;
+}
+export function plainSet(publicId, widths = [400, 640, 900, 1200]) {
+  return widths.map((w) => `${plain(publicId, w)} ${w}w`).join(', ');
+}
+
+/** The owner's original dark logo (never altered), shown on a small plate on every photo. */
+export const LOGO_DARK = 'https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png';

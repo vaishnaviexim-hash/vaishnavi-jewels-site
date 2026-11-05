@@ -104,3 +104,75 @@ p { margin: 0 0 1em; }
 @media (max-width: 640px) {
   .container { padding: 0 18px; }
 }
+
+/* ------------------------------------------------------------------
+   Redesign polish (preview branch redesign-preview, 05/11/2026).
+   Look only: spacing, buttons, focus states, image frames.
+   Same fonts, same colours (ivory / champagne, maroon #3A0F1A, gold #A9852E).
+------------------------------------------------------------------- */
+:root {
+  --color-champagne: #EFE3C8;
+  --color-maroon-deep: #2B0B13;
+  --shadow-soft: 0 18px 48px rgba(58, 15, 26, 0.14);
+  --shadow-card: 0 10px 30px rgba(58, 15, 26, 0.12);
+  --section-pad: clamp(64px, 9vw, 112px);
+}
+
+html { scroll-padding-top: 120px; }
+::selection { background: var(--color-gold-light); color: var(--color-maroon-deep); }
+
+body { text-rendering: optimizeLegibility; }
+
+.btn {
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn-solid { box-shadow: 0 8px 20px rgba(169, 133, 46, 0.25); }
+.btn-solid:hover { box-shadow: 0 10px 26px rgba(140, 110, 36, 0.32); }
+.btn-outline { border-color: rgba(42, 38, 32, 0.55); }
+.btn-maroon { background: var(--color-maroon); border-color: var(--color-maroon); color: #FFF8EA; }
+.btn-maroon:hover { background: var(--color-maroon-deep); border-color: var(--color-maroon-deep); }
+
+a:focus-visible, .btn:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 3px;
+}
+
+/* Small plate with the owner's original logo on every photo (logo itself never altered). */
+.vj-photo { position: relative; overflow: hidden; background: var(--color-maroon-deep); }
+.vj-photo > img.vj-photo-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vj-mark {
+  position: absolute; right: 10px; bottom: 10px; z-index: 2;
+  background: rgba(251, 246, 236, 0.92);
+  padding: 4px 8px; border-radius: 2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+}
+.vj-mark img { height: 26px; width: auto; display: block; }
+
+/* Ornamental gold rule with a small diamond */
+.orn-rule { display: block; width: 72px; height: 1px; background: var(--color-gold); position: relative; margin: 22px 0; }
+.orn-rule::after { content: ''; position: absolute; left: 50%; top: -3px; width: 7px; height: 7px; background: var(--color-gold); transform: translateX(-50%) rotate(45deg); }
+.orn-rule.center { margin-left: auto; margin-right: auto; }
+
+/* Mobile action bar (same WhatsApp / Book a Visit actions as the page) */
+.mobile-cta { display: none; }
+@media (max-width: 760px) {
+  .mobile-cta {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: rgba(251, 246, 236, 0.97);
+    border-top: 1px solid var(--color-line);
+    box-shadow: 0 -6px 20px rgba(58, 15, 26, 0.08);
+  }
+  .mobile-cta .btn { padding: 12px 10px; font-size: 14px; box-shadow: none; }
+  body { padding-bottom: 72px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition: none !important; }
+}
