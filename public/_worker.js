@@ -252,12 +252,14 @@ async function vjVerifyAccess(request, env) {
     if (!ok) return null;
   } catch (e) { return null; }
   const email = String(pay.email || '').trim().toLowerCase();
+  if (!email && !pay.sub && /^[0-9a-f]{32}\.access$/.test(String(pay.common_name || ''))) return 'svc:' + pay.common_name; // C-20261106-TALLYSVC: Access service token (Tally bridge) - no email, client id only
   return /^[^@\s]{1,64}@[^@\s]{1,190}$/.test(email) ? email : null;
 }
 
 async function vjWho(request, env) {
   const email = await vjVerifyAccess(request, env);
   if (!email) return null;
+  if (email.startsWith('svc:')) { const want = String(env.VJ_TALLY_CLIENT_ID || '').trim().toLowerCase(); if (want && email !== 'svc:' + want) return null; return { email, role: 'tallybridge', name: 'Tally bridge' }; } // signed Tally paths only (router)
   const owners = String(env.OWNER_EMAILS || '').toLowerCase().split(',').map(s => s.trim()).filter(Boolean);
   if (owners.includes(email)) return { email, role: 'admin', name: 'Owner' };
   const row = await env.DB.prepare('SELECT role, name FROM users WHERE email = ?').bind(email).first();
@@ -5381,7 +5383,7 @@ async function vjCredTally(request, url, env, who) { if (who.role !== 'admin') r
 // POST /api/vj/tally-sync - for the FUTURE Tally bridge only (unused now): owner login (Access) + HMAC-SHA256 of the raw body with the encrypted secret
 // VJ_TALLY_SECRET in header x-vj-sig (hex) and x-vj-ts (ms, within 5 minutes, signed as ts + '.' + body). Body {ledgers:[{ledger, balance?, payments:[{date, amount, voucher}]}]}.
 // Idempotent by voucher no. (a voucher sent again only updates its row). Writes only VJ Tags' own tables.
-async function vjTallySync(request, env, who) { if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji'); if (!env.VJ_TALLY_SECRET) return vjDeny(503, 'Tally bridge not set up');
+async function vjTallySync(request, env, who) { if (who.role !== 'admin' && who.role !== 'tallybridge') return vjDeny(403, 'only Abhinav or Shilpiji'); if (!env.VJ_TALLY_SECRET) return vjDeny(503, 'Tally bridge not set up');
   const raw = await request.text(); if (raw.length > 500000) return vjDeny(413, 'too large'); const ts = Number(request.headers.get('x-vj-ts') || 0), sig = String(request.headers.get('x-vj-sig') || '').toLowerCase();
   if (!(Math.abs(Date.now() - ts) < 300000) || !/^[0-9a-f]{64}$/.test(sig)) return vjDeny(401, 'bad signature');
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(env.VJ_TALLY_SECRET), { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']);
@@ -5442,7 +5444,8 @@ async function vjTallySig(request, env, raw) { const ts = Number(request.headers
 // GET  /api/vj/tally-outbox            (bridge, signed: ts + '.' + '' )  -> pending + failed vouchers to post in Tally
 // POST /api/vj/tally-outbox {acks:[{src, ok, voucher, error}]} (bridge, signed: ts + '.' + body) -> Sent (with Tally voucher no.) / Failed
 // GET  /api/vj/tally-outbox?view=screen (owner screen, no signature)  ;  POST {op:'retry', src} (owner screen) -> a Failed voucher back to Pending
-async function vjTallyOut(request, url, env, who) { if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji'); await vjTallyOutT(env);
+async function vjTallyOut(request, url, env, who) { if (who.role !== 'admin' && who.role !== 'tallybridge') return vjDeny(403, 'only Abhinav or Shilpiji'); await vjTallyOutT(env);
+  if (who.role === 'tallybridge' && (url.searchParams.get('view') || !request.headers.get('x-vj-sig'))) return vjDeny(403, 'not allowed'); // bridge: signed path only
   const all = async () => ((((await env.DB.prepare('SELECT src, ts, type, date, ledger, amount, narr, status, vno, err, tries, sent_ts, data FROM vj_tally_out ORDER BY date DESC, src').all()).results) || [])).map(r => { const d = vjParse(r) || {}; delete r.data; return Object.assign(r, { vtype: d.vtype || r.type, unit: d.unit || 'Rs', dr: d.dr || '', cr: d.cr || '' }); });
   if (request.method === 'GET' && url.searchParams.get('view') === 'screen') { await vjTallyOutFill(env, who); const R = await all(), c = { pending: 0, sent: 0, failed: 0 }; R.forEach(r => { c[r.status] = (c[r.status] || 0) + 1; });
     return vjJson({ ok: true, rows: R.slice(0, 2000), count: c, bridge: !!env.VJ_TALLY_SECRET }); }
@@ -5571,6 +5574,12 @@ async function vjHandle(request, env, ctx, url) {
   if (!dev && url.hostname !== VJ_HOST) return new Response('Not found', { status: 404 });
   if (!env.DB || !env.PHOTOS) return vjDeny(503, 'not set up');
   const who = await vjWho(request, env);
+  // C-20261106-TALLYSVC (owner 06/11 14:47): the office-PC Tally bridge logs in with the Access service token 'VJ Tally bridge'. It reaches ONLY the two
+  // Tally paths below, and only with the HMAC signature (VJ_TALLY_SECRET) on every call; no page, no owner screen, no retry, nothing else.
+  if (who && who.role === 'tallybridge') { const signed = !!request.headers.get('x-vj-sig') && !!request.headers.get('x-vj-ts');
+    if (signed && p === '/api/vj/tally-sync' && request.method === 'POST') return vjTallySync(request, env, who);
+    if (signed && p === '/api/vj/tally-outbox' && (request.method === 'GET' || request.method === 'POST') && !url.searchParams.get('view')) return vjTallyOut(request, url, env, who);
+    return vjDeny(403, 'not allowed'); }
   if (who && p === '/api/vj/embeds') return request.method === 'GET' ? vjEmbedsGet(url, env, who) : (request.method === 'POST' && vjSameSite(request, env)) ? vjEmbedsPost(request, env, who) : vjDeny(405, 'not allowed'); // C-20261103-PHOTOFIND: every login (sales read only)
   if (!who) return p.startsWith('/api/') ? vjDeny(403, 'not allowed') : new Response('Not allowed. Ask Abhinav to add your email.', { status: 403, headers: { 'content-type': 'text/plain', 'x-robots-tag': 'noindex' } });
   if (who.role === 'tagger' && p.startsWith('/api/') && !(['/api/vj/sync', '/api/vj/bills', '/api/vj/bills.xlsx', '/api/vj/bill', '/api/vj/parties', '/api/vj/moves', '/api/vj/repairs', '/api/vj/estimates', '/api/vj/estimate', '/api/vj/boxes', '/api/vj/bill/sendstatus', '/api/vj/ogs', '/api/vj/korders', '/api/vj/challans', '/api/vj/challan', '/api/vj/addrbook'].includes(p) && request.method === 'GET' || ['/api/vj/write', '/api/vj/photo', '/api/vj/bill', '/api/vj/move', '/api/vj/repair', '/api/vj/estimate/done', '/api/vj/contactshot', '/api/vj/bill/send', '/api/vj/photosearch', '/api/vj/og', '/api/vj/korder', '/api/vj/kslip', '/api/vj/challan'].includes(p) && request.method === 'POST')) return vjDeny(403, 'not allowed'); // owner 26/10 18:07: tagger login gets only these (+ Karigar & Out, 27/10)
