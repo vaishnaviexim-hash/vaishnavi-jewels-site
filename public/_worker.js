@@ -1604,6 +1604,9 @@ async function vjReviewBell(url, env) {
     for (const b of bills.sort((x, y) => String(x.no).localeCompare(String(y.no)))) {
       const m = String(b.mobile || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, ''), no = String(b.no || ''), why = w => skipped.push({ no, reason: w });
       if (b.title !== 'Bill' || !/^B-/.test(no)) continue;
+      // owner 06/11 18:32: first ask when the piece has REACHED the customer - Surat / Gujarat (hand or angadia): 2nd day after the bill; rest of India (courier): 4th day
+      { const GJ = /surat|ahmedabad|amdavad|vadodara|baroda|rajkot|bharuch|ankleshwar|navsari|valsad|vapi|bardoli|vyara|anand|nadiad|bhavnagar|jamnagar|gandhinagar|mehsana|palanpur|junagadh|porbandar|morbi|surendranagar|godhra|dahod|kim|olpad|kamrej|gujarat/i;
+        const c = String(b.city || '').trim(), need = !c || GJ.test(c) ? 2 : 4, age = Math.round((Date.parse(ymd) - Date.parse(String(b.date))) / 864e5); if (age < need) continue; }
       if (b.cancelled) { why('cancelled'); continue; }
       if (!/^[6-9]\d{9}$/.test(m)) { why('no valid mobile'); continue; }
       if (seen.has(m)) { why('same customer, asked once'); continue; } seen.add(m);
@@ -1616,11 +1619,11 @@ async function vjReviewBell(url, env) {
   }
   // C-20261106-REVIEWASK2 (owner 06/11 17:05): REMINDER every 3rd day until the review is posted - day 3, 6 and 9 after the first ask (max 3),
   // only for asks that really went out; Make skips anyone whose Google review is already in the S12c list, STOP, or blocked.
-  const rem = []; if (!test && !onlyClicks) { const RT = (((await env.DB.prepare("SELECT tok, no, mobile, ts, img FROM vj_review_ask WHERE mobile <> '' AND ts > ? AND tok NOT LIKE 'R%'").bind(now - 16 * 864e5).all()).results) || []);
+  const rem = []; if (!test && !onlyClicks) { const RT = (((await env.DB.prepare("SELECT tok, no, mobile, ts, img FROM vj_review_ask WHERE mobile <> '' AND ts > ? AND tok NOT LIKE 'R%'").bind(now - 20 * 864e5).all()).results) || []);
     for (const r of RT) { const d0 = new Date(Number(r.ts) + 5.5 * 3600e3).toISOString().slice(0, 10), age = Math.round((Date.parse(ymd) - Date.parse(d0)) / 864e5);
       // owner 17:09: sent only on good days (no Sunday / festival - the bell is not rung then), so a reminder due on a skipped day goes on the next good day
       const done = ((await env.DB.prepare("SELECT tok, ts FROM vj_review_ask WHERE tok LIKE 'R%' AND no = ? ORDER BY ts DESC").bind(r.no).all()).results) || [], k = done.length + 1;
-      if (k > 3 || age < 3 * k || (done[0] && now - Number(done[0].ts) < 2.5 * 864e5)) continue;
+      if (k > 1 || age < 10) continue; // owner 06/11 18:32: ONE reminder only, 10 days after the first message (more would irritate)
       if (await env.DB.prepare("SELECT 1 FROM vj_meta WHERE k = ?").bind('reviewsent:' + r.tok).first() === null) continue; // never sent -> no reminder
       let stop = false; try { const t = ((await env.DB.prepare('SELECT text FROM wa_inbox WHERE sender = ? AND length(text) < 40').bind('91' + r.mobile).all()).results) || []; stop = t.some(x => WA_OPTOUT.test(String(x.text || '').trim()) || /^stop\b/i.test(String(x.text || '').trim())); } catch (e) {}
       if (stop) continue; const bl = await env.DB.prepare("SELECT data FROM vj_bills WHERE no = ?").bind(r.no).first(), b = bl ? vjParse(bl) : null; if (!b || b.cancelled) continue;
