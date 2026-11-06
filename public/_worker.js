@@ -1587,7 +1587,7 @@ async function vjReviewBell(url, env) {
       env.DB.prepare("INSERT INTO vj_meta (k, v) SELECT 'reviewsent:' || tok, 'fix' FROM vj_review_ask WHERE ts BETWEEN ? AND ? AND mobile <> '' ON CONFLICT(k) DO NOTHING").bind(Date.parse('2026-11-02T08:00:00Z'), cut),
       env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('rvfix:20261106', ?) ON CONFLICT(k) DO NOTHING").bind(new Date().toISOString())]); }
   const key = test ? 'reviewtest:' + ymd : 'reviewbell:' + ymd;
-  if (test) { const r = await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES (?, '1') ON CONFLICT(k) DO UPDATE SET v = CAST(CAST(v AS INTEGER) + 1 AS TEXT) RETURNING v").bind(key).first(); if (Number(r && r.v) > 3) return reply('test limit reached today', 429); }
+  if (test) { const r = await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES (?, '1') ON CONFLICT(k) DO UPDATE SET v = CAST(CAST(v AS INTEGER) + 1 AS TEXT) RETURNING v").bind(key).first(); if (Number(r && r.v) > 8) return reply('test limit reached today', 429); }
   else if (!onlyClicks) { const claim = await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO NOTHING').bind(key, new Date().toISOString()).run(); if (!claim.meta || claim.meta.changes !== 1) return reply('already done today', 200); }
   const day = vjAddDays(ymd, -1), items = [], skipped = [], seen = new Set();
   const clean = v => String(v || '').replace(/[\u0000-\u001f"\\<>{}*_~`]/g, ' ').replace(/\s+/g, ' ').trim();
