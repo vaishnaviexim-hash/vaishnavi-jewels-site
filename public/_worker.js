@@ -1604,9 +1604,13 @@ async function vjReviewBell(url, env) {
     for (const b of bills.sort((x, y) => String(x.no).localeCompare(String(y.no)))) {
       const m = String(b.mobile || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, ''), no = String(b.no || ''), why = w => skipped.push({ no, reason: w });
       if (b.title !== 'Bill' || !/^B-/.test(no)) continue;
-      // owner 06/11 18:32: first ask when the piece has REACHED the customer - Surat / Gujarat (hand or angadia): 2nd day after the bill; rest of India (courier): 4th day
-      { const GJ = /surat|ahmedabad|amdavad|vadodara|baroda|rajkot|bharuch|ankleshwar|navsari|valsad|vapi|bardoli|vyara|anand|nadiad|bhavnagar|jamnagar|gandhinagar|mehsana|palanpur|junagadh|porbandar|morbi|surendranagar|godhra|dahod|kim|olpad|kamrej|gujarat/i;
-        const c = String(b.city || '').trim(), need = !c || GJ.test(c) ? 2 : 4, age = Math.round((Date.parse(ymd) - Date.parse(String(b.date))) / 864e5); if (age < need) continue; }
+      // owner 06/11 18:33: first ask when the piece has REACHED the customer - a delivery challan (outgoing, not cancelled) was made for this bill
+      // (courier / angadia): on the 4th WORKING day after the bill; no challan (taken from the showroom): on the 2nd working day. Sundays are not counted;
+      // the bell itself never rings on a Sunday / festival, so a due ask simply goes on the next good day.
+      { let ch = false; try { const cr = ((await env.DB.prepare("SELECT data FROM vj_challans WHERE direction = 'out' AND bill_no LIKE ?").bind('%' + no + '%').all()).results) || [];
+          ch = cr.some(x => { let d = {}; try { d = JSON.parse(x.data || '{}'); } catch (e) {} return !d.cancelled && String(d.billNo || d.bill_no || no).split(/[,\s]+/).includes(no); }); } catch (e) {}
+        let wd = 0; for (let d = vjAddDays(String(b.date), 1); d <= ymd; d = vjAddDays(d, 1)) if (new Date(d + 'T00:00:00Z').getUTCDay() !== 0) wd++;
+        if (wd < (ch ? 4 : 2)) continue; }
       if (b.cancelled) { why('cancelled'); continue; }
       if (!/^[6-9]\d{9}$/.test(m)) { why('no valid mobile'); continue; }
       if (seen.has(m)) { why('same customer, asked once'); continue; } seen.add(m);
