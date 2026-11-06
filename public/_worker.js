@@ -1600,7 +1600,7 @@ async function vjReviewBell(url, env) {
   if (test) await add('TEST', '7567400099', 'Abhinav', [], { cust: 'abhinav' });
   else if (!onlyClicks) {
     if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
-    const bills = ((((await env.DB.prepare("SELECT no, data FROM vj_bills WHERE no LIKE 'B-%'").all()).results) || [])).map(vjParse).filter(b => b && b.date <= day && b.date >= vjAddDays(day, -9)); // C-20261106-REVIEWASK2: last 10 days (skipped Sundays / festivals are caught up) (a missed day is caught up; the 6-month rule stops repeats)
+    const bills = ((((await env.DB.prepare("SELECT no, data FROM vj_bills WHERE no LIKE 'B-%'").all()).results) || [])).map(vjParse).filter(b => b && b.date <= day && b.date >= vjAddDays(day, -15)); // C-20261106-REVIEWASK2: last 16 days (skipped Sundays / festivals are caught up) (a missed day is caught up; the 6-month rule stops repeats)
     for (const b of bills.sort((x, y) => String(x.no).localeCompare(String(y.no)))) {
       const m = String(b.mobile || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, ''), no = String(b.no || ''), why = w => skipped.push({ no, reason: w });
       if (b.title !== 'Bill' || !/^B-/.test(no)) continue;
