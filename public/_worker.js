@@ -1578,7 +1578,18 @@ let VJ_RV_POSTER = VJ_RV_BRAND;
 // owner 06/11 20:25: no tag photo -> a model-worn image of THE SAME kind of piece (solitaire ring -> solitaire ring, pendant set -> pendant set...), per bill.
 // Keys: 'solitaire ring', 'polki necklace', 'lab-grown ring', 'ring', 'pendant set', 'earring', 'necklace', 'bangle', 'bracelet', 'mangalsutra', 'pendant', 'gents ring', 'nose pin', 'chain'.
 // Values: Cloudinary 'v<ver>/<public_id>.jpg' of real pieces made model-worn (16:9, model on the right, calm left). Filled by the review-header pool job.
-const VJ_RV_POOL = {};
+const VJ_RV_POOL = { // C-20261107-RVPOOL: real pieces (Media_Index) made model-worn, vision-checked 8/10+ with the header layout
+  'solitaire ring': ['v1793989414/vj/design_gemini/rvpool_solitaire_ring_2_20261106235311.jpg'],
+  'ring': ['v1793988905/vj/design_gemini/winback_ring_model_1_20261106234442.jpg'],
+  'lab-grown ring': ['v1793988905/vj/design_gemini/winback_ring_model_1_20261106234442.jpg'],
+  'earring': ['v1793989366/vj/design_gemini/rvpool_earring_1_20261106235220.jpg'],
+  'pendant': ['v1793988958/vj/design_gemini/winback_pendant_model_2_20261106234536.jpg'],
+  'pendant set': ['v1793989938/vj/design_gemini/rvpool_pendant_set_2_20261107000014.jpg'],
+  'necklace': ['v1793989574/vj/design_gemini/rvpool_necklace_1_20261106235551.jpg'],
+  'polki necklace': ['v1793988856/vj/design_gemini/winback_polki_model_1_20261106234351.jpg'],
+  'bangle': ['v1793989623/vj/design_gemini/rvpool_bangle_1_20261106235638.jpg'],
+  'bracelet': ['v1793989706/vj/design_gemini/rvpool_bracelet_1_20261106235759.jpg'],
+  'mangalsutra': ['v1793989753/vj/design_gemini/rvpool_mangalsutra_1_20261106235849.jpg'] };
 const vjRvCat = c => { c = String(c || '').toLowerCase().trim(); if (/gents/.test(c)) return 'gents ring'; if (/ring/.test(c) && !/ear/.test(c)) return 'ring'; if (/ear|bali|jhumk|stud/.test(c)) return 'earring';
   if (/pendant\s*set|\bps\b/.test(c)) return 'pendant set'; if (/mangal/.test(c)) return 'mangalsutra'; if (/neck|haar|choker|\bns\b/.test(c)) return 'necklace'; if (/bangle|kada/.test(c)) return 'bangle';
   if (/bracelet/.test(c)) return 'bracelet'; if (/pendant/.test(c)) return 'pendant'; if (/nose/.test(c)) return 'nose pin'; if (/chain/.test(c)) return 'chain'; return c; };
