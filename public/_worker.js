@@ -452,6 +452,9 @@ async function vjWrite(request, env, who, ctx) {
     { const lk = (cur && cur.korder) || (next.korder && typeof next.korder === 'object' ? next.korder : null), kid = lk ? String(lk.id || '') : '';
       if (kid) { let ko = null; try { const r0 = /^[A-Za-z0-9_-]{1,60}$/.test(kid) ? await env.DB.prepare('SELECT data FROM vj_kord WHERE id = ?').bind(kid).first() : null; ko = r0 ? vjParse(r0) : null; } catch (e) {}
         if (ko) { next.designNo = String(ko.no); next.korder = { id: kid, no: ko.no, karigar: String(ko.karigar || ''), basis: ko.basis === 'g2g' ? 'g2g' : 'rate' }; /* G2GRATE: the bill opens a Gold to Gold order in Gold to Gold */ } else if (cur && cur.korder) { next.korder = cur.korder; next.designNo = String(cur.korder.no); } else delete next.korder; } else delete next.korder; }
+    if (!row && next.kind !== 'sample' && !(next.korder && next.korder.id)) { // C-20261106-NEWTAGSAMPLE (owner 06/11 11:55): New tag makes Samples only; stock / order pieces come from Karigar order -> Received -> Generate tag
+      const sr = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first(); let until = 0; try { until = Number(JSON.parse(sr.data).newTagOpenUntil) || 0; } catch (e) {}
+      if (!(until > Date.now())) return vjDeny(403, 'New tag makes Samples only. Stock and order pieces: Karigar order -> parchi / Received -> Generate tag. (Abhinav can open New tag for stock for 2 hours.)'); }
     if (next.order !== undefined) { // C-20261016-ORDERS: order customer, cleaned
       const o = next.order && typeof next.order === 'object' ? next.order : null;
       if (!o || next.kind !== 'order') delete next.order;
@@ -730,23 +733,23 @@ async function vjKslip(request, env, who) {
   if (who.role === 'sales') return vjDeny(403, 'read only');
   if (!env.ANTHROPIC_API_KEY || !env.PHOTOS) return vjDeny(503, 'slip reading is not set up');
   let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
-  const pid = String(b && b.photo || ''), oid = vjClean(b && b.id, 60); if (!/^[0-9a-f]{32}$/.test(pid) || !oid) return vjDeny(400, 'bad request');
+  const pid = String(b && b.photo || ''), oid = vjClean(b && b.id, 60); if (!/^[0-9a-f]{32}$/.test(pid)) return vjDeny(400, 'bad request'); // C-20261106-KSLIPFIND: no id = read the slip first, then find which karigar order it is
   const used = await env.DB.prepare("SELECT count(*) AS n FROM audit WHERE action = 'kslip' AND ts > ?").bind(Date.now() - 24 * 3600e3).first();
   if (used && used.n >= VJ_KSLIP_DAY) return vjDeny(429, 'daily limit reached (' + VJ_KSLIP_DAY + ' slips in 24 hours)');
   const mine = await env.DB.prepare("SELECT count(*) AS n FROM audit WHERE action = 'kslip' AND email = ? AND ts > ?").bind(who.email, Date.now() - 600e3).first();
   if (mine && mine.n >= 15) return vjDeny(429, 'too many slips - wait a few minutes');
-  const row = await env.DB.prepare('SELECT data FROM vj_kord WHERE id = ?').bind(oid).first(), o = row ? vjParse(row) : null; if (!o) return vjDeny(404, 'order not found');
+  let o = null; if (oid) { await vjKo3Tables(env); const row = await env.DB.prepare('SELECT data FROM vj_kord WHERE id = ?').bind(oid).first(); o = row ? vjParse(row) : null; if (!o) return vjDeny(404, 'order not found'); }
   const ph = await vjPhotoGet(env, pid); if (!ph) return vjDeny(404, 'slip photo not found - upload it again');
   const buf = new Uint8Array(await new Response(ph.body).arrayBuffer()); if (buf.length > 2.2e6) return vjDeny(413, 'slip photo too large');
   let bin = ''; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
   const isPdf = ph.type === 'application/pdf', type = /^image\/(jpeg|png|webp)$/.test(ph.type || '') ? ph.type : 'image/jpeg';
-  await vjAudit(env, who, 'kslip', 'korders/' + oid, String(o.karigar || ''));
-  const iss = (Array.isArray(o.iss) ? o.iss : []).slice(0, 30).map((r, i) => (i + 1) + ') ' + [r.pkt, r.shape].filter(Boolean).join(' ') + ' ' + (Number(r.pcs) || 0) + ' pcs ' + (Number(r.ct) || 0).toFixed(3) + ' ct').join('; ');
-  const how = VJ_KSLIP_HOW[String(o.karigar || '').trim().toLowerCase()] || 'No sample of this karigar\'s slip has been studied yet - read it carefully; diamond lines are usually issued - returned = used, in pieces and carats.';
-  const prompt = 'This photo is a jewellery karigar\'s handwritten hisaab slip for ONE piece he delivered to a jewellery shop. Karigar: ' + vjClean(o.karigar, 40) + '. Order ' + o.no + ', ' + vjClean(o.item, 30) + ', ' + vjClean(o.kt, 4) + 'KT. '
+  await vjAudit(env, who, 'kslip', 'korders/' + (oid || 'find'), String(o ? o.karigar || '' : 'find order'));
+  const iss = (o && Array.isArray(o.iss) ? o.iss : []).slice(0, 30).map((r, i) => (i + 1) + ') ' + [r.pkt, r.shape].filter(Boolean).join(' ') + ' ' + (Number(r.pcs) || 0) + ' pcs ' + (Number(r.ct) || 0).toFixed(3) + ' ct').join('; ');
+  const how = !o ? 'Which karigar wrote it is not known yet - decide from the handwriting and layout. ' + Object.entries(VJ_KSLIP_HOW).map(([k, v]) => '[' + k.toUpperCase() + '] ' + v).join(' ') : VJ_KSLIP_HOW[String(o.karigar || '').trim().toLowerCase()] || 'No sample of this karigar\'s slip has been studied yet - read it carefully; diamond lines are usually issued - returned = used, in pieces and carats.';
+  const prompt = 'This photo is a jewellery karigar\'s handwritten hisaab slip for ONE piece he delivered to a jewellery shop. ' + (o ? 'Karigar: ' + vjClean(o.karigar, 40) + '. Order ' + o.no + ', ' + vjClean(o.item, 30) + ', ' + vjClean(o.kt, 4) + 'KT. ' : 'The shop does not know yet which order it is: read the order / design number written on it (circled, in [brackets], or ORDER NO-) into "design" (digits only) and the karigar (montu / badshah / hiru / other) into "karigar". ')
     + 'Diamonds the shop issued for this order: ' + (iss || 'none recorded') + '. How this karigar writes: ' + how + ' '
     + 'Read ONLY what is written - never guess or invent a digit; if a figure is not clearly readable, put it in "unsure" and leave it null. Ignore drawings, the faint writing showing through from the other page, fingers and anything outside the slip. '
-    + 'Answer with JSON only: {"design": "", "kt": "", "date": "", "gross": number|null, "diaG": number|null, "net": number|null, "making": number|null, '
+    + 'Answer with JSON only: {"design": "", "karigar": "", "kt": "", "date": "", "gross": number|null, "diaG": number|null, "net": number|null, "making": number|null, '
     + '"dia": [{"what": "e.g. round / MQ / centre", "issPcs": number|null, "retPcs": number|null, "pcs": number|null, "issCt": number|null, "retCt": number|null, "ct": number|null, "cert": {"lab": "IGI / GIA / HRD / SGL", "no": ""} or null}], '
     + '"cs": [{"what": "e.g. ruby / emerald / pearl / CZ", "pcs": number|null, "ct": number|null, "g": number|null, "rate": number|null, "amount": number|null}], "unsure": ["..."]} '
     + '- pcs and ct in "dia" are the USED diamond figures; carats as full decimals (0.01 not 1). "cs" = COLOUR STONES (ruby, emerald, pearl, CZ, polki-look stones, beads...) the KARIGAR put in from his side, with their weight (ct and / or g as written) '
@@ -764,6 +767,10 @@ async function vjKslip(request, env, who) {
   const out = { ok: true, stop: String(j.stop_reason || ''), raw: Object.keys(x).length ? '' : String(txt || JSON.stringify(j.content || []).slice(0, 300)).slice(0, 300), cs, design: vjClean(x.design, 20), kt: vjClean(x.kt, 6), date: vjClean(x.date, 12), gross: N(x.gross, 10000), diaG: N(x.diaG, 1000), net: N(x.net, 10000), making: N(x.making, 1e7), dia, unsure: (Array.isArray(x.unsure) ? x.unsure : []).slice(0, 8).map(s => vjClean(s, 80)).filter(Boolean) };
   const ct = dia.reduce((a, d) => a + (d.ct || 0), 0); const csG = cs.reduce((a, d) => a + (d.g != null ? d.g : (d.ct || 0) / 5), 0); out.check = { ct: Math.round(ct * 1000) / 1000, diaG: Math.round(ct / 5 * 1000) / 1000, csG: Math.round(csG * 1000) / 1000, net: out.gross != null ? Math.round((out.gross - ct / 5 - csG) * 1000) / 1000 : null };
   if (out.net != null && out.check.net != null && Math.abs(out.check.net - out.net) > 0.002 && csG > 0 && Math.abs(out.gross - ct / 5 - out.net) <= 0.002) out.check.csOut = true; // slip's net did not take the CS off
+  if (!o) { const dg = String(x.design || '').replace(/\D/g, ''), kg = String(x.karigar || '').trim().toLowerCase(); out.karigar = vjClean(x.karigar, 30); out.matches = [];
+    if (dg) { const rs = await env.DB.prepare('SELECT data FROM vj_kord').all(), live = (rs.results || []).map(vjParse).filter(q => q && q.status !== 'cancelled');
+      const hit = live.filter(q => String(q.no) === dg || (dg.length > 4 && String(q.no) === dg.slice(0, -1))), byK = hit.filter(q => kg && kg !== 'other' && String(q.karigar || '').toLowerCase().includes(kg));
+      out.matches = (byK.length ? byK : hit).slice(0, 8).map(q => ({ id: q.id, no: q.no, karigar: q.karigar, itemTxt: q.itemTxt || q.item || '', kt: q.kt || '', name: q.name || '', status: q.status, tagNo: q.tagNo || '' })); } }
   out.check.ok = out.net == null || out.check.net == null || Math.abs(out.check.net - out.net) <= 0.002 || !!out.check.csOut;
   return vjJson(out);
 }
@@ -2377,7 +2384,8 @@ async function vjKo3List(env, who, url) { if (url.searchParams.has('sample')) re
     return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_karigar_' + (url.searchParams.get('xlsx') === 'pending' ? 'pending' : 'orders') + '.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } }); }
   const codesOut = (cfg.codes || []).map(c => adm ? c : Object.assign({}, c, { cost: null })), dl = await vjKoDiaList(env), lo = (await vjKoLedOwners(env)).includes(String(who.email).toLowerCase());
   const users = adm ? ((((await env.DB.prepare('SELECT email, name, role FROM users').all()).results) || [])).map(u => ({ email: u.email, name: u.name || '', role: u.role, diamonds: dl.includes(String(u.email).toLowerCase()) })) : [];
-  return vjJson({ ok: true, orders: list, nextBy, karigars, kcfg: adm ? cfg.kcfg : Object.fromEntries(Object.entries(cfg.kcfg).map(([k, v]) => [k, { type: v.type, next: v.next, pf: v.pf, managed: v.managed !== false, wa: who.role === 'sales' ? '' : v.wa || '' }])), codes: codesOut, trates: cfg.trates, stages: cfg.stages, mf: who.role === 'sales' ? {} : cfg.mf,
+  const ntRow = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first(); let ntOpen = 0; try { ntOpen = Number(JSON.parse(ntRow.data).newTagOpenUntil) || 0; } catch (e) {} // C-20261106-NEWTAGSAMPLE
+  return vjJson({ ok: true, ntOpen, orders: list, nextBy, karigars, kcfg: adm ? cfg.kcfg : Object.fromEntries(Object.entries(cfg.kcfg).map(([k, v]) => [k, { type: v.type, next: v.next, pf: v.pf, managed: v.managed !== false, wa: who.role === 'sales' ? '' : v.wa || '' }])), codes: codesOut, trates: cfg.trates, stages: cfg.stages, mf: who.role === 'sales' ? {} : cfg.mf,
     items: VJ_KO3_ITEMS, golds: VJ_KO3_GOLD, kts: VJ_KO3_KT, outs, freeOgs, account, pendHead, settles, admin: adm, ledOwner: lo, ledOwners: lo ? await vjKoLedOwners(env) : [], deleted: lo ? (await vjKo3Ledger(env, true)).filter(l => l.status === 'deleted').slice(-100).reverse().map(l => ({ id: l.id, grp: l.delGrp || l.id, date: l.date, karigar: l.karigar, type: l.type, no: l.no || '', descr: l.descr, fine: l.fine, cash: l.cash, delAt: l.delAt, delBy: l.delByName || '' })) : [], canAdd: who.role !== 'sales', canDia: adm || dl.includes(who.email), users, diaPerm: adm ? dl : [] }); }
 // owner 18:54 (C-20261102-KCODEWISE): CODE-WISE statement for a karigar + month - every code delivered in the month with the sheet's columns, gold issued and
 // cash given rows, codes still pending at month end, opening / closing; each row can be ticked 'matched with karigar' (+ note, logged) to reconcile with him.
@@ -5584,6 +5592,10 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/payables' && request.method === 'GET') return vjPayables(env, who); // C-20261103-CHAINVEND
   if (p === '/api/vj/payables' && request.method === 'POST') return vjPaySettle(request, env, who); // C-20261103-CHAINVEND
   if (p === '/api/vj/korders' && request.method === 'GET') return vjKo3List(env, who, url); // C-20261102-KORDER (v2: C-20261102-KORDER3)
+  if (p === '/api/vj/newtag-open' && request.method === 'POST') { if (who.role !== 'admin' || !vjSameSite(request, env)) return vjDeny(403, 'owner only'); // C-20261106-NEWTAGSAMPLE: open New tag for stock/order for a short time
+    let bb = {}; try { bb = await request.json(); } catch (e) {} const h = Math.max(0, Math.min(8, Number(bb.hours) || 0)), sr = await env.DB.prepare("SELECT data, version FROM docs WHERE path = 'settings/main'").first(); if (!sr) return vjDeny(404, 'settings missing');
+    const d = JSON.parse(sr.data); d.newTagOpenUntil = h ? Date.now() + h * 3600e3 : 0; const r = await env.DB.prepare('UPDATE docs SET data = ?, version = ?, updated_at = ?, updated_by = ? WHERE path = ? AND version = ?').bind(JSON.stringify(d), sr.version + 1, Date.now(), who.email, 'settings/main', sr.version).run();
+    if (!r.meta || r.meta.changes !== 1) return vjDeny(409, 'try again'); await vjAudit(env, who, 'update', 'settings/main', h ? 'New tag open for stock/order ' + h + ' h' : 'New tag back to samples only'); return vjJson({ ok: true, until: d.newTagOpenUntil }); }
   if (p === '/api/vj/kslip' && request.method === 'POST') return vjSameSite(request, env) ? vjKslip(request, env, who) : vjDeny(403, 'not allowed'); // C-20261105-KSLIP
   if (p === '/api/vj/korder' && request.method === 'POST') return vjKo3Save(request, env, who); // C-20261102-KORDER (v2: C-20261102-KORDER3)
   if ((p === '/api/vj/bills' || p === '/api/vj/bills.xlsx' || p === '/api/vj/bill') && request.method === 'GET') return vjBillBook(url, env, who, request.headers.get('x-vj-mob'));

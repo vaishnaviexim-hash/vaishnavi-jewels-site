@@ -559,7 +559,47 @@
     b.addEventListener("click", async () => { if (!i.value.trim()) { m.textContent = "Type the tag no."; return; } b.disabled = true; m.textContent = "Linking…";
       try { const j = await postC({ op: "linktag", id: o.id, tagNo: i.value.trim() }); m.textContent = "Linked ✓ tag " + (j.order.tagNo || i.value) + " is now karigar order " + o.karigar + " " + o.no + " (Tagged)."; await load(); if (done) done(j.order); } catch (e) { m.textContent = "Not linked: " + (e.message || e) + "."; b.disabled = false; } });
     return el("div", { style: "display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0" }, [el("b", { textContent: "Tag already made from New tag?", style: "font-size:14px" }), i, b, sug.length > 1 ? el("span", { className: "hint", textContent: "Also with this design no.: " + sug.slice(1, 6).join(", ") }) : "", m]); }
-  function recvDlg(o) { if (!J.canAdd) return; const old = document.getElementById("koRecvDlg"); if (old) old.remove(); /* KORDER6 (owner 14:42): the full 'Received from karigar' form first, the tag only after it */
+  /* C-20261106-KSLIPFIND (owner 06/11 11:54): FIRST thing on the Karigar page - upload the karigar's parchi; it reads the order code (e.g. 4896), finds whose order it is,
+     opens Received from karigar for that order already filled from the parchi; then the usual sequence (Save -> Generate tag / Link tag) */
+  function findBox() { const f = el("input", { type: "file", accept: "image/*,application/pdf", hidden: true }), cam = el("input", { type: "file", accept: "image/*", capture: "environment", hidden: true }),
+      b = el("button", { type: "button", className: "btn", textContent: "📷 Karigar ki parchi daalein - order apne aap khulega" }), b2 = el("button", { type: "button", className: "btn ghost", textContent: "Camera" }),
+      m = el("div", { className: "hint", style: "white-space:pre-wrap;margin-top:6px" }), pick = el("div", { className: "actions", style: "margin:6px 0 0" });
+    b.addEventListener("click", () => f.click()); b2.addEventListener("click", () => cam.click());
+    const go = async file => { if (!file) return; b.disabled = b2.disabled = true; m.style.color = ""; pick.textContent = "";
+      try { m.textContent = "Uploading the parchi…"; const pdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name || ""), bl = pdf ? file : await shrink(file),
+          up = await fetch("/api/vj/photo", { method: "POST", credentials: "same-origin", headers: pdf ? { "content-type": "application/pdf", "x-vj-kind": "slip" } : { "content-type": "image/jpeg" }, body: bl }), uj = await up.json().catch(() => ({})); if (!up.ok) throw new Error(uj.error || up.status);
+        m.textContent = "Reading the parchi and finding the order… (10-20 sec)";
+        const r = await fetch("/api/vj/kslip", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ photo: uj.id }) }), x = await r.json().catch(() => ({})); if (!r.ok) throw new Error(x.error || r.status);
+        const pre = { slipId: uj.id, slipPdf: pdf, x }, M = x.matches || [], code = x.design || "?";
+        const openIt = async mm => { await load(); const o = (J.orders || []).find(q => q.id === mm.id); if (!o) { m.textContent = "Order " + mm.no + " not found any more."; return; }
+          if (o.status === "tagged") { m.textContent = o.karigar + " order " + o.no + " is already Tagged (tag " + (o.tagNo || "") + "). Opened it - attach the parchi there with 🧾 + Karigar slip photo if needed."; openOrder(o); return; }
+          if (o.tag && !J.admin) { m.textContent = o.karigar + " order " + o.no + " is already Received. Opened it - next: Generate tag / Link tag."; openOrder(o); return; }
+          m.textContent = "Parchi " + code + " = " + o.karigar + " order " + o.no + " (" + [o.itemTxt, o.name || "stock"].filter(Boolean).join(", ") + "). Received form opened and filled - check, then Save."; recvDlg(o, pre); };
+        if (M.length === 1) await openIt(M[0]);
+        else if (M.length > 1) { m.textContent = "Parchi code " + code + " matches " + M.length + " orders - choose:"; M.forEach(mm => { const x2 = el("button", { type: "button", className: "btn ghost", textContent: mm.karigar + " " + mm.no + " · " + (mm.itemTxt || "") + (mm.name ? " · " + mm.name : "") + " (" + (ST[mm.status] || mm.status) + ")" }); x2.addEventListener("click", () => openIt(mm)); pick.appendChild(x2); }); }
+        else { m.style.color = "var(--bad,#a12b2b)"; m.textContent = "Parchi read" + (x.karigar ? " (" + x.karigar + ")" : "") + ", but no live karigar order " + code + " found. Type the order no.:"; const i = el("input", { placeholder: "order no.", inputMode: "numeric", maxLength: 8, style: "width:110px" }), ok = el("button", { type: "button", className: "btn ghost", textContent: "Open" });
+          ok.addEventListener("click", () => { const L = (J.orders || []).filter(q => String(q.no) === i.value.trim() && q.status !== "cancelled"); if (L.length === 1) openIt(L[0]); else if (L.length > 1) { pick.textContent = ""; L.forEach(q => { const x3 = el("button", { type: "button", className: "btn ghost", textContent: q.karigar + " " + q.no }); x3.addEventListener("click", () => openIt(q)); pick.appendChild(x3); }); } else m.textContent = "Order " + i.value + " not found."; });
+          pick.append(i, ok); }
+      } catch (e) { m.style.color = "var(--bad,#a12b2b)"; m.textContent = "Parchi not read (" + (e.message || e) + "). Open the order below and press Received."; }
+      b.disabled = b2.disabled = false; };
+    f.addEventListener("change", () => { const x = f.files && f.files[0]; f.value = ""; go(x); }); cam.addEventListener("change", () => { const x = cam.files && cam.files[0]; cam.value = ""; go(x); });
+    return el("div", { id: "koFind", className: "kobox", style: "border:2px solid var(--gold);padding:10px 12px;margin:6px 0 10px" }, [el("b", { textContent: "Karigar se maal aaya? Pehle parchi daalein" }),
+      el("div", { className: "actions", style: "margin:6px 0 0" }, [b, b2, f, cam]), m, pick]); }
+
+  /* C-20261106-NEWTAGSAMPLE (owner 06/11 11:55): New tag makes Samples only. Stock / order pieces come from Karigar order -> Received -> Generate tag (the karigar flow is allowed).
+     Abhinav can open New tag for stock for a short time (server enforces the same rule). */
+  function ntGuard() { const sm = document.getElementById("k-sample"), rs = ["k-sale", "k-order"].map(i => document.getElementById(i)).filter(Boolean), p = document.getElementById("p-new"); if (!sm || !p) return;
+    const open = (Number(J.ntOpen) || 0) > Date.now(), allow = open || !!tagFor || mkFill;
+    rs.forEach(r => { r.disabled = !allow; if (r.parentNode) r.parentNode.style.opacity = allow ? "" : ".45"; });
+    if (!allow && !sm.checked) { sm.checked = true; sm.dispatchEvent(new Event("change", { bubbles: true })); }
+    let n = document.getElementById("koNtNote"); if (!n) { n = el("div", { id: "koNtNote", className: "hint", style: "border:1px dashed var(--gold);border-radius:8px;padding:6px 10px;margin:6px 0" }); p.prepend(n); }
+    n.textContent = ""; if (tagFor) { n.hidden = true; return; } n.hidden = false;
+    n.append(open ? "New tag is OPEN for stock / order pieces till " + new Date(J.ntOpen).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) + ". " : "New tag: only Samples here. Stock / order pieces: Karigar order → parchi → Received → Generate tag. ");
+    if (J.admin) { const bt = el("button", { type: "button", className: "btn ghost", textContent: open ? "Close now (samples only)" : "🔓 Open for stock / order - 2 hours" });
+      bt.addEventListener("click", async () => { bt.disabled = true; try { const r = await fetch("/api/vj/newtag-open", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ hours: open ? 0 : 2 }) }), j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status); J.ntOpen = j.until; } catch (e) { n.append(" (" + (e.message || e) + ")"); } ntGuard(); });
+      n.append(bt); } }
+  setInterval(() => { try { if (J && document.getElementById("p-new") && !document.getElementById("p-new").hidden) ntGuard(); } catch (e) {} }, 3000);
+  function recvDlg(o, pre) { if (!J.canAdd) return; const old = document.getElementById("koRecvDlg"); if (old) old.remove(); /* KORDER6 (owner 14:42): the full 'Received from karigar' form first, the tag only after it */
     const kc = (J.kcfg || {})[o.karigar] || {}; if (kc.type === "mounting") { openOrder(o); $("koRecBox").open = true; $("koRecBox").scrollIntoView({ behavior: "smooth" }); return; }
     const dlg = el("div", { id: "koRecvDlg", style: "position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:50;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:12px" });
     const card = el("div", { className: "card", style: "max-width:640px;width:100%;margin:2vh 0;background:var(--surface,#fff)" }), msg = el("p", { className: "hint" });
@@ -622,11 +662,7 @@
     /* C-20261105-KSLIP (owner 05/11 19:44): photo of the karigar's hisaab slip -> read -> fills gross + diamonds used (check, then Save as before); the slip stays on the order */
     let slipId = (T0 && T0.slip) || ""; const slMsg = el("div", { className: "hint", style: "white-space:pre-wrap" }), slF = el("input", { type: "file", accept: "image/*,application/pdf", hidden: true }), slB = el("button", { type: "button", className: "btn", textContent: "📷 Karigar ki parchi (photo / PDF) - auto fill" }), slV = el("button", { type: "button", className: "btn ghost", textContent: "🧾 See slip", hidden: !slipId });
     let slipPdf = !!(T0 && T0.slipPdf); slV.addEventListener("click", () => { if (slipId) { if (slipPdf) window.open("/_blob/" + slipId, "_blank", "noopener"); else bigImg(Object.assign({}, o, { drawing: slipId, sample: "karigar slip" })); } });
-    slB.addEventListener("click", () => slF.click());
-    slF.addEventListener("change", async () => { const f = slF.files && slF.files[0]; slF.value = ""; if (!f) return; slB.disabled = true; slMsg.style.color = "";
-      try { slMsg.textContent = "Uploading the slip…"; const pdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name || ""), bl = pdf ? f : await shrink(f), up = await fetch("/api/vj/photo", { method: "POST", credentials: "same-origin", headers: pdf ? { "content-type": "application/pdf", "x-vj-kind": "slip" } : { "content-type": "image/jpeg" }, body: bl }), uj = await up.json().catch(() => ({})); if (!up.ok) throw new Error(uj.error || up.status);
-        slipId = uj.id; slipPdf = pdf; slV.hidden = false; slMsg.textContent = "Reading the slip… (10-20 sec)";
-        const r = await fetch("/api/vj/kslip", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: o.id, photo: slipId }) }), x = await r.json().catch(() => ({})); if (!r.ok) throw new Error(x.error || r.status);
+    const applyX = x => { slMsg.style.color = "";
         if (!(x.gross > 0) && !(x.dia || []).length && !(x.cs || []).length) throw new Error("nothing could be read from this slip" + (x.raw ? " - reader said: " + x.raw : "") + (x.stop && x.stop !== "end_turn" ? " [" + x.stop + "]" : ""));
         const L = []; if (x.gross > 0) { gg.value = r3(x.gross); L.push("Gross " + r3(x.gross) + " g"); }
         const rows = [...tb.querySelectorAll("tr.kodr")], usedR = new Set(), left = [];
@@ -651,9 +687,17 @@
         slMsg.textContent = "Slip read" + (x.design ? " · design " + x.design : "") + (x.kt ? " · " + x.kt : "") + ":\n" + L.join("\n") + (left.length ? "\n" + (canD ? "Not matched to an issued packet - type it in yourself: " : "Diamonds (only Fenil / Mihir / Abhinav can change): ") + left.join("; ") : "")
           + "\nCheck: diamonds " + r3(c.ct || 0) + " ct = " + r3(c.diaG || 0) + " g" + (c.csG ? " · CS " + r3(c.csG) + " g" : "") + (c.net != null ? " · gross − diamonds" + (c.csG ? " − CS" : "") + " = " + r3(c.net) + " g" : "") + (c.csOut ? " (slip's net did not take the CS off)" : "") + (x.net != null ? " · slip says net " + r3(x.net) + " g" : "") + (c.ok ? "" : "  ⚠ does not match - check the slip")
           + ((x.unsure || []).length ? "\n⚠ Not clear on the slip: " + x.unsure.join("; ") : "") + "\nCheck every figure, then press Save. Making is from our karigar formula (slip making ignored).";
-        if (!c.ok || (x.unsure || []).length) slMsg.style.color = "var(--bad,#a12b2b)"; }
+        if (!c.ok || (x.unsure || []).length) slMsg.style.color = "var(--bad,#a12b2b)";
+    };
+    slB.addEventListener("click", () => slF.click());
+    slF.addEventListener("change", async () => { const f = slF.files && slF.files[0]; slF.value = ""; if (!f) return; slB.disabled = true; slMsg.style.color = "";
+      try { slMsg.textContent = "Uploading the slip…"; const pdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name || ""), bl = pdf ? f : await shrink(f), up = await fetch("/api/vj/photo", { method: "POST", credentials: "same-origin", headers: pdf ? { "content-type": "application/pdf", "x-vj-kind": "slip" } : { "content-type": "image/jpeg" }, body: bl }), uj = await up.json().catch(() => ({})); if (!up.ok) throw new Error(uj.error || up.status);
+        slipId = uj.id; slipPdf = pdf; slV.hidden = false; slMsg.textContent = "Reading the slip… (10-20 sec)";
+        const r = await fetch("/api/vj/kslip", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: o.id, photo: slipId }) }), x = await r.json().catch(() => ({})); if (!r.ok) throw new Error(x.error || r.status);
+        applyX(x); }
       catch (e) { slMsg.textContent = "Slip not read (" + (e.message || e) + ") - fill by hand" + (slipId ? "; the slip photo is still kept with this order on Save." : "."); }
       slB.disabled = false; });
+    if (pre && pre.x) { slipId = pre.slipId; slipPdf = !!pre.slipPdf; slV.hidden = false; setTimeout(() => { try { applyX(pre.x); } catch (e) { slMsg.textContent = "Slip not read (" + (e.message || e) + ") - fill by hand; the slip photo is kept with this order on Save."; } }, 0); } /* C-20261106-KSLIPFIND: slip read on the main page first */
     const slRow = el("div", { style: "border:1px dashed var(--line);border-radius:8px;padding:8px;margin:6px 0" }, [el("div", { className: "actions", style: "margin:0" }, [slB, slV, slF]), slMsg]);
     card.append(el("h3", { textContent: (T0 ? "Correct received figures · " : "Received from karigar · ") + o.karigar + " · order " + o.no }), el("div", { className: "hint", textContent: [o.itemTxt, o.kt ? o.kt + (o.kt === "PT" ? "" : "KT") : "", o.colour, o.name ? "party " + o.name : "stock"].filter(Boolean).join(" · ") }), slRow,
       el("div", { className: "row" }, [lb("a) Date received", dt), lb("Gross weight received g", gg)]),
@@ -826,7 +870,7 @@
         el("div", { className: "kobox", id: "koGoldBox" }, [el("b", { textContent: "Gold issued for this order (OG register) " }), el("p", { className: "hint", id: "koGoldInfo" }),
           el("div", { className: "row", style: "align-items:end" }, [lab("Link", el("select", { id: "koGoldSel" })), el("button", { type: "button", className: "btn ghost", id: "koGoldLink", textContent: "Link" }),
             lab("or issue new: fine g", inp("koGoldFine", "e.g. 4.000", { maxLength: 10, inputMode: "decimal" })), el("button", { type: "button", className: "btn ghost", id: "koGoldNew", textContent: "Issue from OG pool" })])])])]);
-    sec.append(el("h2", { textContent: "Karigar order" }), el("div", { className: "kosum", id: "koSum" }),
+    sec.append(el("h2", { textContent: "Karigar order" }), findBox(), el("div", { className: "kosum", id: "koSum" }),
       el("div", { className: "actions" }, [el("button", { type: "button", className: "btn", id: "koAdd", textContent: "+ New karigar order", hidden: true }), el("button", { type: "button", className: "btn ghost", id: "koPrP", textContent: "\u{1F5A8} Print pending", hidden: true }), el("button", { type: "button", className: "btn ghost", id: "koPrPdf", textContent: "Pending PDF", hidden: true }), el("button", { type: "button", className: "btn ghost", id: "koXlP", textContent: "Excel pending", hidden: true }),
         el("button", { type: "button", className: "btn ghost", id: "koXl", textContent: "Excel all + account", hidden: true }), el("button", { type: "button", className: "btn ghost", id: "koSetB", textContent: "Settings / import", hidden: true })]),
       el("div", { className: "kobox", id: "koSet", hidden: true }), form, el("p", { className: "hint", id: "koMsg" }),
@@ -858,4 +902,9 @@
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", build); else build();
   setTimeout(build, 1200);
+  /* C-20261106-NEWTAGSAMPLE (owner 06/11 11:54): VJ Tags opens on Karigar order (not New tag), unless a link opens something else */
+  { let n = 0; const first = () => { const b = document.getElementById("t-korder"), pn = document.getElementById("p-new"); if (!b) { if (++n < 20) setTimeout(first, 300); return; }
+      if (!/^#./.test(location.hash) && !b.hidden && pn && !pn.hidden && !tagFor) b.click(); }; setTimeout(first, 400); }
+  /* load J once even if the page opens elsewhere, so the New tag guard knows the open/closed state */
+  setTimeout(() => { try { if (!J || !J.orders) fetch("/api/vj/korders", { credentials: "same-origin", cache: "no-store" }).then(r => r.ok ? r.json() : null).then(j => { if (j && (!J || !J.orders)) J = j; }).catch(() => {}); } catch (e) {} }, 2500);
 })();
