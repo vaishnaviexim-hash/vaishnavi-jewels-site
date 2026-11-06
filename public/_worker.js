@@ -1578,6 +1578,11 @@ async function vjReviewBell(url, env) {
   const onlyClicks = !test && url.searchParams.get('clicks') === '1'; // only the new button clicks, any hour (07:05 run, before the morning report)
   if (!onlyClicks && (min < 11 * 60 || min > 18 * 60)) return reply('outside 11:00-18:00 IST', 200); // owner's sending window (ends 18:30)
   await vjRvT(env);
+  // C-20261106-REVIEWASK2 one-time repair: the Make sender stopped on 02/11 10:38, so the asks made after that never went out -> forget them (they are asked again)
+  if (!(await env.DB.prepare("SELECT 1 FROM vj_meta WHERE k = 'rvfix:20261106'").first())) { const cut = Date.parse('2026-11-02T10:00:00Z');
+    await env.DB.batch([env.DB.prepare("DELETE FROM vj_review_ask WHERE ts > ? AND mobile <> ''").bind(cut),
+      env.DB.prepare("INSERT INTO vj_meta (k, v) SELECT 'reviewsent:' || tok, 'fix' FROM vj_review_ask WHERE ts BETWEEN ? AND ? AND mobile <> '' ON CONFLICT(k) DO NOTHING").bind(Date.parse('2026-11-02T08:00:00Z'), cut),
+      env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('rvfix:20261106', ?) ON CONFLICT(k) DO NOTHING").bind(new Date().toISOString())]); }
   const key = test ? 'reviewtest:' + ymd : 'reviewbell:' + ymd;
   if (test) { const r = await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES (?, '1') ON CONFLICT(k) DO UPDATE SET v = CAST(CAST(v AS INTEGER) + 1 AS TEXT) RETURNING v").bind(key).first(); if (Number(r && r.v) > 3) return reply('test limit reached today', 429); }
   else if (!onlyClicks) { const claim = await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO NOTHING').bind(key, new Date().toISOString()).run(); if (!claim.meta || claim.meta.changes !== 1) return reply('already done today', 200); }
@@ -1585,14 +1590,17 @@ async function vjReviewBell(url, env) {
   const clean = v => String(v || '').replace(/[\u0000-\u001f"\\<>{}*_~`]/g, ' ').replace(/\s+/g, ' ').trim();
   const imgFor = async rows => { for (const r of rows || []) { const id = String(r && r.photo || ''); if (!/^[0-9a-f]{32}$/.test(id)) continue;
     try { const o = await vjPhotoGet(env, id); if (!o) continue; try { o.body.cancel(); } catch (e) {} if (/^image\/(jpeg|png)$/.test(o.type || '')) return id; } catch (e) {} } return ''; };
-  const add = async (no, mobile, name, rows) => { const tok = vjRvTok(16), img = await imgFor(rows), itok = img ? vjRvTok(16) : '';
+  // C-20261106-REVIEWASK2 (owner 17:07): the message is signed by WHOSE customer it is (Mihir / Shilpi / Abhinav) with that person's mobile; else the showroom
+  const signOf = b => { const c = b && ['mihir', 'shilpi', 'abhinav'].includes(b.cust) ? b.cust : /shilpi/i.test(String(b && b.byName || '')) ? 'shilpi' : /mihir|office/i.test(String(b && b.byName || '')) ? 'mihir' : /abhinav/i.test(String(b && b.byName || '')) ? 'abhinav' : '';
+    const T = { mihir: ['Mihir', '+91 90997 63201'], shilpi: ['Shilpi Agarwal', '+91 93740 50969'], abhinav: ['Abhinav Agarwal', '+91 75674 00099'] }; return T[c] || ['Team Vaishnavi Jewels', '+91 99980 43886']; };
+  const add = async (no, mobile, name, rows, bill) => { const tok = vjRvTok(16), img = await imgFor(rows), itok = img ? vjRvTok(16) : '', sg = signOf(bill);
     await env.DB.prepare('INSERT INTO vj_review_ask (tok, no, mobile, ts, img, itok) VALUES (?, ?, ?, ?, ?, ?)').bind(tok, no, test ? '' : mobile, now, img, itok || null).run();
     items.push({ no, date: day, name: name || 'Customer', to: '91' + mobile, masked: '+91 ' + mobile.slice(0, 2) + 'XXXXX' + mobile.slice(-3), tok,
-      img: img ? 'https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok : VJ_RV_BRAND, photo: img ? 'tag photo' : 'brand image' }); };
-  if (test) await add('TEST', '7567400099', 'Abhinav', []);
+      img: img ? 'https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok : VJ_RV_BRAND, photo: img ? 'tag photo' : 'brand image', sname: sg[0], sphone: sg[1] }); };
+  if (test) await add('TEST', '7567400099', 'Abhinav', [], { cust: 'abhinav' });
   else if (!onlyClicks) {
     if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
-    const bills = ((((await env.DB.prepare("SELECT no, data FROM vj_bills WHERE no LIKE 'B-%'").all()).results) || [])).map(vjParse).filter(b => b && b.date === day);
+    const bills = ((((await env.DB.prepare("SELECT no, data FROM vj_bills WHERE no LIKE 'B-%'").all()).results) || [])).map(vjParse).filter(b => b && b.date <= day && b.date >= vjAddDays(day, -6)); // C-20261106-REVIEWASK2: last 7 days (a missed day is caught up; the 6-month rule stops repeats)
     for (const b of bills.sort((x, y) => String(x.no).localeCompare(String(y.no)))) {
       const m = String(b.mobile || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, ''), no = String(b.no || ''), why = w => skipped.push({ no, reason: w });
       if (b.title !== 'Bill' || !/^B-/.test(no)) continue;
@@ -1603,9 +1611,21 @@ async function vjReviewBell(url, env) {
       let stop = false; try { const t = ((await env.DB.prepare('SELECT text FROM wa_inbox WHERE sender = ? AND length(text) < 40').bind('91' + m).all()).results) || []; stop = t.some(x => WA_OPTOUT.test(String(x.text || '').trim()) || /^stop\b/i.test(String(x.text || '').trim())); } catch (e) {}
       if (stop) { why('STOP on WhatsApp'); continue; }
       if (items.length >= 60) { why('daily cap 60'); continue; }
-      await add(no, m, clean(b.name).replace(/\s+ji$/i, '').slice(0, 40), b.rows);
+      await add(no, m, clean(b.name).replace(/\s+ji$/i, '').slice(0, 40), b.rows, b);
     }
   }
+  // C-20261106-REVIEWASK2 (owner 06/11 17:05): REMINDER every 3rd day until the review is posted - day 3, 6 and 9 after the first ask (max 3),
+  // only for asks that really went out; Make skips anyone whose Google review is already in the S12c list, STOP, or blocked.
+  const rem = []; if (!test && !onlyClicks) { const RT = (((await env.DB.prepare("SELECT tok, no, mobile, ts, img FROM vj_review_ask WHERE mobile <> '' AND ts > ? AND tok NOT LIKE 'R%'").bind(now - 11 * 864e5).all()).results) || []);
+    for (const r of RT) { const d0 = new Date(Number(r.ts) + 5.5 * 3600e3).toISOString().slice(0, 10), age = Math.round((Date.parse(ymd) - Date.parse(d0)) / 864e5); if (![3, 6, 9].includes(age)) continue;
+      const k = age / 3; if (await env.DB.prepare("SELECT 1 FROM vj_review_ask WHERE tok LIKE ? AND no = ?").bind('R' + k + '%', r.no).first()) continue;
+      if (await env.DB.prepare("SELECT 1 FROM vj_meta WHERE k = ?").bind('reviewsent:' + r.tok).first() === null) continue; // never sent -> no reminder
+      let stop = false; try { const t = ((await env.DB.prepare('SELECT text FROM wa_inbox WHERE sender = ? AND length(text) < 40').bind('91' + r.mobile).all()).results) || []; stop = t.some(x => WA_OPTOUT.test(String(x.text || '').trim()) || /^stop\b/i.test(String(x.text || '').trim())); } catch (e) {}
+      if (stop) continue; const bl = await env.DB.prepare("SELECT data FROM vj_bills WHERE no = ?").bind(r.no).first(), b = bl ? vjParse(bl) : null; if (!b || b.cancelled) continue;
+      const tok = 'R' + k + vjRvTok(15), itok = r.img ? vjRvTok(16) : ''; await env.DB.prepare('INSERT INTO vj_review_ask (tok, no, mobile, ts, img, itok) VALUES (?, ?, ?, ?, ?, ?)').bind(tok, r.no, r.mobile, now, r.img || '', itok || null).run();
+      rem.push({ no: r.no, date: b.date, name: clean(b.name).replace(/\s+ji$/i, '').slice(0, 40) || 'Customer', to: '91' + r.mobile, masked: '+91 ' + r.mobile.slice(0, 2) + 'XXXXX' + r.mobile.slice(-3), tok, reminder: k,
+        img: itok ? 'https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok : VJ_RV_BRAND, photo: itok ? 'tag photo' : 'brand image', sname: signOf(b)[0], sphone: signOf(b)[1] }); if (rem.length >= 60) break; } }
+  items.push(...rem);
   // first click per asked bill since the last hand-out (for Review_Requests 'Clicked')
   let clicks = []; if (!test) { clicks = (((await env.DB.prepare('SELECT no, MIN(ts) AS ts FROM vj_review_clicks WHERE reported = 0 GROUP BY no').all()).results) || []).map(c => ({ no: c.no, at: waIst(Number(c.ts)) }));
     await env.DB.prepare('UPDATE vj_review_clicks SET reported = 1 WHERE reported = 0').run(); }
@@ -1617,6 +1637,10 @@ async function vjReviewBell(url, env) {
     await env.DB.batch(st); return reply('failed', 502); }
   return reply('handed ' + items.length + ' (skipped ' + skipped.length + ', clicks ' + clicks.length + ')', 200);
 }
+async function vjReviewSent(url, env) { // C-20261106-REVIEWASK2: Make reports a really-sent ask (random token only) -> it can get reminders
+  const t = String(url.searchParams.get('t') || ''); if (!/^[A-Za-z0-9_-]{20,24}$/.test(t)) return reply('not found', 404); await vjRvT(env);
+  const r = await env.DB.prepare('SELECT ts FROM vj_review_ask WHERE tok = ?').bind(t).first(); if (!r || Date.now() - Number(r.ts) > 2 * 864e5) return reply('not found', 404);
+  await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO NOTHING").bind('reviewsent:' + t, String(Date.now())).run(); return reply('ok', 200); }
 async function vjReviewDue(url, env) { // one-time hand-out to Make
   const t = String(url.searchParams.get('t') || ''); if (!/^[a-f0-9]{32}$/.test(t)) return reply('not found', 404);
   await vjRvT(env);
@@ -5769,6 +5793,7 @@ export default {
     if (p === '/hooks/vj-billpdf' || p === '/hooks/vj-billpdf-done') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjBillPdfHook(url, env, p.endsWith('-done')) : reply('Method not allowed', 405); // C-20261017-BILLWA
     if (p === '/hooks/vj-estbell') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjEstBell(env) : reply('Method not allowed', 405); // C-20261028-ESTNOTBILL
     if (p === '/hooks/rfid-demo') return (url.hostname === VJ_HOST || env.VJ_DEV === '1') ? vjRfidDemo(request, env, url) : reply('Not found', 404); // C-20261029-RFIDLIVE
+    if (p === '/hooks/vj-reviewsent') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjReviewSent(url, env) : reply('not found', 404); // C-20261106-REVIEWASK2
     if (p === '/hooks/vj-reviewbell' || p === '/hooks/vj-reviewdue' || p === '/hooks/vj-reviewimg') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-reviewbell' ? vjReviewBell(url, env) : p === '/hooks/vj-reviewdue' ? vjReviewDue(url, env) : vjReviewImg(url, env)) : reply('Method not allowed', 405); // C-20261102-REVIEWASK
     if (p.startsWith('/r/')) return vjReviewClick(request, env, ctx, url); // C-20261102-REVIEWASK: tracked review button -> Google
     if (p === '/hooks/vj-enqbulk') return ((request.method === 'GET' || request.method === 'HEAD') && (url.hostname === VJ_HOST || env.VJ_DEV === '1')) ? vjEnqBulk(env, ctx) : reply('Method not allowed', 405); // C-20261103-ENQBULK (owner-approved one-off)
