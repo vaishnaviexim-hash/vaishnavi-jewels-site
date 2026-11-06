@@ -2338,7 +2338,14 @@ async function vjKoSample(env, who, raw) { if (who.role === 'sales') return vjDe
   const okP = t => typeof t.photo === 'string' && /^[0-9a-f]{32}$/.test(t.photo), t = hits.find(okP) || hits[0], code = String(t.label || t.id || q).slice(0, 40);
   if (!okP(t) || (env.PHOTOS && !(await vjPhotoHas(env, t.photo)))) return vjJson({ ok: false, error: code + ' has no photo yet', code }, 404);
   return vjJson({ ok: true, code, design: String(t.designNo || '').slice(0, 30), photo: t.photo, more: hits.length - 1 }); }
-async function vjKo3List(env, who, url) { if (url.searchParams.has('sample')) return vjKoSample(env, who, url.searchParams.get('sample')); await vjKo3Tables(env); const adm = who.role === 'admin', cfg = await vjKo3Cfg(env); if (who.role !== 'sales') { await vjKoUmSweep(env, who, cfg); await vjKoChAddFix(env, who, cfg); }
+// C-20261106-KSLIPQ (owner 06/11 15:03): diamond quality / shape for a slip comes from OUR side (the karigar order form's quality, else the tag already
+// made for this design no. from New tag), never from the karigar's slip. Returns that tag's diamond lines (shape, quality text, pcs, ct) - read only.
+async function vjKoTagHint(env, id) { await vjKo3Tables(env); const row = await env.DB.prepare('SELECT data FROM vj_kord WHERE id = ?').bind(vjClean(id, 60)).first(); const o = row ? vjParse(row) : null; if (!o) return vjDeny(404, 'order not found');
+  const r = await env.DB.prepare("SELECT path, data FROM docs WHERE path LIKE 'tags/%' AND json_extract(data, '$.designNo') = ? ORDER BY updated_at DESC LIMIT 5").bind(String(o.no)).all();
+  for (const t of (r.results || [])) { let d; try { d = JSON.parse(t.data); } catch (e) { continue; } if (d.korder && d.korder.id && d.korder.id !== o.id) continue;
+    return vjJson({ ok: true, tag: String(d.label || t.path.slice(5)).slice(0, 40), dias: (Array.isArray(d.dias) ? d.dias : []).slice(0, 20).map(x => ({ shape: vjClean(x.shape, 20), q: vjClean(x.q || x.code, 30), pcs: Number(x.pcs) || 0, ct: Number(x.ct) || 0 })) }); }
+  return vjJson({ ok: true, tag: '', dias: [] }); }
+async function vjKo3List(env, who, url) { if (url.searchParams.has('sample')) return vjKoSample(env, who, url.searchParams.get('sample')); if (url.searchParams.has('taghint')) return vjKoTagHint(env, url.searchParams.get('taghint')); await vjKo3Tables(env); const adm = who.role === 'admin', cfg = await vjKo3Cfg(env); if (who.role !== 'sales') { await vjKoUmSweep(env, who, cfg); await vjKoChAddFix(env, who, cfg); }
   const raw = ((((await env.DB.prepare('SELECT data FROM vj_kord ORDER BY karigar, no').all()).results) || []).map(vjParse)).filter(Boolean).map(vjKo3Up);
   const list = raw.map(o => vjKo3View(o, who, cfg)), karigars = (await vjOgKarigars(env)).filter(k => vjKoMg(cfg, k)); karigars.forEach(k => { if (!cfg.kcfg[k]) cfg.kcfg[k] = Object.assign({}, VJ_KO3_STD); });
   const nextBy = {}; Object.keys(cfg.kcfg).filter(k => vjKoMg(cfg, k)).concat(karigars).forEach(k => { const mx = raw.filter(o => o.karigar === k).reduce((a, o) => Math.max(a, Number(o.no) || 0), 0); nextBy[k] = Math.max(Number(cfg.kcfg[k] && cfg.kcfg[k].next) || 1, mx + 1); });
