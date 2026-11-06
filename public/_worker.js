@@ -1593,11 +1593,13 @@ async function vjReviewBell(url, env) {
   // C-20261106-REVIEWASK2 (owner 17:07): the message is signed by WHOSE customer it is (Mihir / Shilpi / Abhinav) with that person's mobile; else the showroom
   const signOf = b => { const c = b && ['mihir', 'shilpi', 'abhinav'].includes(b.cust) ? b.cust : /shilpi/i.test(String(b && b.byName || '')) ? 'shilpi' : /mihir|office/i.test(String(b && b.byName || '')) ? 'mihir' : /abhinav/i.test(String(b && b.byName || '')) ? 'abhinav' : '';
     const T = { mihir: ['Mihir', '+91 90997 63201'], shilpi: ['Shilpi Agarwal', '+91 93740 50969'], abhinav: ['Abhinav Agarwal', '+91 75674 00099'] }; return T[c] || ['Team Vaishnavi Jewels', '+91 99980 43886']; };
+  // owner 06/11 19:15: personal - say WHAT they bought; several bills of one customer = ONE message naming all the pieces ('Ring, Pendant set aur Necklace set')
+  const itemsOf = rows => { const c = []; (rows || []).forEach(r => { const t = clean(r && (r.cat || r.label) || '').replace(/^\s*new design\s*$/i, 'jewellery'); if (t && !c.includes(t)) c.push(t); }); return c.length ? (c.length === 1 ? c[0] : c.slice(0, -1).join(', ') + ' aur ' + c[c.length - 1]).slice(0, 80) : 'jewellery'; };
   const add = async (no, mobile, name, rows, bill) => { const tok = vjRvTok(16), img = await imgFor(rows), itok = img ? vjRvTok(16) : '', sg = signOf(bill);
     await env.DB.prepare('INSERT INTO vj_review_ask (tok, no, mobile, ts, img, itok) VALUES (?, ?, ?, ?, ?, ?)').bind(tok, no, test ? '' : mobile, now, img, itok || null).run();
     items.push({ no, date: day, name: name || 'Customer', to: '91' + mobile, masked: '+91 ' + mobile.slice(0, 2) + 'XXXXX' + mobile.slice(-3), tok,
-      img: img ? 'https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok : VJ_RV_BRAND, photo: img ? 'tag photo' : 'brand image', sname: sg[0], sphone: sg[1] }); };
-  if (test) await add('TEST', '7567400099', 'Abhinav', [], { cust: 'abhinav' });
+      img: img ? 'https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok : VJ_RV_BRAND, photo: img ? 'tag photo' : 'brand image', sname: sg[0], sphone: sg[1], items: itemsOf(rows) }); };
+  if (test) await add('TEST', '7567400099', 'Abhinav', [{ cat: 'Ring' }, { cat: 'Pendant set' }], { cust: 'abhinav' });
   else if (!onlyClicks) {
     if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
     const bills = ((((await env.DB.prepare("SELECT no, data FROM vj_bills WHERE no LIKE 'B-%'").all()).results) || [])).map(vjParse).filter(b => b && b.date <= day && b.date >= vjAddDays(day, -15)); // C-20261106-REVIEWASK2: last 16 days (skipped Sundays / festivals are caught up) (a missed day is caught up; the 6-month rule stops repeats)
@@ -1613,12 +1615,13 @@ async function vjReviewBell(url, env) {
         if (wd < (ch ? 4 : 2)) continue; }
       if (b.cancelled) { why('cancelled'); continue; }
       if (!/^[6-9]\d{9}$/.test(m)) { why('no valid mobile'); continue; }
-      if (seen.has(m)) { why('same customer, asked once'); continue; } seen.add(m);
+      if (seen.has(m)) { why('same customer - in one message'); continue; } seen.add(m);
+      const allRows = bills.filter(x => x.title === 'Bill' && !x.cancelled && String(x.mobile || '').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '') === m).reduce((a2, x) => a2.concat(x.rows || []), []);
       if (await env.DB.prepare('SELECT 1 FROM vj_review_ask WHERE mobile = ? AND ts > ?').bind(m, now - 183 * 864e5).first()) { why('asked in the last 6 months'); continue; }
       let stop = false; try { const t = ((await env.DB.prepare('SELECT text FROM wa_inbox WHERE sender = ? AND length(text) < 40').bind('91' + m).all()).results) || []; stop = t.some(x => WA_OPTOUT.test(String(x.text || '').trim()) || /^stop\b/i.test(String(x.text || '').trim())); } catch (e) {}
       if (stop) { why('STOP on WhatsApp'); continue; }
       if (items.length >= 60) { why('daily cap 60'); continue; }
-      await add(no, m, clean(b.name).replace(/\s+ji$/i, '').slice(0, 40), b.rows, b);
+      await add(no, m, clean(b.name).replace(/\s+ji$/i, '').slice(0, 40), allRows.length ? allRows : b.rows, b);
     }
   }
   // C-20261106-REVIEWASK2 (owner 06/11 17:05): REMINDER every 3rd day until the review is posted - day 3, 6 and 9 after the first ask (max 3),
@@ -1633,7 +1636,7 @@ async function vjReviewBell(url, env) {
       if (stop) continue; const bl = await env.DB.prepare("SELECT data FROM vj_bills WHERE no = ?").bind(r.no).first(), b = bl ? vjParse(bl) : null; if (!b || b.cancelled) continue;
       const tok = 'R' + k + vjRvTok(15), itok = r.img ? vjRvTok(16) : ''; await env.DB.prepare('INSERT INTO vj_review_ask (tok, no, mobile, ts, img, itok) VALUES (?, ?, ?, ?, ?, ?)').bind(tok, r.no, r.mobile, now, r.img || '', itok || null).run();
       rem.push({ no: r.no, date: b.date, name: clean(b.name).replace(/\s+ji$/i, '').slice(0, 40) || 'Customer', to: '91' + r.mobile, masked: '+91 ' + r.mobile.slice(0, 2) + 'XXXXX' + r.mobile.slice(-3), tok, reminder: k,
-        img: itok ? 'https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok : VJ_RV_BRAND, photo: itok ? 'tag photo' : 'brand image', sname: signOf(b)[0], sphone: signOf(b)[1] }); if (rem.length >= 60) break; } }
+        img: itok ? 'https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok : VJ_RV_BRAND, photo: itok ? 'tag photo' : 'brand image', sname: signOf(b)[0], sphone: signOf(b)[1], items: itemsOf(b.rows) }); if (rem.length >= 60) break; } }
   items.push(...rem);
   // first click per asked bill since the last hand-out (for Review_Requests 'Clicked')
   let clicks = []; if (!test) { clicks = (((await env.DB.prepare('SELECT no, MIN(ts) AS ts FROM vj_review_clicks WHERE reported = 0 GROUP BY no').all()).results) || []).map(c => ({ no: c.no, at: waIst(Number(c.ts)) }));
