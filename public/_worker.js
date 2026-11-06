@@ -1576,7 +1576,7 @@ async function vjReviewBell(url, env) {
   const now = Date.now(), ist = new Date(now + 5.5 * 3600e3), ymd = ist.toISOString().slice(0, 10), min = ist.getUTCHours() * 60 + ist.getUTCMinutes();
   const test = url.searchParams.get('test') === '1'; // one sample to Abhinav only (no bill, no customer), at most 3 a day
   const onlyClicks = !test && url.searchParams.get('clicks') === '1'; // only the new button clicks, any hour (07:05 run, before the morning report)
-  if (!onlyClicks && (min < 11 * 60 || min > 18 * 60)) return reply('outside 11:00-18:00 IST', 200); // owner's sending window (ends 18:30)
+  if (!onlyClicks && (test ? (min < 9 * 60 || min > 21 * 60) : (min < 11 * 60 || min > 18 * 60))) return reply('outside the sending window IST', 200); // customers 11:00-18:00; the owner's test sample 09:00-21:00 // owner's sending window (ends 18:30)
   await vjRvT(env);
   // C-20261106-REVIEWASK2 one-time repair: the Make sender stopped on 02/11 10:38, so the asks made after that never went out -> forget them (they are asked again)
   if (!(await env.DB.prepare("SELECT 1 FROM vj_meta WHERE k = 'rvfix:20261106'").first())) { const cut = Date.parse('2026-11-02T10:00:00Z');
