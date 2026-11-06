@@ -1563,14 +1563,25 @@ async function vjContactHook(url, env) {
 // The header photo is the piece's own tag photo (jpg/png) through /hooks/vj-reviewimg?t=<random> for 3 days, otherwise the brand image.
 const VJ_RV_HOOK = 'https://hook.eu1.make.com/1rdirr1j8xtk4ifnvvnuk1fbzhnys7ro'; // Make hook 4022375 (S-REVIEWASK sender)
 const VJ_RV_LINK = 'https://g.page/r/Ce9kbGlQK0O8EBE/review'; // owner 02/11 14:27: official GBP review link (opens the Google Maps app where the customer is signed in); was search.google.com/local/writereview?placeid=ChIJa5MF_XNS4DsR72RsaVArQ7w
-const VJ_RV_BRAND = 'https://res.cloudinary.com/rknejib2/image/upload/c_fill,w_1200,h_628,g_east/l_text:Times_46_bold_italic:Thank%20you%20for%20choosing,co_rgb:6E5028,g_west,x_60,y_-95/l_text:Times_84_bold:Vaishnavi,co_rgb:4A3115,g_west,x_60,y_-15/l_text:Times_84_bold:Jewels,co_rgb:4A3115,g_west,x_60,y_70/l_text:Arial_58:%E2%98%85%E2%98%85%E2%98%85%E2%98%85%E2%98%85,co_rgb:C9A227,g_west,x_62,y_155/f_jpg,q_85/v1793975074/vj/design_gemini/review_header_model_emerald_20261106195410.jpg'; // owner 06/11 19:13: model-worn poster, not the grey logo card
+const VJ_RV_BRAND_PID = 'v1793975074/vj/design_gemini/review_header_model_emerald_20261106195410.jpg'; // owner 06/11 19:13: model-worn poster, not the grey logo card
 // owner 06/11 19:16-19:17: the header shows THE piece the customer bought (its tag photo) in a Vaishnavi Jewels frame, so they can post that very photo in the
 // review without searching; no tag photo -> the general model-worn poster (VJ_RV_BRAND, being replaced by the model-worn pool).
-const vjRvFrame = u => 'https://res.cloudinary.com/rknejib2/image/fetch/c_pad,w_1100,h_540,b_rgb:FAF5EB/c_pad,w_1200,h_628,g_north,b_rgb:FAF5EB/l_text:Times_38_italic:Aapki%20Vaishnavi%20Jewels%20jewellery,co_rgb:6E5028,g_south,y_16/f_jpg,q_85/' + encodeURIComponent(u);
+// owner 06/11 20:24: our (bold) logo + readable 'Thank you for choosing us' + stars on every header; tag photo on the right
+const vjRvFrame = u => 'https://res.cloudinary.com/rknejib2/image/fetch/c_pad,w_600,h_600,b_rgb:FAF5EB/c_pad,w_1200,h_628,g_east,x_14,b_rgb:FAF5EB/l_fetch:aHR0cHM6Ly92YWlzaG5hdmlqZXdlbHMuY29tL2xvZ29fdmpfYm9sZC5wbmc=/c_scale,h_265/fl_layer_apply,g_north_west,x_95,y_45/l_text:Times_46_bold:Thank%20you%20for%20choosing%20us,co_rgb:2E1D08,g_north_west,x_30,y_335/l_text:Arial_66:%E2%98%85%E2%98%85%E2%98%85%E2%98%85%E2%98%85,co_rgb:9A6B0A,g_north_west,x_70,y_405/f_jpg,q_88/' + encodeURIComponent(u);
+// model-worn base image (Cloudinary 'v<ver>/<public_id>.jpg', 16:9, model on the right) -> the same header layout
+const vjRvPoster = pid => 'https://res.cloudinary.com/rknejib2/image/upload/c_fill,w_1200,h_628,g_east/l_fetch:aHR0cHM6Ly92YWlzaG5hdmlqZXdlbHMuY29tL2xvZ29fdmpfYm9sZC5wbmc=/c_scale,h_265/fl_layer_apply,g_north_west,x_95,y_45/l_text:Times_52_bold:Thank%20you%20for%20choosing%20us,co_rgb:2E1D08,g_north_west,x_40,y_335/l_text:Arial_70:%E2%98%85%E2%98%85%E2%98%85%E2%98%85%E2%98%85,co_rgb:9A6B0A,g_north_west,x_75,y_405/f_jpg,q_88/' + pid;
 // C-20261106-REVIEWLINK (owner 19:53): our own short review link https://vaishnavijewels.com/review - WhatsApp shows OUR preview (photo + 'Review dijiye')
 // instead of Google's 'Update your browser to manage your Business Profile', and the page opens the Google Maps APP on Android (customer already signed in),
 // Google's review page on iPhone / others, with big buttons as a fallback.
+const VJ_RV_BRAND = vjRvPoster(VJ_RV_BRAND_PID); // owner 06/11 19:13: model-worn poster, not the grey logo card
 let VJ_RV_POSTER = VJ_RV_BRAND;
+// owner 06/11 20:25: no tag photo -> a model-worn image of THE SAME kind of piece (solitaire ring -> solitaire ring, pendant set -> pendant set...), per bill.
+// Keys: 'solitaire ring', 'polki necklace', 'lab-grown ring', 'ring', 'pendant set', 'earring', 'necklace', 'bangle', 'bracelet', 'mangalsutra', 'pendant', 'gents ring', 'nose pin', 'chain'.
+// Values: Cloudinary 'v<ver>/<public_id>.jpg' of real pieces made model-worn (16:9, model on the right, calm left). Filled by the review-header pool job.
+const VJ_RV_POOL = {};
+const vjRvCat = c => { c = String(c || '').toLowerCase().trim(); if (/gents/.test(c)) return 'gents ring'; if (/ring/.test(c) && !/ear/.test(c)) return 'ring'; if (/ear|bali|jhumk|stud/.test(c)) return 'earring';
+  if (/pendant\s*set|\bps\b/.test(c)) return 'pendant set'; if (/mangal/.test(c)) return 'mangalsutra'; if (/neck|haar|choker|\bns\b/.test(c)) return 'necklace'; if (/bangle|kada/.test(c)) return 'bangle';
+  if (/bracelet/.test(c)) return 'bracelet'; if (/pendant/.test(c)) return 'pendant'; if (/nose/.test(c)) return 'nose pin'; if (/chain/.test(c)) return 'chain'; return c; };
 function vjReviewPage() { const pid = 'ChIJa5MF_XNS4DsR72RsaVArQ7w', web = 'https://search.google.com/local/writereview?placeid=' + pid, g = VJ_RV_LINK;
   const intent = 'intent://search.google.com/local/writereview?placeid=' + pid + '#Intent;scheme=https;package=com.google.android.apps.maps;S.browser_fallback_url=' + encodeURIComponent(g) + ';end';
   const h = '<!doctype html><html lang="hi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vaishnavi Jewels - Google review</title>'
@@ -1614,12 +1625,18 @@ async function vjReviewBell(url, env) {
   // owner 19:15: a one-word detail with the piece - 'lab-grown diamond Ring', 'natural diamond Pendant set', 'Polki Necklace set' (from the tag)
   const kindOf = async r => { try { const id = String(r && r.id || ''); if (!/^[A-Za-z0-9_\-.~]{1,60}$/.test(id)) return ''; const d = await env.DB.prepare('SELECT data FROM docs WHERE path = ?').bind('tags/' + id).first(); const t = d ? JSON.parse(d.data) : null; if (!t) return '';
       const dq = (t.dias || []).map(x => String(x.q || x.code || '')).join(' '); if (t.polki && Number(t.polki.pcs) > 0) return 'Polki'; if (/cvd|lgd|lab/i.test(dq)) return 'lab-grown diamond'; if ((t.dias || []).length) return 'natural diamond'; return ''; } catch (e) { return ''; } };
+  const posterFor = async (rows, seed) => { try { for (const r of (rows || []).slice(0, 12)) { const cat = vjRvCat(r && (r.cat || r.label)); if (!cat) continue; let t = null;
+      const id = String(r && r.id || ''); if (/^[A-Za-z0-9_\-.~]{1,60}$/.test(id)) { const d = await env.DB.prepare('SELECT data FROM docs WHERE path = ?').bind('tags/' + id).first(); t = d ? JSON.parse(d.data) : null; }
+      const dias = (t && t.dias) || [], sol = dias.some(x => /solitaire/i.test(String(x.shape || ''))), dq = dias.map(x => String(x.q || x.code || '')).join(' ');
+      const kind = t && t.polki && Number(t.polki.pcs) > 0 ? 'polki' : /cvd|lgd|lab/i.test(dq) ? 'lab-grown' : '';
+      for (const k of [sol ? 'solitaire ' + cat : '', kind ? kind + ' ' + cat : '', cat]) { const L = k && VJ_RV_POOL[k]; if (L && L.length) { let h = 0; for (const ch of String(seed || '')) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return [vjRvPoster(L[h % L.length]), 'model-worn ' + k]; } } }
+    } catch (e) {} return [VJ_RV_BRAND, 'brand poster']; };
   const itemsOf = async rows => { const c = []; for (const r of (rows || []).slice(0, 12)) { const it = clean(r && (r.cat || r.label) || '').replace(/^\s*new design\s*$/i, 'jewellery'); if (!it) continue; const k = await kindOf(r), t = (k ? k + ' ' : '') + it; if (!c.includes(t)) c.push(t); }
     return c.length ? (c.length === 1 ? c[0] : c.slice(0, -1).join(', ') + ' aur ' + c[c.length - 1]).slice(0, 90) : 'jewellery'; };
-  const add = async (no, mobile, name, rows, bill) => { const tok = vjRvTok(16), img = await imgFor(rows), itok = img ? vjRvTok(16) : '', sg = signOf(bill);
+  const add = async (no, mobile, name, rows, bill) => { const tok = vjRvTok(16), img = await imgFor(rows), itok = img ? vjRvTok(16) : '', sg = signOf(bill), pf = img ? [] : await posterFor(rows, no);
     await env.DB.prepare('INSERT INTO vj_review_ask (tok, no, mobile, ts, img, itok) VALUES (?, ?, ?, ?, ?, ?)').bind(tok, no, test ? '' : mobile, now, img, itok || null).run();
     items.push({ no, date: day, name: name || 'Customer', to: '91' + mobile, masked: '+91 ' + mobile.slice(0, 2) + 'XXXXX' + mobile.slice(-3), tok,
-      img: img ? vjRvFrame('https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok) : VJ_RV_BRAND, photo: img ? 'their piece (tag photo, framed)' : 'brand image', sname: sg[0], sphone: sg[1], items: await itemsOf(rows) }); };
+      img: img ? vjRvFrame('https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok) : pf[0], photo: img ? 'their piece (tag photo, framed)' : pf[1], sname: sg[0], sphone: sg[1], items: await itemsOf(rows) }); };
   if (test) await add('TEST', '7567400099', 'Abhinav', [{ cat: 'Ring' }, { cat: 'Pendant set' }], { cust: 'abhinav' });
   else if (!onlyClicks) {
     if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
@@ -1655,9 +1672,9 @@ async function vjReviewBell(url, env) {
       if (await env.DB.prepare("SELECT 1 FROM vj_meta WHERE k = ?").bind('reviewsent:' + r.tok).first() === null) continue; // never sent -> no reminder
       let stop = false; try { const t = ((await env.DB.prepare('SELECT text FROM wa_inbox WHERE sender = ? AND length(text) < 40').bind('91' + r.mobile).all()).results) || []; stop = t.some(x => WA_OPTOUT.test(String(x.text || '').trim()) || /^stop\b/i.test(String(x.text || '').trim())); } catch (e) {}
       if (stop) continue; const bl = await env.DB.prepare("SELECT data FROM vj_bills WHERE no = ?").bind(r.no).first(), b = bl ? vjParse(bl) : null; if (!b || b.cancelled) continue;
-      const tok = 'R' + k + vjRvTok(15), itok = r.img ? vjRvTok(16) : ''; await env.DB.prepare('INSERT INTO vj_review_ask (tok, no, mobile, ts, img, itok) VALUES (?, ?, ?, ?, ?, ?)').bind(tok, r.no, r.mobile, now, r.img || '', itok || null).run();
+      const tok = 'R' + k + vjRvTok(15), itok = r.img ? vjRvTok(16) : ''; let pf = []; await env.DB.prepare('INSERT INTO vj_review_ask (tok, no, mobile, ts, img, itok) VALUES (?, ?, ?, ?, ?, ?)').bind(tok, r.no, r.mobile, now, r.img || '', itok || null).run();
       rem.push({ no: r.no, date: b.date, name: clean(b.name).replace(/\s+ji$/i, '').slice(0, 40) || 'Customer', to: '91' + r.mobile, masked: '+91 ' + r.mobile.slice(0, 2) + 'XXXXX' + r.mobile.slice(-3), tok, reminder: k,
-        img: itok ? vjRvFrame('https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok) : VJ_RV_BRAND, photo: itok ? 'their piece (tag photo, framed)' : 'brand image', sname: signOf(b)[0], sphone: signOf(b)[1], items: await itemsOf(b.rows) }); if (rem.length >= 60) break; } }
+        img: itok ? vjRvFrame('https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok) : (pf = await posterFor(b.rows, r.no))[0], photo: itok ? 'their piece (tag photo, framed)' : pf[1], sname: signOf(b)[0], sphone: signOf(b)[1], items: await itemsOf(b.rows) }); if (rem.length >= 60) break; } }
   items.push(...rem);
   // first click per asked bill since the last hand-out (for Review_Requests 'Clicked')
   let clicks = []; if (!test) { clicks = (((await env.DB.prepare('SELECT no, MIN(ts) AS ts FROM vj_review_clicks WHERE reported = 0 GROUP BY no').all()).results) || []).map(c => ({ no: c.no, at: waIst(Number(c.ts)) }));
