@@ -2224,7 +2224,7 @@ function vjKo3Rows(a, adm, old, used) { if (!Array.isArray(a)) return []; const 
     const pty = vjKoParty(x), cl = pty ? { code: '', lot: '' } : vjKoCode(x.pkt), r = pty ? { pkt: VJ_KO_PARTY, code: '', lot: '', party: true, shape: vjClean(x.shape, 20), pcs, ct } : { pkt: cl.code ? cl.code + (cl.lot ? '/' + cl.lot : '') : '', code: cl.code, lot: cl.lot, shape: vjClean(x.shape, 20), pcs, ct }; // C-20261103-PARTYDIA
     if (adm) { if (rate) r.rate = rate; } else { const o = ol[i]; if (o && o.rate && o.shape === r.shape && o.pkt === r.pkt) r.rate = o.rate; }
     if (x.cert && typeof x.cert === 'object') { const lab = ['IGI', 'GIA', 'HRD', 'SGL', 'Other'].includes(x.cert.lab) ? x.cert.lab : 'IGI', no = vjClean(x.cert.no, 30).toUpperCase(), why = vjClean(x.cert.why, 80); if (no) r.cert = { lab, no }; else if (x.cert.unk && why) r.cert = { lab, no: '', unk: why }; } // C-20261104-CERTNO
-    if (used && x.add !== '' && x.add != null) { const v = Number(String(x.add).replace(/[^0-9.]/g, '')); if (isFinite(v) && v >= 0 && v <= 50) r.add = Math.round(v * 100) / 100; } // tag weight + % (default 10, solitaire 0)
+    if (used && x.add !== '' && x.add != null) { const v = Number(String(x.add).replace(/[^0-9.\-]/g, '')); if (isFinite(v) && v >= -50 && v <= 50) r.add = Math.round(v * 100) / 100; } // tag weight + % (default 10, solitaire 0); C-20261106-TAGCT: owner may set it up or down (-50..+50 %)
     out.push(r); }
   return out; }
 function vjKo3Auto(iss, rec) { const m = new Map(); (iss || []).forEach(r => { const k = (r.pkt || '') + '|' + (r.shape || ''), e = m.get(k) || { pkt: r.pkt || '', shape: r.shape || '', pcs: 0, mg: 0, rate: r.rate }; e.pcs += r.pcs; e.mg += vjOgMg(r.ct); m.set(k, e); });
