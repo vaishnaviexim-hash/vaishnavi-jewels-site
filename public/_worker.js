@@ -2311,7 +2311,7 @@ async function vjKoSnap(env, k, month, orders) { const start = month + '-01', y 
   G.forEach(g => { const d = String(g.date || ''), f = Number(g.fine) || 0; if (d >= end) return; if (d < start) { s.openFine += f; return; } s.goldIssued += f; rows.push({ date: d, type: 'gold issued', no: '', descr: 'Gold issued (OG register OUT)' + (g.ogs && g.ogs.length ? ' - OG ' + g.ogs.join(', ') : ''), fine: f, cash: 0 }); });
   const closeFine = s.openFine + s.goldIssued - s.credited + s.fineOther, closeCash = s.openCash + s.labour - s.paid + s.cashOther;
   const pending = orders.filter(o => String(o.karigar || '').toLowerCase() === kl && (o.status === 'open' || o.status === 'karigar') && String(o.date || '') < end).sort((a, b) => a.no - b.no)
-    .map(o => ({ no: o.no, item: o.itemTxt || o.item || '', stage: o.stage || '', gwt: vjR3(o.gwt), kt: o.kt || '', fine: vjR3(o.imported ? o.xlPure || 0 : o.fineNeed || 0) })); // no party names on the statement
+    .map(o => ({ no: o.no, item: o.itemTxt || o.item || '', stage: o.stage || '', gwt: vjR3(o.gwt), kt: o.kt || '', fine: vjR3(o.imported && o.xlPure > 0 ? o.xlPure : o.fineNeed || 0) })); // no party names on the statement
   return { karigar: k, month, openFine: vjR3(s.openFine), goldIssued: vjR3(s.goldIssued), credited: vjR3(s.credited), fineOther: vjR3(s.fineOther), closeFine: vjR3(closeFine),
     openCash: vjKo3R2(s.openCash), labour: vjKo3R2(s.labour), paid: vjKo3R2(s.paid), cashOther: vjKo3R2(s.cashOther), closeCash: vjKo3R2(closeCash), cashToPay: Math.trunc(closeCash / 1000) * 1000,
     rows: rows.sort((a, b) => a.date.localeCompare(b.date)), pending }; }
@@ -2362,8 +2362,8 @@ async function vjKo3List(env, who, url) { if (url.searchParams.has('sample')) re
   // C-20261103-KORDER5 (owner 03/11 14:24): Due counts only pieces whose stage is PAST CAD - no stage, Hold and every stage up to CAD in the stage list
   // (Hold, After Diwali, Design, CAD) are left out. Worked out live on every load from the current stages, deliveries and gold given (nothing stored).
   const stL = (cfg.stages || []).map(x => String(x).trim().toLowerCase()), cadI = stL.indexOf('cad'), early = s => { const x = String(s || '').trim().toLowerCase(), i = stL.indexOf(x); return !x || ['hold', 'design', 'cad', 'after diwali'].includes(x) || (cadI >= 0 && i >= 0 && i <= cadI); };
-  const pendHead = {}; account.forEach(a => { const L = list.filter(o => o.karigar === a.karigar && (o.status === 'open' || o.status === 'karigar')), al = o => o.imported ? Number(o.xlPure) || 0 : Number(o.fineNeed) || 0;
-    const inWork = L.filter(o => !o.imported).reduce((x, o) => x + al(o), 0), total = -a.fine + inWork, earlyF = L.filter(o => early(o.stage)).reduce((x, o) => x + al(o), 0), due = total - earlyF;
+  const pendHead = {}; account.forEach(a => { const L = list.filter(o => o.karigar === a.karigar && (o.status === 'open' || o.status === 'karigar')), al = o => o.imported && Number(o.xlPure) > 0 ? Number(o.xlPure) || 0 : Number(o.fineNeed) || 0;
+    const inWork = L.filter(o => !(o.imported && Number(o.xlPure) > 0)).reduce((x, o) => x + al(o), 0), total = -a.fine + inWork, earlyF = L.filter(o => early(o.stage)).reduce((x, o) => x + al(o), 0), due = total - earlyF;
     const R = a.rows || [], sumT = t => R.filter(r => t.includes(r.type)).reduce((x, r) => x + (Number(r.fine) || 0), 0), open = -sumT(['opening']), cred = -sumT(['delivery', 'excel', 'labour']), gold = Number(a.goldIssued) || 0;
     pendHead[a.karigar] = { total: vjKo3R2(total), due: vjKo3R2(due), est: vjKo3R2(L.reduce((x, o) => x + (Number(o.estimate) || 0), 0)),
       parts: { open: vjKo3R2(open), cred: vjKo3R2(cred), inWork: vjKo3R2(inWork), gold: vjKo3R2(gold), other: vjKo3R2(total - (open + cred + inWork - gold)), early: vjKo3R2(earlyF), nEarly: L.filter(o => early(o.stage)).length, n: L.length } }; });
@@ -2425,7 +2425,7 @@ async function vjKoStmt(env, who, cfg, k, month, orders) { await vjKoTkT(env); c
   gold.filter(g => String(g.date) < start).forEach(g => { openFine += g.fine; }); const goldM = gold.filter(g => inM(String(g.date)));
   const undated = op && inM(String(op.date)) ? (op.undatedGold || []).map(u => ({ key: 'U:' + u.row, row: u.row, g: u.g })) : [];
   const pending = orders.filter(o => String(o.karigar || '').toLowerCase() === kl && o.status !== 'cancelled' && (o.imported || o.history || String(o.date || '') < end) && ((o.status === 'open' || o.status === 'karigar') || (o.tag && String(o.tag.date || '') >= end)))
-    .sort((a, b) => a.no - b.no).map(o => ({ key: 'N:' + o.id, no: o.no, item: o.itemTxt || o.item || '', party: o.name || '', stage: o.stage || '', kt: o.kt || '', gwt: vjR3(o.gwt || (o.tag && o.tag.gGold) || 0), fine: vjR3(o.imported ? o.xlPure || 0 : o.tag && o.tag.sheet ? o.tag.sheet.fine : o.fineNeed || 0) }));
+    .sort((a, b) => a.no - b.no).map(o => ({ key: 'N:' + o.id, no: o.no, item: o.itemTxt || o.item || '', party: o.name || '', stage: o.stage || '', kt: o.kt || '', gwt: vjR3(o.gwt || (o.tag && o.tag.gGold) || 0), fine: vjR3(o.imported && o.xlPure > 0 ? o.xlPure : o.tag && o.tag.sheet ? o.tag.sheet.fine : o.fineNeed || 0) }));
   const closeFine = openFine + codes.reduce((a, r) => a + r._f, 0) + goldM.reduce((a, r) => a + r.fine, 0) + cash.reduce((a, r) => a + r.fine, 0), closeCash = openCash + codes.reduce((a, r) => a + r._c, 0) + cash.reduce((a, r) => a + r._c, 0);
   const all = codes.concat(goldM, cash, undated, pending); all.forEach(r => { r.tick = tk(r.key); delete r._f; delete r._c; }); const tickable = codes.concat(goldM, cash, undated);
   const hist = !!(await env.DB.prepare('SELECT v FROM vj_meta WHERE k = ?').bind('ko:hist:' + k).first());
@@ -2464,6 +2464,16 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
     let kdue = null; if (fm) { const st = await vjKoStmt(env, who, cfg, k, fm, []); kdue = vjKo3R2(st.closeCash || 0); } return vjJson({ ok: true, kdue, forMonth: fm }); }
   // C-20261106-OBAL (owner 06/11 15:47): set a month's OPENING to the owner's own karigar sheet closing (gold balance + cash to pay of the month before).
   // One 'adjust' row dated the last day of the previous month = difference between what VJ Tags has and the sheet; owner only, audited, can be deleted / restored like any entry.
+  // C-20261106-NOXL (owner 15:59): the owner's opening is the gold WITH the karigar for pieces in work (no Excel pre-credit). So the imported pieces lose their
+  // 'already credited in the Excel opening' estimate: those 'excel' rows are set aside (status deleted, restorable) and the pieces count like any order.
+  if (op === 'noxl') { const owners = await vjKoLedOwners(env); if (!owners.includes(String(who.email).toLowerCase())) return vjDeny(403, 'only Abhinav can change this');
+    const k = vjClean(b.karigar, 40); if (!k || !vjKoMg(cfg, k)) return vjDeny(400, 'pick the karigar'); const kl = k.toLowerCase(), st = [], ts = Date.now(); let nl = 0, no = 0;
+    for (const l of (await vjKo3Ledger(env)).filter(l => String(l.karigar).toLowerCase() === kl && l.type === 'excel' && l.status !== 'deleted')) { const x = Object.assign({}, l, { status: 'deleted', delBy: who.email, delAt: now, delWhy: 'C-20261106-NOXL owner opening = gold with karigar', delGrp: 'NOXL-' + k + '-' + ts });
+      st.push(env.DB.prepare("UPDATE vj_karigar_ledger SET status = 'deleted', data = ? WHERE id = ?").bind(JSON.stringify(x), l.id)); nl++; }
+    for (const r of ((((await env.DB.prepare('SELECT id, data FROM vj_kord WHERE karigar = ?').bind(k).all()).results) || []))) { const o = vjParse(r); if (!o || !o.imported || !(Number(o.xlPure) > 0)) continue;
+      o.xlPureWas = o.xlPure; o.xlPure = 0; st.push(env.DB.prepare('UPDATE vj_kord SET data = ? WHERE id = ?').bind(JSON.stringify(o), r.id)); no++; }
+    for (let i = 0; i < st.length; i += 50) await env.DB.batch(st.slice(i, i + 50));
+    await vjAudit(env, who, 'ko-noxl', 'korders/' + k, nl + ' excel rows set aside, ' + no + ' imported orders without pre-credit'); return vjJson({ ok: true, rows: nl, orders: no }); }
   if (op === 'obal') { const owners = await vjKoLedOwners(env); if (!owners.includes(String(who.email).toLowerCase())) return vjDeny(403, 'only Abhinav can set an opening balance');
     const k = vjClean(b.karigar, 40), month = String(b.month || ''), tf = Number(b.fine), tc = Number(b.cash); if (!k || !vjKoMg(cfg, k) || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !isFinite(tf) || !isFinite(tc) || Math.abs(tf) > 100000 || Math.abs(tc) > 1e8) return vjDeny(400, 'karigar, month, gold balance and cash to pay are needed');
     const st = await vjKoStmt(env, who, cfg, k, month, []), d0 = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, 0)).toISOString().slice(0, 10);
