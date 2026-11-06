@@ -1564,6 +1564,9 @@ async function vjContactHook(url, env) {
 const VJ_RV_HOOK = 'https://hook.eu1.make.com/1rdirr1j8xtk4ifnvvnuk1fbzhnys7ro'; // Make hook 4022375 (S-REVIEWASK sender)
 const VJ_RV_LINK = 'https://g.page/r/Ce9kbGlQK0O8EBE/review'; // owner 02/11 14:27: official GBP review link (opens the Google Maps app where the customer is signed in); was search.google.com/local/writereview?placeid=ChIJa5MF_XNS4DsR72RsaVArQ7w
 const VJ_RV_BRAND = 'https://res.cloudinary.com/rknejib2/image/fetch/e_trim/h_380,c_scale/c_pad,w_1200,h_500,b_rgb:FAF5EB/c_pad,w_1200,h_628,g_north,b_rgb:FAF5EB/l_text:Times_44_italic:Thank%20you%20for%20choosing%20Vaishnavi%20Jewels,co_rgb:6E5028,g_south,y_50/f_jpg,q_85/https://vaishnavijewels.com/logo_vaishnavi_jewels.png';
+// owner 06/11 19:16-19:17: the header shows THE piece the customer bought (its tag photo) in a Vaishnavi Jewels frame, so they can post that very photo in the
+// review without searching; no tag photo -> the general model-worn poster (VJ_RV_BRAND, being replaced by the model-worn pool).
+const vjRvFrame = u => 'https://res.cloudinary.com/rknejib2/image/fetch/c_pad,w_1100,h_540,b_rgb:FAF5EB/c_pad,w_1200,h_628,g_north,b_rgb:FAF5EB/l_text:Times_38_italic:Aapki%20Vaishnavi%20Jewels%20jewellery,co_rgb:6E5028,g_south,y_16/f_jpg,q_85/' + encodeURIComponent(u);
 let vjRvOk = false;
 async function vjRvT(env) { if (vjRvOk) return; await env.DB.batch([
   env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_review_ask (tok TEXT PRIMARY KEY, no TEXT, mobile TEXT, ts INTEGER, img TEXT, itok TEXT)'),
@@ -1602,7 +1605,7 @@ async function vjReviewBell(url, env) {
   const add = async (no, mobile, name, rows, bill) => { const tok = vjRvTok(16), img = await imgFor(rows), itok = img ? vjRvTok(16) : '', sg = signOf(bill);
     await env.DB.prepare('INSERT INTO vj_review_ask (tok, no, mobile, ts, img, itok) VALUES (?, ?, ?, ?, ?, ?)').bind(tok, no, test ? '' : mobile, now, img, itok || null).run();
     items.push({ no, date: day, name: name || 'Customer', to: '91' + mobile, masked: '+91 ' + mobile.slice(0, 2) + 'XXXXX' + mobile.slice(-3), tok,
-      img: img ? 'https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok : VJ_RV_BRAND, photo: img ? 'tag photo' : 'brand image', sname: sg[0], sphone: sg[1], items: await itemsOf(rows) }); };
+      img: img ? vjRvFrame('https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok) : VJ_RV_BRAND, photo: img ? 'their piece (tag photo, framed)' : 'brand image', sname: sg[0], sphone: sg[1], items: await itemsOf(rows) }); };
   if (test) await add('TEST', '7567400099', 'Abhinav', [{ cat: 'Ring' }, { cat: 'Pendant set' }], { cust: 'abhinav' });
   else if (!onlyClicks) {
     if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
@@ -1640,7 +1643,7 @@ async function vjReviewBell(url, env) {
       if (stop) continue; const bl = await env.DB.prepare("SELECT data FROM vj_bills WHERE no = ?").bind(r.no).first(), b = bl ? vjParse(bl) : null; if (!b || b.cancelled) continue;
       const tok = 'R' + k + vjRvTok(15), itok = r.img ? vjRvTok(16) : ''; await env.DB.prepare('INSERT INTO vj_review_ask (tok, no, mobile, ts, img, itok) VALUES (?, ?, ?, ?, ?, ?)').bind(tok, r.no, r.mobile, now, r.img || '', itok || null).run();
       rem.push({ no: r.no, date: b.date, name: clean(b.name).replace(/\s+ji$/i, '').slice(0, 40) || 'Customer', to: '91' + r.mobile, masked: '+91 ' + r.mobile.slice(0, 2) + 'XXXXX' + r.mobile.slice(-3), tok, reminder: k,
-        img: itok ? 'https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok : VJ_RV_BRAND, photo: itok ? 'tag photo' : 'brand image', sname: signOf(b)[0], sphone: signOf(b)[1], items: await itemsOf(b.rows) }); if (rem.length >= 60) break; } }
+        img: itok ? vjRvFrame('https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok) : VJ_RV_BRAND, photo: itok ? 'their piece (tag photo, framed)' : 'brand image', sname: signOf(b)[0], sphone: signOf(b)[1], items: await itemsOf(b.rows) }); if (rem.length >= 60) break; } }
   items.push(...rem);
   // first click per asked bill since the last hand-out (for Review_Requests 'Clicked')
   let clicks = []; if (!test) { clicks = (((await env.DB.prepare('SELECT no, MIN(ts) AS ts FROM vj_review_clicks WHERE reported = 0 GROUP BY no').all()).results) || []).map(c => ({ no: c.no, at: waIst(Number(c.ts)) }));
