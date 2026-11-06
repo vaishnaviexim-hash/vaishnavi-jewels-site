@@ -2474,6 +2474,15 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
       o.xlPureWas = o.xlPure; o.xlPure = 0; st.push(env.DB.prepare('UPDATE vj_kord SET data = ? WHERE id = ?').bind(JSON.stringify(o), r.id)); no++; }
     for (let i = 0; i < st.length; i += 50) await env.DB.batch(st.slice(i, i + 50));
     await vjAudit(env, who, 'ko-noxl', 'korders/' + k, nl + ' excel rows set aside, ' + no + ' imported orders without pre-credit'); return vjJson({ ok: true, rows: nl, orders: no }); }
+  // C-20261106-KDATE (owner 16:18): move a delivered piece to another delivery date (e.g. 31-10 -> 01-11 so it counts in the month the owner's sheet has it). Owner only, audited; figures unchanged.
+  if (op === 'kdate') { const owners = await vjKoLedOwners(env); if (!owners.includes(String(who.email).toLowerCase())) return vjDeny(403, 'only Abhinav can move a delivery date');
+    const id = vjClean(b.id, 60), nd = String(b.date || ''); if (!/^\d{4}-\d{2}-\d{2}$/.test(nd) || isNaN(Date.parse(nd))) return vjDeny(400, 'bad date');
+    const row = await env.DB.prepare('SELECT data FROM vj_kord WHERE id = ?').bind(id).first(), o = row ? vjParse(row) : null; if (!o || !o.tag) return vjDeny(404, 'order not delivered');
+    const od = String(o.tag.date || ''); { const lk = await vjKoLockMsg(env, [[o.karigar, od], [o.karigar, nd]]); if (lk) return vjDeny(409, lk); }
+    const L = (await vjKo3Ledger(env)).filter(l => l.ref === id && ['delivery', 'labour'].includes(l.type) && l.status === 'ok' && !l.rev && String(l.date) === od), st = [];
+    L.forEach(l => { const x = Object.assign({}, l, { date: nd, dateWas: od }); st.push(env.DB.prepare('UPDATE vj_karigar_ledger SET date = ?, data = ? WHERE id = ?').bind(nd, JSON.stringify(x), l.id)); });
+    o.tag.date = nd; o.tag.dateWas = od; st.push(env.DB.prepare('UPDATE vj_kord SET data = ? WHERE id = ?').bind(JSON.stringify(o), id)); await env.DB.batch(st);
+    await vjAudit(env, who, 'ko-kdate', 'korders/' + id, o.karigar + ' ' + o.no + ' delivery ' + od + ' -> ' + nd + ' (' + L.length + ' rows)'); return vjJson({ ok: true, rows: L.length }); }
   if (op === 'obal') { const owners = await vjKoLedOwners(env); if (!owners.includes(String(who.email).toLowerCase())) return vjDeny(403, 'only Abhinav can set an opening balance');
     const k = vjClean(b.karigar, 40), month = String(b.month || ''), tf = Number(b.fine), tc = Number(b.cash); if (!k || !vjKoMg(cfg, k) || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || !isFinite(tf) || !isFinite(tc) || Math.abs(tf) > 100000 || Math.abs(tc) > 1e8) return vjDeny(400, 'karigar, month, gold balance and cash to pay are needed');
     const st = await vjKoStmt(env, who, cfg, k, month, []), d0 = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, 0)).toISOString().slice(0, 10);
