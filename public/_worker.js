@@ -1594,11 +1594,15 @@ async function vjReviewBell(url, env) {
   const signOf = b => { const c = b && ['mihir', 'shilpi', 'abhinav'].includes(b.cust) ? b.cust : /shilpi/i.test(String(b && b.byName || '')) ? 'shilpi' : /mihir|office/i.test(String(b && b.byName || '')) ? 'mihir' : /abhinav/i.test(String(b && b.byName || '')) ? 'abhinav' : '';
     const T = { mihir: ['Mihir', '+91 90997 63201'], shilpi: ['Shilpi Agarwal', '+91 93740 50969'], abhinav: ['Abhinav Agarwal', '+91 75674 00099'] }; return T[c] || ['Team Vaishnavi Jewels', '+91 99980 43886']; };
   // owner 06/11 19:15: personal - say WHAT they bought; several bills of one customer = ONE message naming all the pieces ('Ring, Pendant set aur Necklace set')
-  const itemsOf = rows => { const c = []; (rows || []).forEach(r => { const t = clean(r && (r.cat || r.label) || '').replace(/^\s*new design\s*$/i, 'jewellery'); if (t && !c.includes(t)) c.push(t); }); return c.length ? (c.length === 1 ? c[0] : c.slice(0, -1).join(', ') + ' aur ' + c[c.length - 1]).slice(0, 80) : 'jewellery'; };
+  // owner 19:15: a one-word detail with the piece - 'lab-grown diamond Ring', 'natural diamond Pendant set', 'Polki Necklace set' (from the tag)
+  const kindOf = async r => { try { const id = String(r && r.id || ''); if (!/^[A-Za-z0-9_\-.~]{1,60}$/.test(id)) return ''; const d = await env.DB.prepare('SELECT data FROM docs WHERE path = ?').bind('tags/' + id).first(); const t = d ? JSON.parse(d.data) : null; if (!t) return '';
+      const dq = (t.dias || []).map(x => String(x.q || x.code || '')).join(' '); if (t.polki && Number(t.polki.pcs) > 0) return 'Polki'; if (/cvd|lgd|lab/i.test(dq)) return 'lab-grown diamond'; if ((t.dias || []).length) return 'natural diamond'; return ''; } catch (e) { return ''; } };
+  const itemsOf = async rows => { const c = []; for (const r of (rows || []).slice(0, 12)) { const it = clean(r && (r.cat || r.label) || '').replace(/^\s*new design\s*$/i, 'jewellery'); if (!it) continue; const k = await kindOf(r), t = (k ? k + ' ' : '') + it; if (!c.includes(t)) c.push(t); }
+    return c.length ? (c.length === 1 ? c[0] : c.slice(0, -1).join(', ') + ' aur ' + c[c.length - 1]).slice(0, 90) : 'jewellery'; };
   const add = async (no, mobile, name, rows, bill) => { const tok = vjRvTok(16), img = await imgFor(rows), itok = img ? vjRvTok(16) : '', sg = signOf(bill);
     await env.DB.prepare('INSERT INTO vj_review_ask (tok, no, mobile, ts, img, itok) VALUES (?, ?, ?, ?, ?, ?)').bind(tok, no, test ? '' : mobile, now, img, itok || null).run();
     items.push({ no, date: day, name: name || 'Customer', to: '91' + mobile, masked: '+91 ' + mobile.slice(0, 2) + 'XXXXX' + mobile.slice(-3), tok,
-      img: img ? 'https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok : VJ_RV_BRAND, photo: img ? 'tag photo' : 'brand image', sname: sg[0], sphone: sg[1], items: itemsOf(rows) }); };
+      img: img ? 'https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok : VJ_RV_BRAND, photo: img ? 'tag photo' : 'brand image', sname: sg[0], sphone: sg[1], items: await itemsOf(rows) }); };
   if (test) await add('TEST', '7567400099', 'Abhinav', [{ cat: 'Ring' }, { cat: 'Pendant set' }], { cust: 'abhinav' });
   else if (!onlyClicks) {
     if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
@@ -1636,7 +1640,7 @@ async function vjReviewBell(url, env) {
       if (stop) continue; const bl = await env.DB.prepare("SELECT data FROM vj_bills WHERE no = ?").bind(r.no).first(), b = bl ? vjParse(bl) : null; if (!b || b.cancelled) continue;
       const tok = 'R' + k + vjRvTok(15), itok = r.img ? vjRvTok(16) : ''; await env.DB.prepare('INSERT INTO vj_review_ask (tok, no, mobile, ts, img, itok) VALUES (?, ?, ?, ?, ?, ?)').bind(tok, r.no, r.mobile, now, r.img || '', itok || null).run();
       rem.push({ no: r.no, date: b.date, name: clean(b.name).replace(/\s+ji$/i, '').slice(0, 40) || 'Customer', to: '91' + r.mobile, masked: '+91 ' + r.mobile.slice(0, 2) + 'XXXXX' + r.mobile.slice(-3), tok, reminder: k,
-        img: itok ? 'https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok : VJ_RV_BRAND, photo: itok ? 'tag photo' : 'brand image', sname: signOf(b)[0], sphone: signOf(b)[1], items: itemsOf(b.rows) }); if (rem.length >= 60) break; } }
+        img: itok ? 'https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok : VJ_RV_BRAND, photo: itok ? 'tag photo' : 'brand image', sname: signOf(b)[0], sphone: signOf(b)[1], items: await itemsOf(b.rows) }); if (rem.length >= 60) break; } }
   items.push(...rem);
   // first click per asked bill since the last hand-out (for Review_Requests 'Clicked')
   let clicks = []; if (!test) { clicks = (((await env.DB.prepare('SELECT no, MIN(ts) AS ts FROM vj_review_clicks WHERE reported = 0 GROUP BY no').all()).results) || []).map(c => ({ no: c.no, at: waIst(Number(c.ts)) }));
