@@ -1563,10 +1563,24 @@ async function vjContactHook(url, env) {
 // The header photo is the piece's own tag photo (jpg/png) through /hooks/vj-reviewimg?t=<random> for 3 days, otherwise the brand image.
 const VJ_RV_HOOK = 'https://hook.eu1.make.com/1rdirr1j8xtk4ifnvvnuk1fbzhnys7ro'; // Make hook 4022375 (S-REVIEWASK sender)
 const VJ_RV_LINK = 'https://g.page/r/Ce9kbGlQK0O8EBE/review'; // owner 02/11 14:27: official GBP review link (opens the Google Maps app where the customer is signed in); was search.google.com/local/writereview?placeid=ChIJa5MF_XNS4DsR72RsaVArQ7w
-const VJ_RV_BRAND = 'https://res.cloudinary.com/rknejib2/image/fetch/e_trim/h_380,c_scale/c_pad,w_1200,h_500,b_rgb:FAF5EB/c_pad,w_1200,h_628,g_north,b_rgb:FAF5EB/l_text:Times_44_italic:Thank%20you%20for%20choosing%20Vaishnavi%20Jewels,co_rgb:6E5028,g_south,y_50/f_jpg,q_85/https://vaishnavijewels.com/logo_vaishnavi_jewels.png';
+const VJ_RV_BRAND = 'https://res.cloudinary.com/rknejib2/image/upload/c_fill,w_1200,h_628,g_east/l_text:Times_46_bold_italic:Thank%20you%20for%20choosing,co_rgb:6E5028,g_west,x_60,y_-95/l_text:Times_84_bold:Vaishnavi,co_rgb:4A3115,g_west,x_60,y_-15/l_text:Times_84_bold:Jewels,co_rgb:4A3115,g_west,x_60,y_70/l_text:Arial_58:%E2%98%85%E2%98%85%E2%98%85%E2%98%85%E2%98%85,co_rgb:C9A227,g_west,x_62,y_155/f_jpg,q_85/v1793975074/vj/design_gemini/review_header_model_emerald_20261106195410.jpg'; // owner 06/11 19:13: model-worn poster, not the grey logo card
 // owner 06/11 19:16-19:17: the header shows THE piece the customer bought (its tag photo) in a Vaishnavi Jewels frame, so they can post that very photo in the
 // review without searching; no tag photo -> the general model-worn poster (VJ_RV_BRAND, being replaced by the model-worn pool).
 const vjRvFrame = u => 'https://res.cloudinary.com/rknejib2/image/fetch/c_pad,w_1100,h_540,b_rgb:FAF5EB/c_pad,w_1200,h_628,g_north,b_rgb:FAF5EB/l_text:Times_38_italic:Aapki%20Vaishnavi%20Jewels%20jewellery,co_rgb:6E5028,g_south,y_16/f_jpg,q_85/' + encodeURIComponent(u);
+// C-20261106-REVIEWLINK (owner 19:53): our own short review link https://vaishnavijewels.com/review - WhatsApp shows OUR preview (photo + 'Review dijiye')
+// instead of Google's 'Update your browser to manage your Business Profile', and the page opens the Google Maps APP on Android (customer already signed in),
+// Google's review page on iPhone / others, with big buttons as a fallback.
+let VJ_RV_POSTER = VJ_RV_BRAND;
+function vjReviewPage() { const pid = 'ChIJa5MF_XNS4DsR72RsaVArQ7w', web = 'https://search.google.com/local/writereview?placeid=' + pid, g = VJ_RV_LINK;
+  const intent = 'intent://search.google.com/local/writereview?placeid=' + pid + '#Intent;scheme=https;package=com.google.android.apps.maps;S.browser_fallback_url=' + encodeURIComponent(g) + ';end';
+  const h = '<!doctype html><html lang="hi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vaishnavi Jewels - Google review</title>'
+    + '<meta property="og:title" content="⭐ Vaishnavi Jewels ka Google review dijiye"><meta property="og:description" content="Apni jewellery ki photo ke saath - sirf 1 minute. Shukriya! 🙏">'
+    + '<meta property="og:image" content="' + VJ_RV_POSTER + '"><meta property="og:type" content="website"><meta name="robots" content="noindex">'
+    + '<style>body{margin:0;font-family:system-ui,sans-serif;background:#FAF5EB;color:#3a2a14;text-align:center;padding:28px 18px}h1{font-size:22px;margin:10px 0 6px}p{font-size:16px;margin:6px 0 18px}a.b{display:block;max-width:420px;margin:12px auto;padding:16px;border-radius:12px;background:#6E5028;color:#fff;font-size:18px;font-weight:700;text-decoration:none}a.o{background:#fff;color:#6E5028;border:2px solid #6E5028}</style></head><body>'
+    + '<img src="https://vaishnavijewels.com/logo_vaishnavi_jewels.png" alt="Vaishnavi Jewels" style="max-width:220px;width:60%"><h1>Google review - photo ke saath ⭐</h1><p>Review page par <b>"Add photos"</b> dabaiye. Likhna nahi hai? Keyboard ka <b>🎤 mic</b> dabaiye.</p>'
+    + '<a class="b" id="app" href="' + intent + '">Google Maps app mein review dein</a><a class="b o" href="' + g + '">Browser mein review dein</a>'
+    + '<script>(function(){var a=/Android/i.test(navigator.userAgent);setTimeout(function(){location.href=a?' + JSON.stringify(intent) + ':' + JSON.stringify(g) + ';},400);})();</script></body></html>';
+  return new Response(h, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=600', 'x-robots-tag': 'noindex' } }); }
 let vjRvOk = false;
 async function vjRvT(env) { if (vjRvOk) return; await env.DB.batch([
   env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_review_ask (tok TEXT PRIMARY KEY, no TEXT, mobile TEXT, ts INTEGER, img TEXT, itok TEXT)'),
@@ -5814,7 +5828,8 @@ export default {
     if (p === '/hooks/rfid-demo') return (url.hostname === VJ_HOST || env.VJ_DEV === '1') ? vjRfidDemo(request, env, url) : reply('Not found', 404); // C-20261029-RFIDLIVE
     if (p === '/hooks/vj-reviewsent') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjReviewSent(url, env) : reply('not found', 404); // C-20261106-REVIEWASK2
     if (p === '/hooks/vj-reviewbell' || p === '/hooks/vj-reviewdue' || p === '/hooks/vj-reviewimg') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-reviewbell' ? vjReviewBell(url, env) : p === '/hooks/vj-reviewdue' ? vjReviewDue(url, env) : vjReviewImg(url, env)) : reply('Method not allowed', 405); // C-20261102-REVIEWASK
-    if (p.startsWith('/r/')) return vjReviewClick(request, env, ctx, url); // C-20261102-REVIEWASK: tracked review button -> Google
+    if (p.startsWith('/r/')) return vjReviewClick(request, env, ctx, url);
+    if (p === '/review' && request.method === 'GET' && url.hostname === VJ_HOST) return vjReviewPage(); // C-20261106-REVIEWLINK // C-20261102-REVIEWASK: tracked review button -> Google
     if (p === '/hooks/vj-enqbulk') return ((request.method === 'GET' || request.method === 'HEAD') && (url.hostname === VJ_HOST || env.VJ_DEV === '1')) ? vjEnqBulk(env, ctx) : reply('Method not allowed', 405); // C-20261103-ENQBULK (owner-approved one-off)
     if (p === '/hooks/vj-enqbell' || p === '/hooks/vj-enqdue') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-enqbell' ? vjEnqBell(env) : vjEnqDue(url, env)) : reply('Method not allowed', 405); // C-20261102-ENQREMIND
     if (p === '/hooks/vj-chatmode' || p === '/hooks/vj-chathot' || p === '/hooks/vj-chatdue' || p === '/hooks/vj-chatdone') return (request.method === 'GET' && url.hostname === VJ_HOST && env.DB) ? (p === '/hooks/vj-chatmode' ? vjChatModeHook(url, env) : p === '/hooks/vj-chathot' ? vjChatHotHook(url, env, ctx) : p === '/hooks/vj-chatdue' ? vjChatDue(url, env) : vjChatDone(url, env)) : reply('Method not allowed', 405); // C-20261103-HANDOVER
