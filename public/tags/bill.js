@@ -280,6 +280,8 @@
       <div class="actions" style="margin:0 0 8px"><button type="button" class="btn" id="bnewest">New estimate (stock pieces or a new design)</button></div>
       <div class="row" style="align-items:end"><label style="flex:0 1 200px">Month <input id="bmonth" type="month"></label><label style="flex:0 1 220px">Customer name or mobile (all bills) <input id="bfmob" autocomplete="off" maxlength="40" placeholder="type name or mobile no."></label>
         <div class="actions" style="margin:0"><button type="button" class="btn ghost" id="bxl">Download summary (Excel)</button><button type="button" class="btn ghost" id="bxlall">All months (Excel)</button><button type="button" class="btn ghost" id="bxwa" hidden>WhatsApp party bills</button><button type="button" class="btn ghost" id="bchselb" title="Tick bills of one party below, then make one challan for the parcel">&#128424; Delivery challan for selected</button></div></div>
+      <div class="row" style="align-items:end;margin-top:6px"><label style="flex:0 1 170px">Print from <input id="bpfrom" type="date"></label><label style="flex:0 1 170px">to <input id="bpto" type="date"></label>
+        <div class="actions" style="margin:0"><button type="button" class="btn" id="bpall" title="One copy of every bill for these dates (and the customer typed above) - or only the ticked bills">&#128424; Print all bills (1 copy each)</button></div></div>
       <div class="list"><table class="items" style="min-width:640px"><thead><tr><th>Date</th><th>Number</th><th>Type</th><th>Customer</th><th>Design · item</th><th>Amount (without GST)</th><th>Fine gold</th><th>By</th><th></th></tr></thead><tbody id="bbook"></tbody></table></div>
       <p class="hint" id="bbookmsg"></p>`;
     $("p-rates").parentNode.insertBefore(sec, $("p-rates"));
@@ -302,7 +304,7 @@
     $("bxl").addEventListener("click", () => xl($("bmonth").value || today().slice(0, 7))); $("bxlall").addEventListener("click", () => xl("all")); $("bxwa").addEventListener("click", e => partyWA(e.currentTarget));
     $("bF").addEventListener("input", () => { editF(); render(); }); /* C-20261101-EDITRATES */ $("bogregb").addEventListener("click", ogReg); /* C-20261101-OGREG */ /* owner 27/10 18:08: "Amount before GST" box removed - only the final amount is typed */ $("bfinalgo").addEventListener("click", applyFinal); $("bfinal").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applyFinal(); } }); /* C-20261027-FINALAMT */  ["bogno", "bogfine", "bograte"].forEach(i => $(i).addEventListener("input", () => totals())); /* C-20261027-OGBAL */  /* owner 27/10 12:21 (C-20261027-BILLTARGET) */ $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { if (B.title === "Estimate") { B.estPhotos = $("bphoto").checked; if (!B.estPhotos) B.summ = true; } else B.photos = $("bphoto").checked; phSync(); render(); }); $("bsumm").addEventListener("change", () => { B.summ = $("bsumm").checked; }); /* C-20261101-ESTSUMMARY */ $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
     $("bclear").addEventListener("click", () => { estDefaults(); B.editNo = null; B.revOf = null; /* C-20261105-ESTREOPEN */ B.final = 0; { const bf = $("bfinal"); if (bf) bf.value = ""; } { const bt = $("btarget"); if (bt) bt.value = ""; ["bogno", "bogfine", "bograte"].forEach(i => { const x = $(i); if (x) x.value = ""; }); } { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.designs = []; drawDesigns(); B.option = ""; document.querySelectorAll("input[name=bopt]").forEach(x => { x.checked = x.value === ""; }); B.cust = ""; document.querySelectorAll("input[name=bcust]").forEach(x => { x.checked = x.value === ""; }); B.nbb = false; $("bnbb").checked = false; B.nbbAuto = false; B.disc = {}; B.rates = {}; B.quals = {}; B.oth = {}; B.frates = {}; B.prates = {}; B.pdrates = {}; B.mkamt = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF", "baddr", "barea", "bstate", "bpin"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
-    $("bsave").addEventListener("click", save); $("bchselb").addEventListener("click", chSel); // C-20261102-CHMULTI
+    $("bsave").addEventListener("click", save); $("bchselb").addEventListener("click", chSel); $("bpall").addEventListener("click", e => printAll(e.currentTarget)); // owner 07/11 16:25 (C-20261107-PRINTALL) // C-20261102-CHMULTI
     $("bback").addEventListener("click", () => { const c = document.querySelector('nav button[data-tab="check"]'); if (c) c.click(); });
   }
   // owner 26/10/2026 (C-20261026-BILLNOW): Price check > Bill now opens a fresh bill with that piece; weights come from the tag (not editable),
@@ -868,11 +870,30 @@
     doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(80);
     const notes = ["All diamonds are third-party certified (IGI / EGL / TGL) and all gold is BIS HUID hallmarked.", b.option ? "Diamonds: " + (optName(b) || b.option) + "." : "", b.usd ? "US dollar figures are indicative only; billing is in Indian rupees." : ""].filter(Boolean);
     doc.text(doc.splitTextToSize(notes.join(" "), W - 2 * M), M, y);
-    return doc.output("blob");
+    return into ? into : doc.output("blob");
   }
-  async function makePdf(b, photos, summ) {
-    if (summ && b.title === "Estimate") return summaryPdf(b); // C-20261101-ESTSUMMARY: estimates only, never bills
-    const { jsPDF } = window.jspdf, doc = new jsPDF({ unit: "mm", format: "a4" });
+  // owner 07/11/2026 16:25 (C-20261107-PRINTALL): many bills printed together, one copy each - by date range and / or the customer typed in the search box;
+  // if bills are ticked in the list, only the ticked ones. One PDF, each bill starting on a new page, sent to the printer once.
+  async function printAll(btn) { const m = $("bbookmsg"), fr = $("bpfrom").value, to = $("bpto").value, ticked = [...document.querySelectorAll("input.bchsel:checked")].map(x => x.dataset.no);
+    const fraw = String(($("bfmob") || {}).value || "").trim(), mob = /[a-z]/i.test(fraw) ? "" : fraw.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""), nm = /[a-z]/i.test(fraw) ? fraw.toLowerCase().replace(/\s*ji$/, "").replace(/\s+/g, " ").trim() : "";
+    if (!ticked.length && !fr && !to && mob.length < 4 && nm.length < 2) { m.textContent = "Choose dates (Print from / to), type a customer above, or tick bills - then Print all."; return; }
+    btn.disabled = true; const t0 = btn.textContent;
+    try { const mo = $("bmonth").value || today().slice(0, 7), all = !!(fr || to || mob.length >= 4 || nm.length >= 2);
+      const r = await fetch("/api/vj/bills?month=" + encodeURIComponent(all ? "all" : mo), { credentials: "same-origin" }), j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+      let L = (j.bills || []).filter(b => b.title === "Bill" && !b.cancelled);
+      if (ticked.length) L = L.filter(b => ticked.includes(b.no)); else {
+        if (fr) L = L.filter(b => String(b.date) >= fr); if (to) L = L.filter(b => String(b.date) <= to);
+        if (mob.length >= 4) L = L.filter(b => String(b.mobile || "").replace(/\D/g, "").includes(mob)); if (nm.length >= 2) L = L.filter(b => String(b.name || "").toLowerCase().replace(/\s+/g, " ").includes(nm)); }
+      L.sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.no).localeCompare(String(b.no)));
+      if (!L.length) { m.textContent = "No bills for that choice."; return; } if (L.length > 60 && !confirm(L.length + " bills will print. Go ahead?")) return;
+      let doc = null; for (let i = 0; i < L.length; i++) { btn.textContent = "Preparing " + (i + 1) + " / " + L.length + "…";
+        const rr = await fetch("/api/vj/bill?no=" + encodeURIComponent(L[i].no), { credentials: "same-origin" }), jj = await rr.json(); if (!rr.ok) throw new Error(L[i].no + ": " + (jj.error || rr.status));
+        if (!doc) { const blob0 = null; doc = new window.jspdf.jsPDF({ unit: "mm", format: "a4" }); await makePdf(jj.bill, B.photos, false, doc); doc.deletePage(1); } else await makePdf(jj.bill, B.photos, false, doc); }
+      printBlob(doc.output("blob"), m); m.textContent = L.length + " bill" + (L.length === 1 ? "" : "s") + " (" + L[0].no + (L.length > 1 ? " … " + L[L.length - 1].no : "") + ") sent to the printer, 1 copy each.";
+    } catch (e) { m.textContent = "Could not print all (" + (e.message || e) + ")."; } finally { btn.disabled = false; btn.textContent = t0; } }
+  async function makePdf(b, photos, summ, into) {
+    if (summ && b.title === "Estimate" && !into) return summaryPdf(b); // C-20261101-ESTSUMMARY: estimates only, never bills
+    const { jsPDF } = window.jspdf, doc = into || new jsPDF({ unit: "mm", format: "a4" }); if (into) into.addPage(); // C-20261107-PRINTALL: several bills in one PDF
     const W = 210, M = 14; let y = 14;
     y += 6; // owner 16/10/2026 19:31: no company name, logo or address on bills / estimates
     doc.setTextColor(20); doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.text(b.title, M, y);
