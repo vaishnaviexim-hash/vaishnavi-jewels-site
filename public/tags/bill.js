@@ -888,7 +888,8 @@
       if (!L.length) { m.textContent = "No bills for that choice."; return; } if (L.length > 60 && !confirm(L.length + " bills will print. Go ahead?")) return;
       let doc = null; for (let i = 0; i < L.length; i++) { btn.textContent = "Preparing " + (i + 1) + " / " + L.length + "…";
         const rr = await fetch("/api/vj/bill?no=" + encodeURIComponent(L[i].no), { credentials: "same-origin" }), jj = await rr.json(); if (!rr.ok) throw new Error(L[i].no + ": " + (jj.error || rr.status));
-        if (!doc) { const blob0 = null; doc = new window.jspdf.jsPDF({ unit: "mm", format: "a4" }); await makePdf(jj.bill, B.photos, false, doc); doc.deletePage(1); } else await makePdf(jj.bill, B.photos, false, doc); }
+        if (!doc) { doc = new window.jspdf.jsPDF({ unit: "mm", format: "a4" }); await makePdf(jj.bill, B.photos, false, doc); doc.deletePage(1); } else await makePdf(jj.bill, B.photos, false, doc);
+        if (i < L.length - 1 && doc.getNumberOfPages() % 2 === 1) doc.addPage(); } // owner 16:31: the printer prints both sides - a blank back page so every bill starts on a NEW sheet
       printBlob(doc.output("blob"), m); m.textContent = L.length + " bill" + (L.length === 1 ? "" : "s") + " (" + L[0].no + (L.length > 1 ? " … " + L[L.length - 1].no : "") + ") sent to the printer, 1 copy each.";
     } catch (e) { m.textContent = "Could not print all (" + (e.message || e) + ")."; } finally { btn.disabled = false; btn.textContent = t0; } }
   async function makePdf(b, photos, summ, into) {
