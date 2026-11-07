@@ -1593,20 +1593,25 @@ const VJ_RV_POOL = { // C-20261107-RVPOOL: real pieces (Media_Index) made model-
 const vjRvCat = c => { c = String(c || '').toLowerCase().trim(); if (/gents/.test(c)) return 'gents ring'; if (/ring/.test(c) && !/ear/.test(c)) return 'ring'; if (/ear|bali|jhumk|stud/.test(c)) return 'earring';
   if (/pendant\s*set|\bps\b/.test(c)) return 'pendant set'; if (/mangal/.test(c)) return 'mangalsutra'; if (/neck|haar|choker|\bns\b/.test(c)) return 'necklace'; if (/bangle|kada/.test(c)) return 'bangle';
   if (/bracelet/.test(c)) return 'bracelet'; if (/pendant/.test(c)) return 'pendant'; if (/nose/.test(c)) return 'nose pin'; if (/chain/.test(c)) return 'chain'; return c; };
-function vjReviewPage() { const pid = 'ChIJa5MF_XNS4DsR72RsaVArQ7w', web = 'https://search.google.com/local/writereview?placeid=' + pid, g = VJ_RV_LINK;
-  const intent = 'intent://search.google.com/local/writereview?placeid=' + pid + '#Intent;scheme=https;package=com.google.android.apps.maps;S.browser_fallback_url=' + encodeURIComponent(g) + ';end';
+function vjReviewPage() { const pid = 'ChIJa5MF_XNS4DsR72RsaVArQ7w', g = VJ_RV_LINK;
+  // owner 07/11 09:21-13:37: WhatsApp opens business links in its OWN browser (iPhone and Android), where Google is not signed in.
+  // iPhone: jump to Safari (x-safari-, owner-tested OK 09:31). Android: jump to Chrome (signed in) with an intent - never load g.page inside WhatsApp's browser.
+  const chrome = 'intent://vaishnavijewels.com/review?c=1#Intent;scheme=https;package=com.android.chrome;end';
+  const maps = 'intent://www.google.com/maps/search/?api=1&query=Vaishnavi+Jewels+Surat&query_place_id=' + pid + '#Intent;scheme=https;package=com.google.android.apps.maps;end';
   const h = '<!doctype html><html lang="hi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vaishnavi Jewels - Google review</title>'
     + '<meta property="og:title" content="⭐ Vaishnavi Jewels ka Google review dijiye"><meta property="og:description" content="Apni jewellery ki photo ke saath - sirf 1 minute. Shukriya! 🙏">'
     + '<meta property="og:image" content="' + VJ_RV_POSTER + '"><meta property="og:type" content="website"><meta name="robots" content="noindex">'
-    + '<style>body{margin:0;font-family:system-ui,sans-serif;background:#FAF5EB;color:#3a2a14;text-align:center;padding:28px 18px}h1{font-size:22px;margin:10px 0 6px}p{font-size:16px;margin:6px 0 18px}a.b{display:block;max-width:420px;margin:12px auto;padding:16px;border-radius:12px;background:#6E5028;color:#fff;font-size:18px;font-weight:700;text-decoration:none}a.o{background:#fff;color:#6E5028;border:2px solid #6E5028}</style></head><body>'
-    + '<img src="https://vaishnavijewels.com/logo_vaishnavi_jewels.png" alt="Vaishnavi Jewels" style="max-width:220px;width:60%"><h1>Google review - photo ke saath ⭐</h1><p>Review page par <b>"Add photos"</b> dabaiye. Likhna nahi hai? Keyboard ka <b>🎤 mic</b> dabaiye.</p>'
-    // owner 07/11 09:21: on iPhone WhatsApp opens links in its OWN browser, where Google is not signed in -> jump out to Safari / Maps / Chrome (signed in there)
-    + '<div id="and"><a class="b" href="' + intent + '">Google Maps app mein review dein</a><a class="b o" href="' + g + '">Browser mein review dein</a></div>'
-    + '<div id="ios" style="display:none"><a class="b" href="x-safari-' + g + '">Safari mein review dein</a><a class="b o" href="comgooglemaps://?q=Vaishnavi+Jewels+Parle+Point+Surat">Google Maps app mein kholiye</a><a class="b o" href="googlechromes://' + g.replace(/^https:\/\//, '') + '">Chrome mein kholiye</a>'
-    + '<p style="font-size:14px">Google Maps app mein: <b>Reviews → Write a review</b></p></div>'
-    + '<script>(function(){var u=navigator.userAgent,a=/Android/i.test(u),i=/iPhone|iPad|iPod/i.test(u)||(/Macintosh/.test(u)&&navigator.maxTouchPoints>1);'
-    + 'if(i){document.getElementById("and").style.display="none";document.getElementById("ios").style.display="block";}'
-    + 'setTimeout(function(){location.href=a?' + JSON.stringify(intent) + ':i?' + JSON.stringify('x-safari-' + g) + ':' + JSON.stringify(g) + ';},400);})();</script></body></html>';
+    + '<style>body{margin:0;font-family:system-ui,sans-serif;background:#FAF5EB;color:#3a2a14;text-align:center;padding:28px 18px}h1{font-size:22px;margin:10px 0 6px}p{font-size:16px;margin:6px 0 18px}a.b{display:block;max-width:420px;margin:12px auto;padding:16px;border-radius:12px;background:#6E5028;color:#fff;font-size:18px;font-weight:700;text-decoration:none}a.o{background:#fff;color:#6E5028;border:2px solid #6E5028}.x{display:none}</style></head><body>'
+    + '<img src="https://vaishnavijewels.com/logo_vj_bold.png" alt="Vaishnavi Jewels" style="max-width:200px;width:55%"><h1>Google review - photo ke saath ⭐</h1><p>Review page par <b>"Add photos"</b> dabaiye. Likhna nahi hai? Keyboard ka <b>🎤 mic</b> dabaiye.</p>'
+    + '<div id="and" class="x"><a class="b" href="' + chrome + '">Chrome mein review dein</a><a class="b o" href="' + maps + '">Google Maps app mein kholiye</a><p style="font-size:14px">Maps app mein: <b>Reviews → Write a review</b></p></div>'
+    + '<div id="ios" class="x"><a class="b" href="x-safari-' + g + '">Safari mein review dein</a><a class="b o" href="comgooglemaps://?q=Vaishnavi+Jewels+Parle+Point+Surat">Google Maps app mein kholiye</a><a class="b o" href="googlechromes://' + g.replace(/^https:\/\//, '') + '">Chrome mein kholiye</a><p style="font-size:14px">Google Maps app mein: <b>Reviews → Write a review</b></p></div>'
+    + '<div id="web" class="x"><a class="b" href="' + g + '">Google review dein</a></div>'
+    + '<script>(function(){var u=navigator.userAgent,q=location.search,a=/Android/i.test(u),i=/iPhone|iPad|iPod/i.test(u)||(/Macintosh/.test(u)&&navigator.maxTouchPoints>1),'
+    + 'inapp=/WhatsApp|FBAN|FBAV|Instagram|; wv\\)|\\bwv\\b/i.test(u),G=' + JSON.stringify(g) + ';'
+    + 'function show(id){document.getElementById(id).style.display="block";}'
+    + 'if(i){show("ios");setTimeout(function(){location.href="x-safari-"+G;},300);}'
+    + 'else if(a&&inapp&&q.indexOf("c=1")<0){show("and");setTimeout(function(){location.href=' + JSON.stringify(chrome) + ';},300);}'
+    + 'else{show("web");setTimeout(function(){location.href=G;},300);}})();</script></body></html>';
   return new Response(h, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex' } }); }
 let vjRvOk = false;
 async function vjRvT(env) { if (vjRvOk) return; await env.DB.batch([
