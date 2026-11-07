@@ -872,7 +872,8 @@ function vjQPrice(gold, dv, extra, st, mk) { // final price incl. GST, or 0 when
   const mv = !g0 ? 0 : mk === 'flat' ? 1600 * nt : Math.max((g0.net > st.mk.limit ? st.mk.base : st.mk.small) * nt, Number(st.mk.min) || 0) + gv * st.mk.pct / 100;
   return vjQUp(vjQUp(gv + cv + mv + dv + extra, 100) * (1 + st.gst / 100), 1000);
 }
-const vjQOptRate = (d, opt, st) => { if (d.shape === 'Polki' || /party/i.test(String(d.q || '')) || VJ_Q_NONDIA.test(String(d.q || '') + ' ' + String(d.code || ''))) return Number(d.rate) || 0; if (opt === 'lgd') return 23000;
+const vjQOptRate = (d, opt, st, own) => { if (d.shape === 'Polki' || /party/i.test(String(d.q || '')) || VJ_Q_NONDIA.test(String(d.q || '') + ' ' + String(d.code || ''))) return Number(d.rate) || 0; if (opt === 'lgd') return 23000;
+  if (opt === 'own' && own) return d.shape === 'Fancy' && own.fancy > 0 ? own.fancy : own.rate; // owner 07/11 13:52: a quality typed on the bill with its own rate
   if (opt === 'fg') { const s3 = ['Round', 'Choki', 'Fancy'].includes(d.shape) ? d.shape : 'Round'; return Number(st.rates['VVS FG|' + s3]) || (s3 === 'Fancy' ? 95000 : 65000); } // owner 29/10 (C-20261029-VVSFG)
   const q = opt === 'gh' ? 'VS GH' : 'VS IJ', sh = ['Round', 'Choki', 'Fancy'].includes(d.shape) ? d.shape : 'Round'; return Number(st.rates[q + '|' + sh]) || Number(st.rates[q + '|Round']) || 0; };
 const vjQNum = (v, lo, hi, int) => { if (v === '' || v == null) return null; const n = Number(v); return isFinite(n) && n >= lo && n <= hi && (!int || Number.isInteger(n)) ? n : NaN; };
@@ -904,7 +905,7 @@ async function vjQuote(request, env, who, ctx) {
       if (isNaN(other) || isNaN(ppcs) || isNaN(prate)) return vjDeny(400, no + ': polki pcs 0-10000, rate per pc Rs 1-1,00,000 and other charges must be whole rupees');
       const dl = Array.isArray(i.dias) ? i.dias : []; if (dl.length > 20) return vjDeny(400, no + ': at most 20 diamond lines');
       const dias = [];
-      for (const d0 of dl) { const d = d0 && typeof d0 === 'object' ? d0 : {}, q = VJ_Q_QUALS.includes(d.q) ? d.q : '', shape = VJ_Q_SHAPES.includes(d.shape) ? d.shape : '';
+      for (const d0 of dl) { const d = d0 && typeof d0 === 'object' ? d0 : {}, q = VJ_Q_QUALS.includes(d.q) ? d.q : (/^[A-Za-z0-9][A-Za-z0-9 .\-\/+]{1,23}$/.test(String(d.q || '').trim()) ? String(d.q).trim().toUpperCase() : ''), shape = VJ_Q_SHAPES.includes(d.shape) ? d.shape : ''; // owner 07/11 13:52: any quality can be typed (e.g. VS SI FG) with its own rate
         const ct = vjQNum(d.ct, 0.001, 200), pcs = vjQNum(d.pcs, 0, 100000, true) ?? 0, r0 = vjQNum(d.rate, 1, 5000000), rate = r0 === null ? Number(st.rates[q + '|' + shape]) || 0 : r0;
         if (!q || !shape || !(ct > 0) || !(rate > 0) || isNaN(pcs)) return vjDeny(400, no + ': each diamond line needs quality, shape, ct (up to 200), a rate per ct, and whole pcs');
         dias.push({ q, pcs, shape, ct: Math.round(ct * 1000) / 1000, rate: Math.round(rate) }); }
@@ -1106,7 +1107,10 @@ async function vjBill(request, env, who, ctx) { // every login may make bills (o
     const tunch = isNaN(tn) ? 0 : Math.round(tn * 1000) / 1000, src = { desc: vjClean(i.desc, 60), k, net: Math.round(net * 1000) / 1000, tunch, dias, ppcs, prate, other };
     vtags.push({ id: 'new-' + (n + 1), label: src.desc || (tunch ? 'Chain' : 'New design'), designNo: '', catName: 'New design', kind: 'design', newDesign: true, src,
       gold: [{ k, net: src.net, ...(tunch ? { tunch } : {}) }], dias, ...(ppcs ? { polki: { pcs: ppcs, rate: prate } } : {}), ...(other ? { other: { amt: other } } : {}) }); }
-  const option = ['gh', 'ij', 'fg', 'lgd'].includes(b && b.option) ? b.option : '', usd0 = Math.round(Number(b && b.usd) * 100) / 100, usd = usd0 >= 50 && usd0 <= 200 ? usd0 : 0;
+  const ownQ = String(b && b.ownQ || '').trim().toUpperCase(), ownRate = vjQNum(b && b.ownRate, 1000, 1000000, true), ownFancy = vjQNum(b && b.ownFancy, 1000, 1000000, true);
+  if (b && b.option === 'own' && (!/^[A-Z0-9][A-Z0-9 .\-\/+]{1,23}$/.test(ownQ) || !(ownRate > 0))) return vjDeny(400, 'Other quality: type the quality (e.g. VS SI FG) and its rate per ct (Rs 1,000 - 10,00,000)');
+  const own = b && b.option === 'own' ? { q: ownQ, rate: ownRate, fancy: ownFancy > 0 ? ownFancy : 0 } : null;
+  const option = ['gh', 'ij', 'fg', 'lgd'].includes(b && b.option) || own ? b.option : '', usd0 = Math.round(Number(b && b.usd) * 100) / 100, usd = usd0 >= 50 && usd0 <= 200 ? usd0 : 0;
   const cust = ['mihir', 'shilpi', 'abhinav'].includes(b && b.cust) ? b.cust : ''; // C-20261027-ESTOWNER: whose customer (for the follow-up reminder and the morning report)
   const allIds = ids.concat(vtags.map(t => t.id));
   const disc = {}; if (b && b.disc && typeof b.disc === 'object') for (const id of allIds) if (b.disc[id] != null) disc[id] = String(b.disc[id]).slice(0, 12);
@@ -1153,12 +1157,12 @@ async function vjBill(request, env, who, ctx) { // every login may make bills (o
   const sRow = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first();
   const s = sRow ? JSON.parse(sRow.data) : {};
   vtags.forEach(t => tags.push(t)); // C-20261027-ESTBILL: the typed designs are priced like tags
-  if (option) { const stQ = vjQSt(s); tags.forEach(t => { t.dias = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map(d => Object.assign({}, d, { rate: vjQOptRate(d, option, stQ) })); }); } // diamonds choice (C-20261027-ESTBILL)
+  if (option) { const stQ = vjQSt(s); tags.forEach(t => { t.dias = (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map(d => Object.assign({}, d, { rate: vjQOptRate(d, option, stQ, own) })); }); } // diamonds choice (C-20261027-ESTBILL)
   const calc = vjBillCalc(tags, { F, mode, settle, g2g: b && b.g2g === 'nett' ? 'nett' : 'ws', disc, rates, frates, prates, pdrates, mkamt, og, final, purity: s.purity, making: s.making, gst: s.gst, defRates: s.defaultRates || VJ_DEF_RATES });
   { const miss = []; calc.rows.forEach(r => (r.dias || []).forEach(d => { if (d.ct > 0 && !(d.rate > 0) && !(Number(rates[r.id] && rates[r.id][d.idx]) === -1) && !VJ_Q_NONDIA.test(d.q)) miss.push((r.design ? r.design + ' ' : '') + (r.label || r.id) + ' (' + d.shape + ' ' + d.q + ', ' + d.ct + ' ct)'); }));
     if (miss.length) return vjDeny(400, 'diamond rate missing on ' + miss.slice(0, 6).join('; ') + (miss.length > 6 ? ' and ' + (miss.length - 6) + ' more' : '') + ' - type the rate per ct on the bill (or 0 for a party diamond)'); } // C-20261028-SIGHRATE: never Rs 0 diamonds by mistake
   calc.rows.forEach((r, i) => { const ph = tags[i].photo; if (typeof ph === 'string' && /^[0-9a-f]{32}$/.test(ph)) r.photo = ph; if (tags[i].src) r.src = tags[i].src; }); // owner 16/10: photo on the bill; src = the typed design (C-20261027-ESTBILL)
-  const bill = Object.assign({ no, title, date, name, city, mobile, ...adr, F, nbb: !!(b && b.nbb === true), by: who.email, byName: who.name, at: new Date().toISOString(), ...(option ? { option } : {}), ...(usd ? { usd } : {}), ...(cust ? { cust } : {}), ...(title === 'Bill' && ogNo ? { ogNo } : {}) }, calc); // nbb: 'No Buy Back No Exchange' stamp (owner 17/10, C-20261017-NBB)
+  const bill = Object.assign({ no, title, date, name, city, mobile, ...adr, F, nbb: !!(b && b.nbb === true), by: who.email, byName: who.name, at: new Date().toISOString(), ...(option ? { option } : {}), ...(own ? { ownQ: own.q, ownRate: own.rate, ...(own.fancy ? { ownFancy: own.fancy } : {}) } : {}), ...(usd ? { usd } : {}), ...(cust ? { cust } : {}), ...(title === 'Bill' && ogNo ? { ogNo } : {}) }, calc); // nbb: 'No Buy Back No Exchange' stamp (owner 17/10, C-20261017-NBB)
   if (adr.addr || adr.pin) { try { await vjAbPut(env, { name, mobile, city, ...adr }, who, title.toLowerCase(), Date.now()); } catch (e) {} } // C-20261102-ADDRBOOK: typed / edited address saved to the address book
   if (editNo) { // C-20261026-BILLEDIT (owner 26/10/2026 17:32 'i should be able to edit the bill'): owners only; the old version is kept in vj_bill_old
     if (who.role !== 'admin') return vjDeny(403, 'only Abhinav or Shilpiji can edit a saved bill');
