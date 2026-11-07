@@ -37,7 +37,7 @@
   const css = `#p-korder .kosum{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px}#p-korder .kosum span{border:1px solid var(--line);border-radius:999px;padding:4px 12px;font-weight:600}
 #p-korder .kobox{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:8px 0}#p-korder .kobox h3{margin:0 0 6px}
 #p-korder .kodraw{max-width:100%;max-height:340px;border:1px solid var(--line);border-radius:8px;display:block;margin-top:6px}
-#p-korder tr.kox td{opacity:.5;text-decoration:line-through}#p-korder .kolate{color:var(--bad);font-weight:700}
+#p-korder .kount{border:3px solid #8b1a1a;background:#fff1f0;border-radius:12px;padding:10px 14px;margin:6px 0 12px;color:#7a1010}#p-korder .kount h3{margin:0 0 8px;font-size:22px;line-height:1.25;font-weight:800;color:#8b1a1a}#p-korder .kount .kuc{display:flex;flex-wrap:wrap;gap:8px}#p-korder .kount button.kuch{font:inherit;font-size:16px;font-weight:700;background:#8b1a1a;color:#fff;border:0;border-radius:8px;padding:7px 12px;cursor:pointer}#p-korder .kount button.kuch small{font-weight:500;opacity:.9}#p-korder .kount button.kumore{font:inherit;font-size:15px;font-weight:700;background:none;color:#8b1a1a;border:2px solid #8b1a1a;border-radius:8px;padding:6px 12px;cursor:pointer}#p-korder .kount.ok{border:1px solid #2e7d32;background:#eef7ee;color:#1b5e20;padding:6px 12px}#p-korder .kount.ok h3{font-size:15px;color:#1b5e20;margin:0}@media (prefers-color-scheme:dark){#p-korder .kount{background:#3a1212;color:#ffd7d2}#p-korder .kount h3{color:#ffb4aa}#p-korder .kount.ok{background:#12301a;color:#bfe8c3}#p-korder .kount.ok h3{color:#bfe8c3}#p-korder .kount button.kumore{color:#ffb4aa;border-color:#ffb4aa}}#p-korder tr.kox td{opacity:.5;text-decoration:line-through}#p-korder .kolate{color:var(--bad);font-weight:700}
 #p-korder .kodia td input{width:84px}#p-korder .kodia td select{width:110px}#p-korder .kostat{font-weight:700}#p-korder.konoadm .koRate,#p-korder.konoadm .koAdm{display:none}
 #p-korder .kotabs{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}#p-korder .kotabs .btn[aria-pressed="true"]{background:var(--gold);color:#fff;border-color:var(--gold)}
 #p-korder .kopend{display:grid;grid-template-columns:minmax(0,1fr);gap:14px} /* KORDER6: one karigar below another, full width */#p-korder .kopend>div{min-width:0}
@@ -64,7 +64,21 @@
     } catch (e) { if (m) m.textContent = "Could not load karigar orders (" + (e.message || e) + ")."; } }
   const mg = k => !((J.kcfg || {})[k] && J.kcfg[k].managed === false); /* 18:18 C-20261102-KUNMANAGED: Priyank stays manual */
   const ks = () => [...new Set((J.karigars || []).concat(Object.keys(J.kcfg || {})).concat((J.orders || []).map(o => o.karigar).filter(Boolean)))].filter(mg);
-  function summary() { const b = $("koSum"); b.textContent = ""; const L = J.orders || [], c = s => L.filter(o => o.status === s).length;
+  /* C-20261107-UNTAGGED (owner 06/11 20:46): FRONT of the Karigar page, above the parchi box - big red list of codes received from the karigar whose tag is NOT made yet,
+     so he can keep staff tight. Only codes received in VJ Tags (Excel history rows from the karigar sheets are old deliveries, tagged in Ornate - left out). No auto tags. */
+  let unMore = false;
+  function untagged() { const b = $("koUntag"); if (!b) return; b.textContent = ""; const today = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
+    const day = o => String((o.statusAt && o.statusAt.received) ? new Date(new Date(o.statusAt.received).getTime() + 5.5 * 3600e3).toISOString() : (o.tag && o.tag.date) || "").slice(0, 10);
+    const L = (J.orders || []).filter(o => o.status === "received" && !o.tagId && mg(o.karigar) && !(o.history && o.history.from === "Excel"))
+      .map(o => { const d = day(o), n = d ? Math.max(0, Math.round((Date.parse(today) - Date.parse(d)) / 864e5)) : 0; return { o, d, n }; }).sort((a, c) => c.n - a.n || a.o.no - c.o.no);
+    if (!L.length) { b.className = "kount ok"; b.appendChild(el("h3", { textContent: "\u2714 Sab tag ban gaye - jama hua koi code tag ke bina nahi hai." })); return; }
+    b.className = "kount"; b.appendChild(el("h3", { textContent: "\u26a0 " + L.length + " code jama ho gaye, par TAG NAHI BANA" + (L[0].n ? " - sabse purana " + L[0].n + " din se" : "") }));
+    const box = el("div", { className: "kuc" }), max = unMore ? L.length : 12;
+    L.slice(0, max).forEach(({ o, d, n }) => { const c = el("button", { type: "button", className: "kuch", title: "Open order " + o.no }); c.append(String(o.no) + " ", el("small", { textContent: "\u00b7 " + o.karigar + " \u00b7 " + (d ? dmy(d).slice(0, 5) : "?") + " \u00b7 " + (n === 0 ? "aaj" : n + " din") }));
+      c.addEventListener("click", () => openOrder(o)); box.appendChild(c); });
+    if (L.length > 12) { const m = el("button", { type: "button", className: "kumore", textContent: unMore ? "Kam dikhayein" : "+ " + (L.length - 12) + " aur" }); m.addEventListener("click", () => { unMore = !unMore; untagged(); }); box.appendChild(m); }
+    b.appendChild(box); }
+  function summary() { const b = $("koSum"); b.textContent = ""; untagged(); const L = J.orders || [], c = s => L.filter(o => o.status === s).length;
     ["open", "karigar", "received", "tagged", "cancelled"].forEach(s => b.append(el("span", { textContent: ST[s] + ": " + c(s) })));
     const od = L.filter(o => o.overdue).length; if (od) b.append(el("span", { className: "kolate", textContent: "Overdue: " + od })); }
   function render() { document.querySelectorAll("#koTabs .btn").forEach(x => x.setAttribute("aria-pressed", x.dataset.v === view ? "true" : "false")); $("koFilt").hidden = view !== "all";
@@ -951,7 +965,7 @@
         el("div", { className: "kobox", id: "koGoldBox" }, [el("b", { textContent: "Gold issued for this order (OG register) " }), el("p", { className: "hint", id: "koGoldInfo" }),
           el("div", { className: "row", style: "align-items:end" }, [lab("Link", el("select", { id: "koGoldSel" })), el("button", { type: "button", className: "btn ghost", id: "koGoldLink", textContent: "Link" }),
             lab("or issue new: fine g", inp("koGoldFine", "e.g. 4.000", { maxLength: 10, inputMode: "decimal" })), el("button", { type: "button", className: "btn ghost", id: "koGoldNew", textContent: "Issue from OG pool" })])])])]);
-    sec.append(el("h2", { textContent: "Karigar order" }), findBox(), el("div", { className: "kosum", id: "koSum" }),
+    sec.append(el("h2", { textContent: "Karigar order" }), el("div", { id: "koUntag", className: "kount ok" }), findBox(), el("div", { className: "kosum", id: "koSum" }),
       el("div", { className: "actions" }, [el("button", { type: "button", className: "btn", id: "koAdd", textContent: "+ New karigar order", hidden: true }), el("button", { type: "button", className: "btn ghost", id: "koPrP", textContent: "\u{1F5A8} Print pending", hidden: true }), el("button", { type: "button", className: "btn ghost", id: "koPrPdf", textContent: "Pending PDF", hidden: true }), el("button", { type: "button", className: "btn ghost", id: "koXlP", textContent: "Excel pending", hidden: true }),
         el("button", { type: "button", className: "btn ghost", id: "koXl", textContent: "Excel all + account", hidden: true }), el("button", { type: "button", className: "btn ghost", id: "koSetB", textContent: "Settings / import", hidden: true })]),
       el("div", { className: "kobox", id: "koSet", hidden: true }), form, el("p", { className: "hint", id: "koMsg" }),
