@@ -1729,6 +1729,41 @@ async function vjReviewDue(url, env) { // one-time hand-out to Make
   const s = JSON.parse(r.v); if (Date.now() - s.at > 3600e3) return reply('gone', 410);
   return vjJson({ test: s.test, clicksOnly: !!s.clicksOnly, day: s.day, items: s.items, skipped: s.skipped, clicks: s.clicks });
 }
+// C-20261107-XLAUTO (owner 07/11 13:52-16:24): the karigar Excel (D.A.) and CUSTOMERS ACCOUNT update themselves 3x a day (09:30 / 15:00 / 21:30 IST), all in the cloud.
+// A Make schedule rings GET /hooks/vj-xlbell (no data, no secret). The worker keeps a random one-time token (10 min) and sends ONLY {token} to the Make hook;
+// Make fetches /hooks/vj-xldata?t=token once: the karigar orders of Montu / Hiru / Badshah, the bills since 01/10 and the OG register - Make edits the two files.
+const VJ_XL_HOOK = 'https://hook.eu1.make.com/os3j9tnxi3gcffnrl292tud7z9xzqqyh'; // Make hook 4059853 (VJ XLAUTO)
+async function vjXlBell(url, env) {
+  if (!env.DB) return reply('not set up', 503); await vjRvT(env);
+  const ymd = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
+  const c = await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES (?, '1') ON CONFLICT(k) DO UPDATE SET v = CAST(CAST(v AS INTEGER) + 1 AS TEXT) RETURNING v").bind('xlbell:' + ymd).first();
+  if (Number(c && c.v) > 12) return reply('limit reached today', 429);
+  const token = [...crypto.getRandomValues(new Uint8Array(16))].map(b => b.toString(16).padStart(2, '0')).join('');
+  await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('xltok:' + token, JSON.stringify({ at: Date.now(), test: url.searchParams.get('test') === '1' })).run();
+  try { await fetch(VJ_XL_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000), body: JSON.stringify({ token }) }); } catch (e) { return reply('hook not reached', 502); }
+  return reply('ok', 200);
+}
+async function vjXlData(url, env) {
+  const t = String(url.searchParams.get('t') || ''); if (!/^[a-f0-9]{32}$/.test(t)) return reply('not found', 404);
+  await vjRvT(env);
+  const r = await env.DB.prepare('SELECT v FROM vj_meta WHERE k = ?').bind('xltok:' + t).first(); if (!r) return reply('gone', 410);
+  const del = await env.DB.prepare('DELETE FROM vj_meta WHERE k = ? AND v = ?').bind('xltok:' + t, r.v).run(); if (!del.meta || del.meta.changes !== 1) return reply('gone', 410);
+  const s = JSON.parse(r.v); if (Date.now() - s.at > 600e3) return reply('gone', 410);
+  const n3 = x => x == null || x === '' || isNaN(Number(x)) ? null : Math.round(Number(x) * 1000) / 1000;
+  await vjKo3Tables(env); const G = await vjOg2Load(env), outs = new Map(G.outs.filter(o => o && !o.cancelled).map(o => [o.id, o]));
+  const kord = ((((await env.DB.prepare('SELECT data FROM vj_kord ORDER BY karigar, no').all()).results) || []).map(vjParse)).filter(o => o && /montu|hiru|badshah/i.test(String(o.karigar || ''))).map(vjKo3Up)
+    .map(o => { const tg = o.tag || {}, g = o.goldOut ? outs.get(o.goldOut) : null;
+      return { k: o.karigar, no: o.no, status: o.status, cancelled: o.status === 'cancelled', date: o.date || '', est: n3(o.estimate), rate: n3(o.goldRate), party: o.name || '', item: o.itemTxt || o.item || '', kt: o.kt || '',
+        del: tg.date ? { date: tg.date, net: n3(tg.nGold != null ? tg.nGold : tg.gGold), gross: n3(tg.gGold), cs: n3(tg.csWt), stones: n3(tg.csCost) } : null, given: g ? { fine: n3(g.fine), date: g.date || '' } : null }; });
+  const bills = ((((await env.DB.prepare("SELECT data FROM vj_bills WHERE no LIKE 'B-%'").all()).results) || []).map(vjParse)).filter(b => b && b.title === 'Bill' && String(b.date || '') >= '2026-10-01')
+    .map(b => ({ no: b.no, date: String(b.date || '').slice(0, 10), name: b.name || '', city: b.city || '', mobile: String(b.mobile || '').replace(/\D/g, '').slice(-10), cancelled: !!b.cancelled, ogNo: String(b.ogNo || (b.og && b.og.no) || ''),
+      mode: b.goldMode || b.mode || b.opt || '', total: n3(b.original ? b.original.total : b.total), sub: n3(b.sub != null ? b.sub : b.taxable), fine: n3(b.fine != null ? b.fine : b.totFine), gst: n3(b.gst),
+      rows: (b.rows || []).map(x => ({ code: x.design || x.code || '', label: x.label || '', cat: x.cat || '', kt: x.kt || '', net: n3(x.net), gross: n3(x.gross || x.gwt), fine: n3(x.fine), dia: n3(x.dia != null ? x.dia : x.diaAmt), cs: n3(x.cs != null ? x.cs : x.csAmt), making: n3(x.making != null ? x.making : x.mk), amount: n3(x.amount != null ? x.amount : x.amt), keys: Object.keys(x).slice(0, 40) })), keys: Object.keys(b).slice(0, 60) }));
+  const used = (await vjOgList(env)).filter(x => !x.cancelled);
+  const ogs = G.reg.filter(x => x && !x.cancelled && x.no).map(x => { const c = vjOgCalc(x), u = used.filter(y => vjOgN(y.og) === vjOgN(x.no)).map(y => y.no);
+    return { no: x.no, date: String(x.date || '').slice(0, 10), src: x.src || 'party', name: x.name || '', city: x.city || '', mobile: String(x.mobile || '').replace(/\D/g, '').slice(-10), cred: n3(c.credFine), act: n3(c.actFine), acct: !!x.acct, cash: !!x.cash, cashAmt: n3(x.cashAmt || x.amount), bills: u }; });
+  return vjJson({ ok: true, test: !!s.test, at: new Date().toISOString(), kord, bills, ogs });
+}
 async function vjReviewImg(url, env) { // the tag photo for the WhatsApp header, 3 days, random link
   const t = String(url.searchParams.get('t') || ''); if (!/^[A-Za-z0-9_-]{20,24}$/.test(t)) return reply('not found', 404);
   await vjRvT(env);
@@ -5885,6 +5920,7 @@ export default {
     if (p === '/hooks/vj-estbell') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjEstBell(env) : reply('Method not allowed', 405); // C-20261028-ESTNOTBILL
     if (p === '/hooks/rfid-demo') return (url.hostname === VJ_HOST || env.VJ_DEV === '1') ? vjRfidDemo(request, env, url) : reply('Not found', 404); // C-20261029-RFIDLIVE
     if (p === '/hooks/vj-reviewsent') return (request.method === 'GET' && url.hostname === VJ_HOST) ? vjReviewSent(url, env) : reply('not found', 404); // C-20261106-REVIEWASK2
+    if (p === '/hooks/vj-xlbell' || p === '/hooks/vj-xldata') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-xlbell' ? vjXlBell(url, env) : vjXlData(url, env)) : reply('Method not allowed', 405); // C-20261107-XLAUTO
     if (p === '/hooks/vj-reviewbell' || p === '/hooks/vj-reviewdue' || p === '/hooks/vj-reviewimg') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-reviewbell' ? vjReviewBell(url, env) : p === '/hooks/vj-reviewdue' ? vjReviewDue(url, env) : vjReviewImg(url, env)) : reply('Method not allowed', 405); // C-20261102-REVIEWASK
     if (p.startsWith('/r/')) return vjReviewClick(request, env, ctx, url);
     if (p === '/review' && (request.method === 'GET' || request.method === 'HEAD') && url.hostname === VJ_HOST) return vjReviewPage(); // HEAD too: link-preview crawlers // C-20261106-REVIEWLINK // C-20261102-REVIEWASK: tracked review button -> Google
