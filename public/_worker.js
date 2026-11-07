@@ -1600,9 +1600,14 @@ function vjReviewPage() { const pid = 'ChIJa5MF_XNS4DsR72RsaVArQ7w', web = 'http
     + '<meta property="og:image" content="' + VJ_RV_POSTER + '"><meta property="og:type" content="website"><meta name="robots" content="noindex">'
     + '<style>body{margin:0;font-family:system-ui,sans-serif;background:#FAF5EB;color:#3a2a14;text-align:center;padding:28px 18px}h1{font-size:22px;margin:10px 0 6px}p{font-size:16px;margin:6px 0 18px}a.b{display:block;max-width:420px;margin:12px auto;padding:16px;border-radius:12px;background:#6E5028;color:#fff;font-size:18px;font-weight:700;text-decoration:none}a.o{background:#fff;color:#6E5028;border:2px solid #6E5028}</style></head><body>'
     + '<img src="https://vaishnavijewels.com/logo_vaishnavi_jewels.png" alt="Vaishnavi Jewels" style="max-width:220px;width:60%"><h1>Google review - photo ke saath ⭐</h1><p>Review page par <b>"Add photos"</b> dabaiye. Likhna nahi hai? Keyboard ka <b>🎤 mic</b> dabaiye.</p>'
-    + '<a class="b" id="app" href="' + intent + '">Google Maps app mein review dein</a><a class="b o" href="' + g + '">Browser mein review dein</a>'
-    + '<script>(function(){var a=/Android/i.test(navigator.userAgent);setTimeout(function(){location.href=a?' + JSON.stringify(intent) + ':' + JSON.stringify(g) + ';},400);})();</script></body></html>';
-  return new Response(h, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'public, max-age=600', 'x-robots-tag': 'noindex' } }); }
+    // owner 07/11 09:21: on iPhone WhatsApp opens links in its OWN browser, where Google is not signed in -> jump out to Safari / Maps / Chrome (signed in there)
+    + '<div id="and"><a class="b" href="' + intent + '">Google Maps app mein review dein</a><a class="b o" href="' + g + '">Browser mein review dein</a></div>'
+    + '<div id="ios" style="display:none"><a class="b" href="x-safari-' + g + '">Safari mein review dein</a><a class="b o" href="comgooglemaps://?q=Vaishnavi+Jewels+Parle+Point+Surat">Google Maps app mein kholiye</a><a class="b o" href="googlechromes://' + g.replace(/^https:\/\//, '') + '">Chrome mein kholiye</a>'
+    + '<p style="font-size:14px">Google Maps app mein: <b>Reviews → Write a review</b></p></div>'
+    + '<script>(function(){var u=navigator.userAgent,a=/Android/i.test(u),i=/iPhone|iPad|iPod/i.test(u)||(/Macintosh/.test(u)&&navigator.maxTouchPoints>1);'
+    + 'if(i){document.getElementById("and").style.display="none";document.getElementById("ios").style.display="block";}'
+    + 'setTimeout(function(){location.href=a?' + JSON.stringify(intent) + ':i?' + JSON.stringify('x-safari-' + g) + ':' + JSON.stringify(g) + ';},400);})();</script></body></html>';
+  return new Response(h, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex' } }); }
 let vjRvOk = false;
 async function vjRvT(env) { if (vjRvOk) return; await env.DB.batch([
   env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_review_ask (tok TEXT PRIMARY KEY, no TEXT, mobile TEXT, ts INTEGER, img TEXT, itok TEXT)'),
