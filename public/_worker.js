@@ -1148,13 +1148,14 @@ async function vjBill(request, env, who, ctx) { // every login may make bills (o
     return `this piece is already billed: ${String(t.label || t.designNo || id)} is on ${d.no} (${dd}, ${d.name || ''}). Cancel that bill first if it must be billed again.` + (hit.size > 1 ? ` ${hit.size - 1} more piece${hit.size > 2 ? 's are' : ' is'} also already billed.` : ''); };
   if (title === 'Bill') { const hit = await onBill(); if (hit.size) return vjJson({ error: dupMsg(hit), duplicate: true }, 409); }
   // owner 01/11/2026 14:55 (C-20261101-OGREG): Gold to Gold (customer gives fine gold) needs the OG no.; one OG no. on one live bill only
-  const ogNo = vjClean(b && (b.ogNo || (b.og && b.og.no)), 20);
+  const ogNo = vjOgSplit(vjClean(b && (b.ogNo || (b.og && b.og.no)), 80)).map(x => x.replace(/\s+/g, '').toUpperCase()).join(',');
   // owner 01/11 15:00: OG no. NOT compulsory - a Gold to Gold bill is made without it when the party gives the gold later
-  if (title === 'Bill' && ogNo) { const used = (await vjOgList(env)).find(x => !x.cancelled && vjOgN(x.og) === vjOgN(ogNo) && x.no !== editNo);
-    try { const r0 = await env.DB.prepare('SELECT data FROM vj_ogs WHERE no = ?').bind(ogNo.replace(/\s+/g, '').toUpperCase()).first(), o0 = r0 ? vjParse(r0) : null; // C-20261102-OGVENDOR / OGCASH: only a party OG not converted to cash
-      if (o0 && !o0.cancelled && o0.src && o0.src !== 'party') return vjDeny(409, `OG no. ${ogNo} is not a party's old gold (own stock / vendor entry) - it cannot go on a bill`);
-      if (o0 && !o0.cancelled && o0.cash) return vjDeny(409, `OG ${ogNo} already converted to cash on ${vjDmy(o0.cash.date)} (₹${Number(o0.cash.amount || 0).toLocaleString('en-IN')}) — can't adjust in a bill.`); } catch (e) {} // C-20261102-OGDUP (owner 15:27)
-    if (used) return vjDeny(409, `OG ${ogNo} already adjusted in bill ${used.no}${used.name ? ' (' + used.name + ')' : ''}.`); }
+  if (title === 'Bill' && ogNo) { const ogL = await vjOgList(env); for (const one of vjOgSplit(ogNo)) { const used = ogL.find(x => !x.cancelled && vjOgN(x.og) === vjOgN(one) && x.no !== editNo);
+    try { const r0 = await env.DB.prepare('SELECT data FROM vj_ogs WHERE no = ?').bind(vjOgN(one)).first(), o0 = r0 ? vjParse(r0) : null; // C-20261102-OGVENDOR / OGCASH / 07/11 OGACCT
+      if (o0 && !o0.cancelled && o0.src && o0.src !== 'party') return vjDeny(409, `OG no. ${one} is not a party's old gold (own stock / vendor entry) - it cannot go on a bill`);
+      if (o0 && !o0.cancelled && o0.cash) return vjDeny(409, `OG ${one} already converted to cash on ${vjDmy(o0.cash.date)} — can't adjust in a bill.`);
+      if (o0 && !o0.cancelled && o0.acct) return vjDeny(409, `OG ${one} is already adjusted on account (${vjDmy(o0.acct.at)}, ${o0.acct.byName || ''}) — can't go on a bill.`); } catch (e) {}
+    if (used) return vjDeny(409, `OG ${one} already adjusted in bill ${used.no}${used.name ? ' (' + used.name + ')' : ''}.`); } }
   const sRow = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first();
   const s = sRow ? JSON.parse(sRow.data) : {};
   vtags.forEach(t => tags.push(t)); // C-20261027-ESTBILL: the typed designs are priced like tags
@@ -1795,8 +1796,8 @@ async function vjBillPdfHook(url, env, done) {
 // C-20261101-OGREG: every OG no. used on a bill (live and cancelled), in number order; next = highest number + 1, gaps = skipped numbers
 async function vjOgList(env) { if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
   const out = []; ((((await env.DB.prepare("SELECT no, email, data FROM vj_bills WHERE no LIKE 'B-%'").all()).results) || [])).forEach(x => { let d; try { d = JSON.parse(x.data); } catch (e) { return; }
-    const og = String((d && (d.ogNo || (d.og && d.og.no))) || '').trim(); if (!og) return;
-    out.push({ og, no: d.no || x.no, date: d.date || '', name: d.name || '', city: d.city || '', fine: d.og && d.og.recv ? d.og.recv : 0, cancelled: !!d.cancelled, email: x.email }); });
+    const og0 = String((d && (d.ogNo || (d.og && d.og.no))) || '').trim(); if (!og0) return;
+    vjOgSplit(og0).forEach(og => out.push({ og, no: d.no || x.no, date: d.date || '', name: d.name || '', city: d.city || '', fine: d.og && d.og.recv ? d.og.recv : 0, cancelled: !!d.cancelled, email: x.email })); });
   const num = s => { const m = String(s).match(/\d+/); return m ? Number(m[0]) : Infinity; }; out.sort((a, b) => num(a.og) - num(b.og) || String(a.og).localeCompare(String(b.og)));
   return out; }
 // C-20261101-OGTAB (owner 01/11/2026 15:11): OG register - old gold slips entered with OG no. + party (own tab, like New tag). On a Gold to Gold bill the
@@ -1869,6 +1870,7 @@ async function vjOgs(env, who, url) { const all = await vjOgList(env), live = al
     if (r.src === 'vendor') { o.vendor = r.vendor || r.name || ''; o.inv = r.inv || ''; } // C-20261102-OGVENDOR: rate / amount only for admin (below)
     const sr = r.cancelled ? stones.filter(s => s.og === r.no && s.status === 'cancelled') : stOf(r.no); // C-20261102-OGSTONES
     o.stones = sr.map(s => ({ row: s.row, src: s.src, pcs: s.pcs || 0, ct: s.ct || 0, q: s.q || '', shape: s.shape || '', note: s.note || '', st: s.st || '' }));
+    if (r.acct) o.acct = { at: r.acct.at, byName: r.acct.byName || '', note: r.acct.note || '' }; // C-20261107-OGACCT
     if (r.cash) o.cash = { date: r.cash.date, fine: r.cash.fine, rate: who.role === 'sales' ? null : r.cash.rate, amount: who.role === 'sales' ? null : r.cash.amount, note: r.cash.note || '', byName: r.cash.byName || '', at: r.cash.at, edited: r.cash.editedAt ? { at: r.cash.editedAt, byName: r.cash.editedByName || '' } : null }; // C-20261102-OGCASH
     if (Array.isArray(r.cashOld) && r.cashOld.length) o.cashOld = r.cashOld.map(c => ({ date: c.date, fine: c.fine, amount: who.role === 'sales' ? null : c.amount, cancelled: c.cancelled ? { at: c.cancelled.at, byName: c.cancelled.byName, why: c.cancelled.why || '' } : null }));
     if (adm) Object.assign(o, { tunch: r.tunch === '' || r.tunch == null ? null : Number(r.tunch), margin: r.src !== 'party' ? null : (Number(r.tunch) > 0 ? Number(r.margin) : null), credTunch: r.credTunch, actFine: r.actFine, marginFine: r.marginFine });
@@ -1877,7 +1879,7 @@ async function vjOgs(env, who, url) { const all = await vjOgList(env), live = al
     return o; }).sort((a, b) => vjOgNum(a.no) - vjOgNum(b.no) || String(a.no).localeCompare(String(b.no)));
   const nums = [...new Set(live.map(x => x.og).concat(raw.map(r => r.no)).map(vjOgNum).filter(n => n >= 0 && n < 1e7))].sort((a, b) => a - b);
   const next = nums.length ? nums[nums.length - 1] + 1 : 0, lastB = live.slice().sort((a, b) => vjOgNum(a.og) - vjOgNum(b.og)).pop() || null;
-  const free = regOut.filter(r => !r.bill && !r.cancelled && r.src === 'party' && !r.cash).map(r => ({ no: r.no, name: r.name, city: r.city, fine: r.credFine, date: r.date })); // bill prefills the PARTY CREDIT fine
+  const free = regOut.filter(r => !r.bill && !r.cancelled && r.src === 'party' && !r.cash && !r.acct).map(r => ({ no: r.no, name: r.name, city: r.city, fine: r.credFine, date: r.date })); // bill prefills the PARTY CREDIT fine
   const list = (who.role === 'sales' ? all.filter(x => x.email === who.email) : all).map(x => ({ og: x.og, no: x.no, date: x.date, name: x.name, city: x.city, fine: x.fine, cancelled: x.cancelled }));
   const regN = new Set(raw.map(r => vjOgN(r.no))), orphans = who.role === 'sales' ? [] : live.filter(x => !regN.has(vjOgN(x.og))).map(x => ({ og: x.og, no: x.no, date: x.date || '', name: x.name || '' })); // C-20261102-OGDONE: OG nos. on live bills, not in the register
   const outOut = outs.map(o => ({ id: o.id, date: o.date, ogs: o.ogs || [], fine: o.fine, gross: o.gross || 0, to: o.to, karigar: o.karigar || '', note: o.note || '', byName: o.byName || '', cancelled: o.cancelled ? { at: o.cancelled.at, byName: o.cancelled.byName, why: o.cancelled.why || '' } : null, edited: o.editedAt ? { at: o.editedAt, byName: o.editedByName || '' } : null }))
@@ -1915,6 +1917,15 @@ async function vjOgSave(request, env, who) { if (who.role === 'sales') return vj
   if (op === 'out' || op === 'outcancel') return vjOgOutSave(b, env, who, adm, now, byName, op, dateOk);
   if (op === 'dia') return vjOgDiaSave(b, env, who, adm, now, byName);
   if (op === 'cash' || op === 'cashcancel') return vjOgCashSave(b, env, who, adm, now, byName, op, dateOk); // C-20261102-OGCASH
+  if (op === 'acct') { // owner 07/11 14:18 (C-20261107-OGACCT): a party OG adjusted ON ACCOUNT (not bill to bill) - his tick strikes it out; it never goes on a bill
+    if (!adm) return vjDeny(403, 'only Abhinav or Shilpiji can mark an OG adjusted on account');
+    const no = vjOgN(vjClean(b && b.no, 20)); const row = await env.DB.prepare('SELECT data FROM vj_ogs WHERE no = ?').bind(no).first(), old = row ? vjParse(row) : null; if (!old) return vjDeny(404, 'OG ' + no + ' is not in the register');
+    if (old.cancelled) return vjDeny(409, 'OG ' + no + ' is cancelled'); if (old.src && old.src !== 'party') return vjDeny(400, 'only a party OG');
+    if (old.cash) return vjDeny(409, 'OG ' + no + ' is converted to cash');
+    if (b.on === true) { const used = (await vjOgList(env)).find(x => !x.cancelled && vjOgN(x.og) === no); if (used) return vjDeny(409, 'OG ' + no + ' is already on bill ' + used.no); }
+    const rec = Object.assign({}, old); if (b.on === true) rec.acct = { at: now, by: who.email, byName, note: vjClean(b.note, 80) }; else delete rec.acct;
+    await vjOgHist(env, who, 'acct', no, b.on === true ? 'on' : 'off', old); await env.DB.prepare('UPDATE vj_ogs SET data = ?, ts = ? WHERE no = ?').bind(JSON.stringify(rec), Date.now(), no).run();
+    await vjAudit(env, who, 'og-acct', 'ogs/' + no, b.on === true ? 'adjusted on account' : 'tick removed'); return vjJson({ ok: true }); }
   const sIn = Array.isArray(b && b.stones) ? vjOgStonesIn(b.stones) : null; if (typeof sIn === 'string') return vjDeny(400, sIn); let stw = null; // C-20261102-OGSTONES
   const no = vjClean(b && b.no, 20).replace(/\s+/g, '').toUpperCase(); if (!/^[A-Z0-9\-\/]{1,20}$/.test(no)) return vjDeny(400, 'OG no. is needed (e.g. 189)');
   const used = (await vjOgList(env)).find(x => !x.cancelled && vjOgN(x.og) === vjOgN(no));
@@ -2905,6 +2916,7 @@ async function vjOgDiaSave(b, env, who, adm, now, byName) {
   await env.DB.prepare('UPDATE vj_og_dia SET data = ?, status = ? WHERE id = ?').bind(JSON.stringify(d), d.status, id).run();
   await vjAudit(env, who, 'og-dia', 'ogdia/' + id, d.status + (d.karigar ? ' ' + d.karigar : '')); return vjJson({ ok: true }); }
 let vjOgT = false; async function vjOgTable(env) { if (!vjOgT) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_ogs (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjOgT = true; } }
+const vjOgSplit = s => String(s || '').split(/[,;&+]+|\s+and\s+/i).map(x => x.trim()).filter(Boolean).slice(0, 12); // owner 07/11 14:18: several OGs on one bill ('199,200,201')
 const vjOgN = s => String(s || '').toUpperCase().replace(/\s+/g, '').replace(/^OG[-.:#]*/, ''); // C-20261102-OGDONE: 'OG 151' / 'og-151' / '151' are the same OG
 const vjOgNum = s => { const m = String(s).match(/\d+/); return m ? Number(m[0]) : Infinity; };
 async function vjOgsV1(env, who) { /* old version, replaced by vjOgs above (C-20261102-OGREG2) */ await vjOgTable(env); const all = await vjOgList(env), live = all.filter(x => !x.cancelled);
