@@ -18,7 +18,7 @@ Start four to eight weeks before your travel date:
 
 1. **Message us on WhatsApp** with the wedding date, the functions, the outfits and the budget you have in mind.
 2. **See a shortlist on a video call.** Our team shows pieces live, with grading report details for diamond pieces, at a time that suits your time zone.
-3. **Order custom pieces early.** Custom and bridal pieces usually take 2 to 4 weeks from the final design, so order before you fly if you want them ready on arrival.
+3. **Order custom pieces early.** Custom and bridal pieces take 4 days to 3 weeks from the final design, so order before you fly if you want them ready on arrival.
 4. **Book a visit slot** for your first days in Surat, so the shortlisted pieces are ready to try.
 
 ## What happens during the visit?

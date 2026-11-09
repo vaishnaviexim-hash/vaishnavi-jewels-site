@@ -47,7 +47,7 @@ Heavy outfits are already tiring to wear for hours. Jewellery should not add str
 - Check that the necklace clasp does not catch on the embroidery at the back.
 - Make sure bangles slide on and off easily over the chooda.
 
-Because we make every piece in our own manufacturing unit, we can adjust length, weight and clasps, and make a design to suit your budget. Custom and bridal pieces usually take 2 to 4 weeks depending on the design. With over 3,000 designs to try, you can compare several shapes against your outfit before deciding.
+Because we make every piece in our own manufacturing unit, we can adjust length, weight and clasps, and make a design to suit your budget. Custom and bridal pieces take 4 days to 3 weeks depending on the design. With over 3,000 designs to try, you can compare several shapes against your outfit before deciding.
 
 ## How can I be sure of what I am buying?
 

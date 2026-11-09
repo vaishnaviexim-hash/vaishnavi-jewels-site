@@ -53,7 +53,7 @@ The more work on the lehenga, the fewer separate pieces you need. Use this simpl
 
 Bring your lehenga, or even just the dupatta and a clear photo on your phone, when you [visit our showroom](/visit-us) at Rajhans Ornate Mall, Parle Point. We hold pieces against the fabric under good light so you can see which gold tone and which stone colour actually work with your particular shade of red, because a maroon, a tomato red and a wine red each behave differently.
 
-With over 3,000 designs across Polki, Jadau, natural diamond and lab-grown diamond jewellery, most brides find a set they love on the day. If you want a change, say emerald drops instead of pearls or a longer chain on the rani haar, we make it in our own manufacturing unit to suit your budget and your timeline, usually within 2 to 4 weeks. Brides outside Surat can do the same over a video call; see our [bridal jewellery](/bridal-jewellery) page for how that works. Every gold piece carries a BIS HUID hallmark that you can check in the BIS Care app, and every piece comes with its grading report.
+With over 3,000 designs across Polki, Jadau, natural diamond and lab-grown diamond jewellery, most brides find a set they love on the day. If you want a change, say emerald drops instead of pearls or a longer chain on the rani haar, we make it in our own manufacturing unit to suit your budget and your timeline, usually within 4 days to 3 weeks. Brides outside Surat can do the same over a video call; see our [bridal jewellery](/bridal-jewellery) page for how that works. Every gold piece carries a BIS HUID hallmark that you can check in the BIS Care app, and every piece comes with its grading report.
 
 ## Frequently asked questions
 
@@ -67,6 +67,6 @@ Polki or Jadau suits the wedding ceremony, especially with a red lehenga, becaus
 
 ### How long does it take to make custom bridal jewellery, and when should I order?
 
-Custom and bridal pieces made in our own manufacturing unit usually take 2 to 4 weeks, depending on the design. Place your order at least six to eight weeks before the wedding so there is time for a trial with your lehenga and any final adjustments to length or fit.
+Custom and bridal pieces made in our own manufacturing unit take 4 days to 3 weeks, depending on the design. Place your order at least six to eight weeks before the wedding so there is time for a trial with your lehenga and any final adjustments to length or fit.
 
 Bring your lehenga photo to our showroom at 120 & 220, Rajhans Ornate Mall, Parle Point, Surat (Monday to Saturday, 11 AM to 8 PM), or WhatsApp us at +91 99980 43886 to set up a video-call viewing.

@@ -38,7 +38,7 @@ If you are unsure, include one of each in your shortlist and decide when you try
 
 ## Can a shortlisted choker be changed?
 
-Yes. Because we make jewellery ourselves, a design you like can be adjusted: a slightly smaller size for a petite frame, different coloured stones to match your outfit, a lighter build for comfort through long functions, or a different gold karat. Custom and bridal pieces usually take 2 to 4 weeks from the final design, so start early if you want changes. If time is short, our diamond and Polki pieces are in ready stock.
+Yes. Because we make jewellery ourselves, a design you like can be adjusted: a slightly smaller size for a petite frame, different coloured stones to match your outfit, a lighter build for comfort through long functions, or a different gold karat. Custom and bridal pieces take 4 days to 3 weeks from the final design, so start early if you want changes. If time is short, our diamond and Polki pieces are in ready stock.
 
 ## What happens when I visit after the call?
 
@@ -56,6 +56,6 @@ Yes. Many families decide on the call, pay by NEFT or UPI and receive the jewell
 
 ### How early should I start choosing my bridal choker?
 
-Start at least four to six weeks before the wedding if you want any changes made. Custom pieces usually take 2 to 4 weeks from the final design, plus time for a trial.
+Start at least four to six weeks before the wedding if you want any changes made. Custom pieces take 4 days to 3 weeks from the final design, plus time for a trial.
 
 To get your shortlist, WhatsApp us on +91 99980 43886, or book a visit to our Parle Point showroom.

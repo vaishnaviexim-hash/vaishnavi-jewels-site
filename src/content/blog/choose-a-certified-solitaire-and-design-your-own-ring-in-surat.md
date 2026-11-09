@@ -6,7 +6,7 @@ tags: ["solitaire rings","custom jewellery","surat","engagement"]
 draft: false
 ---
 
-Yes. At Vaishnavi Jewels in Parle Point, Surat, you can choose a certified solitaire first and then have a ring made around it in the design you want. You check the stone's IGI, EGL or TGL report and its laser-inscribed number before you decide, choose the setting, band and gold karat, and we make the ring in our own manufacturing unit, usually in 2 to 4 weeks. The finished gold mount is BIS HUID hallmarked.
+Yes. At Vaishnavi Jewels in Parle Point, Surat, you can choose a certified solitaire first and then have a ring made around it in the design you want. You check the stone's IGI, EGL or TGL report and its laser-inscribed number before you decide, choose the setting, band and gold karat, and we make the ring in our own manufacturing unit, in 4 days to 3 weeks. The finished gold mount is BIS HUID hallmarked.
 
 ## Why choose the diamond first?
 
@@ -56,7 +56,7 @@ We have certified solitaires in our [natural diamond jewellery](/natural-diamond
 
 ### How long does a custom solitaire ring take?
 
-Usually 2 to 4 weeks, depending on the design. We confirm the timeline once the design and finger size are final.
+Usually 4 days to 3 weeks, depending on the design. We confirm the timeline once the design and finger size are final.
 
 ### How do I verify the report number on my diamond?
 

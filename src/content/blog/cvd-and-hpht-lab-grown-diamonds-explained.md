@@ -52,7 +52,7 @@ Every jewellery piece also comes with a jewellery grading report, small diamonds
 
 ## Does the method affect how the jewellery is made or worn?
 
-No. Once cut, a lab-grown diamond is set, worn and cared for just like any diamond. We make lab-grown diamond jewellery in our own manufacturing unit, so you can choose the design, gold karat and diamond quality, made to suit your budget. Custom pieces usually take 2 to 4 weeks depending on the design.
+No. Once cut, a lab-grown diamond is set, worn and cared for just like any diamond. We make lab-grown diamond jewellery in our own manufacturing unit, so you can choose the design, gold karat and diamond quality, made to suit your budget. Custom pieces take 4 days to 3 weeks depending on the design.
 
 ## Should I choose a stone by its growth method?
 

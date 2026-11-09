@@ -44,7 +44,7 @@ Yes, in small amounts. A single emerald, ruby or sapphire-coloured drop on a dia
 
 Every solitaire at Vaishnavi Jewels comes with its own grading report from IGI, EGL or TGL, and its report number is laser-inscribed on the stone, which you can verify on the laboratory's website. Every jewellery piece comes with a jewellery grading report that states the quality and origin, natural or lab-grown. The gold carries a BIS HUID hallmark you can check in the BIS Care app.
 
-We make jewellery in our own manufacturing unit, so a design can be customised in gold karat, diamond quality and size, made to suit your budget. Custom pieces usually take 2 to 4 weeks depending on the design. With over 3,000 designs in the showroom, you can try several looks with a photo of your outfit.
+We make jewellery in our own manufacturing unit, so a design can be customised in gold karat, diamond quality and size, made to suit your budget. Custom pieces take 4 days to 3 weeks depending on the design. With over 3,000 designs in the showroom, you can try several looks with a photo of your outfit.
 
 ## Can I wear the same pieces again after the engagement?
 

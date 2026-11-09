@@ -50,7 +50,7 @@ Yes, much depends on how it is made. Since we make jewellery in our own manufact
 - Add sahara chains to long earrings.
 - Fit secure, simple clasps that do not catch on embroidery.
 
-We can adjust length, weight and gold karat and make a design to suit your budget. Custom and bridal pieces usually take 2 to 4 weeks depending on the design. With over 3,000 designs to try, you can feel the weight of several sets before deciding.
+We can adjust length, weight and gold karat and make a design to suit your budget. Custom and bridal pieces take 4 days to 3 weeks depending on the design. With over 3,000 designs to try, you can feel the weight of several sets before deciding.
 
 ## How do I know the stones and gold are as described?
 
