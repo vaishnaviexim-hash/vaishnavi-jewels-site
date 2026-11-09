@@ -3684,7 +3684,7 @@ function vjEnqBuild(sheetRows, hist) {
           if (h.status === 'Visit booked') s.visitBooked = h.next_followup_date || s.visitBooked;
           if (h.status === 'Visited') s.visited = vjEnqIst(h.at).slice(0, 10);
           if (h.status === 'Quote' && h.amount) s.quote = h.amount;
-          if (h.status === 'Bought') { s.bought = h.amount || s.bought; s.billNo = h.bill_no || s.billNo; }
+          if (h.status === 'Bought' && h.kind !== 'auto-bill') { s.bought = h.amount || s.bought; s.billNo = h.bill_no || s.billNo; } // C-20261110-BILLCONVERT: an automatic Bought carries no amount / bill no. (owner rule: purchase history date-wise only)
           if (h.status === 'Not interested' || h.status === 'Not relevant' || h.status === 'Closed') s.lost = h.note || h.status;
           s.closedAt = VJ_ENQ_CLOSED.has(h.status) ? h.at : 0; s.closedBy = VJ_ENQ_CLOSED.has(h.status) ? (h.by_name || h.by) : '';
         }
@@ -3705,12 +3705,14 @@ async function vjEnqLoad(env, force) {
   if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
   const bills = ((((await env.DB.prepare("SELECT data FROM vj_bills WHERE no LIKE 'B-%'").all()).results) || []).map(vjParse)).filter(b => b && !b.cancelled && b.title === 'Bill' && /^\d{10}$/.test(String(b.mobile || '').replace(/\D/g, '').slice(-10)));
   const done = new Set(hist.filter(h => h.kind === 'auto-bill' && h.bill_no).map(h => h.number + '|' + h.bill_no)), adds = [];
+  // C-20261110-BILLCONVERT (owner 09/11 17:58 'If a client is converted, bill will be generated'): bill within 120 days of the enquiry; the note is
+  // the date only - no amount, no bill no. (bill_no stays in D1 only as the key that stops a double mark; it is never shown or sent to the sheet)
   for (const q of list) {
     if (q.key.startsWith('h:') || q.ep.status === 'Bought') continue;
-    const start = vjEnqIst(q.ep.start).slice(0, 10);
-    const b = bills.filter(b => String(b.mobile).replace(/\D/g, '').slice(-10) === q.key && String(b.date || '') >= start && !done.has(q.key + '|' + b.no)).sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+    const start = vjEnqIst(q.ep.start).slice(0, 10), end = vjAddDays(start, 120);
+    const b = bills.filter(b => String(b.mobile).replace(/\D/g, '').slice(-10) === q.key && String(b.date || '') >= start && String(b.date || '') <= end && !done.has(q.key + '|' + b.no)).sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
     if (b) adds.push(env.DB.prepare('INSERT INTO vj_enq_followup (number, enquiry_date, status, next_followup_date, note, amount, bill_no, kind, "by", by_name, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
-      .bind(q.key, start, 'Bought', '', 'Bill ' + b.no + ' made in VJ Tags', Math.round(Number(b.total) || 0), String(b.no), 'auto-bill', 'vj-tags', 'VJ Tags bill', Date.now()));
+      .bind(q.key, start, 'Bought', '', (/^\d{4}-\d{2}-\d{2}$/.test(String(b.date)) ? String(b.date).slice(8, 10) + '/' + String(b.date).slice(5, 7) : vjDmy(vjEnqIst().slice(0, 10)).slice(0, 5)) + ': bill made (VJ Tags)', null, String(b.no), 'auto-bill', 'vj-tags', 'VJ Tags bill', Date.now()));
   }
   if (adds.length) {
     await env.DB.batch(adds.slice(0, 50));
@@ -3777,7 +3779,7 @@ function vjEnqView(q, who, today) {
     name: String(l.C || '').slice(0, 60), cat: String(e.rows.map(r => r.E).filter(x => x && x !== 'Other').pop() || l.E || ''), what: what.slice(0, 400), relevant: String(l.G || ''), urgent: String(l.H || ''),
     reply: String(l.J || '').slice(0, 400), status: e.status, open: !VJ_ENQ_CLOSED.has(e.status), next: e.next || '', due: !VJ_ENQ_CLOSED.has(e.status) && e.next ? (e.next < today ? 'overdue' : e.next === today ? 'today' : '') : '',
     quote: e.quote || 0, bought: e.bought || 0, billNo: e.billNo || '', lost: e.lost || '', closedBy: e.closedBy || '', closedAt: e.closedAt ? vjEnqIst(e.closedAt).slice(0, 10) : '',
-    notes: e.hist.map(h => ({ at: vjEnqIst(h.at).slice(0, 16).replace('T', ' '), by: h.by_name || h.by, status: h.status || '', next: h.next_followup_date || '', note: h.note || '', amount: h.amount || 0, bill: h.bill_no || '' })).slice(-30),
+    notes: e.hist.map(h => h.kind === 'auto-bill' ? ({ at: vjEnqIst(h.at).slice(0, 16).replace('T', ' '), by: h.by_name || h.by, status: h.status || '', next: '', note: /^\d{2}\/\d{2}: bill made/.test(String(h.note || '')) ? h.note : 'bill made (VJ Tags)', amount: 0, bill: '' }) : ({ at: vjEnqIst(h.at).slice(0, 16).replace('T', ' '), by: h.by_name || h.by, status: h.status || '', next: h.next_followup_date || '', note: h.note || '', amount: h.amount || 0, bill: h.bill_no || '' })).slice(-30), // C-20261110-BILLCONVERT
     earlier: q.earlier.map(p => ({ from: vjEnqIst(p.start).slice(0, 10), status: p.status, closedAt: p.closedAt ? vjEnqIst(p.closedAt).slice(0, 10) : '' })).slice(-5) };
   v.tab = vjEnqTab(q, today); { const lastAct = e.hist.reduce((m, h) => Math.max(m, h.at || 0), 0); v.replied = !!lastAct && l.t > lastAct; }
   if (!sales) { const d = String(l.D || ''), wa = vjEnqWa(d); v.number = d.slice(0, 20); v.wa = wa; v.tel = wa ? '+' + wa : ''; v.msg = vjEnqMsg(q, vjEnqSender(who)); }
@@ -4664,6 +4666,17 @@ async function vjOrdersReport(env, who) {
   return new Response(out, { headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'content-disposition': 'attachment; filename="VJ_Orders.xlsx"', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'x-pending': String(pend.length) } });
 }
 
+// C-20261110-BILLCONVERT: once a day (with the 20:10 summary) - fresh Enquiries sheet, auto Bought from today's VJ Tags bills, every
+// automatic Bought not yet 'Bought' in sheet column I copied there (I only; no amount / bill no.), and the 7-day conversion line.
+async function vjEnqBillSync(env) {
+  const { list } = await vjEnqLoad(env, true), ps = [], cx = { waitUntil: p => ps.push(p) }, now = Date.now();
+  let pushed = 0;
+  for (const q of list) { if (pushed >= 15) break;
+    if (q.ep.status === 'Bought' && q.ep.hist.some(h => h.kind === 'auto-bill') && String((q.last || {}).I || '').trim() !== 'Bought') { vjEnqPush(env, cx, q); pushed++; } }
+  await Promise.all(ps);
+  const wk = list.filter(q => q.ep.status === 'Bought' && q.ep.closedAt && now - q.ep.closedAt <= 7 * 864e5), ads = wk.filter(q => /ad$/.test(vjEnqChan(q.first.B, q.first.Q))).length;
+  return { line: `Enquiry -> bill conversions this week: ${wk.length} (from ads ${ads}, direct ${wk.length - ads})`, pushed };
+}
 async function vjDailyReport(env) {
   const ist = new Date(Date.now() + 5.5 * 3600e3), mins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
   if (mins < 20 * 60 + 10) return reply('not yet', 200);
@@ -4699,9 +4712,10 @@ async function vjDailyReport(env) {
     const B = bills.filter(b => b.title !== 'Estimate'), E = bills.filter(b => b.title === 'Estimate' && !est.some(x => x.no === b.no)).concat(est);
     const fg = arr => fineSum(arr) > 0 ? ' + fine gold ' + fineSum(arr).toFixed(3) + ' g' : '';
     const day = ist.toUTCString().slice(0, 11);
+    let convLine = ''; try { convLine = (await vjEnqBillSync(env)).line; } catch (e) { convLine = 'Enquiry -> bill check failed: ' + String(e && e.message || e).slice(0, 80); }
     const custName = { mihir: 'Mihir', shilpi: 'Shilpi ji', abhinav: 'Abhinav' }; // C-20261027-ESTOWNER: every estimate listed with the customer and whose customer it is
     const eLines = E.map(b => `  ${b.no} - ${b.name || ''}${b.city ? ', ' + b.city : ''}${b.mobile ? ' (' + b.mobile + ')' : ''} - ${inr(Number(b.total) || 0)}${b.usd ? ' / US$ ' + Math.round((Number(b.total) || 0) / b.usd).toLocaleString('en-US') : ''} - ${custName[b.cust] ? custName[b.cust] + "'s customer" : 'customer not marked'}`).join('\n');
-    const text = `VJ Tags - daily report, ${day} (summary)\nNew tags made: ${created.size}${samples ? ' (samples ' + samples + ')' : ''} (order tags not counted)\nOld tags edited: ${edited.size}\nTags deleted: ${gone.size}\nBills made: ${B.length}${B.length ? ', total ' + inr(sum(B)) + fg(B) : ''}\nEstimates made: ${E.length}${E.length ? ', total ' + inr(sum(E)) : ''}${eLines ? '\n' + eLines : ''}`;
+    const text = `VJ Tags - daily report, ${day} (summary)\nNew tags made: ${created.size}${samples ? ' (samples ' + samples + ')' : ''} (order tags not counted)\nOld tags edited: ${edited.size}\nTags deleted: ${gone.size}\nBills made: ${B.length}${B.length ? ', total ' + inr(sum(B)) + fg(B) : ''}\nEstimates made: ${E.length}${E.length ? ', total ' + inr(sum(E)) : ''}${eLines ? '\n' + eLines : ''}${convLine ? '\n' + convLine : ''}`;
     // only a random one-time token leaves the worker; Make 8190722 (hook 3981296) fetches the summary once from /hooks/vj-summary
     const token = [...crypto.getRandomValues(new Uint8Array(16))].map(x => x.toString(16).padStart(2, '0')).join('');
     await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('summary:' + token, JSON.stringify({ text, date: ymd, at: Date.now() })).run();
