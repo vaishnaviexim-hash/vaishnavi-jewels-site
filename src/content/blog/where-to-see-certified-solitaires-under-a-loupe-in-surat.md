@@ -44,7 +44,7 @@ Usually, yes. In most solitaire settings the girdle is visible between the prong
 
 - **The BIS HUID hallmark** on the gold of the ring, which you can verify in the BIS Care app.
 - **The invoice:** it should list the report number, the stone details and the gold weight and purity.
-- **After-care:** ask about resizing (charged on actuals) and periodic prong checks.
+- **After-care:** ask about resizing (free for a new piece bought from us) and periodic prong checks.
 
 ## What if I cannot visit Surat?
 

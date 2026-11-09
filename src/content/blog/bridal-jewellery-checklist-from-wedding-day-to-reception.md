@@ -53,7 +53,7 @@ This keeps the trousseau useful and made to suit your budget. Since we make jewe
 
 ## When should I order bridal jewellery?
 
-Custom and bridal pieces take 4 days to 3 weeks depending on the design. Leave extra time for a fitting, small changes and resizing of rings or bangles (resizing is charged on actuals). A practical timeline:
+Custom and bridal pieces take 4 days to 3 weeks depending on the design. Leave extra time for a fitting, small changes and resizing of rings or bangles (resizing is free for a new piece bought from us). A practical timeline:
 
 1. Two to three months before: shortlist designs and share your outfit colours.
 2. Six to eight weeks before: confirm designs and place the order.

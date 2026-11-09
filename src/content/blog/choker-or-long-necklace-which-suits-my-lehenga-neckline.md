@@ -56,7 +56,7 @@ If you want a particular design in a different gold karat, stone size or length,
 
 Yes. [Visit our showroom](/visit-us) at Rajhans Ornate, Parle Point, Surat, with your blouse or a photograph, and we will put chokers, long necklaces and layered sets against it one by one. We are open Monday to Saturday, 11 AM to 8 PM.
 
-If you are outside Surat, we offer viewing on a video call. Hold the blouse up to the camera, and we will show each piece at the right length so you can judge the gap between the necklace and the neckline. Payment is by NEFT or UPI, and we offer free insured [delivery across India](/delivery-across-india) to major cities. Resizing is charged on actuals.
+If you are outside Surat, we offer viewing on a video call. Hold the blouse up to the camera, and we will show each piece at the right length so you can judge the gap between the necklace and the neckline. Payment is by NEFT or UPI, and we offer free insured [delivery across India](/delivery-across-india) to major cities. Resizing is free for a new piece bought from us.
 
 ## Frequently asked questions
 
