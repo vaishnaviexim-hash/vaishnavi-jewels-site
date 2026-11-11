@@ -22,4 +22,4 @@ export function plainSet(publicId, widths = [400, 640, 900, 1200]) {
 }
 
 /** The owner's original dark logo (never altered), shown on a small plate on every photo. */
-export const LOGO_DARK = '/logo_mark_light.png';
+export const LOGO_DARK = '/logo_mark_on_dark.png';
