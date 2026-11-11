@@ -8,7 +8,7 @@ heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fil
 heroAlt: "Bride in a red lehenga wearing a polki bridal set"
 ---
 
-Most brides need a main necklace set with earrings, a maang tikka or matha patti, bangles or kadas, rings and a nath for the wedding ceremony, then a lighter necklace and earrings for the reception and smaller sets for the sangeet, mehendi and haldi. The easiest way to plan is to list each function, note the outfit, and decide which pieces can be worn more than once. Custom bridal pieces take 4 days to 3 weeks to make, so start early.
+Most brides need a main necklace set with earrings, a maang tikka or matha patti, bangles or kadas, rings and a nath for the wedding ceremony, then a lighter necklace and earrings for the reception and smaller sets for the sangeet, mehendi and haldi. The easiest way to plan is to list each function, note the outfit, and decide which pieces can be worn more than once. Custom bridal pieces take about 3 weeks (simple designs can be faster) to make, so start early.
 
 ## What jewellery do I need for the wedding ceremony?
 
@@ -58,7 +58,7 @@ This keeps the trousseau useful and made to suit your budget. Since we make jewe
 
 ## When should I order bridal jewellery?
 
-Custom and bridal pieces take 4 days to 3 weeks depending on the design. Leave extra time for a fitting, small changes and resizing of rings or bangles (resizing is free for a new piece bought from us). A practical timeline:
+Custom and bridal pieces take about 3 weeks (simple designs can be faster) depending on the design. Leave extra time for a fitting, small changes and resizing of rings or bangles (resizing is free for a new piece bought from us). A practical timeline:
 
 1. Two to three months before: shortlist designs and share your outfit colours.
 2. Six to eight weeks before: confirm designs and place the order.
@@ -79,7 +79,7 @@ Our [FAQ](/faq) explains each of these in more detail.
 
 ### How long does it take to make custom bridal jewellery?
 
-Custom and bridal pieces take 4 days to 3 weeks, depending on the design. Order six to eight weeks before the wedding to leave time for fittings and changes.
+Custom and bridal pieces take about 3 weeks (simple designs can be faster), depending on the design. Order six to eight weeks before the wedding to leave time for fittings and changes.
 
 ### Polki or diamond jewellery: what should I wear for each function?
 

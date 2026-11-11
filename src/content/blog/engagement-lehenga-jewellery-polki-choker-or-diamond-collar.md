@@ -61,7 +61,7 @@ Every solitaire, including the one in your engagement ring, comes with its own g
 
 ## How do I plan my engagement jewellery with Vaishnavi Jewels?
 
-Bring a photo of your engagement lehenga to our showroom and we will try a few chokers and collars against it with you. We have a wide variety of [bridal jewellery](/bridal-jewellery), [Polki jewellery](/polki-jewellery) and [natural diamond jewellery](/natural-diamond-jewellery), and because we make jewellery in our own manufacturing unit, we can adjust a design, its weight and its length, made to suit your budget. Custom pieces take 4 days to 3 weeks, so plan the engagement set before the wedding set if the dates are close.
+Bring a photo of your engagement lehenga to our showroom and we will try a few chokers and collars against it with you. We have a wide variety of [bridal jewellery](/bridal-jewellery), [Polki jewellery](/polki-jewellery) and [natural diamond jewellery](/natural-diamond-jewellery), and because we make jewellery in our own manufacturing unit, we can adjust a design, its weight and its length, made to suit your budget. Custom pieces take about 3 weeks (simple designs can be faster), so plan the engagement set before the wedding set if the dates are close.
 
 ## Frequently asked questions
 

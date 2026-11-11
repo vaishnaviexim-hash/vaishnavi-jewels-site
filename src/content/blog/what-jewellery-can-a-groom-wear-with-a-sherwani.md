@@ -61,7 +61,7 @@ Yes, and it is worth planning for. A diamond band or solitaire ring becomes an e
 
 ## How do we plan groom jewellery at Vaishnavi Jewels?
 
-Couples often visit together, which makes matching easy. Bring photos of both outfits to our showroom and we will put the groom's pieces next to the bride's set. We have a wide variety of [bridal jewellery](/bridal-jewellery), [Polki jewellery](/polki-jewellery) and [natural diamond jewellery](/natural-diamond-jewellery), and we can make groom pieces to order, made to suit your budget. Custom pieces take 4 days to 3 weeks.
+Couples often visit together, which makes matching easy. Bring photos of both outfits to our showroom and we will put the groom's pieces next to the bride's set. We have a wide variety of [bridal jewellery](/bridal-jewellery), [Polki jewellery](/polki-jewellery) and [natural diamond jewellery](/natural-diamond-jewellery), and we can make groom pieces to order, made to suit your budget. Custom pieces take about 3 weeks (simple designs can be faster).
 
 ## Frequently asked questions
 

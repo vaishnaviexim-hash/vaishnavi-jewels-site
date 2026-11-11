@@ -52,7 +52,7 @@ Yes. Many brides choose sequinned or crystal-embellished lehengas and gowns for 
 
 ## Can I find or make the right piece?
 
-With over 3,000 designs in the showroom, you can try several earring and necklace shapes against a photo of your outfit. We also make jewellery in our own manufacturing unit, so we can adjust length, weight and gold karat, or design a piece around your outfit, made to suit your budget. Custom pieces take 4 days to 3 weeks depending on the design.
+With over 3,000 designs in the showroom, you can try several earring and necklace shapes against a photo of your outfit. We also make jewellery in our own manufacturing unit, so we can adjust length, weight and gold karat, or design a piece around your outfit, made to suit your budget. Custom pieces take about 3 weeks (simple designs can be faster) depending on the design.
 
 Every jewellery piece comes with a jewellery grading report from IGI, EGL or TGL, every solitaire is laser-inscribed with its report number that you can verify online, and the gold carries a BIS HUID hallmark you can check in the BIS Care app. Our [bridal jewellery](/bridal-jewellery) page shows more sets.
 

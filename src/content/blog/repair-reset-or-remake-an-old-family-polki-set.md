@@ -68,6 +68,6 @@ Yes, in many cases. The set can be remade into a lighter design, or the heaviest
 
 ### How long does Polki restoration or a remake take?
 
-It depends on the work. A new custom piece usually takes 4 days to 3 weeks from the final design; for repairs, our team will give you a timeline once the set has been seen.
+It depends on the work. A new custom piece usually takes about 3 weeks (simple designs can be faster) from the final design; for repairs, our team will give you a timeline once the set has been seen.
 
 To have your family set looked at, send photos on WhatsApp to +91 99980 43886, or book a visit to our Parle Point showroom.

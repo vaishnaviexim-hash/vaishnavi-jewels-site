@@ -53,7 +53,7 @@ A useful test: stand in front of a mirror and ask which single piece you notice 
 
 Make a simple list, function by function, of the outfit colour, the neckline and the pieces you need. You will usually find that earrings, bangles and a ring can be shared across two or three functions, while the necklace changes. Bring outfit photos when you visit, and we will try pieces against them with you.
 
-We make jewellery in our own manufacturing unit, so a design can be adjusted in weight, length or gold karat, and made to suit your budget. Custom and bridal pieces take 4 days to 3 weeks depending on the design, so start planning early. With over 3,000 designs in the showroom, most brides find a starting point quickly. Our [bridal jewellery](/bridal-jewellery) page shows the kinds of sets we make.
+We make jewellery in our own manufacturing unit, so a design can be adjusted in weight, length or gold karat, and made to suit your budget. Custom and bridal pieces take about 3 weeks (simple designs can be faster) depending on the design, so start planning early. With over 3,000 designs in the showroom, most brides find a starting point quickly. Our [bridal jewellery](/bridal-jewellery) page shows the kinds of sets we make.
 
 Every piece comes with proof you can check yourself: a jewellery grading report from IGI, EGL or TGL, laser-inscribed solitaires whose report number you can verify on the laboratory's website, and a BIS HUID hallmark on the gold that you can check in the BIS Care app.
 

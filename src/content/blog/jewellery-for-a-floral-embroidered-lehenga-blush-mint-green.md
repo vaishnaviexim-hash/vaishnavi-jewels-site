@@ -53,7 +53,7 @@ Comfort matters at these long, active functions. Choose earrings that feel light
 
 ## Can a set be made to match my lehenga?
 
-We make jewellery in our own manufacturing unit, so we can match a stone colour to your embroidery, adjust length and weight, and set the gold karat and diamond quality you prefer, made to suit your budget. Custom pieces take 4 days to 3 weeks depending on the design. With over 3,000 designs at the showroom, you can try several options against a photo of your lehenga.
+We make jewellery in our own manufacturing unit, so we can match a stone colour to your embroidery, adjust length and weight, and set the gold karat and diamond quality you prefer, made to suit your budget. Custom pieces take about 3 weeks (simple designs can be faster) depending on the design. With over 3,000 designs at the showroom, you can try several options against a photo of your lehenga.
 
 Every jewellery piece comes with a jewellery grading report from IGI, EGL or TGL, every solitaire is laser-inscribed with its report number that you can verify on the laboratory's website, and the gold carries a BIS HUID hallmark you can check in the BIS Care app.
 

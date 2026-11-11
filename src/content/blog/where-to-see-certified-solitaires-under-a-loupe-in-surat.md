@@ -39,7 +39,7 @@ Our guides on [how to read an IGI certificate](/blog/lab-grown-diamond-jewellery
 
 We have certified solitaires in [natural diamond jewellery](/natural-diamond-jewellery) and in [lab-grown diamond jewellery](/lab-grown-diamond-jewellery). Each one is shown with its own report, and each report states its origin clearly. You can also browse our [solitaire rings](/solitaire-rings), with settings in yellow, white and rose gold.
 
-Because we make jewellery in our own manufacturing unit, you can choose a stone and then the setting, band width and gold karat, made to suit your budget. Custom pieces take 4 days to 3 weeks depending on the design.
+Because we make jewellery in our own manufacturing unit, you can choose a stone and then the setting, band width and gold karat, made to suit your budget. Custom pieces take about 3 weeks (simple designs can be faster) depending on the design.
 
 ## Can I still see the inscription once the stone is set?
 

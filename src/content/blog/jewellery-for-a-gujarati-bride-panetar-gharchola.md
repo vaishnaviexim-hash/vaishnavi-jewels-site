@@ -54,7 +54,7 @@ Gujarati wedding rituals are long and involve sitting, standing and walking arou
 
 ## Why choose a Surat showroom for Gujarati bridal jewellery?
 
-Surat is India's diamond city, and Vaishnavi Jewels has made jewellery here since 2005. Pieces are made in our own manufacturing unit, so a set can be designed to match family heirlooms, a specific saree border or a family custom, with the gold karat and diamond quality you choose, made to suit your budget. Custom and bridal pieces take 4 days to 3 weeks depending on the design. With over 3,000 designs in the showroom, families can choose together.
+Surat is India's diamond city, and Vaishnavi Jewels has made jewellery here since 2005. Pieces are made in our own manufacturing unit, so a set can be designed to match family heirlooms, a specific saree border or a family custom, with the gold karat and diamond quality you choose, made to suit your budget. Custom and bridal pieces take about 3 weeks (simple designs can be faster) depending on the design. With over 3,000 designs in the showroom, families can choose together.
 
 Every piece comes with a jewellery grading report from IGI, EGL or TGL. Every solitaire is laser-inscribed with its report number, which you can verify on the laboratory's website, and the gold carries a BIS HUID hallmark that you can check in the BIS Care app.
 
@@ -70,6 +70,6 @@ Graceful, comfortable sets that complement the bride without competing, such as 
 
 ### How long does it take to make custom bridal jewellery?
 
-Custom and bridal pieces take 4 days to 3 weeks, depending on the design. Order six to eight weeks before the wedding to leave time for fittings.
+Custom and bridal pieces take about 3 weeks (simple designs can be faster), depending on the design. Order six to eight weeks before the wedding to leave time for fittings.
 
 Plan your Gujarati bridal set with us at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886.

@@ -1,6 +1,6 @@
 ---
 title: "Can I Turn My Old Gold Into a New Diamond Design in Surat?"
-description: "Yes. Old gold, even from other jewellers, can be exchanged towards a new diamond piece made to your design in our own unit in about 4 days to 3 weeks."
+description: "Yes. Old gold, even from other jewellers, can be exchanged towards a new diamond piece made to your design in our own unit, usually in about 3 weeks."
 pubDate: 2026-11-09
 tags: ["old gold","custom jewellery","diamond jewellery","surat"]
 draft: false
@@ -8,7 +8,7 @@ heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fil
 heroAlt: "Old gold bangles and chain beside a new diamond pendant and its design sketch"
 ---
 
-Yes. At Vaishnavi Jewels we accept old gold jewellery, including pieces bought from other jewellers, in exchange towards new jewellery, and because we make jewellery in our own manufacturing unit in Surat, the new piece can be a diamond design of your choice. Custom pieces take 4 days to 3 weeks once the design is final, and the finished piece carries a BIS HUID hallmark.
+Yes. At Vaishnavi Jewels we accept old gold jewellery, including pieces bought from other jewellers, in exchange towards new jewellery, and because we make jewellery in our own manufacturing unit in Surat, the new piece can be a diamond design of your choice. Custom pieces take about 3 weeks (simple designs can be faster) once the design is final, and the finished piece carries a BIS HUID hallmark.
 
 ## Why do families remake old gold?
 
@@ -20,7 +20,7 @@ Most homes have gold that is no longer worn: a chain with a broken clasp, earrin
 2. **Weight and purity.** The gold is weighed and its purity is checked before its value is agreed. Ask to see both numbers, wherever you exchange gold.
 3. **Choose the design.** Pick one of our designs, share a photo or sketch of a piece you like, or describe what you want. We can change the gold karat, the diamond quality and the size to suit you.
 4. **Agree the details.** The gold, the diamonds and the design are finalised together, and the value of your old gold is set against the new piece.
-5. **Making and delivery.** The piece is made in our own manufacturing unit, in 4 days to 3 weeks depending on the design. Collect it at the showroom, or we send it with free insured delivery to major Indian cities.
+5. **Making and delivery.** The piece is made in our own manufacturing unit, in about 3 weeks (simple designs can be faster) depending on the design. Collect it at the showroom, or we send it with free insured delivery to major Indian cities.
 
 <figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_karigar_20261111131036" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/concept/web_sec_karigar_20261111131036 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_karigar_20261111131036 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/concept/web_sec_karigar_20261111131036 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Craftsman setting diamonds into a gold necklace in the Vaishnavi Jewels manufacturing unit, Surat" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
 
@@ -56,7 +56,7 @@ Yes. We accept old gold jewellery from other jewellers in exchange for new jewel
 
 ### How long does a remade diamond piece take?
 
-Custom pieces take 4 days to 3 weeks once the design is final, depending on the work. Share your occasion date at the start, so we can confirm the timeline.
+Custom pieces take about 3 weeks (simple designs can be faster) once the design is final, depending on the work. Share your occasion date at the start, so we can confirm the timeline.
 
 ### Will the new piece be hallmarked?
 

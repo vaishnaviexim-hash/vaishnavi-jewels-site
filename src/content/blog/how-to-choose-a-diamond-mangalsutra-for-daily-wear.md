@@ -61,7 +61,7 @@ Read more about certificates and hallmarks in [our FAQ](/faq).
 
 ## Can I get a design made to my taste?
 
-Yes. Because we make jewellery in our own manufacturing unit, you can choose the pendant shape, the gold colour and karat, the diamond quality and the chain length. Custom pieces take 4 days to 3 weeks, depending on the design. You can see our designs on the [diamond mangalsutra](/diamond-mangalsutra) page and in our [natural diamond jewellery](/natural-diamond-jewellery) and [lab-grown diamond jewellery](/lab-grown-diamond-jewellery) collections, each made to suit your budget.
+Yes. Because we make jewellery in our own manufacturing unit, you can choose the pendant shape, the gold colour and karat, the diamond quality and the chain length. Custom pieces take about 3 weeks (simple designs can be faster), depending on the design. You can see our designs on the [diamond mangalsutra](/diamond-mangalsutra) page and in our [natural diamond jewellery](/natural-diamond-jewellery) and [lab-grown diamond jewellery](/lab-grown-diamond-jewellery) collections, each made to suit your budget.
 
 If you live outside Surat, we can show designs on a video call and share the report details on WhatsApp before you decide. We offer free insured delivery to major Indian cities.
 

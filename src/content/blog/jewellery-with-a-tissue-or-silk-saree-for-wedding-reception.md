@@ -55,7 +55,7 @@ Because one side of the face is always open, earrings carry much of the look. Lo
 
 Yes, and that is one of the advantages of choosing for a saree. A diamond collar, a mid-length necklace and drop earrings work at family weddings, festivals and parties for years. Our [bridal jewellery](/bridal-jewellery) page shows sets designed to be split and worn in parts.
 
-We make jewellery in our own manufacturing unit, so length, weight and gold karat can be adjusted to suit your saree and made to suit your budget. Custom pieces take 4 days to 3 weeks depending on the design. With over 3,000 designs at the showroom, you can try several options with your saree.
+We make jewellery in our own manufacturing unit, so length, weight and gold karat can be adjusted to suit your saree and made to suit your budget. Custom pieces take about 3 weeks (simple designs can be faster) depending on the design. With over 3,000 designs at the showroom, you can try several options with your saree.
 
 Every piece comes with a jewellery grading report from IGI, EGL or TGL, every solitaire has its report number laser-inscribed so you can verify it online, and the gold carries a BIS HUID hallmark that you can check in the BIS Care app.
 
