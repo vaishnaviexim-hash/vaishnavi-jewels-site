@@ -253,8 +253,7 @@ const description = "Certified diamond jewellery made in Surat since 2005: natur
 
   .hero-pic { margin: 0; position: relative; justify-self: end; width: 100%; max-width: 460px; }
   .hero-pic::before {
-    content: ''; position: absolute; inset: 22px -22px -22px 22px;
-    border: 1px solid var(--color-gold); z-index: 0;
+    content: ''; position: absolute; inset: 12px; border: 1px solid rgba(240, 220, 170, 0.8); z-index: 2; pointer-events: none;
   }
   .hero-frame { position: relative; z-index: 1; aspect-ratio: 4 / 5; box-shadow: 0 30px 70px rgba(58, 15, 26, 0.28); }
   .hero-frame img { object-position: center 22%; }
@@ -339,7 +338,7 @@ const description = "Certified diamond jewellery made in Surat since 2005: natur
     flex-wrap: wrap;
   }
   .contact-pic { margin: 0; position: relative; width: 100%; max-width: 420px; justify-self: end; }
-  .contact-pic::before { content: ''; position: absolute; inset: -18px 18px 18px -18px; border: 1px solid var(--color-gold); z-index: 0; }
+  .contact-pic::before { content: ''; position: absolute; inset: 12px; border: 1px solid rgba(240, 220, 170, 0.8); z-index: 2; pointer-events: none; }
   .contact-frame { position: relative; z-index: 1; aspect-ratio: 4 / 5; box-shadow: var(--shadow-soft); }
 
   @media (max-width: 1000px) {
