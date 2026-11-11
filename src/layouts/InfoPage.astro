@@ -6,7 +6,7 @@ import BaseLayout from './BaseLayout.astro';
 import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import { business } from '../data/business.js';
-import { img, plain, plainSet, LOGO_DARK } from '../data/images.js';
+import { img, plain, plainSet } from '../data/images.js';
 
 type Pic = { id: string; alt: string; caption?: string; noOg?: boolean };
 interface Props {
@@ -69,7 +69,6 @@ const trust = [
             <figure class="hero-pic">
               <img src={plain(hero.id, 900)} srcset={plainSet(hero.id)} sizes="(max-width: 860px) 92vw, 480px"
                    width="900" height="1125" alt={hero.alt} fetchpriority="high" decoding="async" />
-              <span class="vj-mark" aria-hidden="true"><img src={LOGO_DARK} alt="" width="60" height="40" /></span>
             </figure>
           )}
         </div>
@@ -110,7 +109,6 @@ const trust = [
                     <img src={plain(g.id, 640)} srcset={plainSet(g.id, [320, 480, 640, 900])}
                          sizes="(max-width: 640px) 46vw, (max-width: 1000px) 30vw, 260px"
                          width="640" height="800" alt={g.alt} loading="lazy" decoding="async" />
-                    <span class="vj-mark" aria-hidden="true"><img src={LOGO_DARK} alt="" width="45" height="30" loading="lazy" /></span>
                   </div>
                   {g.caption && <figcaption>{g.caption}</figcaption>}
                 </figure>
@@ -170,9 +168,6 @@ const trust = [
   .hero-pic::before { content: ''; position: absolute; inset: 18px -18px -18px 18px; border: 1px solid var(--color-gold); z-index: 0; }
   .hero-pic img { position: relative; z-index: 1; width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; object-position: center 28%; box-shadow: 0 24px 60px rgba(58, 15, 26, 0.25); }
 
-  .hero-pic .vj-mark { z-index: 3; }
-  .frame .vj-mark { right: 8px; bottom: 8px; padding: 3px 6px; }
-  .frame .vj-mark img { height: 20px; }
 
   /* Trust strip */
   .trust { background: var(--color-maroon); color: #F3E7CF; }
