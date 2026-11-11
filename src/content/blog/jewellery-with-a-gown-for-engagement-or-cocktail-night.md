@@ -4,6 +4,8 @@ description: "A diamond choker, a solitaire pendant or statement diamond earring
 pubDate: 2026-10-26
 tags: ["engagement jewellery","cocktail night","diamond jewellery","gown"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/design_gemini/vs2_western_s3_20261012171400"
+heroAlt: "Woman in a black gown wearing a diamond and emerald necklace"
 ---
 
 For a gown or indo-western outfit at your engagement or cocktail night, a diamond choker, a solitaire pendant or a pair of statement diamond earrings suit most looks. Match the necklace to the neckline: chokers and collars for strapless and off-shoulder gowns, pendants for V-necks, and statement earrings with high or halter necks. Add a bracelet and your engagement ring, and keep the rest simple.
@@ -19,6 +21,9 @@ Gowns and indo-western outfits have cleaner lines, more open necklines and less 
 3. **V-neck or deep neck:** a solitaire pendant or a fine Y-shaped necklace that follows the line of the V.
 4. **Halter or high neck:** skip the necklace and let statement earrings lead.
 5. **One-shoulder:** no necklace, long earrings on the open side, and a bracelet on the bare arm.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/vs2_western_s1_20261012170111" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/vs2_western_s1_20261012170111 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/vs2_western_s1_20261012170111 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/vs2_western_s1_20261012170111 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Woman in a black gown wearing a fine diamond necklace" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 Our [natural diamond jewellery](/natural-diamond-jewellery) and [lab-grown diamond jewellery](/lab-grown-diamond-jewellery) collections include chokers, pendants and earrings in these styles.
 

@@ -4,6 +4,8 @@ description: "Seven questions to ask before you buy a solitaire: the report, the
 pubDate: 2026-10-20
 tags: ["solitaire","engagement ring","buying guide","certified diamonds"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/design_gemini/gbp_round_solitaire_20261022153639"
+heroAlt: "Round solitaire ring in rose gold with pave shoulders"
 ---
 
 Before you buy a solitaire ring, ask to see the grading report, ask for the laser-inscribed report number to be shown on the diamond, confirm whether the stone is natural or lab-grown as stated on the report, and check the gold karat and BIS HUID on the band. Then ask about resizing, exchange and buyback. A good jeweller answers all of these before you pay.
@@ -15,6 +17,9 @@ Every solitaire should have its own report from a recognised laboratory such as 
 ## 2. Can you show me the inscription on the stone?
 
 The report number is laser-inscribed on the girdle, the thin outer edge of the diamond. Ask to see it under a loupe or microscope and match it to the report. Every Vaishnavi solitaire is inscribed.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_laser_inscription_20261111130643" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/concept/web_sec_laser_inscription_20261111130643 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_laser_inscription_20261111130643 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/concept/web_sec_laser_inscription_20261111130643 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Close-up of a certified diamond held in tweezers, showing the report number laser-inscribed on its girdle" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 ## 3. Is this diamond natural or lab-grown?
 

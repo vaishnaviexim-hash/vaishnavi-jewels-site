@@ -4,6 +4,8 @@ description: "Pick one hero piece, echo one stone colour from the embroidery and
 pubDate: 2026-10-26
 tags: ["bridal jewellery","lehenga","wedding look","styling"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_bl_embroidered_20261111131230"
+heroAlt: "Bride in a heavily embroidered red lehenga wearing one polki choker with matching earrings"
 ---
 
 With a heavily embroidered lehenga, choose one hero piece of jewellery, usually the necklace, and keep everything else in proportion. Echo one stone colour from the embroidery, match the metal to the zari or thread, and skip extra layers where the work is heaviest. The aim is a look where the outfit and the jewellery support each other instead of competing.
@@ -17,6 +19,9 @@ So the question is not "how much jewellery?" but "which piece leads?"
 ## Which piece should be the hero?
 
 Look at where the embroidery is heaviest.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/gbp_polki_ranihaar_20261022153530" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/gbp_polki_ranihaar_20261022153530 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/gbp_polki_ranihaar_20261022153530 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/gbp_polki_ranihaar_20261022153530 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Polki rani haar with emeralds and pearls on a velvet bust" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 - **Heavy blouse and neckline:** let the earrings and maang tikka lead, and choose a necklace that sits above the neckline rather than on top of the work, such as a choker.
 - **Heavy skirt, lighter blouse:** the necklace can lead. A layered Polki set or a diamond collar with a long rani haar fills the open space well.

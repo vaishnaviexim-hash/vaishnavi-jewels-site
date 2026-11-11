@@ -4,6 +4,8 @@ description: "When the outfit already shines, wear fewer pieces with a clean sha
 pubDate: 2026-10-26
 tags: ["sangeet jewellery","mirror work lehenga","diamond earrings","styling"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_bl_mirrorwork_20261111131420"
+heroAlt: "Guest at a sangeet in a mirror-work lehenga wearing light diamond jhumkas and a slim necklace"
 ---
 
 When your sangeet or night-reception lehenga already shines with mirror work or sequins, wear fewer pieces with a clean, structured shape. Statement earrings or a single defined diamond or Polki necklace work better than many layers, because they hold their outline against a reflective outfit. Keep everything comfortable enough to dance in.
@@ -17,6 +19,9 @@ Clean shapes solve this. A collar with a clear edge, earrings with a defined out
 ## Which pieces work best?
 
 **Statement earrings.** Often the best choice for a sangeet. Long diamond drops, geometric earrings or chandbalis frame the face, move nicely when you dance and do not compete with the blouse. Pair them with a fine chain or no necklace. See our [diamond earrings](/diamond-earrings) collection.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/ww_enamel_pendant_necklace_20261028153303" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/ww_enamel_pendant_necklace_20261028153303 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/ww_enamel_pendant_necklace_20261028153303 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/ww_enamel_pendant_necklace_20261028153303 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Enamel and pearl pendant necklace in festive colours" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 **A structured necklace.** If you prefer a necklace, choose one with a firm shape: a diamond collar, a choker with a single centre motif, or a Polki necklace with a clear outline. Wear smaller earrings with it.
 

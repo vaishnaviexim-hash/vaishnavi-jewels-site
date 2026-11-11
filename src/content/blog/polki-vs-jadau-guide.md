@@ -4,6 +4,8 @@ description: "A simple guide to two of India's most celebrated bridal jewellery 
 pubDate: 2026-09-20
 tags: ["bridal", "polki", "jadau", "guide"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/design_gemini/gbp_polki_ranihaar_20261022153530"
+heroAlt: "Polki rani haar with emeralds and pearls on a velvet bust"
 ---
 
 Polki and Jadau are often mentioned in the same breath, and for good reason
@@ -22,6 +24,9 @@ Jadau is a **setting technique**, not a stone. It's the traditional method
 of embedding stones — often Polki diamonds, but also emeralds, rubies, and
 pearls — directly into a gold base using pure gold foil, without any
 adhesive or claws.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_karigar_20261111131036" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/concept/web_sec_karigar_20261111131036 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_karigar_20261111131036 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/concept/web_sec_karigar_20261111131036 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Craftsman setting diamonds into a gold necklace in the Vaishnavi Jewels manufacturing unit, Surat" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 ## Which should you choose?
 

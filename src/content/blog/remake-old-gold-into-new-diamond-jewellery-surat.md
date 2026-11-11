@@ -4,6 +4,8 @@ description: "Yes. Old gold, even from other jewellers, can be exchanged towards
 pubDate: 2026-11-09
 tags: ["old gold","custom jewellery","diamond jewellery","surat"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_sec_oldgold_20261111131006"
+heroAlt: "Old gold bangles and chain beside a new diamond pendant and its design sketch"
 ---
 
 Yes. At Vaishnavi Jewels we accept old gold jewellery, including pieces bought from other jewellers, in exchange towards new jewellery, and because we make jewellery in our own manufacturing unit in Surat, the new piece can be a diamond design of your choice. Custom pieces take 4 days to 3 weeks once the design is final, and the finished piece carries a BIS HUID hallmark.
@@ -19,6 +21,9 @@ Most homes have gold that is no longer worn: a chain with a broken clasp, earrin
 3. **Choose the design.** Pick one of our designs, share a photo or sketch of a piece you like, or describe what you want. We can change the gold karat, the diamond quality and the size to suit you.
 4. **Agree the details.** The gold, the diamonds and the design are finalised together, and the value of your old gold is set against the new piece.
 5. **Making and delivery.** The piece is made in our own manufacturing unit, in 4 days to 3 weeks depending on the design. Collect it at the showroom, or we send it with free insured delivery to major Indian cities.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_karigar_20261111131036" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/concept/web_sec_karigar_20261111131036 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_karigar_20261111131036 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/concept/web_sec_karigar_20261111131036 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Craftsman setting diamonds into a gold necklace in the Vaishnavi Jewels manufacturing unit, Surat" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 ## What should I check on the new bill?
 

@@ -4,6 +4,8 @@ description: "Keep it soft and clean: uncut or rose-cut diamonds, one hero neckl
 pubDate: 2026-10-26
 tags: ["sequin lehenga","reception jewellery","polki jewellery","diamond jewellery"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_bl_sequin_20261111132123"
+heroAlt: "Woman in a silver sequin lehenga wearing a white diamond necklace and drop earrings"
 ---
 
 With a sequin or crystal-embellished net lehenga, keep the jewellery soft and clean: uncut or rose-cut diamonds, one hero necklace and slim earrings. A heavily embellished outfit already reflects a lot of light, so jewellery with a calmer surface and a clear outline stands out better than pieces that try to match the shine. Fewer, well-chosen pieces keep the whole look balanced.
@@ -17,6 +19,9 @@ The answer is contrast. Jewellery with a softer glow or a firmer shape gives the
 ## Which diamond and Polki styles work best?
 
 **Uncut diamonds and Polki.** Polki has a soft, glassy glow rather than a sharp flash, which contrasts nicely with sequins. A Polki choker or collar looks rich without competing. See our [Polki jewellery](/polki-jewellery).
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/sun2510_bust_straight_20261025070753" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/sun2510_bust_straight_20261025070753 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/sun2510_bust_straight_20261025070753 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/sun2510_bust_straight_20261025070753 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Diamond necklace on a green velvet bust" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 **Rose-cut diamonds.** These have a flatter top and fewer facets, giving a gentle, mirror-like look that sits calmly against a crystal-heavy outfit.
 

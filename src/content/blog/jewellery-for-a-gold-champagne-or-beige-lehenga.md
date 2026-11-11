@@ -4,6 +4,8 @@ description: "Choose contrast: diamonds or Polki with emerald, ruby or pearl acc
 pubDate: 2026-11-02
 tags: ["bridal","lehenga","polki","wedding look"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_bl_gold_champagne_20261111131323"
+heroAlt: "Woman in a champagne gold lehenga wearing a diamond necklace with emerald drops"
 ---
 
 With a gold, champagne or beige lehenga, choose jewellery that creates contrast rather than more gold. Diamond pieces, or Polki set with emeralds, rubies or pearls, stand out clearly against zari and tissue fabric. Pick one hero piece, usually the necklace, and let one colour from the stones carry through your earrings and maang tikka.
@@ -21,6 +23,9 @@ There are three simple ways to create that difference:
 ## Which stone colours work best with gold, champagne and beige?
 
 The shade of your lehenga matters:
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/dhan_20261029_bride_20261022130922" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/dhan_20261029_bride_20261022130922 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/dhan_20261029_bride_20261022130922 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/dhan_20261029_bride_20261022130922 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Bride in an ivory lehenga with a veil wearing a diamond and coloured-stone necklace" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 - **Rich gold or antique gold:** emeralds and rubies give the strongest contrast. A Polki choker with emerald drops, or a diamond necklace with ruby accents, looks clear and festive.
 - **Champagne and light gold:** pearls and soft pink or green stones keep the look gentle. A diamond necklace with pearl strands suits a day ceremony.

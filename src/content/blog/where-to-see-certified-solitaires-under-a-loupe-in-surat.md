@@ -4,6 +4,8 @@ description: "At Vaishnavi Jewels, Parle Point, Surat, you can match each solita
 pubDate: 2026-10-26
 tags: ["solitaire rings","surat","diamond certificate","laser inscription"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_sec_laser_inscription_20261111130643"
+heroAlt: "Close-up of a certified diamond held in tweezers, showing the report number laser-inscribed on its girdle"
 ---
 
 You can see certified solitaires under a loupe at Vaishnavi Jewels, 120, Rajhans Ornate - High Street Retail Mall, Parle Point, Surat. Every solitaire we sell has its own grading report from IGI, EGL or TGL, and its report number is laser-inscribed on the stone. At the counter, we show you the inscription under a 10x loupe, match it to the report, and help you check the number on the laboratory's website before you pay.
@@ -21,6 +23,9 @@ Seeing the stone under a loupe lets you:
 ## What does the check look like at our showroom?
 
 When you visit, we follow the same steps for every solitaire, whether it is natural or lab-grown:
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/ww_showroom_cabinets_20261028153418" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/ww_showroom_cabinets_20261028153418 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/ww_showroom_cabinets_20261028153418 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/ww_showroom_cabinets_20261028153418 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Display cabinets in the Vaishnavi Jewels showroom, Surat" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 1. **We show you the report.** It states the carat weight, colour, clarity, cut, measurements and shape, and clearly states the origin of the diamond.
 2. **We hand you a loupe.** With a little guidance, most customers can find and read the girdle inscription within a minute.

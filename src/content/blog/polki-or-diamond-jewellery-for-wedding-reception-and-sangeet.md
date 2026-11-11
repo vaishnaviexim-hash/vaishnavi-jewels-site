@@ -4,6 +4,8 @@ description: "Wear Polki for the wedding ceremony, diamonds for the reception an
 pubDate: 2026-10-26
 tags: ["polki jewellery","diamond jewellery","wedding functions","bridal jewellery"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/design_gemini/vs2_bridal_s1_20261012170008"
+heroAlt: "Bride in a red lehenga wearing a polki bridal set"
 ---
 
 A simple plan works for most brides: wear Polki for the wedding ceremony, diamond jewellery for the reception, and lighter Polki or diamond pieces for the sangeet and mehendi. Polki's warm, uncut look suits a heavy, richly coloured bridal lehenga, while diamonds suit the lighter, more contemporary outfits most brides choose for the evening reception. Choose one hero necklace per function so every look in your photos feels different.
@@ -25,6 +27,9 @@ You do not need every piece to be equally heavy. Let the necklace lead and keep 
 ## Why do diamonds work for the reception?
 
 The reception is usually in the evening, under strong indoor lights, and many brides change into a gown, a saree-gown, a lighter lehenga or a silk saree. Diamond jewellery has a crisp, bright look that suits these cleaner lines. A diamond necklace with matching earrings, a bracelet and a ring is often all you need.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/vs2_western_s1_20261012170111" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/vs2_western_s1_20261012170111 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/vs2_western_s1_20261012170111 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/vs2_western_s1_20261012170111 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Woman in a black gown wearing a fine diamond necklace" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 Because the outfit is lighter, the jewellery can be a little more modern: a fine diamond collar, a long pendant necklace, or statement earrings with a slim chain. Our [natural diamond jewellery](/natural-diamond-jewellery) and [lab-grown diamond jewellery](/lab-grown-diamond-jewellery) ranges both include reception-ready sets, each with its own grading report that states the quality and origin clearly.
 

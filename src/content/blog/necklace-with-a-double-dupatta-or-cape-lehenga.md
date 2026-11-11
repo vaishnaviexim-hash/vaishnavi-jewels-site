@@ -4,6 +4,8 @@ description: "Choose a choker or short necklace that sits above the drape, and l
 pubDate: 2026-10-26
 tags: ["double dupatta","cape lehenga","choker necklace","bridal styling"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_bl_cape_20261111131645"
+heroAlt: "Bride in a cape lehenga with a double dupatta wearing a diamond choker and maang tikka"
 ---
 
 With a double dupatta or a cape lehenga, choose a choker or short necklace that sits above the drape, and wear a longer necklace only if it can lie clear of the fabric. Earrings and a maang tikka become more important, because they frame the face where the drape cannot cover them. Planning necklace length and earring weight around the drape keeps your jewellery visible in every photograph.
@@ -19,6 +21,9 @@ So a beautiful rani haar can end up hidden under fabric for most of the ceremony
 1. **Choker.** The safest choice. It sits at the base of the neck, above the drape, and stays visible from every angle.
 2. **Collar or short necklace.** Sits on the collarbone. Works if the dupatta is pinned wide at the shoulders or the cape opens at the front.
 3. **Long rani haar.** Wear it only if the shoulder dupatta is pinned to one side or the cape is open at the centre, so the necklace can fall in the gap.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/dhan_20261025_stand_20261022130705" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/dhan_20261025_stand_20261022130705 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/dhan_20261025_stand_20261022130705 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/dhan_20261025_stand_20261022130705 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Diamond and sapphire necklace set on a velvet stand" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 If you love both a choker and a long necklace, try them with the actual draping before the wedding. Our guide to [choosing a choker or long necklace for your neckline](/blog/choker-or-long-necklace-which-suits-my-lehenga-neckline) explains how necklines affect the choice.
 

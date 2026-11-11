@@ -4,6 +4,8 @@ description: "A groom looks best with two or three pieces: a pearl or Polki mala
 pubDate: 2026-11-02
 tags: ["groom","sherwani","wedding look","polki"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_bl_groom_20261111131733"
+heroAlt: "Groom in an ivory sherwani wearing a diamond brooch, a pearl mala and a diamond ring"
 ---
 
 A groom looks best with two or three well-chosen pieces rather than many. A pearl or Polki mala over the sherwani, one strong ring and either a kada or small diamond studs is a complete, tasteful look. Match the metal tone to the bride's jewellery, so the couple looks connected in photographs.
@@ -23,6 +25,9 @@ Pick two or three of these. A mala, a ring and a kada together is the fullest lo
 ## How do I match the groom's jewellery to the bride's?
 
 Couples look best when their jewellery shares one idea:
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/gbp_mens_ring_20261022154012" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/gbp_mens_ring_20261022154012 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/gbp_mens_ring_20261022154012 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/gbp_mens_ring_20261022154012 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Men&#x27;s diamond ring in rose gold" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 - **The same metal tone:** if the bride wears Polki in yellow gold, the groom's mala and kada should also be yellow gold. If she wears diamonds in white or rose gold for the reception, choose a diamond band or studs in the same tone.
 - **The same stone colour:** if the bride's set has emeralds, a few emeralds in the groom's mala connect the two looks.

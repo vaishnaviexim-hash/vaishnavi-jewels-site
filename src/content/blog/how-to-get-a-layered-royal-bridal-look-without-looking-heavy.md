@@ -4,6 +4,8 @@ description: "Build it in steps: a tikka or matha patti, one layered necklace in
 pubDate: 2026-10-26
 tags: ["polki jewellery","royal bridal look","layered necklace","bridal jewellery"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/design_gemini/vs2_bridal_s1b_20261012170705"
+heroAlt: "Bride in a red lehenga with a veil, maang tikka and layered polki"
 ---
 
 To get a layered, royal bridal look with Polki, emeralds and pearls without looking too heavy, build it in steps: a maang tikka or matha patti, one layered necklace instead of several separate ones, and kadas that match. Space the layers so each one shows, keep the colours to two or three, and ask for lighter construction so the set stays comfortable through a long day. The look should feel rich, not crowded.
@@ -21,6 +23,9 @@ When the look goes wrong, it is usually because too many unrelated pieces are ad
 3. **Choose earrings that connect.** Chandbalis or jhumkas with pearl or emerald drops tie the tikka and necklace together.
 4. **Finish with the wrists.** One or two kadas per wrist look stronger and lighter than many thin bangles.
 5. **Add a nath and haathphool only if they suit your face and the overall weight.**
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/meraki_today_feed_real_polki_20261022095111" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/meraki_today_feed_real_polki_20261022095111 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/meraki_today_feed_real_polki_20261022095111 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/meraki_today_feed_real_polki_20261022095111 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Layered polki necklace set on a green velvet bust" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 Our [Polki jewellery](/polki-jewellery) page shows the layered sets we make.
 

@@ -4,6 +4,8 @@ description: "Yes. Share your wedding date, outfit and budget on WhatsApp, see a
 pubDate: 2026-11-09
 tags: ["bridal","choker","video call","wedding planning"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_sec_videocall_20261111130856"
+heroAlt: "Customer shortlisting a diamond and polki choker set on a WhatsApp video call with Vaishnavi Jewels"
 ---
 
 Yes. Send us your wedding date, your outfit colours and the budget you have in mind on WhatsApp, and we will shortlist bridal choker sets from our designs and show them to you live on a video call. Once you have two or three favourites, book a visit to try them on with your outfit, or ask for a change in size, stones or gold karat to be made in our own manufacturing unit.
@@ -15,6 +17,9 @@ Wedding shopping days are long, and a showroom with thousands of designs can fee
 ## What should I share for a close shortlist?
 
 The more we know, the closer the first shortlist will be. Message us with:
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/rvpool_necklace_1_20261106235551" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/rvpool_necklace_1_20261106235551 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/rvpool_necklace_1_20261106235551 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/rvpool_necklace_1_20261106235551 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Woman in a maroon saree wearing a diamond choker" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 1. **Your wedding date and the function** the choker is for: the ceremony, the reception or the sangeet.
 2. **Your outfit:** a photo of the lehenga or saree, its colour and the blouse neckline.

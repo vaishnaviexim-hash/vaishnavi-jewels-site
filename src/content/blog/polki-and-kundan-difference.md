@@ -4,6 +4,8 @@ description: "Polki is a natural uncut diamond set in gold; Kundan is a gold-foi
 pubDate: 2026-11-09
 tags: ["polki","kundan","bridal","buying guide"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/design_gemini/vs2_bridal_s4_20261012171130"
+heroAlt: "Close-up of a polki and emerald necklace with matching earrings"
 ---
 
 Polki is the stone: a natural diamond left uncut, with its flat, natural shape, set in gold. Kundan is a way of setting stones in fine gold foil, and the stones used in Kundan work are often glass or other gems rather than diamonds. So a Polki piece always has diamonds, while a Kundan piece may or may not, and the only way to know is to ask what the stones are and see it written on the bill.
@@ -17,6 +19,9 @@ Polki is usually set in yellow gold, often with a foil backing that brings out t
 ## What is Kundan?
 
 Kundan is a technique, not a stone. The craftsperson places stones into a gold frame and packs very fine, pure gold foil around each one to hold it in place. The method is centuries old and gives the clean, gold-edged outline that people picture when they think of a royal Indian necklace.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/gbp_polki_ranihaar_20261022153530" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/gbp_polki_ranihaar_20261022153530 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/gbp_polki_ranihaar_20261022153530 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/gbp_polki_ranihaar_20261022153530 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Polki rani haar with emeralds and pearls on a velvet bust" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 The important point for a buyer is that the word "Kundan" says nothing about which stones are inside. Kundan work can hold glass, coloured gemstones or uncut diamonds. When uncut diamonds are set this way, the piece is often called Polki or Polki-Kundan.
 

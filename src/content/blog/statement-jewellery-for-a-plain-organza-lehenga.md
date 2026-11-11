@@ -4,6 +4,8 @@ description: "With a plain organza lehenga, wear one focal piece such as a Polki
 pubDate: 2026-10-26
 tags: ["organza lehenga","statement jewellery","minimal bridal look","styling"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_bl_organza_20261111131707"
+heroAlt: "Woman in a plain ivory organza lehenga wearing one statement polki and diamond necklace"
 ---
 
 With a plain or minimal organza lehenga, choose one focal piece, such as a Polki choker, a diamond necklace or a pair of statement earrings, and keep everything else light. A simple, airy outfit gives a single piece room to stand out, so the jewellery becomes the main detail of the look. Pick the piece that suits your neckline and the part of your face or neck you most want people to notice.
@@ -17,6 +19,9 @@ One strong piece, with quieter supporting pieces, keeps the balance right and ph
 ## Which statement piece should I choose?
 
 Start with the neckline.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/dhan_20261025_stand_20261022130705" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/dhan_20261025_stand_20261022130705 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/dhan_20261025_stand_20261022130705 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/dhan_20261025_stand_20261022130705 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Diamond and sapphire necklace set on a velvet stand" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 - **Deep V or sweetheart neck:** a statement necklace leads. A Polki choker or a broad diamond collar fills the space and draws the eye to the neck and face.
 - **High neck, boat neck or collar:** skip the big necklace. Let large chandbalis or long diamond earrings lead, with perhaps a slim chain.

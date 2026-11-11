@@ -4,6 +4,8 @@ description: "With a jacket or high blouse, wear a choker or collar above the ne
 pubDate: 2026-11-09
 tags: ["wedding look","lehenga","blouse","choker"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_bl_backblouse_20261111131359"
+heroAlt: "Back view of a deep-back blouse lehenga with long diamond earrings and a fine necklace"
 ---
 
 With a jacket-style or high-neck blouse, choose a choker or collar necklace that sits just above the neckline, and let statement earrings do the rest. With a deep-back blouse, keep the front light, with a slim choker or a single pendant, and add long earrings or a back chain so the jewellery follows the line of the blouse. In both cases, pick one hero piece so the blouse and the jewellery do not compete.
@@ -15,6 +17,9 @@ The blouse frames the face and the neck, so it decides where a necklace can sit 
 ## What jewellery suits a jacket-style blouse?
 
 Jacket blouses, often embroidered and structured, are popular for winter weddings and receptions. They work well with:
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/web_earrings_g1_20261012173134" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/web_earrings_g1_20261012173134 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/web_earrings_g1_20261012173134 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/web_earrings_g1_20261012173134 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Diamond and emerald chandelier earrings on a velvet stand" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 1. **A choker or collar necklace** that sits on the neck above the jacket's edge. Polki chokers with emerald or pearl drops suit embroidered jackets; a diamond collar suits a plain or velvet jacket.
 2. **Statement earrings** such as chandbalis, jhumkas or long diamond drops, which show clearly because the neck and ears are the open area.

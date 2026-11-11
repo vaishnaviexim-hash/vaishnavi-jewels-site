@@ -4,6 +4,8 @@ description: "High and boat necklines suit a choker; sweetheart and V necklines 
 pubDate: 2026-10-16
 tags: ["bridal jewellery","lehenga styling","necklace","wedding jewellery"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_bl_choker_long_20261111132022"
+heroAlt: "Bride in a maroon lehenga wearing a polki choker layered with a long rani haar"
 ---
 
 A choker suits high necklines, boat necklines and closed blouses, because it sits on the skin above the fabric and does not fight with the cut. A long necklace or rani haar suits sweetheart and V necklines, because it follows the open shape of the blouse and fills the space it leaves. For a bridal lehenga, many brides wear both: a choker at the throat and a long rani haar below it, which works with almost every neckline as long as the two pieces are different lengths.
@@ -23,6 +25,9 @@ If you are unsure, bring the blouse or a clear photograph of it. Our team at the
 ## Can I layer a choker with a long rani haar?
 
 Yes, and for a bridal lehenga this is the most popular way to wear a neck set. The choker gives the face a frame, and the rani haar adds length and fills the bodice. The two pieces should differ in length by a clear margin, so the choker sits at the base of the throat and the rani haar reaches the chest or below.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/dhan_20261031_stand_20261022131022" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/dhan_20261031_stand_20261022131022 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/dhan_20261031_stand_20261022131022 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/dhan_20261031_stand_20261022131022 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Layered long necklace and earrings on a velvet stand" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 A few points keep the layered look balanced:
 

@@ -4,6 +4,8 @@ description: "Ivory is a clean base, so gold-set Polki, uncut diamonds, pearls w
 pubDate: 2026-10-26
 tags: ["ivory lehenga","modern bride","polki jewellery","diamond jewellery"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/design_gemini/dhan_20261029_bride_v2_20261022131354"
+heroAlt: "Bride in an ivory lehenga and veil wearing layered diamond necklaces"
 ---
 
 An ivory or off-white lehenga is a clean canvas, so the jewellery can lead the look. Gold-set Polki and uncut diamonds give a warm, heritage feel; pearls with emeralds add soft colour; and a diamond choker with a long necklace gives a crisp, modern finish. Add one colour through the stones if you want contrast, and keep the rest of the look in the same tone.
@@ -17,6 +19,9 @@ The flip side is that every choice is visible. The jewellery sets the mood of th
 ## Which jewellery styles suit an ivory lehenga?
 
 **Warm and traditional: Polki in yellow gold.** Uncut diamonds set in gold glow against ivory and give a classic bridal feel. A Polki choker with a rani haar, chandbalis and a maang tikka make a complete ceremony look. See our [Polki jewellery](/polki-jewellery).
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/dhan_20261029_bride_20261022130922" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/dhan_20261029_bride_20261022130922 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/dhan_20261029_bride_20261022130922 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/dhan_20261029_bride_20261022130922 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Bride in an ivory lehenga with a veil wearing a diamond and coloured-stone necklace" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 **Soft and romantic: pearls with emeralds or pink stones.** Pearl strands, pearl drops on Polki earrings and a few green or pink stones add gentle colour without overpowering the outfit.
 
