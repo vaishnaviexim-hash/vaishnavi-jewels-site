@@ -209,6 +209,13 @@ async function waFlush(request, env) {
 //     never in the public website files or on GitHub.
 // Bindings / variables (set in Cloudflare Pages > Settings): DB (D1), PHOTOS (KV namespace or R2 bucket), ACCESS_TEAM, ACCESS_AUD,
 // OWNER_EMAILS (comma list), GOLD_PUSH_SECRET (encrypted), VJ_GOLD_HOOK (encrypted, gold relay), ANTHROPIC_API_KEY (encrypted, photo search), VJ_TALLY_SECRET (encrypted, future Tally bridge -> /api/vj/tally-sync + /api/vj/tally-outbox; not set yet), VJ_QUOTE_HOOK (encrypted, quote follow-up). ACCESS_CERTS_URL / VJ_DEV only for local tests.
+// Sheet relay for the non-gold ?want= routes (boxes, addrs, enquiries, enqset, chatlog, brainhours). Prefers the n8n relay
+// VJ_N8N_RELAY (encrypted; n8n "VJ 06 Website relay"), falls back to the Make relay VJ_GOLD_HOOK. Gold itself stays on VJ_GOLD_HOOK.
+function relayBase(env) {
+  if (env.VJ_N8N_RELAY && /^https:\/\/n8n-epei\.srv2114308\.hstgr\.cloud\/webhook\/vj-relay-[a-f0-9]{16,}$/.test(env.VJ_N8N_RELAY)) return env.VJ_N8N_RELAY;
+  if (env.VJ_GOLD_HOOK && /^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_GOLD_HOOK)) return env.VJ_GOLD_HOOK;
+  return '';
+}
 // ---------------------------------------------------------------------------------------------
 const VJ_HOST = 'vaishnavijewels.com';
 const VJ_JSON_H = { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow' };
@@ -579,9 +586,9 @@ async function vjBoxes(url, env, who) {
   const row = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'boxmap'").first();
   let c = null; try { c = row ? JSON.parse(row.v) : null; } catch (e) {}
   const fresh = url.searchParams.get('fresh') === '1' && who.role === 'admin';
-  if ((!c || fresh || Date.now() - c.at > 6 * 3600e3) && env.VJ_GOLD_HOOK && /^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_GOLD_HOOK)) {
+  if ((!c || fresh || Date.now() - c.at > 6 * 3600e3) && relayBase(env)) {
     try {
-      const r = await fetch(env.VJ_GOLD_HOOK + '?want=boxes', { signal: AbortSignal.timeout(10000) });
+      const r = await fetch(relayBase(env) + '?want=boxes', { signal: AbortSignal.timeout(10000) });
       const t = (await r.text()).trim();
       if (r.ok && t.length < 300000 && /^[A-Z]{2,4}:\d+=/.test(t)) {
         c = { at: Date.now(), s: t };
@@ -3585,8 +3592,8 @@ async function vjAbSync(env, force) {
     await vjChT(env); for (const c of ((((await env.DB.prepare('SELECT data FROM vj_challans').all()).results) || []).map(vjParse))) if (c && !c.cancelled && c.party) await vjAbPut(env, c.party, c.by, 'challan ' + c.no, Date.parse(c.at) || 1);
     s.saved = Date.now(); }
   if (force || !s.at || Date.now() - s.at > 10 * 60e3) { s.at = Date.now();
-    if (env.VJ_GOLD_HOOK && /^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_GOLD_HOOK)) try {
-      const r = await fetch(env.VJ_GOLD_HOOK + '?want=addrs', { signal: AbortSignal.timeout(10000) }), t = await r.text(); let j = null; try { j = JSON.parse(t); } catch (e) {}
+    if (relayBase(env)) try {
+      const r = await fetch(relayBase(env) + '?want=addrs', { signal: AbortSignal.timeout(10000) }), t = await r.text(); let j = null; try { j = JSON.parse(t); } catch (e) {}
       if (r.ok && j && Array.isArray(j.rows)) { let n = 0; for (const x of j.rows.slice(0, 5000)) { if (!Array.isArray(x) || /reject|wrong|test/i.test(String(x[8] || ''))) continue;
           await vjAbPut(env, { name: x[0], addr: x[1], area: x[2], city: x[3], state: x[4], pin: x[5], mobile: x[6] }, 'Client_Addresses', 'sheet', vjAbTime(x[7]) || 1); n++; } s.ok = true; s.n = n; } else s.ok = false;
     } catch (e) { s.ok = false; } }
@@ -3644,8 +3651,8 @@ async function vjEnqSheet(env, force) {
   if (!force && vjEnqMem && Date.now() - vjEnqMem.at < 5 * 60e3) return vjEnqMem;
   const st = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'enq-sheet'").first(); let c = null; try { c = st ? JSON.parse(st.v) : null; } catch (e) {}
   if (!force && c && Date.now() - c.at < 5 * 60e3) { vjEnqMem = c; return c; }
-  if (env.VJ_GOLD_HOOK && /^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_GOLD_HOOK)) try {
-    const r = await fetch(env.VJ_GOLD_HOOK + '?want=enquiries', { signal: AbortSignal.timeout(15000) }), t = await r.text(); let j = null; try { j = JSON.parse(t); } catch (e) {}
+  if (relayBase(env)) try {
+    const r = await fetch(relayBase(env) + '?want=enquiries', { signal: AbortSignal.timeout(15000) }), t = await r.text(); let j = null; try { j = JSON.parse(t); } catch (e) {}
     if (r.ok && j && Array.isArray(j.rows)) {
       c = { at: Date.now(), ok: true, rows: j.rows.filter(x => Array.isArray(x) && Number.isInteger(x[0]) && x[0] >= 2).slice(0, 6000).map(x => x.slice(0, 18).map((v, i) => i === 0 ? v : String(v == null ? '' : v).slice(0, i === 6 ? 700 : i === 10 ? 400 : 120))) };
       await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('enq-sheet', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(c)).run();
@@ -3723,10 +3730,10 @@ async function vjEnqLoad(env, force) {
 }
 // copy the status of one enquiry to its sheet row(s) - never J / K
 function vjEnqPush(env, ctx, q) {
-  if (!env.VJ_GOLD_HOOK || !/^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_GOLD_HOOK) || !q || q.key.startsWith('h:')) return;
+  if (!relayBase(env) || !q || q.key.startsWith('h:')) return;
   const dm = ymd => /^\d{4}-\d{2}-\d{2}$/.test(ymd || '') ? ymd.split('-').reverse().join('/') : '';
   const e = q.ep, body = { rows: e.rows.map(r => r.row).slice(-10).join(','), num: q.key, I: e.status === 'New' ? '' : e.status, L: dm(e.visitBooked), M: dm(e.visited), N: e.quote ? String(e.quote) : '', O: e.bought ? String(e.bought) : '', P: e.lost ? String(e.lost).slice(0, 100) : '' };
-  const p = fetch(env.VJ_GOLD_HOOK + '?want=enqset', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(20000), body: JSON.stringify(body) }).catch(() => {});
+  const p = fetch(relayBase(env) + '?want=enqset', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(20000), body: JSON.stringify(body) }).catch(() => {});
   if (ctx && ctx.waitUntil) ctx.waitUntil(p);
 }
 // Ready WhatsApp message to the customer (rule-based; opens on the user's own WhatsApp, nothing sent from here)
@@ -3911,8 +3918,8 @@ async function vjEnqBulk(env, ctx) {
     await env.DB.batch(part.map(q => env.DB.prepare('INSERT INTO vj_enq_followup (number, enquiry_date, status, next_followup_date, note, amount, bill_no, kind, "by", by_name, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
       .bind(q.key, vjEnqIst(q.ep.start).slice(0, 10), 'Closed', '', NOTE, null, '', 'bulk', 'vaishnaviexim@gmail.com', 'Abhinav (bulk close)', now)));
     let ok = 0;
-    if (env.VJ_GOLD_HOOK && /^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_GOLD_HOOK)) await Promise.all(part.filter(q => !q.key.startsWith('h:')).map(q =>
-      fetch(env.VJ_GOLD_HOOK + '?want=enqset', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(25000),
+    if (relayBase(env)) await Promise.all(part.filter(q => !q.key.startsWith('h:')).map(q =>
+      fetch(relayBase(env) + '?want=enqset', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(25000),
         body: JSON.stringify({ rows: q.ep.rows.map(r => r.row).slice(-10).join(','), num: q.key, I: 'Closed', L: '', M: '', N: '', O: '', P: RESULT }) }).then(r => { if (r.ok) ok++; }).catch(() => {})));
     await vjAudit(env, { email: 'vaishnaviexim@gmail.com' }, 'enquiry-bulkclose', 'enquiries/', part.length + ' closed, sheet ' + ok + ': ' + part.map(q => q.id).join(','));
     const t0 = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = ?").bind(rule.k).first();
@@ -4150,11 +4157,11 @@ async function vjChatTplState(env, ctx, force) {
 async function vjChatSheet(env, force) {
   const st = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'chat-sheet-at'").first(), at = st ? Number(st.v) : 0;
   if (!force && Date.now() - at < 5 * 60e3) return { at, ok: true };
-  if (!env.VJ_GOLD_HOOK || !/^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_GOLD_HOOK)) return { at, ok: false };
+  if (!relayBase(env)) return { at, ok: false };
   const claim = await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES (?, '1') ON CONFLICT(k) DO NOTHING").bind('chatsheetring:' + Math.floor(Date.now() / 60e3)).run();
   if (!claim.meta || claim.meta.changes !== 1) return { at, ok: true };
   try {
-    const r = await fetch(env.VJ_GOLD_HOOK + '?want=chatlog', { signal: AbortSignal.timeout(20000) }), j = await r.json().catch(() => null);
+    const r = await fetch(relayBase(env) + '?want=chatlog', { signal: AbortSignal.timeout(20000) }), j = await r.json().catch(() => null);
     if (!r.ok || !j || !Array.isArray(j.inbox)) return { at, ok: false };
     const stmts = [], ins = env.DB.prepare("INSERT OR IGNORE INTO vj_chat_in (id, number, name, dir, type, text, t, src) VALUES (?, ?, ?, ?, ?, ?, ?, 'sheet')");
     j.inbox.slice(-6000).forEach(x => { const n = vjChatNum(x[1]), t = vjAbTime(x[0]), id = String(x[5] || '').slice(0, 120); if (n && t && id) stmts.push(ins.bind(id, n, vjClean(x[2], 60), 'in', String(x[3] || '').slice(0, 20), String(x[4] || '').slice(0, 2000) || '(' + (x[3] || 'message') + ')', t)); });
@@ -4406,10 +4413,10 @@ async function vjAhT(env) {
 async function vjAhBrain(env) {
   const hz = vjHours(), r = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'hours-text'").first();
   if (r && r.v === hz.text) return;
-  if (!env.VJ_GOLD_HOOK || !/^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_GOLD_HOOK)) return;
+  if (!relayBase(env)) return;
   const claim = await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES (?, '1') ON CONFLICT(k) DO NOTHING").bind('hoursring:' + Math.floor(Date.now() / 60e3)).run();
   if (!claim.meta || claim.meta.changes !== 1) return;
-  const res = await fetch(env.VJ_GOLD_HOOK + '?want=brainhours', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(9000), body: JSON.stringify({ text: hz.text }) });
+  const res = await fetch(relayBase(env) + '?want=brainhours', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(9000), body: JSON.stringify({ text: hz.text }) });
   const t = await res.text();
   if (res.ok && /"ok":\s*true/.test(t)) await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('hours-text', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(hz.text).run();
 }
