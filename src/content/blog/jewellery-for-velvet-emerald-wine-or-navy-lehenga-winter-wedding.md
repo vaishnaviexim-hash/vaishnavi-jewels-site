@@ -4,6 +4,8 @@ description: "Velvet and jewel-tone lehengas suit warm gold, Polki and uncut dia
 pubDate: 2026-10-26
 tags: ["velvet lehenga","winter wedding","polki jewellery","bridal jewellery"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_bl_velvet_winter_20261111131544"
+heroAlt: "Woman in an emerald velvet lehenga wearing a polki necklace with emeralds and pearls"
 ---
 
 Velvet and deep jewel-tone lehengas, such as emerald, wine, navy or bottle green, look best with warm gold settings, Polki and uncut diamonds, or emeralds and pearls that pick up the colour of the outfit. Keep one strong necklace as the focus and let the rich fabric be its backdrop. Because winter functions are often in the evening, a few bright diamond accents near the face also help the look stand out under indoor lights.
@@ -17,6 +19,9 @@ Jewel tones also carry a lot of colour already. The jewellery works best when it
 ## Which jewellery suits each colour?
 
 **Emerald and bottle green.** Yellow-gold Polki with pearls is a classic match, and white diamonds look crisp against green. If you want colour, a few emerald drops tie the set to the outfit. Avoid adding red or blue stones as well.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/vs2_western_s4_20261012171511" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/vs2_western_s4_20261012171511 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/vs2_western_s4_20261012171511 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/vs2_western_s4_20261012171511 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Emerald and diamond necklace with a matching ring" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 **Wine, maroon and burgundy.** Warm gold and Polki give a heritage feel. Rubies or deep red stones in small amounts work well; pearls soften the look for a day function.
 

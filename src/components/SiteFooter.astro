@@ -33,39 +33,64 @@ import { infoPages, business } from '../data/business.js';
   </div>
 </footer>
 
+<div class="mobile-cta">
+  <a href={business.whatsapp} target="_blank" rel="noopener" class="btn btn-maroon">WhatsApp Us</a>
+  <a href="/book-a-visit" class="btn btn-solid">Visit / Video Call</a>
+</div>
+
 <style>
   .site-footer {
     border-top: 1px solid var(--color-line);
-    background: var(--color-ivory-deep);
+    background:
+      linear-gradient(180deg, rgba(239, 227, 200, 0.55), rgba(243, 234, 214, 1)),
+      var(--color-ivory-deep);
     margin-top: 96px;
-    padding: 48px 0;
+    padding: 64px 0 48px;
+    position: relative;
+  }
+  .site-footer::before {
+    content: ''; position: absolute; top: -1px; left: 50%; transform: translateX(-50%);
+    width: 120px; height: 2px; background: var(--color-gold);
   }
   .footer-inner {
-    display: flex;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 24px;
+    display: grid;
+    grid-template-columns: 1.3fr 1fr 1fr;
+    gap: 40px;
   }
   .footer-brand {
     font-family: var(--font-display);
-    font-size: 22px;
-    margin-bottom: 6px;
+    font-size: 28px;
+    margin-bottom: 12px;
+    color: var(--color-maroon);
   }
   .footer-line {
-    font-size: 13px;
+    font-size: 13.5px;
+    line-height: 1.7;
     color: var(--color-ink-soft);
-    margin: 0;
-    max-width: 380px;
+    margin: 0 0 4px;
+    max-width: 400px;
   }
-  .footer-line a { color: var(--color-ink-soft); text-decoration: underline; }
+  .footer-line a { color: var(--color-ink); text-decoration: underline; text-underline-offset: 3px; }
   .footer-links {
     display: flex;
-    flex-wrap: wrap;
-    gap: 12px 24px;
+    flex-direction: column;
+    gap: 9px;
     align-items: flex-start;
-    font-size: 13px;
-    max-width: 420px;
+    font-size: 13.5px;
+    padding-top: 6px;
+    border-left: 1px solid var(--color-line);
+    padding-left: 28px;
   }
-  .footer-links a { color: var(--color-ink-soft); }
+  .footer-links a { color: var(--color-ink-soft); transition: color 0.2s ease; }
   .footer-links a:hover { color: var(--color-gold-deep); }
+
+  @media (max-width: 860px) {
+    .footer-inner { grid-template-columns: 1fr 1fr; }
+    .footer-inner > div:first-child { grid-column: 1 / -1; }
+    .footer-links { border-left: 0; padding-left: 0; }
+  }
+  @media (max-width: 520px) {
+    .site-footer { margin-top: 72px; padding-top: 48px; }
+    .footer-inner { gap: 28px; }
+  }
 </style>

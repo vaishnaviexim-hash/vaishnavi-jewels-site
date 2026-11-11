@@ -4,6 +4,8 @@ description: "A short choker or collar just above the neckline suits a sharara o
 pubDate: 2026-11-09
 tags: ["wedding look","sharara","anarkali","choker"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_bl_anarkali_20261111131606"
+heroAlt: "Woman in a high-neck anarkali wearing statement diamond earrings instead of a necklace"
 ---
 
 A short choker or collar necklace that sits just above the neckline suits a sharara or a high-neck anarkali, paired with chandbalis or long earrings to frame the face. Long necklaces tend to fight a high neckline and get lost in the fabric, so keep them for open or V-shaped necks. If the outfit is heavily embroidered at the neck, you can skip the necklace and let strong earrings and a maang tikka carry the look.
@@ -15,6 +17,9 @@ Both outfits are popular for mehendi, sangeet and family wedding functions, and 
 ## What necklace suits a high-neck anarkali?
 
 For a high or band-collar anarkali:
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/web_earrings_g2_20261012173215" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/web_earrings_g2_20261012173215 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/web_earrings_g2_20261012173215 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/web_earrings_g2_20261012173215 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Diamond and sapphire floral earrings on a velvet stand" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 1. **A choker** that sits on the neck above the collar, in Polki with pearls for a traditional look or in diamonds for an evening function.
 2. **A narrow collar necklace** if the neckline is slightly lower and round.

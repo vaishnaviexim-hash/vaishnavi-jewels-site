@@ -4,6 +4,8 @@ description: "Soft floral lehengas pair well with Polki, uncut diamonds, pearls 
 pubDate: 2026-10-26
 tags: ["floral lehenga","pastel bridal","polki jewellery","styling"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_bl_floral_blush_20261111131303"
+heroAlt: "Woman in a blush floral lehenga wearing delicate diamond and pearl jewellery"
 ---
 
 A floral or multicolour embroidered lehenga in blush, mint or mehendi green pairs well with Polki, uncut diamonds, pearls or a touch of emerald. Pick one hero piece, usually the necklace or the earrings, and keep the stone colours close to a single shade from the embroidery so the flowers stay the focus. White and warm-gold tones work with almost every floral palette.
@@ -17,6 +19,9 @@ The goal is jewellery that frames the outfit rather than repeating it.
 ## Which jewellery suits each colour?
 
 **Blush and rose pink.** Rose-gold diamond settings blend gently with blush. White Polki with pearl drops gives a softer, more traditional feel. If you want colour, a pale pink stone at the centre is enough.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/ww_pearl_cluster_earrings_20261028152939" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/ww_pearl_cluster_earrings_20261028152939 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/ww_pearl_cluster_earrings_20261028152939 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/ww_pearl_cluster_earrings_20261028152939 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Pearl and diamond cluster earrings on a velvet stand" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 **Mint and sage.** White Polki in yellow gold looks fresh against mint, as do diamonds with a small green accent. Keep designs floral or leafy rather than sharply geometric.
 

@@ -15,6 +15,7 @@ const blog = defineCollection({
     // Used for the <meta property="og:image"> tag and the blog card image.
     // Optional so a post can be written/published even before an image exists.
     heroImage: z.string().optional(),
+    heroAlt: z.string().optional(),
     // Free-form tags, e.g. ["bridal", "polki", "diamond-guide"]
     tags: z.array(z.string()).default([]),
     // Set true to hide a post without deleting the file (handy for drafts

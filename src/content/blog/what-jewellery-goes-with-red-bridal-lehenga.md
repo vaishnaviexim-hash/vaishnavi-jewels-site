@@ -4,6 +4,8 @@ description: "Gold-toned Polki or Jadau with emeralds and pearls suits a red leh
 pubDate: 2026-10-08
 tags: ["bridal jewellery","red lehenga","polki","wedding look"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/design_gemini/vs2_bridal_s1b_20261012170705"
+heroAlt: "Bride in a red lehenga with a veil, maang tikka and layered polki"
 ---
 
 A red bridal lehenga looks its best with gold-toned jewellery: Polki or Jadau sets with green emeralds and soft pearls are the classic pairing, because the gold warms the red and the green gives it contrast. If you prefer a lighter, more modern look, a diamond choker worn with one or two layered long necklaces in white or rose gold works just as well. Choose stones that contrast with the red rather than match it, and let the embroidery on your lehenga decide how heavy the necklace should be.
@@ -19,6 +21,9 @@ A practical point: most brides buy jewellery they will wear long after the weddi
 ## Which stones look best against deep red?
 
 Think contrast, not matching. Stones in the same red family can disappear against the fabric, while green, white and cream stand out.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/vs2_bridal_s4_20261012171130" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/vs2_bridal_s4_20261012171130 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/vs2_bridal_s4_20261012171130 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/vs2_bridal_s4_20261012171130 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Close-up of a polki and emerald necklace with matching earrings" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 1. **Polki (uncut diamonds):** flat, foil-backed uncut diamonds have a soft glow rather than a sharp flash, which suits the richness of a bridal red. This is why [Polki jewellery](/polki-jewellery) is the most-asked-for choice for a red lehenga at our Parle Point showroom.
 2. **Emeralds:** green is the natural partner to red. A string of emerald beads under a Polki choker, or emerald drops on the earrings, lifts the whole look.

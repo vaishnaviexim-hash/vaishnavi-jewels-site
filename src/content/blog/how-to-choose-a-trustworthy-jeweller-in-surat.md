@@ -4,6 +4,8 @@ description: "Six checks before you pay: grading report, laser inscription, BIS 
 pubDate: 2026-10-20
 tags: ["buying guide","trust","certified diamonds","surat"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/design_gemini/ww_showroom_cabinets_20261028153418"
+heroAlt: "Display cabinets in the Vaishnavi Jewels showroom, Surat"
 ---
 
 A trustworthy jeweller shows you the proof before you pay: a grading report for every diamond, the matching laser inscription on the stone, a BIS HUID hallmark on the gold that you can check yourself, and an itemised invoice with the gold weight and the stones listed separately. They also explain exchange and buyback terms clearly and never rush you. If a jeweller is reluctant on any of these, keep looking.
@@ -19,6 +21,9 @@ For pieces with many small diamonds, such as earrings, pendants and necklace set
 ## 2. Match the report to the diamond itself
 
 A report only helps if it belongs to the stone in front of you. Most graded solitaires carry the report number laser-inscribed on the girdle, the thin outer edge of the diamond. Ask the jeweller to show it to you under a 10x loupe or a microscope and check that it matches the report. At Vaishnavi Jewels every solitaire is laser-inscribed, and we show you the inscription at the counter.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_huid_20261111130822" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/concept/web_sec_huid_20261111130822 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_huid_20261111130822 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/concept/web_sec_huid_20261111130822 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="BIS hallmark with HUID on the inside of an 18 karat gold diamond ring" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 ## 3. Check the BIS HUID on the gold
 

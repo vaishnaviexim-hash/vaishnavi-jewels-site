@@ -4,6 +4,8 @@ description: "A Gujarati bride often wears a rani haar or long necklace with a c
 pubDate: 2026-10-26
 tags: ["gujarati bride","panetar","gharchola","bridal jewellery"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/design_gemini/gujarati-new-year_2026_model_1_20261107024313"
+heroAlt: "Gujarati bride in a red and white saree wearing a diamond necklace"
 ---
 
 A Gujarati bride usually wears a long necklace or rani haar with a choker, a nath, a maang tikka or matha patti, earrings, and bangles alongside her chudo, with her panetar, gharchola or Banarasi saree. Polki and gold-set uncut diamonds suit the red and white of the panetar and the red, green and gold of the gharchola especially well. The exact set depends on family custom, so many brides plan it together with both families.
@@ -23,6 +25,9 @@ Each of these has strong colour and clear borders, which guide the jewellery cho
 5. **Nath:** a nose ring, often with a chain to the ear, worn as per family custom.
 6. **Chudo and bangles:** the bridal chudo, traditionally gifted by the bride's maternal family, worn with gold bangles or kadas.
 7. **Rings and haathphool:** optional, depending on the bride's taste.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/kc_collar_story_v1_20261023045755" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/kc_collar_story_v1_20261023045755 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/kc_collar_story_v1_20261023045755 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/kc_collar_story_v1_20261023045755 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Woman in a red saree wearing a diamond necklace set" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 Families often add heirloom pieces. A new set can be designed to sit comfortably alongside them.
 

@@ -4,6 +4,8 @@ description: "Pastel lehengas suit light diamond or rose-gold pieces, pearls and
 pubDate: 2026-10-24
 tags: ["pastel lehenga","day wedding","bridal jewellery","rose gold"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_bl_pastel_day_20261111131827"
+heroAlt: "Woman in a mint pastel lehenga at a day wedding wearing light diamond jewellery"
 ---
 
 A pastel lehenga for a day wedding looks best with lighter jewellery: open, airy diamond pieces, rose-gold or soft yellow-gold settings, pearls and gently coloured stones such as pale pink, mint or sky blue. Daylight is bright and unforgiving, so the jewellery should add a glow rather than compete with the outfit, and it should be light enough to wear comfortably from the morning pheras to the afternoon lunch. One well-chosen necklace, matching earrings and a maang tikka or haathphool are usually enough.
@@ -21,6 +23,9 @@ A simple rule: in daylight, the jewellery should look like it belongs to the out
 - **Rose gold** is the easiest match for blush, peach, lilac and ivory. Its warm pink tone sits close to the fabric colour, so the piece blends in and the diamonds stand out.
 - **Soft yellow gold** suits mint, sage, butter yellow and champagne. It brings a traditional feel and works especially well for Polki and Jadau pieces at a morning ceremony.
 - **White or platinum-toned settings** suit powder blue, grey-lilac and silver-ivory. They give a cool, clean look that photographs well in bright sun.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/tue2710_swirl_day_20261026214219" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/tue2710_swirl_day_20261026214219 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/tue2710_swirl_day_20261026214219 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/tue2710_swirl_day_20261026214219 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Woman wearing a fine diamond pendant for daytime" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 You do not have to choose only one. Many brides pair a rose-gold diamond necklace with yellow-gold bangles from the family, and the mix looks natural as long as the stones are similar in tone. Because every piece at Vaishnavi Jewels is made in our own manufacturing unit, the design, gold karat and diamond quality can be customised, so a design you like in one gold colour can usually be discussed in another. Custom and bridal pieces generally take two to four weeks, depending on the design, so plan this a little ahead of the wedding.
 

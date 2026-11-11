@@ -74,5 +74,29 @@ const absoluteOgImage = ogImage.startsWith('http') ? ogImage : new URL(ogImage, 
 </head>
 <body>
   <slot />
+  <script is:inline>
+  /* Logo on photos: dark logo on light photos, light logo on dark photos (owner 11/11 14:18). */
+  (function(){
+    function pick(m){
+      var box=m.parentElement, ph=box && box.querySelector('img.vj-photo-img, img:not(.vj-mark img)');
+      if(!ph || m.dataset.vjDone) return; var src=ph.currentSrc||ph.src; if(!src) return;
+      var t=new Image(); t.crossOrigin='anonymous';
+      t.onload=function(){ try{
+        var c=document.createElement('canvas'), w=30, h=30; c.width=w; c.height=h; var x=c.getContext('2d');
+        var lg=m.querySelector('img'), pr=ph.getBoundingClientRect(), mr=lg.getBoundingClientRect(), nw=t.naturalWidth, nh=t.naturalHeight;
+        if(pr.width>0 && mr.width>0){
+          var k=Math.max(pr.width/nw, pr.height/nh), ox=(nw*k-pr.width)/2, oy=(nh*k-pr.height)/2;
+          x.drawImage(t,(mr.left-pr.left+ox)/k,(mr.top-pr.top+oy)/k,mr.width/k,mr.height/k,0,0,w,h);
+        } else { x.drawImage(t, nw*0.7, nh*0.82, nw*0.28, nh*0.15, 0, 0, w, h); }
+        var d=x.getImageData(0,0,w,h).data, L=0; for(var i=0;i<d.length;i+=4){ L+=0.2126*d[i]+0.7152*d[i+1]+0.0722*d[i+2]; }
+        L=L/(d.length/4);
+        if(L>125){ m.classList.add('on-light'); lg.src='/logo_mark_on_light.png'; } m.dataset.vjDone='1';
+      }catch(e){} };
+      t.src=src;
+    }
+    function run(){ var ms=document.querySelectorAll('.vj-mark'); for(var i=0;i<ms.length;i++){ (function(m){ var ph=m.parentElement&&m.parentElement.querySelector('img'); if(ph&&!ph.complete){ ph.addEventListener('load',function(){pick(m);},{once:true}); } else pick(m); })(ms[i]); } }
+    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',run); else run();
+  })();
+  </script>
 </body>
 </html>

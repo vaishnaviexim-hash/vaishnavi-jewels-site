@@ -6,9 +6,9 @@ import BaseLayout from './BaseLayout.astro';
 import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import { business } from '../data/business.js';
-import { img, srcset } from '../data/images.js';
+import { img, plain, plainSet, LOGO_DARK } from '../data/images.js';
 
-type Pic = { id: string; alt: string; caption?: string };
+type Pic = { id: string; alt: string; caption?: string; noOg?: boolean };
 interface Props {
   title: string;
   description: string;
@@ -37,7 +37,7 @@ const crumbs = {
     { '@type': 'ListItem', position: 2, name: heading, item: 'https://vaishnavijewels.com' + path },
   ],
 };
-const ogImage = hero ? img(hero.id, 1200, '1.91') : undefined;
+const ogImage = hero && !hero.noOg ? img(hero.id, 1200, '1.91') : undefined;
 const trust = [
   { icon: 'diamond', title: 'Certified diamonds', text: 'Grading report with every piece' },
   { icon: 'shield', title: 'BIS HUID hallmark', text: 'Check it yourself in BIS Care' },
@@ -67,8 +67,9 @@ const trust = [
           </div>
           {hero && (
             <figure class="hero-pic">
-              <img src={img(hero.id, 900)} srcset={srcset(hero.id)} sizes="(max-width: 860px) 92vw, 480px"
+              <img src={plain(hero.id, 900)} srcset={plainSet(hero.id)} sizes="(max-width: 860px) 92vw, 480px"
                    width="900" height="1125" alt={hero.alt} fetchpriority="high" decoding="async" />
+              <span class="vj-mark" aria-hidden="true"><img src={LOGO_DARK} alt="" width="60" height="40" /></span>
             </figure>
           )}
         </div>
@@ -106,9 +107,10 @@ const trust = [
               {gallery.map((g) => (
                 <figure>
                   <div class="frame">
-                    <img src={img(g.id, 640)} srcset={srcset(g.id, [320, 480, 640, 900])}
+                    <img src={plain(g.id, 640)} srcset={plainSet(g.id, [320, 480, 640, 900])}
                          sizes="(max-width: 640px) 46vw, (max-width: 1000px) 30vw, 260px"
                          width="640" height="800" alt={g.alt} loading="lazy" decoding="async" />
+                    <span class="vj-mark sm" aria-hidden="true"><img src={LOGO_DARK} alt="" width="45" height="30" loading="lazy" /></span>
                   </div>
                   {g.caption && <figcaption>{g.caption}</figcaption>}
                 </figure>
@@ -155,7 +157,7 @@ const trust = [
 <style>
   /* Hero */
   .info-hero { background: radial-gradient(120% 80% at 85% 20%, #F6EBD3 0%, var(--color-ivory) 60%); border-bottom: 1px solid var(--color-line); }
-  .hero-grid { display: grid; grid-template-columns: 1fr; gap: 32px; padding-top: 56px; padding-bottom: 48px; align-items: center; }
+  .hero-grid { display: grid; grid-template-columns: 1fr; gap: 32px; padding-top: clamp(48px, 7vw, 88px); padding-bottom: clamp(48px, 6vw, 80px); align-items: center; }
   .has-img .hero-grid { grid-template-columns: 1.1fr 0.9fr; gap: 56px; }
   .hero-text { max-width: 620px; }
   .info-hero h1 { font-size: clamp(34px, 5vw, 56px); margin: 12px 0 18px; }
@@ -165,8 +167,9 @@ const trust = [
   .lead { font-size: 19px; color: var(--color-ink-soft); }
   .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 26px; }
   .hero-pic { margin: 0; position: relative; justify-self: end; width: 100%; max-width: 480px; }
-  .hero-pic::before { content: ''; position: absolute; inset: 18px -18px -18px 18px; border: 1px solid var(--color-gold); z-index: 0; }
-  .hero-pic img { position: relative; z-index: 1; width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; box-shadow: 0 24px 60px rgba(58, 15, 26, 0.25); }
+  .hero-pic::before { content: ''; position: absolute; inset: 12px; border: 1px solid rgba(240, 220, 170, 0.8); z-index: 2; pointer-events: none; }
+  .hero-pic img { position: relative; z-index: 1; width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; object-position: center 28%; box-shadow: 0 24px 60px rgba(58, 15, 26, 0.25); }
+
 
   /* Trust strip */
   .trust { background: var(--color-maroon); color: #F3E7CF; }
@@ -192,8 +195,8 @@ const trust = [
   .gallery h2 { font-size: clamp(28px, 4vw, 40px); margin: 8px 0 16px; }
   .grid { display: grid; grid-template-columns: repeat(var(--cols, 4), 1fr); gap: 22px; margin-top: 30px; max-width: calc(var(--cols, 4) * 290px); margin-left: auto; margin-right: auto; }
   .grid figure { margin: 0; }
-  .frame { overflow: hidden; background: #2b0b13; box-shadow: 0 10px 30px rgba(58, 15, 26, 0.18); }
-  .frame img { width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; transition: transform 0.6s ease; }
+  .frame { position: relative; overflow: hidden; background: #2b0b13; box-shadow: 0 10px 30px rgba(58, 15, 26, 0.18); }
+  .frame img { width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; object-position: center 30%; transition: transform 0.6s ease; }
   .grid figure:hover img { transform: scale(1.05); }
   .grid figcaption { font-family: var(--font-display); font-size: 18px; text-align: center; margin-top: 12px; color: var(--color-ink); }
   .note { margin-top: 28px; font-size: 14px; color: var(--color-ink-soft); }

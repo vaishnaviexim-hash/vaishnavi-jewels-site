@@ -4,6 +4,8 @@ description: "Wipe Polki and Kundan gently with a soft dry cloth, keep them away
 pubDate: 2026-10-26
 tags: ["polki jewellery","jewellery care","kundan","storage"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_sec_polkicare_20261111131113"
+heroAlt: "Polki and emerald necklace set stored in a velvet-lined box with a soft muslin cloth"
 ---
 
 To clean Polki and Kundan jewellery at home, wipe each piece gently with a soft, dry cloth after wearing, keep it away from water, perfume, hairspray and creams, and store it separately in a soft pouch or lined box. Do not soak it, scrub it or use an ultrasonic cleaner, because the stones are often backed with foil and set in ways that water and harsh cleaning can damage. For a deeper clean, bring the piece to a jeweller.
@@ -21,6 +23,9 @@ Water and chemicals can get behind the stones, dull the foil or loosen the setti
 3. **Clean the back carefully.** Use a soft, dry make-up brush to remove dust from the back and between stones.
 4. **Check the pearls.** If the piece has pearl strands or drops, wipe them separately with a soft cloth.
 5. **Air it.** Leave it on a clean cloth for a short while before storing, so any moisture from the skin dries.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/vs2_bridal_s4_20261012171130" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/vs2_bridal_s4_20261012171130 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/vs2_bridal_s4_20261012171130 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/vs2_bridal_s4_20261012171130 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Close-up of a polki and emerald necklace with matching earrings" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 Avoid toothpaste, baking soda, soap solutions, steam and ultrasonic machines.
 

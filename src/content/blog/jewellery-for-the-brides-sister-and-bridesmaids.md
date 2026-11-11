@@ -4,6 +4,8 @@ description: "Choose lighter pieces from the bride's style family: a slim choker
 pubDate: 2026-11-09
 tags: ["wedding look","bridesmaids","sister of the bride","polki"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_bl_bridesmaids_20261111131517"
+heroAlt: "Bride's sister and bridesmaids in pastel lehengas wearing light matching diamond jewellery"
 ---
 
 The bride's sister and bridesmaids look their most graceful in lighter pieces from the same style family as the bride's set: a slim Polki or diamond choker or a pair of statement earrings, a few stacked bangles and a ring, all in the same metal tone. Keep one piece as the focus and leave the full heavy bridal set, the large maang tikka and the nath to the bride, so she stays the centre of every photograph.
@@ -24,6 +26,9 @@ Three things to keep for the bride alone:
 - **Sangeet:** this is where the sister can wear more: statement earrings with a sequin or mirror-work outfit, or a slim diamond necklace with an Indo-western look.
 - **Wedding ceremony:** a Polki or diamond choker with matching earrings, or just strong earrings if her outfit is heavily embroidered. A small tikka is fine if the bride wears a larger one.
 - **Reception:** diamond studs or drops, a fine necklace and a bracelet with a gown or saree.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/beauty_r637_pendant_model_20261107233441" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/beauty_r637_pendant_model_20261107233441 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/beauty_r637_pendant_model_20261107233441 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/beauty_r637_pendant_model_20261107233441 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Woman wearing a diamond pendant set with coloured stones" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 ## How do bridesmaids coordinate as a group?
 

@@ -4,6 +4,8 @@ description: "CVD and HPHT are the two ways diamonds are grown in a laboratory; 
 pubDate: 2026-10-26
 tags: ["lab-grown diamonds","cvd","hpht","diamond certificate"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_sec_lab_20261111130918"
+heroAlt: "Lab-grown diamond crystal plates beside a polished brilliant-cut diamond"
 ---
 
 CVD (chemical vapour deposition) and HPHT (high pressure, high temperature) are the two main ways diamonds are grown in a laboratory. CVD builds the crystal layer by layer from a carbon-rich gas, while HPHT recreates intense pressure and heat around a small diamond seed. Both produce real diamond, and the grading report for a lab-grown diamond states clearly that it is laboratory-grown and often notes the growth method and any treatment after growth.
@@ -17,6 +19,9 @@ The process takes several weeks. The rough crystal is then cut and polished like
 ## What is an HPHT lab-grown diamond?
 
 In the HPHT method, a small diamond seed is placed with a carbon source and a metal mixture inside a press. The press creates very high pressure and temperature, the carbon dissolves and then crystallises on the seed, growing a new diamond.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/gbp_solitaire_lgd_20261022153802" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/gbp_solitaire_lgd_20261022153802 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/gbp_solitaire_lgd_20261022153802 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/gbp_solitaire_lgd_20261022153802 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Lab-grown solitaire ring in rose gold" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 HPHT crystals often grow in a different shape from CVD crystals, but once cut and polished they are graded on the same scales of cut, colour, clarity and carat.
 

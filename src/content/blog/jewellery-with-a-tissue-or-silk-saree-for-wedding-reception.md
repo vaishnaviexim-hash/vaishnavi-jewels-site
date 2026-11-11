@@ -4,6 +4,8 @@ description: "A diamond or light Polki necklace with matching earrings suits a r
 pubDate: 2026-10-26
 tags: ["reception saree","diamond jewellery","bridal jewellery","styling"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/design_gemini/sun2510_saree_blush_20261025070829"
+heroAlt: "Woman in a blush silk saree wearing diamond jewellery"
 ---
 
 For a wedding reception in a tissue or silk saree, a diamond or light Polki necklace with matching earrings is usually the best choice. A saree drape leaves the neckline open and carries the pallu over one shoulder, so a necklace that sits clear of the pallu and earrings that frame the face give the most balanced look. Add a bracelet and your engagement ring, and you are done.
@@ -23,6 +25,9 @@ This means:
 1. **Diamond choker or collar.** Sits above the pallu and the blouse line, so it is always seen. Works especially well with a boat or round neck blouse.
 2. **Mid-length diamond necklace.** Rests on the collarbone and suits a V or sweetheart blouse. Keep the length short enough that the pallu does not cover it.
 3. **Light Polki necklace.** If your saree is a rich Banarasi or Kanjeevaram silk with a heavy gold border, a lighter Polki necklace can echo the warmth of the zari.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/rvpool_necklace_1_20261106235551" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/rvpool_necklace_1_20261106235551 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/rvpool_necklace_1_20261106235551 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/rvpool_necklace_1_20261106235551 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Woman in a maroon saree wearing a diamond choker" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 Avoid stacking several long layers. With a saree, one well-placed necklace is clearer than three.
 

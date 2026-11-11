@@ -4,6 +4,8 @@ description: "Both work: a light Polki choker suits a rich, traditional lehenga,
 pubDate: 2026-11-02
 tags: ["engagement","lehenga","polki","diamond necklace"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_bl_engagement_collar_20261111132052"
+heroAlt: "Bride-to-be in a lilac engagement lehenga wearing a white diamond necklace and earrings"
 ---
 
 For an engagement lehenga, both a light Polki choker and a diamond collar necklace are good choices; the right one depends on your outfit. A light Polki choker suits a rich, traditional lehenga in red, maroon, green or gold, while a diamond collar suits pastel, ivory or modern lehengas and evening functions. Either way, keep the engagement set lighter than your wedding-day set, and choose pieces you can wear again after the wedding.
@@ -22,6 +24,9 @@ A semi-bridal set usually includes:
 ## When should I choose a light Polki choker?
 
 A Polki choker is a good fit when:
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/meraki_today_feed_real_polki_20261022095111" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/meraki_today_feed_real_polki_20261022095111 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/meraki_today_feed_real_polki_20261022095111 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/meraki_today_feed_real_polki_20261022095111 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Layered polki necklace set on a green velvet bust" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 - Your lehenga is in a deep or traditional colour such as red, maroon, emerald, mustard or gold.
 - The function is a traditional ring ceremony or roka with family rituals.

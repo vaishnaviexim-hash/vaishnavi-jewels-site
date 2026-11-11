@@ -21,6 +21,7 @@ const { Content } = await post.render();
 
 // T-20261027-JOURNALLINKS (02/11/2026): every post links to its collection page(s), a visit and WhatsApp.
 import { business as biz } from '../../data/business.js';
+import { LOGO_DARK } from '../../data/images.js';
 const hay = (post.data.tags.join(' ') + ' ' + post.data.title + ' ' + post.slug).toLowerCase();
 const COLLECTIONS = [
   [/polki|kundan/, '/polki-jewellery', 'Polki jewellery'],
@@ -55,9 +56,12 @@ if (related.length === 0) related = [{ href: '/natural-diamond-jewellery', label
       </div>
 
       {post.data.heroImage && (
-        <div class="post-hero-img">
-          <img src={post.data.heroImage} alt={post.data.title} />
-        </div>
+        <figure class="vj-fig post-hero-fig">
+          <div class="vj-fig-frame">
+            <img class="vj-photo-img" src={post.data.heroImage} alt={post.data.heroAlt || post.data.title} width="900" height="1125" fetchpriority="high" decoding="async" />
+            <span class="vj-mark" aria-hidden="true"><img src={LOGO_DARK} alt="" width="60" height="40" /></span>
+          </div>
+        </figure>
       )}
 
       <div class="container">
@@ -77,13 +81,15 @@ if (related.length === 0) related = [{ href: '/natural-diamond-jewellery', label
 
 <style>
   .post-header {
-    padding: 56px 0 32px;
+    padding: clamp(48px, 7vw, 88px) 0 36px;
     max-width: 760px;
+    border-bottom: 1px solid var(--color-line);
+    margin-bottom: 40px;
   }
-  .post-header h1 { font-size: clamp(30px, 5vw, 46px); margin: 12px 0 14px; }
+  .post-header h1 { font-size: clamp(32px, 5vw, 52px); margin: 12px 0 16px; color: var(--color-maroon); }
   .post-date { font-size: 13px; color: var(--color-ink-soft); }
-  .post-hero-img { margin-bottom: 40px; }
-  .post-hero-img img { width: 100%; max-height: 480px; object-fit: cover; }
+  .post-hero-fig { margin: 0 auto 40px; }
+
 
   .prose {
     max-width: 720px;
@@ -92,9 +98,12 @@ if (related.length === 0) related = [{ href: '/natural-diamond-jewellery', label
     color: var(--color-ink);
   }
   .prose :global(h2) {
-    font-size: 28px;
-    margin: 40px 0 16px;
+    font-size: clamp(25px, 3.2vw, 32px);
+    margin: 48px 0 16px;
+    padding-top: 18px;
+    position: relative;
   }
+  .prose :global(h2)::before { content: ''; position: absolute; top: 0; left: 0; width: 40px; height: 2px; background: var(--color-gold); }
   .prose :global(h3) {
     font-size: 22px;
     margin: 32px 0 12px;
@@ -103,6 +112,8 @@ if (related.length === 0) related = [{ href: '/natural-diamond-jewellery', label
   .prose :global(a) { color: var(--color-gold-deep); text-decoration: underline; }
   .prose :global(ul), .prose :global(ol) { margin-bottom: 20px; padding-left: 22px; color: var(--color-ink-soft); }
 
-  .post-related { margin-top: 40px; }
+  .post-related { margin-top: 48px; max-width: 720px; padding: 28px; background: var(--color-ivory-deep); border: 1px solid var(--color-line); }
+  .post-related a:not(.btn) { color: var(--color-gold-deep); text-decoration: underline; text-underline-offset: 3px; }
+  .post-related .btn { margin: 6px 8px 0 0; }
   .back-link { margin: 48px 0 72px; }
 </style>

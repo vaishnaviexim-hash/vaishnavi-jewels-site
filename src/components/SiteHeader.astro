@@ -1,4 +1,15 @@
 ---
+const links = [
+  ['/', 'Home'],
+  ['/#collections', 'Collections'],
+  ['/#about', 'About'],
+  ['/bridal-jewellery', 'Bridal'],
+  ['/visit-us', 'Visit Us'],
+  ['/delivery-across-india', 'Delivery'],
+  ['/blog', 'Journal'],
+  ['/faq', 'FAQ'],
+  ['/#contact', 'Contact'],
+];
 ---
 <header class="site-header">
   <div class="container header-inner">
@@ -6,23 +17,28 @@
       <img src="https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png" alt="Vaishnavi Jewels" width="150" height="100" loading="eager" />
     </a>
     <nav class="nav">
-      <a href="/">Home</a>
-      <a href="/#collections">Collections</a>
-      <a href="/#about">About</a>
-      <a href="/bridal-jewellery">Bridal</a>
-      <a href="/visit-us">Visit Us</a>
-      <a href="/delivery-across-india">Delivery</a>
-      <a href="/blog">Journal</a>
-      <a href="/faq">FAQ</a>
-      <a href="/#contact">Contact</a>
+      {links.map(([href, label]) => <a href={href}>{label}</a>)}
     </nav>
-    <a href="/#contact" class="btn btn-solid enquire-btn">Enquire Now</a>
+    <div class="header-actions">
+      <a href="/#contact" class="btn btn-solid enquire-btn">Enquire Now</a>
+      <details class="mnav">
+        <summary aria-label="Menu">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h18M3 12h18M3 17h18" /></svg>
+        </summary>
+        <nav class="mnav-panel" aria-label="Mobile">
+          {links.map(([href, label]) => <a href={href}>{label}</a>)}
+        </nav>
+      </details>
+    </div>
   </div>
 </header>
 
 <style>
   .site-header {
-    background: var(--color-ivory);
+    background: rgba(251, 246, 236, 0.96);
+    backdrop-filter: saturate(1.2) blur(8px);
+    -webkit-backdrop-filter: saturate(1.2) blur(8px);
+    border-bottom: 1px solid rgba(220, 209, 180, 0.7);
     position: sticky;
     top: 0;
     z-index: 50;
@@ -31,8 +47,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-top: 10px;
-    padding-bottom: 10px;
+    padding-top: 8px;
+    padding-bottom: 8px;
     gap: 24px;
   }
   .logo {
@@ -40,6 +56,7 @@
     align-items: center;
     position: relative;
     z-index: 1;
+    flex: none;
   }
   .logo img {
     height: 96px;
@@ -48,14 +65,45 @@
   }
   .nav {
     display: flex;
-    gap: 32px;
-    font-size: 14px;
+    gap: 28px;
+    font-size: 13.5px;
+    letter-spacing: 0.05em;
   }
-  .nav a { color: var(--color-ink-soft); }
+  .nav a { color: var(--color-ink-soft); position: relative; padding: 6px 0; }
+  .nav a::after {
+    content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+    background: var(--color-gold); transform: scaleX(0); transition: transform 0.25s ease;
+  }
   .nav a:hover { color: var(--color-gold-deep); }
+  .nav a:hover::after { transform: scaleX(1); }
+  .header-actions { display: flex; align-items: center; gap: 10px; }
   .enquire-btn { font-size: 13px; padding: 11px 22px; }
 
-  @media (max-width: 860px) {
+  .mnav { display: none; position: relative; }
+  .mnav summary {
+    list-style: none; cursor: pointer; width: 44px; height: 44px;
+    display: grid; place-items: center; border: 1px solid var(--color-line); border-radius: 2px;
+  }
+  .mnav summary::-webkit-details-marker { display: none; }
+  .mnav summary svg { width: 22px; height: 22px; fill: none; stroke: var(--color-ink); stroke-width: 1.5; stroke-linecap: round; }
+  .mnav-panel {
+    position: absolute; right: 0; top: calc(100% + 10px); min-width: 220px;
+    background: var(--color-ivory); border: 1px solid var(--color-line);
+    box-shadow: var(--shadow-soft); padding: 8px 0; display: flex; flex-direction: column;
+  }
+  .mnav-panel a { padding: 12px 20px; font-size: 15px; color: var(--color-ink); border-bottom: 1px solid rgba(220, 209, 180, 0.5); }
+  .mnav-panel a:last-child { border-bottom: 0; }
+  .mnav-panel a:hover { background: var(--color-ivory-deep); color: var(--color-gold-deep); }
+
+  @media (max-width: 1080px) {
+    .nav { gap: 18px; font-size: 13px; }
+  }
+  @media (max-width: 960px) {
     .nav { display: none; }
+    .mnav { display: block; }
+  }
+  @media (max-width: 640px) {
+    .logo img { height: 64px; }
+    .enquire-btn { padding: 10px 14px; font-size: 12.5px; }
   }
 </style>

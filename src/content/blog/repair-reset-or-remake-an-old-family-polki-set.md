@@ -4,6 +4,8 @@ description: "Often, yes. A Polki maker can assess a family set, then clean, rep
 pubDate: 2026-11-09
 tags: ["polki","heirloom","repair","bridal"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_sec_karigar_20261111131036"
+heroAlt: "Craftsman setting diamonds into a gold necklace in the Vaishnavi Jewels manufacturing unit, Surat"
 ---
 
 Often, yes. An old Polki set can usually be cleaned, repaired or re-set, and when it is too worn or the design no longer suits you, its gold can go towards a new Polki or diamond piece. Because we make Polki jewellery in our own manufacturing unit in Surat, our team can look at a family set and tell you honestly which of these routes makes sense before any work starts.
@@ -23,6 +25,9 @@ Each of these is different to fix, which is why the set needs to be seen before 
 ## How is an heirloom set assessed?
 
 Start by sending clear photos of the front and the back of every piece on WhatsApp, with close-ups of any damage. When the set reaches us, our team looks at:
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/meraki_today_feed_real_polki_20261022095111" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/meraki_today_feed_real_polki_20261022095111 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/meraki_today_feed_real_polki_20261022095111 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/meraki_today_feed_real_polki_20261022095111 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Layered polki necklace set on a green velvet bust" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 1. **The stones:** how many are loose, missing or dull, and whether they can be re-set.
 2. **The gold frame:** whether it is strong enough for repair, or worn thin.

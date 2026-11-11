@@ -4,6 +4,8 @@ description: "Shortlist on a video call before you fly, choose in Surat or have 
 pubDate: 2026-11-09
 tags: ["nri","wedding planning","diamond jewellery","surat"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/design_gemini/ww_branded_boxes_20261028153531"
+heroAlt: "Vaishnavi Jewels gift boxes used for insured delivery"
 ---
 
 NRI families can plan most of their wedding jewellery from abroad: shortlist designs on a WhatsApp video call before the trip, order any custom pieces early, and then see, try and collect everything in Surat during the visit, or have it delivered to a family address in India. Keep the itemised invoice and grading reports with the jewellery when you travel, and check the customs allowance of the country you are flying back to before you leave.
@@ -15,6 +17,9 @@ Surat is where much of the world's diamonds are cut and polished, so families fi
 ## How do I plan before I fly?
 
 Start four to eight weeks before your travel date:
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_videocall_20261111130856" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/concept/web_sec_videocall_20261111130856 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_videocall_20261111130856 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/concept/web_sec_videocall_20261111130856 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Customer shortlisting a diamond and polki choker set on a WhatsApp video call with Vaishnavi Jewels" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 1. **Message us on WhatsApp** with the wedding date, the functions, the outfits and the budget you have in mind.
 2. **See a shortlist on a video call.** Our team shows pieces live, with grading report details for diamond pieces, at a time that suits your time zone.

@@ -4,6 +4,8 @@ description: "Pick a fine black-bead chain at a length that sits comfortably, a 
 pubDate: 2026-11-02
 tags: ["mangalsutra","daily wear","diamond jewellery","bis huid"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/design_gemini/kc_mangalsutra_bride_01_20261017133549"
+heroAlt: "Bride wearing a diamond mangalsutra"
 ---
 
 To choose a diamond mangalsutra for daily wear, start with comfort: a fine black-bead chain at a length that sits where you like it, and a pendant small and flat enough not to catch on clothes. Then match the gold colour to the jewellery you already wear, and check the papers: a jewellery grading report for the diamonds and the BIS HUID hallmark on the gold.
@@ -21,6 +23,9 @@ If you are unsure, try medium first. Because we make jewellery in our own manufa
 ## What kind of chain is best?
 
 For a diamond mangalsutra, a very fine, delicate single-strand chain works best for daily wear. It carries small, even black beads set inline, often separated by tiny gold links, so the chain reads as a fine dotted black line. This kind of chain is light on the neck and sits flat under clothes. Rose or yellow gold chains are chosen to match the pendant.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/gbp_mangalsutra_fine_20261022153253" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/gbp_mangalsutra_fine_20261022153253 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/gbp_mangalsutra_fine_20261022153253 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/gbp_mangalsutra_fine_20261022153253 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Diamond mangalsutra worn every day" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 Check the clasp too. A secure lobster or box clasp that you can open and close easily matters more than people expect when the piece is worn every day.
 

@@ -4,6 +4,8 @@ description: "Real Polki uses uncut diamonds set in gold. Check the stones in wr
 pubDate: 2026-10-20
 tags: ["polki","bridal jewellery","buying guide","trust"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/design_gemini/vs2_bridal_s4_20261012171130"
+heroAlt: "Close-up of a polki and emerald necklace with matching earrings"
 ---
 
 Real Polki jewellery is made with uncut diamonds, flat slices of diamond in their natural shape, set in gold and usually backed with foil. The surest way to know what you are buying is to have the stones described in writing on the invoice or a report, with the gold weight and karat shown separately from the stones. Kundan-style pieces look similar but usually use glass or other stones, so the paperwork is what tells them apart.
@@ -15,6 +17,9 @@ Ask the jeweller to write down exactly what the stones are and their total weigh
 ## 2. Look at the bill for the gold weight
 
 A Polki set is part gold and part stone. An itemised invoice shows the gold weight and karat on one line and the stone details on another, so you can see what you are paying for. If the bill shows one combined weight, ask for the breakup.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_karigar_20261111131036" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/concept/web_sec_karigar_20261111131036 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_karigar_20261111131036 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/concept/web_sec_karigar_20261111131036 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Craftsman setting diamonds into a gold necklace in the Vaishnavi Jewels manufacturing unit, Surat" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 ## 3. Check the gold
 

@@ -4,6 +4,8 @@ description: "Yes. At Vaishnavi Jewels you choose a certified solitaire, check i
 pubDate: 2026-11-02
 tags: ["solitaire rings","custom jewellery","surat","engagement"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/design_gemini/gbp_round_solitaire_20261022153639"
+heroAlt: "Round solitaire ring in rose gold with pave shoulders"
 ---
 
 Yes. At Vaishnavi Jewels in Parle Point, Surat, you can choose a certified solitaire first and then have a ring made around it in the design you want. You check the stone's IGI, EGL or TGL report and its laser-inscribed number before you decide, choose the setting, band and gold karat, and we make the ring in our own manufacturing unit, in 4 days to 3 weeks. The finished gold mount is BIS HUID hallmarked.
@@ -15,6 +17,9 @@ For an engagement ring or a milestone ring, the solitaire is the heart of the pi
 ## What are the steps?
 
 Here is how a custom solitaire ring comes together with us:
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_laser_inscription_20261111130643" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/concept/web_sec_laser_inscription_20261111130643 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_laser_inscription_20261111130643 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/concept/web_sec_laser_inscription_20261111130643 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Close-up of a certified diamond held in tweezers, showing the report number laser-inscribed on its girdle" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 1. **Tell us what you are looking for.** Share the shape, approximate size and the look you have in mind on WhatsApp or at the showroom. We keep suitable stones ready for your visit.
 2. **See the stones with their reports.** Every solitaire comes with its own grading report from IGI, EGL or TGL, which states its quality and its origin, natural or lab-grown.

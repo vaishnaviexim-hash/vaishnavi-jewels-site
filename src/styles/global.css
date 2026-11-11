@@ -104,3 +104,81 @@ p { margin: 0 0 1em; }
 @media (max-width: 640px) {
   .container { padding: 0 18px; }
 }
+
+/* ------------------------------------------------------------------
+   Redesign polish (preview branch redesign-preview, 05/11/2026).
+   Look only: spacing, buttons, focus states, image frames.
+   Same fonts, same colours (ivory / champagne, maroon #3A0F1A, gold #A9852E).
+------------------------------------------------------------------- */
+:root {
+  --color-champagne: #EFE3C8;
+  --color-maroon-deep: #2B0B13;
+  --shadow-soft: 0 18px 48px rgba(58, 15, 26, 0.14);
+  --shadow-card: 0 10px 30px rgba(58, 15, 26, 0.12);
+  --section-pad: clamp(64px, 9vw, 112px);
+}
+
+html { scroll-padding-top: 120px; }
+::selection { background: var(--color-gold-light); color: var(--color-maroon-deep); }
+
+body { text-rendering: optimizeLegibility; }
+
+.btn {
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.25s ease, color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn-solid { box-shadow: 0 8px 20px rgba(169, 133, 46, 0.25); }
+.btn-solid:hover { box-shadow: 0 10px 26px rgba(140, 110, 36, 0.32); }
+.btn-outline { border-color: rgba(42, 38, 32, 0.55); }
+.btn-maroon { background: var(--color-maroon); border-color: var(--color-maroon); color: #FFF8EA; }
+.btn-maroon:hover { background: var(--color-maroon-deep); border-color: var(--color-maroon-deep); }
+
+a:focus-visible, .btn:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 3px;
+}
+
+/* Small plate with the owner's original logo on every photo (logo itself never altered). */
+.vj-photo { position: relative; overflow: hidden; background: var(--color-maroon-deep); }
+.vj-photo > img.vj-photo-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vj-mark { position: absolute !important; right: 24px; bottom: 22px; z-index: 3; background: none !important; padding: 0 !important; border-radius: 0; line-height: 0; box-shadow: none !important; pointer-events: none; }
+.vj-mark img { height: 60px !important; width: auto !important; max-width: none !important; aspect-ratio: auto !important; position: static !important; box-shadow: none !important; object-fit: contain !important; margin: 0 !important; display: block; filter: drop-shadow(0 0 1px rgba(0,0,0,0.9)) drop-shadow(0 1px 5px rgba(0,0,0,0.6)); }
+.vj-mark.on-light img { filter: drop-shadow(0 0 1px rgba(255,255,255,0.9)) drop-shadow(0 0 6px rgba(255,255,255,0.7)); }
+.vj-mark.sm { right: 14px; bottom: 12px; }
+.vj-mark.sm img { height: 44px !important; }
+
+/* Ornamental gold rule with a small diamond */
+.orn-rule { display: block; width: 72px; height: 1px; background: var(--color-gold); position: relative; margin: 22px 0; }
+.orn-rule::after { content: ''; position: absolute; left: 50%; top: -3px; width: 7px; height: 7px; background: var(--color-gold); transform: translateX(-50%) rotate(45deg); }
+.orn-rule.center { margin-left: auto; margin-right: auto; }
+
+/* Mobile action bar (same WhatsApp / Book a Visit actions as the page) */
+.mobile-cta { display: none; }
+@media (max-width: 760px) {
+  .mobile-cta {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: rgba(251, 246, 236, 0.97);
+    border-top: 1px solid var(--color-line);
+    box-shadow: 0 -6px 20px rgba(58, 15, 26, 0.08);
+  }
+  .mobile-cta .btn { padding: 12px 10px; font-size: 14px; box-shadow: none; }
+  body { padding-bottom: 72px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition: none !important; }
+}
+
+/* Editorial photos inside articles and page sections (owner 11/11: every section/article carries a matching photo, beautified, with the logo) */
+.vj-fig { margin: 34px auto; max-width: 460px; }
+.vj-fig .vj-fig-frame { position: relative; overflow: hidden; aspect-ratio: 4 / 5; box-shadow: 0 18px 44px rgba(58, 15, 26, 0.18); background: #2b0b13; }
+.vj-fig .vj-fig-frame::before { content: ''; position: absolute; inset: 12px; border: 1px solid rgba(240, 220, 170, 0.8); z-index: 2; pointer-events: none; }
+.vj-fig .vj-fig-frame > img.vj-photo-img { width: 100%; height: 100%; object-fit: cover; display: block; margin: 0; }
+.vj-fig.wide { max-width: 640px; }
+.vj-fig.wide .vj-fig-frame { aspect-ratio: 5 / 4; }
+.vj-fig figcaption { margin-top: 12px; font-size: 14px; color: var(--color-ink-soft); text-align: center; font-style: italic; }

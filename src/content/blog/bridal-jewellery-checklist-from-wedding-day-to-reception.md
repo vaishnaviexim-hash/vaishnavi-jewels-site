@@ -4,6 +4,8 @@ description: "A bride needs a main necklace set, earrings, tikka, bangles, rings
 pubDate: 2026-10-26
 tags: ["bridal jewellery","checklist","wedding planning","trousseau"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/design_gemini/vs2_bridal_s1_20261012170008"
+heroAlt: "Bride in a red lehenga wearing a polki bridal set"
 ---
 
 Most brides need a main necklace set with earrings, a maang tikka or matha patti, bangles or kadas, rings and a nath for the wedding ceremony, then a lighter necklace and earrings for the reception and smaller sets for the sangeet, mehendi and haldi. The easiest way to plan is to list each function, note the outfit, and decide which pieces can be worn more than once. Custom bridal pieces take 4 days to 3 weeks to make, so start early.
@@ -25,6 +27,9 @@ Polki is a popular choice for the ceremony because its warm, uncut look suits he
 ## What do I need for the reception?
 
 The reception is usually in the evening, and many brides wear a gown, a saree-gown, a silk saree or a lighter lehenga. The list is shorter:
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/vs2_western_s4_20261012171511" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/vs2_western_s4_20261012171511 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/vs2_western_s4_20261012171511 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/vs2_western_s4_20261012171511 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Emerald and diamond necklace with a matching ring" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 - A diamond necklace or choker, or a long pendant necklace for a deep neckline.
 - Matching earrings.

@@ -4,6 +4,8 @@ description: "One strong piece in a slightly lighter weight than the bride: a Po
 pubDate: 2026-10-20
 tags: ["wedding look","mother of the bride","bridal jewellery"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_bl_mother_20261111131800"
+heroAlt: "Mother of the bride in a silk saree wearing an elegant diamond necklace set and bangles"
 ---
 
 The mother of the bride or groom looks best in one strong necklace, a little lighter than the bride's set, chosen to suit her saree or lehenga rather than to match the bride. A Polki or diamond necklace with matching earrings, a pair of bangles and a ring is usually enough. Comfort matters as much as looks, because she is on her feet and greeting guests all day.
@@ -15,6 +17,9 @@ Rich silk sarees such as Kanjeevaram or Banarasi suit gold-toned Polki or a diam
 ## One statement, not many layers
 
 A single necklace, either a choker or a mid-length haar, keeps the look elegant in photos. If the blouse neckline is high, choose a longer necklace; for a lower neckline, a choker or collar necklace fills the space well.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/gbp_bangle_rose_20261022153503" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/gbp_bangle_rose_20261022153503 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/gbp_bangle_rose_20261022153503 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/gbp_bangle_rose_20261022153503 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Rose gold diamond bangle" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 ## Comfort through a long day
 

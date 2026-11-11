@@ -4,6 +4,8 @@ description: "With a veil or head dupatta, a slim maang tikka or a side passa us
 pubDate: 2026-11-02
 tags: ["bridal","maang tikka","earrings","wedding look"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/design_gemini/vs2_bridal_s1b_20261012170705"
+heroAlt: "Bride in a red lehenga with a veil, maang tikka and layered polki"
 ---
 
 With a bridal veil or a head dupatta, you do not have to give up forehead jewellery. A slim maang tikka worn in the centre parting, or a passa on one side, usually works best, because both sit under or beside the drape without lifting it. Choose earrings that frame the face under the veil, and try the whole look with your actual dupatta before the wedding day.
@@ -21,6 +23,9 @@ A slim tikka with a fine chain and a medium pendant sits most comfortably. A ver
 ## When does a passa work better?
 
 A passa, worn on one side of the head, is a good choice when:
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/dhan_20261029_bride_v2_20261022131354" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/design_gemini/dhan_20261029_bride_v2_20261022131354 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/design_gemini/dhan_20261029_bride_v2_20261022131354 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/design_gemini/dhan_20261029_bride_v2_20261022131354 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Bride in an ivory lehenga and veil wearing layered diamond necklaces" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 - Your hair is styled with a side parting.
 - The veil is pinned further back, leaving one side of the hairline open.

@@ -4,6 +4,8 @@ description: "A plain-language guide to reading an IGI lab-grown diamond certifi
 pubDate: 2026-09-30
 tags: ["lab-grown diamonds","igi certificate","surat","diamond jewellery"]
 draft: false
+heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/design_gemini/gbp_solitaire_lgd_20261022153802"
+heroAlt: "Lab-grown solitaire ring in rose gold"
 ---
 
 If you have been looking at lab-grown diamond jewellery in Surat, you have probably noticed that every serious piece comes with a laboratory report. That report is your most useful tool as a buyer, but only if you know what the lines on it mean. At Vaishnavi Jewels, our [lab-grown diamond jewellery](/lab-grown-diamond-jewellery) is made in-house at our Parle Point showroom, and diamond certificates from recognised labs such as IGI, TGL and EGL accompany our pieces where applicable. This guide walks you through an IGI lab-grown diamond report line by line, so that you can read one with confidence, whether you are sitting across the counter from us or viewing a piece on a video call from Ahmedabad, Vadodara or Mathura.
@@ -19,6 +21,9 @@ Most lab-grown diamonds graded by IGI are also laser-inscribed with the report n
 ## Reading the 4Cs on the report
 
 The main body of the report covers the four grading factors that most people have heard of.
+
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_laser_inscription_20261111130643" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/concept/web_sec_laser_inscription_20261111130643 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_laser_inscription_20261111130643 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/concept/web_sec_laser_inscription_20261111130643 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Close-up of a certified diamond held in tweezers, showing the report number laser-inscribed on its girdle" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
 
 **Carat weight** is the weight of the stone, stated to two decimal places. Remember that carat is weight, not size. Two stones of the same weight can look slightly different in diameter depending on how they are cut, which is why the report also lists measurements in millimetres.
 
