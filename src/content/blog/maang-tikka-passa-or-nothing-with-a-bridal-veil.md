@@ -56,7 +56,7 @@ Keep the stones of the tikka, passa and earrings the same, for example all Polki
 - **Check the weight.** A comfortable piece is one you forget you are wearing after an hour.
 - **Check the papers.** Our pieces come with a jewellery grading report from IGI, EGL or TGL for the diamonds, and all our gold is BIS HUID hallmarked, which you can check in the BIS Care app.
 
-Because we make jewellery in our own manufacturing unit, we can adjust a tikka's chain length, change a hook, or make a lighter passa to match your necklace. Custom bridal pieces usually take 2 to 4 weeks.
+Because we make jewellery in our own manufacturing unit, we can adjust a tikka's chain length, change a hook, or make a lighter passa to match your necklace. Custom bridal pieces take 4 days to 3 weeks.
 
 ## How do I try this at Vaishnavi Jewels?
 

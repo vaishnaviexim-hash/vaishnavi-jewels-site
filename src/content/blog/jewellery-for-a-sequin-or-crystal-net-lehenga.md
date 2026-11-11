@@ -49,7 +49,7 @@ Comfort still matters. Net and crystals can snag, so check that clasps and earri
 
 ## Can a piece be made for my outfit?
 
-Yes. We make jewellery in our own manufacturing unit, so a collar, choker or pair of earrings can be designed around your outfit's colour and neckline, with the gold karat and diamond quality you prefer, made to suit your budget. Custom pieces usually take 2 to 4 weeks depending on the design. With over 3,000 designs at the showroom, you can try options against a photo of your lehenga first.
+Yes. We make jewellery in our own manufacturing unit, so a collar, choker or pair of earrings can be designed around your outfit's colour and neckline, with the gold karat and diamond quality you prefer, made to suit your budget. Custom pieces take 4 days to 3 weeks depending on the design. With over 3,000 designs at the showroom, you can try options against a photo of your lehenga first.
 
 Every jewellery piece comes with a jewellery grading report from IGI, EGL or TGL, every solitaire is laser-inscribed with its report number that you can verify online, and the gold carries a BIS HUID hallmark you can check in the BIS Care app.
 

@@ -50,13 +50,13 @@ Points we check with every customer:
 - **Hallmark:** every gold piece we sell is BIS HUID hallmarked, and you can check the HUID yourself in the BIS Care app.
 - **Grading report:** every diamond jewellery piece comes with a jewellery grading report from IGI, EGL or TGL, stating the quality and whether the diamonds are natural or lab-grown. Small diamonds are described with their total weight, number of pieces and quality, so you know exactly what is in the necklace.
 
-If you want a particular design in a different gold karat, stone size or length, we can make it in our own manufacturing unit. Custom and bridal pieces usually take 2 to 4 weeks depending on the design, so it helps to start the conversation once the lehenga has been chosen. Our aim is to give you a wide variety to choose from, and then to make the piece suit both your neckline and your budget.
+If you want a particular design in a different gold karat, stone size or length, we can make it in our own manufacturing unit. Custom and bridal pieces take 4 days to 3 weeks depending on the design, so it helps to start the conversation once the lehenga has been chosen. Our aim is to give you a wide variety to choose from, and then to make the piece suit both your neckline and your budget.
 
 ## Can I try the look before I decide?
 
 Yes. [Visit our showroom](/visit-us) at Rajhans Ornate, Parle Point, Surat, with your blouse or a photograph, and we will put chokers, long necklaces and layered sets against it one by one. We are open Monday to Saturday, 11 AM to 8 PM.
 
-If you are outside Surat, we offer viewing on a video call. Hold the blouse up to the camera, and we will show each piece at the right length so you can judge the gap between the necklace and the neckline. Payment is by NEFT or UPI, and we offer free insured [delivery across India](/delivery-across-india) to major cities. Resizing is charged on actuals.
+If you are outside Surat, we offer viewing on a video call. Hold the blouse up to the camera, and we will show each piece at the right length so you can judge the gap between the necklace and the neckline. Payment is by NEFT or UPI, and we offer free insured [delivery across India](/delivery-across-india) to major cities. Resizing is free for a new piece bought from us.
 
 ## Frequently asked questions
 

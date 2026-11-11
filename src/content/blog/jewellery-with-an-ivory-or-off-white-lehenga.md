@@ -49,7 +49,7 @@ Our guide to [choosing a choker or long necklace for your neckline](/blog/choker
 
 Ivory lehengas are often chosen for day weddings with long ceremonies. Keep earrings light enough to wear for hours, check that clasps do not catch on delicate fabric, and make sure the tikka sits flat without pulling the hair.
 
-We make jewellery in our own manufacturing unit, so we can adjust weight, length and clasps, and set the gold karat and diamond quality you choose, made to suit your budget. Custom and bridal pieces usually take 2 to 4 weeks depending on the design. With over 3,000 designs at the showroom, you can see several combinations against your outfit.
+We make jewellery in our own manufacturing unit, so we can adjust weight, length and clasps, and set the gold karat and diamond quality you choose, made to suit your budget. Custom and bridal pieces take 4 days to 3 weeks depending on the design. With over 3,000 designs at the showroom, you can see several combinations against your outfit.
 
 Every piece comes with a jewellery grading report from IGI, EGL or TGL, every solitaire is laser-inscribed with its report number that you can verify on the laboratory's website, and the gold carries a BIS HUID hallmark you can check in the BIS Care app.
 

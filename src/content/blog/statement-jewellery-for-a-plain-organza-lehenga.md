@@ -47,7 +47,7 @@ If you want a touch of colour, add it once, for example a single emerald drop at
 
 ## Can one statement piece be made for my outfit?
 
-Yes. We make jewellery in our own manufacturing unit, so a choker, collar or pair of earrings can be designed around your neckline and outfit colour, with the gold karat and diamond quality you prefer, made to suit your budget. Custom pieces usually take 2 to 4 weeks depending on the design. With over 3,000 designs in the showroom, you can also try existing pieces against a photo of your lehenga first.
+Yes. We make jewellery in our own manufacturing unit, so a choker, collar or pair of earrings can be designed around your neckline and outfit colour, with the gold karat and diamond quality you prefer, made to suit your budget. Custom pieces take 4 days to 3 weeks depending on the design. With over 3,000 designs in the showroom, you can also try existing pieces against a photo of your lehenga first.
 
 A statement piece is also easy to wear again. A diamond collar or Polki choker you choose for your wedding can return at festivals and family functions for years.
 

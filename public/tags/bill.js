@@ -6,7 +6,7 @@
   "use strict";
   const $ = id => document.getElementById(id);
   const fmt = n => "Rs " + Math.round(n).toLocaleString("en-IN");
-  const B = { items: [], mode: "ws", settle: "fine", title: "Bill", g2g: "ws", photos: true, estPhotos: false, summ: true, nbb: false, disc: {}, rates: {}, frates: {}, prates: {}, pdrates: {}, mkamt: {}, designs: [], option: "", usd: 0 }; // designs / option / usd: C-20261027-ESTBILL // prates: polki rate per pc for this bill (C-20261017-POLKI)
+  const B = { items: [], mode: "ws", settle: "fine", title: "Bill", g2g: "ws", photos: true, estPhotos: false, summ: true, nbb: false, disc: {}, rates: {}, quals: {}, oth: {}, frates: {}, prates: {}, pdrates: {}, mkamt: {}, designs: [], option: "", usd: 0 }; // designs / option / usd: C-20261027-ESTBILL // prates: polki rate per pc for this bill (C-20261017-POLKI)
   const MODES = { ws: "W/s", nett: "Nett", g2g: "Gold to Gold", item: "Gold Item" };
   const fineMode = () => B.mode === "g2g" || B.mode === "item";
   const g3 = n => Number(n || 0).toFixed(3) + " g";
@@ -19,10 +19,13 @@
   const DKARATS = ["14K", "18K", "22K", "9K", "24K"], DQUALS = ["CVD", "VS IJ", "VS HI", "VS GH", "VVS EF"], DSHAPES = ["Round", "Choki", "Fancy", "Solitaire", "Polki"], QC = { "CVD": "42", "VS IJ": "2", "VS HI": "3", "VS GH": "4", "VVS EF": "5" };
   const DEF_RATES = { "CVD|Round": 23000, "CVD|Choki": 23000, "CVD|Fancy": 23000, "CVD|Solitaire": 23000, "VS GH|Round": 46000, "VS GH|Choki": 46000, "VS GH|Fancy": 85000, "VS HI|Round": 40000, "VS HI|Choki": 40000, "VS IJ|Round": 35000, "VS IJ|Choki": 35000 };
   const NON_DIAMOND = /POL|EMR|MOZ|RUBY|PEARL|MOTI|STONE|KUNDAN/i, OPT_NAMES = { gh: "Natural VS GH", ij: "Natural VS IJ", fg: "Natural VVS FG", lgd: "Lab-grown" };
+  // owner 07/11 13:52: "Other quality" on the bill - any quality typed (e.g. VS SI FG) with its own rate per ct (fancy rate optional)
+  const optName = b => b && b.option === "own" ? (b.ownQ || (B.own && B.own.q) || "Other quality") : OPT_NAMES[b && b.option] || "";
   const num = v => { const n = parseFloat(String(v == null ? "" : v).replace(/,/g, "")); return isFinite(n) ? n : 0; };
   const defRate = (q, sh) => { const r = settings().defaultRates || DEF_RATES, v = Number(r[q + "|" + sh]) || Number(r[q + "|Round"]); return v > 0 ? v : 0; };
   // the rate a diamond line gets under the Diamonds choice (same rule as the server's vjQOptRate): polki / coloured stones keep their own rate
   function optRate(d, opt) { if (!opt || d.shape === "Polki" || /party/i.test(String(d.q || "")) || NON_DIAMOND.test(String(d.q || "") + " " + String(d.code || ""))) return Number(d.rate) || 0; if (opt === "lgd") return 23000;
+    if (opt === "own") { const o = B.own || {}; return d.shape === "Fancy" && num(o.fancy) > 0 ? num(o.fancy) : num(o.rate); }
     if (opt === "fg") { const s3 = ["Round", "Choki", "Fancy"].includes(d.shape) ? d.shape : "Round", r3 = (settings().defaultRates || {})["VVS FG|" + s3]; return Number(r3) > 0 ? Number(r3) : (s3 === "Fancy" ? 95000 : 65000); } // owner 29/10 (C-20261029-VVSFG): natural VVS FG round / choki (baguette) 65,000, fancy 95,000 per ct
     const q = opt === "gh" ? "VS GH" : "VS IJ", sh = ["Round", "Choki", "Fancy"].includes(d.shape) ? d.shape : "Round"; return defRate(q, sh); }
   const newDesign = () => ({ desc: "", k: "14K", net: "", tunch: "", dias: [], ppcs: "", prate: "300", other: "" });
@@ -63,18 +66,18 @@
       card.append(el("strong", { textContent: "Line " + (i + 1) + " - new design (no code)" }), el("div", { className: "row" }, [fld("Description", desc, "2 1 220px"), fld("Karat", k), fld("Net gold (g)", net), fld("Chain tunch", tu)]));
       const dbox = el("div", { style: "display:flex;flex-direction:column;gap:6px" });
       d.dias.forEach((x, j) => {
-        const q = sel(DQUALS, x.q, o => QC[o] + " · " + o), sh = sel(DSHAPES, x.shape), pc = el("input", { value: x.pcs || "", inputMode: "numeric", autocomplete: "off", placeholder: "0" });
+        const std = DQUALS.includes(x.q), q = sel(DQUALS.concat(["Other"]), std ? x.q : "Other", o => QC[o] ? QC[o] + " · " + o : "Other (type)"), qo = el("input", { value: std ? "" : (x.q || ""), maxLength: 24, autocomplete: "off", placeholder: "e.g. VS SI FG", hidden: std }), sh = sel(DSHAPES, x.shape), pc = el("input", { value: x.pcs || "", inputMode: "numeric", autocomplete: "off", placeholder: "0" });
         const ce = el("input", { value: x.cents || "", inputMode: "decimal", autocomplete: "off", placeholder: "e.g. 0.22" }), ct = el("input", { value: x.ct, inputMode: "decimal", autocomplete: "off", placeholder: "0.00" });
         const rt = el("input", { value: x.rate, inputMode: "numeric", autocomplete: "off" }), xx = el("button", { type: "button", className: "btn ghost", textContent: "✕", ariaLabel: "Remove diamond line" });
         codeKeys(q);
         // Pcs x Ct/pc (typed in carats, 0.22 = 22 cents) fills the total carats: 121 x 0.22 = 26.62 ct (owner 27/10 17:27); carats typed by hand still work
         const auto = () => { const p = num(x.pcs), c = num(x.cents); if (p > 0 && c > 0) { x.ct = (Math.round(p * c * 100) / 100).toFixed(2); ct.value = x.ct; } render(); };
         const fill = () => { const def = defRate(x.q, x.shape); rt.placeholder = def ? "default " + def.toLocaleString("en-IN") : "enter rate"; if (!x.edited) { x.rate = def ? String(def) : ""; rt.value = x.rate; } };
-        q.addEventListener("change", () => { x.q = q.value; fill(); render(); }); sh.addEventListener("change", () => { x.shape = sh.value; fill(); render(); });
+        q.addEventListener("change", () => { const o = q.value === "Other"; qo.hidden = !o; x.q = o ? qo.value.trim().toUpperCase() : q.value; if (o) qo.focus(); fill(); render(); }); qo.addEventListener("input", () => { x.q = qo.value.trim().toUpperCase(); fill(); render(); }); // owner 07/11 13:52: any quality typed, rate typed by hand sh.addEventListener("change", () => { x.shape = sh.value; fill(); render(); });
         pc.addEventListener("input", () => { x.pcs = pc.value; auto(); }); ce.addEventListener("input", () => { x.cents = ce.value; auto(); });
         ct.addEventListener("input", () => { x.ct = ct.value; x.cents = ""; ce.value = ""; render(); }); rt.addEventListener("input", () => { x.rate = rt.value; x.edited = rt.value.trim() !== ""; render(); });
         xx.addEventListener("click", () => { d.dias.splice(j, 1); drawDesigns(); render(); }); fill();
-        dbox.append(el("div", { className: "row", style: "align-items:end" }, [fld("Shape", sh), fld("Quality", q), fld("Pcs", pc), fld("Ct/pc", ce), fld("D Wt (ct)", ct), fld("Rate ₹/ct", rt), el("div", {}, [xx])]));
+        dbox.append(el("div", { className: "row", style: "align-items:end" }, [fld("Shape", sh), fld("Quality", el("span", {}, [q, qo])), fld("Pcs", pc), fld("Ct/pc", ce), fld("D Wt (ct)", ct), fld("Rate ₹/ct", rt), el("div", {}, [xx])]));
       });
       const addD = el("button", { type: "button", className: "btn ghost", textContent: "+ Diamond line" }); addD.addEventListener("click", () => { d.dias.push({ q: "CVD", pcs: "", cents: "", shape: "Round", ct: "", rate: "", edited: false }); drawDesigns(); render(); });
       const pp = el("input", { value: d.ppcs, inputMode: "numeric", autocomplete: "off", placeholder: "0" }), pr = el("input", { value: d.prate, inputMode: "numeric", autocomplete: "off" }), ot = el("input", { value: d.other, inputMode: "numeric", autocomplete: "off", placeholder: "0" });
@@ -238,7 +241,7 @@
       <div class="seg" role="radiogroup" aria-label="Gold to Gold on" id="bg2g" hidden style="margin-top:8px">
         <label><input type="radio" name="bg2g" value="ws" checked> Gold to Gold on W/s (10% wastage in the fine)</label>
         <label><input type="radio" name="bg2g" value="nett"> Gold to Gold on Nett (wastage in the making)</label></div>
-      <div class="row" id="bog" hidden style="margin-top:8px"><label>OG no. (old gold, if received) <input id="bogno" list="bogdl" autocomplete="off" maxlength="20" placeholder="pick or type"><datalist id="bogdl"></datalist><span class="hint" id="bognext" style="display:block"></span><button type="button" class="btn ghost" id="bogregb" style="margin-top:4px">OG register</button></label></label><label>Old gold received, fine g <input id="bogfine" inputmode="decimal" autocomplete="off" maxlength="10" placeholder="e.g. 8.000"></label><label>Party fine gold rate, 24K/g <input id="bograte" inputmode="decimal" autocomplete="off" maxlength="8" placeholder="rate at order time"></label></div>
+      <div class="row" id="bog" hidden style="margin-top:8px"><label>OG no. (old gold, if received) <input id="bogno" list="bogdl" autocomplete="off" maxlength="80" placeholder="pick or type"><datalist id="bogdl"></datalist><span class="hint" id="bognext" style="display:block"></span><button type="button" class="btn ghost" id="bogregb" style="margin-top:4px">OG register</button></label></label><label>Old gold received, fine g <input id="bogfine" inputmode="decimal" autocomplete="off" maxlength="10" placeholder="e.g. 8.000"></label><label>Party fine gold rate, 24K/g <input id="bograte" inputmode="decimal" autocomplete="off" maxlength="8" placeholder="rate at order time"></label></div>
       <div class="seg" role="radiogroup" aria-label="Title" style="margin-top:8px">
         <label><input type="radio" name="btitle" value="Bill" checked> Bill</label>
         <label><input type="radio" name="btitle" value="Estimate"> Estimate</label></div>
@@ -252,7 +255,8 @@
         <label><input type="radio" name="bopt" value="gh"> Natural VS GH</label>
         <label><input type="radio" name="bopt" value="ij"> Natural VS IJ</label>
         <label><input type="radio" name="bopt" value="fg"> Natural VVS FG (Rs 65,000/ct, fancy 95,000)</label>
-        <label><input type="radio" name="bopt" value="lgd"> Lab-grown (Rs 23,000/ct)</label></div>
+        <label><input type="radio" name="bopt" value="lgd"> Lab-grown (Rs 23,000/ct)</label>
+        <label><input type="radio" name="bopt" value="own"> Other quality <input id="boq" maxlength="24" autocomplete="off" placeholder="e.g. VS SI FG" style="width:120px"> Rs/ct <input id="bor" inputmode="numeric" autocomplete="off" placeholder="rate" style="width:90px"> fancy Rs/ct <input id="borf" inputmode="numeric" autocomplete="off" placeholder="same" style="width:90px"></label></div>
       <h2>2 · Pieces</h2>
       <div class="row" style="align-items:end"><label style="flex:2 1 220px">Code on the tag, tag number or design number <input id="bq" autocomplete="off" placeholder="e.g. abc270xyz, 803 or 1436"></label>
       <div><button type="button" class="btn" id="badd">Add piece</button></div><div><button type="button" class="btn ghost" id="bnewdes">+ Add line (estimate): our code, or blank = new design</button></div></div>
@@ -276,6 +280,8 @@
       <div class="actions" style="margin:0 0 8px"><button type="button" class="btn" id="bnewest">New estimate (stock pieces or a new design)</button></div>
       <div class="row" style="align-items:end"><label style="flex:0 1 200px">Month <input id="bmonth" type="month"></label><label style="flex:0 1 220px">Customer name or mobile (all bills) <input id="bfmob" autocomplete="off" maxlength="40" placeholder="type name or mobile no."></label>
         <div class="actions" style="margin:0"><button type="button" class="btn ghost" id="bxl">Download summary (Excel)</button><button type="button" class="btn ghost" id="bxlall">All months (Excel)</button><button type="button" class="btn ghost" id="bxwa" hidden>WhatsApp party bills</button><button type="button" class="btn ghost" id="bchselb" title="Tick bills of one party below, then make one challan for the parcel">&#128424; Delivery challan for selected</button></div></div>
+      <div class="row" style="align-items:end;margin-top:6px"><label style="flex:0 1 170px">Print from <input id="bpfrom" type="date"></label><label style="flex:0 1 170px">to <input id="bpto" type="date"></label>
+        <div class="actions" style="margin:0"><button type="button" class="btn" id="bpall" title="One copy of every bill for these dates (and the customer typed above) - or only the ticked bills">&#128424; Print all bills (1 copy each)</button></div></div>
       <div class="list"><table class="items" style="min-width:640px"><thead><tr><th>Date</th><th>Number</th><th>Type</th><th>Customer</th><th>Design · item</th><th>Amount (without GST)</th><th>Fine gold</th><th>By</th><th></th></tr></thead><tbody id="bbook"></tbody></table></div>
       <p class="hint" id="bbookmsg"></p>`;
     $("p-rates").parentNode.insertBefore(sec, $("p-rates"));
@@ -288,7 +294,8 @@
     document.querySelectorAll("input[name=bset]").forEach(r => r.addEventListener("change", () => { B.settle = r.value; render(); }));
     document.querySelectorAll("input[name=bg2g]").forEach(r => r.addEventListener("change", () => { B.g2g = r.value; render(); })); // C-20261026-G2GNETT
     document.querySelectorAll("input[name=btitle]").forEach(r => r.addEventListener("change", () => { if (r.value === "Bill" && B.designs.length) { r.checked = false; document.querySelector('input[name=btitle][value=Estimate]').checked = true; $("bmsg").textContent = "A new design (no tag) can only go on an Estimate. Remove the design to make a Bill."; return; } if (r.value === "Estimate" && B.title !== "Estimate") estDefaults(); B.title = r.value; numField(); }));
-    document.querySelectorAll("input[name=bopt]").forEach(r => r.addEventListener("change", () => { B.option = r.value; if (!B.editNo) B.rates = {}; render(); })); /* C-20261029-BILLFROZEN: on Edit the billed diamond rates stay */ // C-20261027-ESTBILL: diamonds choice resets the per-line rate edits
+    { const oq = $("boq"), orr = $("bor"), orf = $("borf"), upd = () => { B.own = { q: oq.value.trim().toUpperCase(), rate: orr.value.trim(), fancy: orf.value.trim() }; const r = document.querySelector("input[name=bopt][value=own]"); if (!r.checked) { r.checked = true; B.option = "own"; } render(); }; B.own = B.own || { q: "", rate: "", fancy: "" }; [oq, orr, orf].forEach(i => i.addEventListener("input", upd)); }
+    document.querySelectorAll("input[name=bopt]").forEach(r => r.addEventListener("change", () => { B.option = r.value; if (!B.editNo && !B.revOf) B.rates = {}; render(); })); /* C-20261029-BILLFROZEN: on Edit the billed diamond rates stay */ // C-20261027-ESTBILL: diamonds choice resets the per-line rate edits
     document.querySelectorAll("input[name=bcust]").forEach(r => r.addEventListener("change", () => { B.cust = r.value; })); // C-20261027-ESTOWNER: whose customer (Mihir / Shilpi ji / Abhinav) - for the follow-up reminder and the morning report, not printed
     $("bnewdes").addEventListener("click", () => { B.designs.push(newDesign()); drawDesigns(); render(); $("bmsg").textContent = ""; });
     $("bnewest").addEventListener("click", () => { $("bclear").click(); $("bform").hidden = false; B.title = "Estimate"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.checked = x.value === "Estimate"; }); numField(); window.scrollTo({ top: 0, behavior: "smooth" }); setTimeout(() => { const n = $("bq"); if (n) n.focus(); }, 120); });
@@ -296,8 +303,8 @@
     $("bmonth").value = today().slice(0, 7); bShotInit(); $("bmonth").addEventListener("change", loadBook); { let tm = 0; $("bfmob").addEventListener("input", () => { B.fcity = null; clearTimeout(tm); tm = setTimeout(loadBook, 350); }); } // owner 26/10 17:58: type a mobile no. and see all that customer's bills
     $("bxl").addEventListener("click", () => xl($("bmonth").value || today().slice(0, 7))); $("bxlall").addEventListener("click", () => xl("all")); $("bxwa").addEventListener("click", e => partyWA(e.currentTarget));
     $("bF").addEventListener("input", () => { editF(); render(); }); /* C-20261101-EDITRATES */ $("bogregb").addEventListener("click", ogReg); /* C-20261101-OGREG */ /* owner 27/10 18:08: "Amount before GST" box removed - only the final amount is typed */ $("bfinalgo").addEventListener("click", applyFinal); $("bfinal").addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applyFinal(); } }); /* C-20261027-FINALAMT */  ["bogno", "bogfine", "bograte"].forEach(i => $(i).addEventListener("input", () => totals())); /* C-20261027-OGBAL */  /* owner 27/10 12:21 (C-20261027-BILLTARGET) */ $("bdate").addEventListener("change", numField); $("bphoto").addEventListener("change", () => { if (B.title === "Estimate") { B.estPhotos = $("bphoto").checked; if (!B.estPhotos) B.summ = true; } else B.photos = $("bphoto").checked; phSync(); render(); }); $("bsumm").addEventListener("change", () => { B.summ = $("bsumm").checked; }); /* C-20261101-ESTSUMMARY */ $("bnbb").addEventListener("change", () => { B.nbb = $("bnbb").checked; });
-    $("bclear").addEventListener("click", () => { estDefaults(); B.editNo = null; B.final = 0; { const bf = $("bfinal"); if (bf) bf.value = ""; } { const bt = $("btarget"); if (bt) bt.value = ""; ["bogno", "bogfine", "bograte"].forEach(i => { const x = $(i); if (x) x.value = ""; }); } { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.designs = []; drawDesigns(); B.option = ""; document.querySelectorAll("input[name=bopt]").forEach(x => { x.checked = x.value === ""; }); B.cust = ""; document.querySelectorAll("input[name=bcust]").forEach(x => { x.checked = x.value === ""; }); B.nbb = false; $("bnbb").checked = false; B.nbbAuto = false; B.disc = {}; B.rates = {}; B.frates = {}; B.prates = {}; B.pdrates = {}; B.mkamt = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF", "baddr", "barea", "bstate", "bpin"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
-    $("bsave").addEventListener("click", save); $("bchselb").addEventListener("click", chSel); // C-20261102-CHMULTI
+    $("bclear").addEventListener("click", () => { estDefaults(); B.editNo = null; B.revOf = null; /* C-20261105-ESTREOPEN */ B.final = 0; { const bf = $("bfinal"); if (bf) bf.value = ""; } { const bt = $("btarget"); if (bt) bt.value = ""; ["bogno", "bogfine", "bograte"].forEach(i => { const x = $(i); if (x) x.value = ""; }); } { const n = $("beditnote"); if (n) { n.hidden = true; n.textContent = ""; } } $("bsave").textContent = "Save bill & make PDF"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.disabled = false; }); B.items = []; B.designs = []; drawDesigns(); B.option = ""; document.querySelectorAll("input[name=bopt]").forEach(x => { x.checked = x.value === ""; }); B.cust = ""; document.querySelectorAll("input[name=bcust]").forEach(x => { x.checked = x.value === ""; }); B.nbb = false; $("bnbb").checked = false; B.nbbAuto = false; B.disc = {}; B.rates = {}; B.quals = {}; B.oth = {}; B.frates = {}; B.prates = {}; B.pdrates = {}; B.mkamt = {}; $("bcusthint").textContent = ""; ["bname", "bcity", "bmob", "bno", "bq", "bF", "baddr", "barea", "bstate", "bpin"].forEach(i => $(i).value = ""); $("bdate").value = ""; $("bmsg").textContent = ""; $("bout").hidden = true; prefill(); numField(); render(); });
+    $("bsave").addEventListener("click", save); $("bchselb").addEventListener("click", chSel); $("bpall").addEventListener("click", e => printAll(e.currentTarget)); // owner 07/11 16:25 (C-20261107-PRINTALL) // C-20261102-CHMULTI
     $("bback").addEventListener("click", () => { const c = document.querySelector('nav button[data-tab="check"]'); if (c) c.click(); });
   }
   // owner 26/10/2026 (C-20261026-BILLNOW): Price check > Bill now opens a fresh bill with that piece; weights come from the tag (not editable),
@@ -338,8 +345,8 @@
     if (form) form.addEventListener("paste", e => { const it = [...((e.clipboardData && e.clipboardData.items) || [])].find(x => /^image\//.test(x.type)); if (it) { e.preventDefault(); read(it.getAsFile()); } });
   }
   function numField() { const e = B.title === "Estimate", n = $("bno"); n.disabled = true; n.value = ""; const d = $("bdate").value || today(); // owner 16/10: bill numbers automatic too
-    n.placeholder = "automatic (" + (e ? "E-" : "B-") + d.slice(2, 4) + d.slice(5, 7) + "-01, 02 …)";
-    { const sv = $("bsave"); if (sv && !B.editNo) sv.textContent = e ? "Send on my WhatsApp" : "Save bill & make PDF"; } phSync(); } // C-20261028-ESTNOTBILL
+    n.placeholder = B.revOf && e ? "revision of " + B.revOf + " (-R2, -R3 …)" : "automatic (" + (e ? "E-" : "B-") + d.slice(2, 4) + d.slice(5, 7) + "-01, 02 …)";
+    { const sv = $("bsave"); if (sv && !B.editNo && !B.revOf) sv.textContent = e ? "Send on my WhatsApp" : "Save bill & make PDF"; } phSync(); } // C-20261028-ESTNOTBILL
   // owner 01/11/2026 13:30 (C-20261101-ESTSUMMARY): on an ESTIMATE the photo option starts OFF every time (not remembered) and under it
   // "Summary only" starts ON: the PDF then shows per piece only gold g + karat and total diamond ct, and the final amount as the full estimate.
   // Photo ON = the full estimate with photos (summary ignored); photo OFF + summary OFF = full breakup without photos. Bills are unchanged.
@@ -371,23 +378,28 @@
       pn.innerHTML = `<h2>Estimates sent - follow-ups</h2><p class="hint">Estimates are not saved as bills. Only the customer's name and number are kept here; the person whose customer it is gets a WhatsApp reminder 2 days after the estimate (and once more 3 days later) until it is marked below.</p>
         <div class="row" style="align-items:end;gap:8px"><label style="flex:0 1 200px">Show <select id="estst"><option value="open">To follow up</option><option value="done">Followed up</option><option value="all">All</option></select></label></div>
         <div class="list"><table class="items" style="min-width:640px"><thead><tr><th>Date</th><th>Number</th><th>Customer</th><th>Mobile</th><th>Amount</th><th>Whose customer</th><th>Reminder</th><th></th></tr></thead><tbody id="estrows"></tbody></table></div><p class="hint" id="estmsg"></p>`;
-      host.after(pn); $("estst").addEventListener("change", loadEst); }
+      host.after(pn); $("estst").addEventListener("change", loadEst);
+      /* C-20261105-ESTREOPEN: on a phone each estimate is a small card (no sideways scrolling to reach Reopen / Edit) */
+      const css = document.createElement("style"); css.textContent = "@media (max-width:640px){#estpanel table.items{min-width:0!important}#estpanel thead{display:none}#estpanel tbody tr{display:flex;flex-wrap:wrap;gap:2px 12px;padding:10px 0;border-bottom:1px solid rgba(0,0,0,.12)}#estpanel tbody td{border:0;padding:0;white-space:normal!important}#estpanel tbody td:nth-child(3){flex-basis:100%;order:-1;font-weight:600}#estpanel tbody td:last-child{flex-basis:100%;display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}#estpanel tbody td:last-child select{flex:1 1 140px}}"; pn.appendChild(css); }
     const body = $("estrows"), m = $("estmsg");
     try { const r = await fetch("/api/vj/estimates?status=" + encodeURIComponent($("estst").value), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
       body.textContent = "";
       j.estimates.forEach(e => { const tr = document.createElement("tr"); const td = x => { const c = document.createElement("td"); c.textContent = x; tr.appendChild(c); return c; };
         td(dmy(e.date)); { const c = td(""); if (e.convTo) { const a = document.createElement("button"); a.type = "button"; a.className = "btn ghost"; a.textContent = e.no + " → " + e.convTo; a.title = "Open bill " + e.convTo + " (PDF)"; a.addEventListener("click", () => reprint(e.convTo, a)); c.appendChild(a); } else c.textContent = e.no; } /* C-20261104-SAVEBILLFIX */ { const c = td(e.name + (e.city ? ", " + e.city : "")); if (e.items) { const h = document.createElement("div"); h.className = "hint"; h.textContent = e.items; c.appendChild(h); } }
         td(e.mobile || ""); td(fmt(e.total)); td(e.custName || "-");
-        td(e.status === "open" ? (e.reminders ? e.reminders + " sent" : e.due ? "on " + dmy(e.due) : "-") : ({ won: "Bought", lost: "Not buying", done: "Followed up", converted: "Converted → " + (e.convTo || "bill") })[e.status] + (e.doneByName ? " (" + e.doneByName + ")" : "") + (e.note ? " - " + e.note : ""));
+        td(e.status === "open" ? (e.reminders ? e.reminders + " sent" : e.due ? "on " + dmy(e.due) : "-") : ({ won: "Bought", lost: "Not buying", done: "Followed up", converted: "Converted → " + (e.convTo || "bill"), revised: "Revised → " + String(e.revTo || "").replace(/^.*-(R\d+)$/, "$1") })[e.status] + (e.doneByName ? " (" + e.doneByName + ")" : "") + (e.note ? " - " + e.note : ""));
         const x = document.createElement("td"); x.style.whiteSpace = "nowrap";
-        const btn = (label, st) => { const b = document.createElement("button"); b.type = "button"; b.className = "btn ghost"; b.textContent = label; b.addEventListener("click", async () => {
-          if (st === "won" && j.canConv && e.status === "open") { estConv(e, m); return; } /* C-20261104-SAVEBILLFIX: Bought = make the bill */
-          const note = st === "open" ? "" : (prompt("Note (optional) for " + e.no + " - " + e.name, "") || "").slice(0, 120); b.disabled = true;
+        const setSt = async (st, ctl) => { if (st === "won" && j.canConv && e.status === "open") { estConv(e, m); return; } /* C-20261104-SAVEBILLFIX: Bought = make the bill */
+          const note = st === "open" ? "" : (prompt("Note (optional) for " + e.no + " - " + e.name, "") || "").slice(0, 120); ctl.disabled = true;
           try { const r = await fetch("/api/vj/estimate/done", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ no: e.no, status: st, note }) }); const k = await r.json().catch(() => ({})); if (!r.ok) throw new Error(k.error || r.status); await loadEst(); if (st !== "open") m.textContent = e.no + " (" + e.name + ") moved to \"Followed up\" - choose Show: Followed up or All to see it. Nothing is deleted."; }
-          catch (er) { b.disabled = false; m.textContent = "Not changed: " + (er.message || er); } }); x.appendChild(b); };
-        if (e.status === "open" && j.canConv) { const cb = document.createElement("button"); cb.type = "button"; cb.className = "btn"; cb.textContent = "Convert to bill"; cb.addEventListener("click", () => estConv(e, m)); x.appendChild(cb); } /* C-20261104-SAVEBILLFIX: Abhinav / Shilpiji */
-        if ((e.status === "won" || e.status === "done") && j.canConv) { const cb = document.createElement("button"); cb.type = "button"; cb.className = "btn"; cb.textContent = "Convert to bill"; cb.addEventListener("click", () => estConv(e, m)); x.appendChild(cb); }
-        if (e.status === "open") { btn("Bought", "won"); btn("Not buying", "lost"); btn("Followed up", "done"); } else if (e.status !== "converted") btn("Re-open", "open");
+          catch (er) { ctl.disabled = false; m.textContent = "Not changed: " + (er.message || er); } };
+        const live = e.status !== "converted" && e.status !== "revised";
+        // C-20261105-ESTREOPEN: Reopen / Edit for every login (latest version only; a revised one shows where it went, a converted one its bill)
+        if (live) { const ro = document.createElement("button"); ro.type = "button"; ro.className = "btn"; ro.textContent = "Reopen / Edit"; ro.title = "Open " + e.no + " on the Bill screen, change it and send it again (saved as the next revision)"; ro.addEventListener("click", () => estOpen(e, ro, m)); x.appendChild(ro); }
+        if (live && (e.status === "open" || e.status === "won" || e.status === "done") && j.canConv) { const cb = document.createElement("button"); cb.type = "button"; cb.className = "btn ghost"; cb.textContent = "Convert to bill"; cb.addEventListener("click", () => estConv(e, m)); x.appendChild(cb); } /* C-20261104-SAVEBILLFIX: Abhinav / Shilpiji */
+        if (live) { const sl = document.createElement("select"); sl.setAttribute("aria-label", "Mark " + e.no); sl.style.cssText = "width:auto;margin-left:4px";
+          (e.status === "open" ? [["", "Mark as…"], ["won", "Bought"], ["lost", "Not buying"], ["done", "Followed up"]] : [["", "Mark as…"], ["open", "Back to follow-up"]]).forEach(([v, t]) => sl.append(Object.assign(document.createElement("option"), { value: v, textContent: t })));
+          sl.addEventListener("change", () => { const v = sl.value; sl.value = ""; if (v) setSt(v, sl); }); x.appendChild(sl); }
         tr.appendChild(x); body.appendChild(tr); });
       m.textContent = j.estimates.length ? j.estimates.length + " shown. " + j.open + " still to follow up." : ($("estst").value === "open" ? "Nothing to follow up." : "None.");
       if (j.fix && !B.fixShown && ((j.fix.done || []).length || (j.fix.candidates || []).length || (j.fix.skipped || []).length)) { B.fixShown = true; m.textContent += ((j.fix.done || []).length ? " Made into bills (Save & make bill fix 04/11): " + j.fix.done.join("; ") + "." : "") + ((j.fix.candidates || []).length ? " Other estimates on Generate-tag pieces (use Convert to bill if they were bills): " + j.fix.candidates.join("; ") + "." : "") + ((j.fix.skipped || []).length ? " Not converted: " + j.fix.skipped.join("; ") + "." : ""); }
@@ -533,12 +545,11 @@
     btn.disabled = false;
   }
   // owner 26/10/2026 17:32 (C-20261026-BILLEDIT): open a saved bill in the form; saving updates it under the same number (owners only, the server keeps the old version)
-  async function editBill(no, btn) { btn.disabled = true;
-    try { const r = await fetch("/api/vj/bill?no=" + encodeURIComponent(no), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
-      const b = j.bill, all = tags0(); const miss = (b.rows || []).filter(x => !x.src && !all.some(t => t.id === x.id)); if (miss.length) throw new Error("a piece on it is no longer in stock (" + miss.map(x => x.label).join(", ") + ")");
+  // C-20261105-ESTREOPEN: the Bill screen filled from a saved bill / estimate (shared by Edit bill and Reopen estimate)
+  function fillDoc(b) {
       $("bclear").click(); $("bform").hidden = false; B.items = b.rows.filter(x => !x.src).map(x => x.id); B.mode = b.mode || "ws";
       B.designs = b.rows.filter(x => x.src).map(x => ({ desc: x.src.desc || "", k: x.src.k || "14K", net: String(x.src.net || ""), tunch: x.src.tunch ? String(x.src.tunch) : "", dias: (x.src.dias || []).map(d => ({ q: d.q, shape: d.shape, pcs: d.pcs ? String(d.pcs) : "", cents: "", ct: String(d.ct), rate: String(d.rate), edited: true })), ppcs: x.src.ppcs ? String(x.src.ppcs) : "", prate: String(x.src.prate || 300), other: x.src.other ? String(x.src.other) : "" })); drawDesigns();
-      B.option = ["gh", "ij", "fg", "lgd"].includes(b.option) ? b.option : ""; document.querySelectorAll("input[name=bopt]").forEach(x => { x.checked = x.value === B.option; }); /* C-20261027-ESTBILL */ B.cust = ["mihir", "shilpi", "abhinav"].includes(b.cust) ? b.cust : ""; document.querySelectorAll("input[name=bcust]").forEach(x => { x.checked = x.value === B.cust; }); B.settle = b.settle || "fine"; B.g2g = b.g2g === "nett" ? "nett" : "ws"; document.querySelectorAll("input[name=bg2g]").forEach(x => { x.checked = x.value === B.g2g; }); B.title = b.title || "Bill"; B.nbb = !!b.nbb; $("bnbb").checked = B.nbb; B.nbbAuto = true;
+      B.option = ["gh", "ij", "fg", "lgd", "own"].includes(b.option) ? b.option : ""; B.own = { q: b.ownQ || "", rate: b.ownRate ? String(b.ownRate) : "", fancy: b.ownFancy ? String(b.ownFancy) : "" }; { const oq = $("boq"); if (oq) { oq.value = B.own.q; $("bor").value = B.own.rate; $("borf").value = B.own.fancy; } } document.querySelectorAll("input[name=bopt]").forEach(x => { x.checked = x.value === B.option; }); /* C-20261027-ESTBILL */ B.cust = ["mihir", "shilpi", "abhinav"].includes(b.cust) ? b.cust : ""; document.querySelectorAll("input[name=bcust]").forEach(x => { x.checked = x.value === B.cust; }); B.settle = b.settle || "fine"; B.g2g = b.g2g === "nett" ? "nett" : "ws"; document.querySelectorAll("input[name=bg2g]").forEach(x => { x.checked = x.value === B.g2g; }); B.title = b.title || "Bill"; B.nbb = !!b.nbb; $("bnbb").checked = B.nbb; B.nbbAuto = true;
       document.querySelectorAll("input[name=bmode]").forEach(x => { x.checked = x.value === B.mode; }); document.querySelectorAll("input[name=bset]").forEach(x => { x.checked = x.value === B.settle; });
       document.querySelectorAll("input[name=btitle]").forEach(x => { x.checked = x.value === B.title; x.disabled = true; });
       $("bname").value = b.name || ""; $("bcity").value = b.city || ""; $("baddr").value = b.addr || ""; $("barea").value = b.area || ""; $("bstate").value = b.state || ""; $("bpin").value = b.pin || ""; /* C-20261102-BILLADDR */ $("bmob").value = b.mobile || ""; $("bdate").value = b.date; $("bF").value = b.F; B.final = Number(b.final) || 0; $("bfinal").value = B.final ? String(B.final) : ""; { const g = b.og || null; $("bogno").value = g ? g.no || "" : ""; $("bogfine").value = g ? String(g.recv) : ""; $("bograte").value = g ? String(g.rate) : ""; }
@@ -546,10 +557,34 @@
         // C-20261029-BILLFROZEN (owner 29/10 13:27): every billed rate is kept as billed - gold rate, each diamond line (0 stays 0), polki, party diamond, making
         if (Number(x.F) >= 2000) B.frates[x.id] = x.F;
         const ds = x.dias || []; if (ds.length) { const a = []; ds.forEach((d, k) => { a[d.idx != null ? d.idx : k] = Number(d.rate) > 0 ? Number(d.rate) : -1; }); for (let k = 0; k < a.length; k++) if (a[k] == null) a[k] = 0; B.rates[x.id] = a; }
+        if (ds.length && b.quals && Array.isArray(b.quals[x.id])) B.quals[x.id] = b.quals[x.id].slice(); if (b.oth && b.oth[x.id] != null) B.oth[x.id] = b.oth[x.id];
         if (x.polkiPcs && x.polkiRate >= 1) B.prates[x.id] = x.polkiRate;
         if (x.pdCt && x.pdRate >= 1) B.pdrates[x.id] = x.pdRate;
         if (Number(x.making) > 0) B.mkamt[x.id] = Math.max(0, Number(x.making) - (x.amt0 != null ? (Number(x.amount) || 0) - (Number(x.amt0) || 0) : 0)); });
         if (b.roundIn > 0 && !(b.rows || []).some(x => x.amt0 != null)) { const rc = b.rows.filter(x => !x.chain && B.mkamt[x.id] != null), r0 = rc.reduce((a, x) => (!a || x.net > a.net) ? x : a, null); if (r0) B.mkamt[r0.id] = Math.max(0, B.mkamt[r0.id] - b.roundIn); } // bills before 27/10: the Rs 500 round-up sat in the biggest piece's making
+  }
+  // C-20261105-ESTREOPEN (owner 05/11 10:23): "Reopen / Edit" on the Estimates list - the Bill screen opens in ESTIMATE mode with the party, pieces
+  // (stock + new-design lines), gold rate, rates, making and discounts exactly as saved; Save makes the next revision (E-2611-09-R2, -R3 …), the old one is kept
+  async function estOpen(e, btn, m) { btn.disabled = true;
+    try { const r = await fetch("/api/vj/estimate?no=" + encodeURIComponent(e.no), { credentials: "same-origin", cache: "no-store" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+      const d = j.doc, all = tags0(); let note = "";
+      if (d && Array.isArray(d.rows) && d.rows.length) { const miss = d.rows.filter(x => !x.src && !all.some(t => t.id === x.id)); d.rows = d.rows.filter(x => !miss.includes(x)); d.title = "Estimate";
+        if (miss.length) note = " Not in stock any more (left out): " + miss.map(x => (x.design ? x.design + " " : "") + (x.label || x.id)).join(", ") + ".";
+        fillDoc(d); }
+      else { $("bclear").click(); $("bform").hidden = false; const est = j.est || e; $("bname").value = String(est.name || "").replace(/\s*ji$/i, ""); $("bmob").value = est.mobile || ""; $("bcity").value = est.city || "";
+        B.cust = ["mihir", "shilpi", "abhinav"].includes(est.cust) ? est.cust : ""; document.querySelectorAll("input[name=bcust]").forEach(x => { x.checked = x.value === B.cust; });
+        B.items = (est.ids || []).filter(i => all.some(t => t.id === i)); note = " Old estimate - items were not stored; add them again." + (B.items.length ? " (Its stock pieces are put back at today's rates - check them.)" : ""); }
+      B.title = "Estimate"; document.querySelectorAll("input[name=btitle]").forEach(x => { x.checked = x.value === "Estimate"; x.disabled = true; }); if (!B.estPhotos) B.summ = true;
+      document.querySelectorAll('[id^="p-"]').forEach(p => { p.hidden = p.id !== "p-bill"; }); $("bdate").value = today(); B.revOf = e.no; B.editF0 = F(); B.editNo = null; numField();
+      $("bcusthint").textContent = `Reopened estimate ${e.no} - saving makes the next revision; ${e.no} is kept.`; /* shown at the top too */
+      const n = $("beditnote"); n.hidden = false; n.textContent = `Reopened estimate ${e.no} (${e.name}, ${fmt(e.total)}). Change what you need, then Send on my WhatsApp - it is saved as the next revision (${e.no.replace(/-R\d+$/, "")}-R…) with today's date; ${e.no} is kept, marked revised. Clear = stop.` + note;
+      $("bsave").textContent = "Save revision & send on my WhatsApp"; render(); window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (er) { m.textContent = "Cannot reopen " + e.no + ": " + (er.message || er) + "."; }
+    btn.disabled = false; }
+  async function editBill(no, btn) { btn.disabled = true;
+    try { const r = await fetch("/api/vj/bill?no=" + encodeURIComponent(no), { credentials: "same-origin" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+      const b = j.bill, all = tags0(); const miss = (b.rows || []).filter(x => !x.src && !all.some(t => t.id === x.id)); if (miss.length) throw new Error("a piece on it is no longer in stock (" + miss.map(x => x.label).join(", ") + ")");
+      fillDoc(b);
       B.editNo = b.no; B.editF0 = Number(b.F) || 0; if (!$("bogno").value && b.ogNo) $("bogno").value = b.ogNo; $("bno").value = b.no; const n = $("beditnote"); n.hidden = false;
       n.textContent = `Editing ${b.title} ${b.no} (${b.name}). Change what you need, then Update - it keeps the same number. Clear = stop editing.`;
       $("bsave").textContent = "Update bill & make PDF"; render(); $("p-bill").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -651,6 +686,8 @@
       else if (!$("bmob").value.trim()) h.textContent += " Type the mobile number."; }).catch(() => {}); }
   const F = () => Number(String($("bF").value).replace(/[^0-9.]/g, "")) || 0;
   function calcNow() { const s = settings(), all = tags(); const list = B.items.map(id => all.find(t => t.id === id)).filter(Boolean).concat(vtags())
+      .map(t => B.oth[t.id] != null ? Object.assign({}, t, { other: { amt: Number(B.oth[t.id]) || 0 } }) : t) // owner 07/11 16:17: colour stones / other charges typed on the bill
+      .map(t => B.quals[t.id] ? Object.assign({}, t, { dias: (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map((d, i) => B.quals[t.id][i] ? Object.assign({}, d, { q: B.quals[t.id][i] }) : d) }) : t) // owner 07/11 14:02: quality typed on the bill line
       .map(t => B.option ? Object.assign({}, t, { dias: (Array.isArray(t.dias) ? t.dias : []).filter(Boolean).map(d => Object.assign({}, d, { rate: optRate(d, B.option) })) }) : t); // C-20261027-ESTBILL
     return vjBillCalc(list, { F: F(), mode: B.mode, settle: B.settle, g2g: B.g2g, disc: B.disc, rates: B.rates, frates: B.frates, prates: B.prates, pdrates: B.pdrates, mkamt: B.mkamt, og: ogNow(), final: B.final || 0, purity: s.purity, making: s.making, gst: s.gst, defRates: s.defaultRates }); }
   function goldCell(r, c) { return c.settle === "fine" ? g3(r.fine) + " fine" : fmt(r.goldAmt) + (c.settle ? " (" + g3(r.fine) + " fine)" : ""); }
@@ -669,7 +706,7 @@
         fi.addEventListener("input", () => { const v = Number(fi.value.replace(/[^0-9.]/g, "")) || 0; if (v && v !== Math.round(r.Fdef)) B.frates[r.id] = v; else delete B.frates[r.id]; totals(); });
         ln.append(r.orderRate ? "tag rate " : "rate ", fi); gt.appendChild(ln); tr.appendChild(gt); }
       const t0 = tags().find(t => t.id === r.id); if (phOn() && t0 && t0.photo) { const im = document.createElement("img"); im.alt = ""; im.src = "/_blob/" + t0.photo; im.style.cssText = "width:56px;height:56px;object-fit:cover;border-radius:4px;display:block;margin-bottom:4px"; tr.firstChild.prepend(im); }
-      td(ok || c.settle === "fine" ? goldCell(r, c) : "—", "num"); if (ok && B.editNo && c.mode !== "item" && !r.chain) { // owner 01/11/2026 14:55 (C-20261101-EDITRATES): on Edit the making is typed by hand
+      td(ok || c.settle === "fine" ? goldCell(r, c) : "—", "num"); if (ok && (B.editNo || B.revOf) && c.mode !== "item" && !r.chain) { // owner 01/11/2026 14:55 (C-20261101-EDITRATES): on Edit the making is typed by hand
         const mt = document.createElement("td"); mt.className = "num"; const mi = document.createElement("input"); mi.className = "brate"; mi.inputMode = "numeric"; mi.autocomplete = "off"; mi.style.cssText = "width:84px;text-align:right;padding:4px 6px"; mi.value = Math.round(r.making) || ""; mi.title = "Making in Rs for this piece (" + r.mkRate + "/g)";
         mi.addEventListener("input", () => { const v = mi.value.replace(/[^0-9]/g, ""); if (v !== "") B.mkamt[r.id] = Number(v); else delete B.mkamt[r.id]; totals(); });
         mt.append("Rs ", mi); tr.appendChild(mt); } else td(ok ? mkCell(r, c) : "—", "num");
@@ -678,7 +715,9 @@
       r.dias.forEach((d, k) => { const ln = document.createElement("div"); ln.style.cssText = "white-space:nowrap;margin:2px 0";
         const ri = document.createElement("input"); ri.className = "brate"; ri.inputMode = "numeric"; ri.autocomplete = "off"; ri.style.cssText = "width:78px;text-align:right;padding:4px 6px"; ri.value = d.rate === 0 && (d.tagRate > 0 || /party/i.test(d.q)) ? "0" : (d.rate || ""); ri.title = "Rate per ct (tag: " + (d.tagRate || "-") + ")";
         ri.addEventListener("input", () => { const a = B.rates[r.id] = (B.rates[r.id] || r.dias.map(() => 0)).slice(); a[d.idx != null ? d.idx : k] = ri.value.replace(/[^0-9.]/g, "") !== "" && Number(ri.value.replace(/[^0-9.]/g, "")) === 0 ? -1 : Number(ri.value.replace(/[^0-9.]/g, "")) || 0; totals(); });
-        ln.append(`${d.shape ? d.shape + " " : ""}${d.q} ${d.ct.toFixed(2)} ct @ `, ri); /* owner 26/10: diamond shape shown (C-20261026-DIASHAPE) */ dt.appendChild(ln); });
+        const qi = document.createElement("input"); qi.className = "brate"; qi.autocomplete = "off"; qi.maxLength = 24; qi.style.cssText = "width:96px;padding:4px 6px"; qi.value = d.q; qi.title = "Quality - type any (e.g. VS SI FG) for this bill; set its rate per ct";
+        qi.addEventListener("change", () => { const ix = d.idx != null ? d.idx : k, v = qi.value.trim().toUpperCase(), a = B.quals[r.id] = (B.quals[r.id] || []).slice(); a[ix] = v; for (let j = 0; j < a.length; j++) if (a[j] == null) a[j] = ""; if (!a.some(Boolean)) delete B.quals[r.id]; render(); });
+        ln.append(`${d.shape ? d.shape + " " : ""}`, qi, ` ${d.ct.toFixed(2)} ct @ `, ri); /* owner 26/10: diamond shape shown (C-20261026-DIASHAPE) */ dt.appendChild(ln); });
       if (r.dias.length) { const dv = document.createElement("div"); dv.dataset.dia = r.id; dv.style.fontWeight = "600"; dv.textContent = "= " + fmt(r.diaAmt); dt.appendChild(dv); }
       tr.appendChild(dt);
       if (hasPol) { // polki pcs x rate per pc; the rate can be changed for this bill only (C-20261017-POLKI)
@@ -692,7 +731,9 @@
           pi.addEventListener("input", () => { const v = Number(pi.value.replace(/[^0-9.]/g, "")) || 0; if (Number.isInteger(v) && v >= 1 && v <= 100000 && v !== r.polkiTagRate) B.prates[r.id] = v; else delete B.prates[r.id]; totals(); });
           ln.append(`${r.polkiPcs} pc @ `, pi); const pv = document.createElement("div"); pv.dataset.pol = r.id; pv.style.fontWeight = "600"; pv.textContent = "= " + fmt(r.polki); pt.append(ln, pv); }
         tr.appendChild(pt); }
-      td(r.other ? fmt(r.other) : "—", "num"); const am = document.createElement("td"); am.className = "num"; am.dataset.amt = r.id; am.textContent = ok ? fmt(r.amount) : "—"; tr.appendChild(am);
+      if (ok && !/^new-\d+$/.test(r.id)) { const ot = document.createElement("td"); ot.className = "num"; const oi = document.createElement("input"); oi.className = "brate"; oi.inputMode = "numeric"; oi.autocomplete = "off"; oi.style.cssText = "width:84px;text-align:right;padding:4px 6px"; oi.placeholder = "0"; oi.value = r.other ? String(r.other) : ""; oi.title = "Colour stones / other charges in Rs for this piece (this bill only)";
+        oi.addEventListener("change", () => { const v = oi.value.replace(/[^0-9]/g, ""); const t0 = tags().find(t => t.id === r.id), tagO = Math.round(Number(t0 && t0.other && t0.other.amt) || 0); if (v === "" ? tagO === 0 : Number(v) === tagO) delete B.oth[r.id]; else B.oth[r.id] = v === "" ? 0 : Number(v); render(); });
+        ot.append("Rs ", oi); tr.appendChild(ot); } else td(r.other ? fmt(r.other) : "—", "num"); const am = document.createElement("td"); am.className = "num"; am.dataset.amt = r.id; am.textContent = ok ? fmt(r.amount) : "—"; tr.appendChild(am);
       const dc = document.createElement("td"), di = document.createElement("input"); di.className = "bdisc"; di.dataset.id = r.id; di.value = B.disc[r.id] || ""; di.placeholder = "0"; di.maxLength = 12; di.autocomplete = "off"; di.style.cssText = "width:84px;text-align:right";
       di.addEventListener("input", () => { B.disc[r.id] = di.value.trim(); totals(); }); dc.appendChild(di); tr.appendChild(dc);
       const nt = document.createElement("td"); nt.className = "num"; nt.dataset.net = r.id; nt.textContent = ok ? fmt(r.net) : "—"; tr.appendChild(nt);
@@ -705,7 +746,7 @@
   // discount (total less that amount) is spread over the pieces by their amount, the rest on the biggest piece. Only the per-piece
   // discounts are saved, so the server works the bill out exactly as before.
   // owner 01/11/2026 14:55 (C-20261101-EDITRATES): on Edit, a new gold rate in the top box goes to every piece that carried the bill's old rate
-  function editF() { if (!B.editNo) return; const nf = F(); if (!(nf >= 2000)) return; const o = B.editF0; Object.keys(B.frates).forEach(id => { if (Number(B.frates[id]) === o) B.frates[id] = nf; }); B.editF0 = nf; }
+  function editF() { if (!B.editNo && !B.revOf) return; const nf = F(); if (!(nf >= 2000)) return; const o = B.editF0; Object.keys(B.frates).forEach(id => { if (Number(B.frates[id]) === o) B.frates[id] = nf; }); B.editF0 = nf; }
   // owner 01/11/2026 14:55 (C-20261101-OGREG): the OG list runs in number order (151, 152, 153 ...) - the next free numbers (and any skipped ones)
   // are offered in the drop-down, and 'OG register' shows every OG no. with its bill, date, party and fine gold. Optional (owner 15:00).
   let ogAt = 0; async function ogLoad(force) { if (!force && Date.now() - ogAt < 60000) return; ogAt = Date.now();
@@ -715,11 +756,18 @@
       const fr = j.free || []; $("bognext").textContent = fr.length ? `Free OGs: ${fr.slice(0, 6).map(x => x.no + " " + x.name).join(", ")}${fr.length > 6 ? " +" + (fr.length - 6) + " more" : ""} - new old gold goes in the OG register tab first. Leave empty if the gold comes later.` : "No free OG in the OG register - enter the old gold there first (OG register tab), or leave empty if the gold comes later.";
       const n = $("bogno"); if (!n.dataset.og) { n.dataset.og = "1"; n.addEventListener("change", () => { const x = ((B.ogs && B.ogs.free) || []).find(f => String(f.no) === n.value.trim().toUpperCase()); if (!x) { if (n.value.trim()) $("bognext").textContent = "OG " + n.value.trim() + " is not a free OG in the OG register."; return; } if (x.fine && !$("bogfine").value) { $("bogfine").value = String(x.fine); render(); } $("bognext").textContent = "OG " + x.no + ": " + x.name + (x.fine ? ", " + g3(x.fine) + " fine" : "") + (x.date ? ", " + String(x.date).split("-").reverse().join("-") : "") + "."; }); }
     } catch (e) { $("bognext").textContent = "Could not load the OG list (" + (e.message || e) + ")."; } }
-  async function ogReg() { await ogLoad(true); const j = B.ogs || {}; let w = $("bogreg"); if (w) { w.remove(); return; } w = document.createElement("div"); w.id = "bogreg"; w.className = "list"; w.style.cssText = "margin-top:8px;max-height:320px;overflow:auto";
+  async function ogReg() { await ogLoad(true); const j = B.ogs || {}; let w = $("bogreg"); if (w) { w.remove(); return; } w = document.createElement("div"); w.id = "bogreg"; w.className = "list"; w.style.cssText = "margin-top:8px;max-height:420px;overflow:auto";
+    // owner 07/11 14:18 (C-20261107-OGPICK): all FREE OGs with a tick - ticked ones fill the OG no. (199,200,201) and the fine (sum); on saving the bill they show as adjusted
+    { const fr = j.free || [], cur = new Set($("bogno").value.split(/[,;&+\s]+/).map(x => x.trim().toUpperCase()).filter(Boolean)), pk = document.createElement("div"); pk.style.cssText = "padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px";
+      const hd = document.createElement("b"); hd.textContent = fr.length ? "Tick the old gold (OG) for this bill:" : "No free OG in the register - enter the old gold in the OG register tab first."; pk.appendChild(hd);
+      const upd = () => { const sel = fr.filter(x => pk.querySelector('input[data-og="' + x.no + '"]').checked); $("bogno").value = sel.map(x => x.no).join(","); const f = sel.reduce((a, x) => a + (Number(x.fine) || 0), 0); $("bogfine").value = f > 0 ? String(Math.round(f * 1000) / 1000) : ""; $("bognext").textContent = sel.length ? "OG " + sel.map(x => x.no).join(", ") + " · " + g3(f) + " fine (party credit)." : ""; render(); };
+      fr.forEach(x => { const l = document.createElement("label"); l.style.cssText = "display:flex;gap:8px;align-items:center;padding:4px 0;font-size:16px"; const c = document.createElement("input"); c.type = "checkbox"; c.dataset.og = x.no; c.checked = cur.has(String(x.no).toUpperCase()); c.style.cssText = "width:20px;height:20px"; c.addEventListener("change", upd);
+        l.append(c, "OG " + x.no + " · " + [x.name, x.city].filter(Boolean).join(", ") + (x.fine ? " · " + g3(x.fine) + " fine" : "") + (x.date ? " · " + String(x.date).split("-").reverse().join("-") : "")); pk.appendChild(l); });
+      w.appendChild(pk); }
     const t = document.createElement("table"); t.className = "items"; t.innerHTML = "<thead><tr><th>OG no.</th><th>Bill</th><th>Date</th><th>Party</th><th>Old gold, fine g</th></tr></thead>"; const tb = document.createElement("tbody");
     (j.list || []).forEach(x => { const tr = document.createElement("tr"); [x.og, x.no + (x.cancelled ? " (cancelled)" : ""), String(x.date || "").split("-").reverse().join("-"), [x.name, x.city].filter(Boolean).join(", "), x.fine ? g3(x.fine) : "-"].forEach(v => { const td = document.createElement("td"); td.textContent = v; tr.appendChild(td); }); if (x.cancelled) tr.style.opacity = "0.5"; tb.appendChild(tr); });
     if (!(j.list || []).length) tb.innerHTML = "<tr><td colspan=5>No OG no. used yet.</td></tr>"; t.appendChild(tb); w.appendChild(t); $("bog").after(w); }
-  function ogNow() { const f = Number(String($("bogfine").value).replace(/[^0-9.]/g, "")) || 0; return f > 0 ? { no: $("bogno").value.trim().slice(0, 20), fine: Math.round(f * 1000) / 1000, rate: Math.round(Number(String($("bograte").value).replace(/[^0-9.]/g, "")) || 0) } : null; } // C-20261027-OGBAL
+  function ogNow() { const f = Number(String($("bogfine").value).replace(/[^0-9.]/g, "")) || 0; return f > 0 ? { no: $("bogno").value.trim().slice(0, 80), fine: Math.round(f * 1000) / 1000, rate: Math.round(Number(String($("bograte").value).replace(/[^0-9.]/g, "")) || 0) } : null; } // C-20261027-OGBAL
   // owner 27/10/2026 13:35 (C-20261027-FINALAMT): final amount -> taxable = final less GST inside it; the discount is spread over the pieces to reach it
   function applyFinal() {
     const h = $("bfinalhint"), T = Number(String($("bfinal").value).replace(/[^0-9]/g, "")) || 0, s = settings(), pct = s.gst == null ? 3 : Number(s.gst);
@@ -772,7 +820,7 @@
     $("bFl").textContent = allOwn ? "Gold Rate per g, 24K (from the tag)" : c.rows.some(r => r.orderRate || r.rateEdited) ? "Today's gold rate (F) per g, 24K - for pieces without a rate on the tag" : "Gold Rate (F) per g, 24K";
     $("bgstl").textContent = "GST " + c.gstPct + "%"; $("bgst").textContent = has ? fmt(c.gst) : "—"; $("btotal").textContent = has ? fmt(c.total) : "—";
     { const miss = B.designs.map((d, i) => ({ i, bad: designBad(d) })).filter(x => x.bad.length && (num(B.designs[x.i].net) > 0 || B.designs[x.i].dias.length)); const bm = $("bmsg"); if (bm && (miss.length || /^New design/.test(bm.textContent))) bm.textContent = miss.map(x => "New design " + (x.i + 1) + ": check " + x.bad.join(", ")).join(". "); }
-    $("bnote").textContent = !ok ? "Type the gold rate (F): fine 24K per gram." : (B.option ? "Diamonds priced as " + OPT_NAMES[B.option] + " (default rates). " : "") + noteText(B.mode, c.rows, B.g2g) + "Diamond rates come from the tag; change them here for this bill if needed." + (c.rows.some(r => r.orderRate) ? " Pieces with a gold rate on their tag are billed at that rate; F is used only for pieces without one." : "") + " Each piece's gold rate can be changed in its Gold cell.";
+    $("bnote").textContent = !ok ? "Type the gold rate (F): fine 24K per gram." : (B.option ? "Diamonds priced as " + optName(B) + (B.option === "own" ? (num(B.own && B.own.rate) > 0 ? " @ Rs " + num(B.own.rate).toLocaleString("en-IN") + "/ct. " : " - type its rate per ct. ") : " (default rates). ") : "") + noteText(B.mode, c.rows, B.g2g) + "Diamond rates come from the tag; change them here for this bill if needed." + (c.rows.some(r => r.orderRate) ? " Pieces with a gold rate on their tag are billed at that rate; F is used only for pieces without one." : "") + " Each piece's gold rate can be changed in its Gold cell.";
   }
   async function dataUrl(src) { const r = await fetch(src, { credentials: "same-origin" }); if (!r.ok) throw new Error("img"); const b = await r.blob(); return await new Promise((res, rej) => { const f = new FileReader(); f.onload = () => res(f.result); f.onerror = rej; f.readAsDataURL(b); }); }
   // photo for the PDF: drawn onto a small canvas and saved as JPEG, so PNG / WebP photos work too
@@ -786,6 +834,7 @@
     const sh = ({ round: "R", choki: "C", fancy: "F", solitaire: "S", polki: "P" })[String(d.shape || "").trim().toLowerCase()] || (d.shape ? String(d.shape).trim().slice(0, 1).toUpperCase() : "");
     let q = q0.replace(/\b(cvd|lgd|lab[- ]?grown|lab)\b/ig, "").replace(/\s+/g, " ").trim().replace(/^[- ]+|[- ]+$/g, "");
     q = q.replace(/^(.*?)[- ]([D-N]{1,2})$/i, "$1 $2");
+    if (!party && b && b.option === "own" && d.shape !== "Polki" && !NON_DIAMOND.test(q0 + " " + String(d.code || ""))) return [/cvd|lab|lgd|\blg\b/i.test(String(b.ownQ || "")) ? "LG" : "N", sh, String(b.ownQ || "").replace(/\b(cvd|lgd|lab[- ]?grown|lab)\b/ig, "").trim()].filter(Boolean).join(" ");
     if (!party && b && ({ gh: 1, ij: 1, fg: 1 })[b.option] && d.shape !== "Polki" && !NON_DIAMOND.test(q0 + " " + String(d.code || ""))) return ["N", sh, ({ gh: "VS GH", ij: "VS IJ", fg: "VVS FG" })[b.option]].filter(Boolean).join(" "); // diamonds choice decides the quality shown
     return [party ? "Party" : lab ? "LG" : "N", sh, party ? "" : q].filter(Boolean).join(" ");
   }
@@ -819,13 +868,33 @@
     if (b.usd) tot(`In US$ (approx., at Rs ${Number(b.usd).toFixed(2)} per US$)`, "US$ " + Math.round(b.total / b.usd).toLocaleString("en-US"));
     y += 2; doc.setFont("helvetica", "bold"); doc.setFontSize(10.5); doc.setTextColor(20); doc.text("Above are approximate estimates. Actual may vary when the final product is ready.", M, y); y += 8;
     doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(80);
-    const notes = ["All diamonds are third-party certified (IGI / EGL / TGL) and all gold is BIS HUID hallmarked.", b.option ? "Diamonds: " + (OPT_NAMES[b.option] || b.option) + "." : "", b.usd ? "US dollar figures are indicative only; billing is in Indian rupees." : ""].filter(Boolean);
+    const notes = ["All diamonds are third-party certified (IGI / EGL / TGL) and all gold is BIS HUID hallmarked.", b.option ? "Diamonds: " + (optName(b) || b.option) + "." : "", b.usd ? "US dollar figures are indicative only; billing is in Indian rupees." : ""].filter(Boolean);
     doc.text(doc.splitTextToSize(notes.join(" "), W - 2 * M), M, y);
-    return doc.output("blob");
+    return into ? into : doc.output("blob");
   }
-  async function makePdf(b, photos, summ) {
-    if (summ && b.title === "Estimate") return summaryPdf(b); // C-20261101-ESTSUMMARY: estimates only, never bills
-    const { jsPDF } = window.jspdf, doc = new jsPDF({ unit: "mm", format: "a4" });
+  // owner 07/11/2026 16:25 (C-20261107-PRINTALL): many bills printed together, one copy each - by date range and / or the customer typed in the search box;
+  // if bills are ticked in the list, only the ticked ones. One PDF, each bill starting on a new page, sent to the printer once.
+  async function printAll(btn) { const m = $("bbookmsg"), fr = $("bpfrom").value, to = $("bpto").value, ticked = [...document.querySelectorAll("input.bchsel:checked")].map(x => x.dataset.no);
+    const fraw = String(($("bfmob") || {}).value || "").trim(), mob = /[a-z]/i.test(fraw) ? "" : fraw.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""), nm = /[a-z]/i.test(fraw) ? fraw.toLowerCase().replace(/\s*ji$/, "").replace(/\s+/g, " ").trim() : "";
+    if (!ticked.length && !fr && !to && mob.length < 4 && nm.length < 2) { m.textContent = "Choose dates (Print from / to), type a customer above, or tick bills - then Print all."; return; }
+    btn.disabled = true; const t0 = btn.textContent;
+    try { const mo = $("bmonth").value || today().slice(0, 7), all = !!(fr || to || mob.length >= 4 || nm.length >= 2);
+      const r = await fetch("/api/vj/bills?month=" + encodeURIComponent(all ? "all" : mo), { credentials: "same-origin" }), j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+      let L = (j.bills || []).filter(b => b.title === "Bill" && !b.cancelled);
+      if (ticked.length) L = L.filter(b => ticked.includes(b.no)); else {
+        if (fr) L = L.filter(b => String(b.date) >= fr); if (to) L = L.filter(b => String(b.date) <= to);
+        if (mob.length >= 4) L = L.filter(b => String(b.mobile || "").replace(/\D/g, "").includes(mob)); if (nm.length >= 2) L = L.filter(b => String(b.name || "").toLowerCase().replace(/\s+/g, " ").includes(nm)); }
+      L.sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.no).localeCompare(String(b.no)));
+      if (!L.length) { m.textContent = "No bills for that choice."; return; } if (L.length > 60 && !confirm(L.length + " bills will print. Go ahead?")) return;
+      let doc = null; for (let i = 0; i < L.length; i++) { btn.textContent = "Preparing " + (i + 1) + " / " + L.length + "…";
+        const rr = await fetch("/api/vj/bill?no=" + encodeURIComponent(L[i].no), { credentials: "same-origin" }), jj = await rr.json(); if (!rr.ok) throw new Error(L[i].no + ": " + (jj.error || rr.status));
+        if (!doc) { doc = new window.jspdf.jsPDF({ unit: "mm", format: "a4" }); await makePdf(jj.bill, B.photos, false, doc); doc.deletePage(1); } else await makePdf(jj.bill, B.photos, false, doc);
+        if (i < L.length - 1 && doc.getNumberOfPages() % 2 === 1) doc.addPage(); } // owner 16:31: the printer prints both sides - a blank back page so every bill starts on a NEW sheet
+      printBlob(doc.output("blob"), m); m.textContent = L.length + " bill" + (L.length === 1 ? "" : "s") + " (" + L[0].no + (L.length > 1 ? " … " + L[L.length - 1].no : "") + ") sent to the printer, 1 copy each.";
+    } catch (e) { m.textContent = "Could not print all (" + (e.message || e) + ")."; } finally { btn.disabled = false; btn.textContent = t0; } }
+  async function makePdf(b, photos, summ, into) {
+    if (summ && b.title === "Estimate" && !into) return summaryPdf(b); // C-20261101-ESTSUMMARY: estimates only, never bills
+    const { jsPDF } = window.jspdf, doc = into || new jsPDF({ unit: "mm", format: "a4" }); if (into) into.addPage(); // C-20261107-PRINTALL: several bills in one PDF
     const W = 210, M = 14; let y = 14;
     y += 6; // owner 16/10/2026 19:31: no company name, logo or address on bills / estimates
     doc.setTextColor(20); doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.text(b.title, M, y);
@@ -873,7 +942,7 @@
     if (b.usd) tot(`In US$ (approx., at Rs ${Number(b.usd).toFixed(2)} per US$)`, "US$ " + Math.round(b.total / b.usd).toLocaleString("en-US")); // C-20261027-ESTBILL
     if (b.title === "Estimate") { y += 2; doc.setFont("helvetica", "bold"); doc.setFontSize(10.5); doc.setTextColor(20); doc.text("Above are approximate estimates. Actual may vary when the final product is ready.", M, y); y += 4; } // owner 27/10 17:29
     y += 4; doc.setFont("helvetica", "normal"); doc.setFontSize(10.5); doc.setTextColor(80);
-    const notes = [noteText(b.mode, b.rows, b.g2g).trim(), "All diamonds are third-party certified (IGI / EGL / TGL) and all gold is BIS HUID hallmarked.", (b.rows || []).some(r => r.ct) ? "Diamond code: N = natural, LG = lab-grown; R = round, C = choki, F = fancy, S = solitaire, P = polki; then quality and colour (e.g. N R VS-SI GH)." : "", b.title === "Estimate" && b.usd ? "US dollar figures are indicative only; billing is in Indian rupees." : b.usd ? "US dollar figures are indicative only." : "", b.option ? "Diamonds priced as " + (OPT_NAMES[b.option] || b.option) + "." : "", b.nbb ? "Sold on a no buy back, no exchange basis." : "", b.ogNo && !b.og ? "Old gold OG no. " + b.ogNo + "." : "",
+    const notes = [noteText(b.mode, b.rows, b.g2g).trim(), "All diamonds are third-party certified (IGI / EGL / TGL) and all gold is BIS HUID hallmarked.", (b.rows || []).some(r => r.ct) ? "Diamond code: N = natural, LG = lab-grown; R = round, C = choki, F = fancy, S = solitaire, P = polki; then quality and colour (e.g. N R VS-SI GH)." : "", b.title === "Estimate" && b.usd ? "US dollar figures are indicative only; billing is in Indian rupees." : b.usd ? "US dollar figures are indicative only." : "", b.option ? "Diamonds priced as " + (OPT_NAMES[b.option] || b.option) + "." : "", b.nbb ? "Sold on a no buy back, no exchange basis." : b.title === "Estimate" ? "" : "Please keep this ORIGINAL bill and the ORIGINAL certificate safely - both are needed for exchange or buy back. Photocopies, photos or soft copies are not accepted." /* owner 09/11 15:11 (F-20261109-EXCHANGE) */, b.ogNo && !b.og ? "Old gold OG no. " + b.ogNo + "." : "",
       b.settled ? `Settled: settlement discount ${fmt(b.settled.discount)} given on ${dmy(String(b.settled.at).slice(0, 10))}` + (b.original ? ` (bill total ${fmt(b.original.total)} reduced to ${fmt(b.total)}, the amount received)` : "") + "." + (b.settled.fineWaived ? ` Fine gold waived ${g3(b.settled.fineWaived)}.` : "") : ""].filter(Boolean); // C-20261017-LEDGER
     doc.text(doc.splitTextToSize(notes.join(" "), W - 2 * M), M, y);
     return doc.output("blob");
@@ -881,9 +950,9 @@
   async function save() {
     const m = $("bmsg"), out = $("bout"); out.hidden = true;
     const body = { no: $("bno").value.trim(), name: (n => n && !/ji$/i.test(n) ? n + " ji" : n)($("bname").value.trim().slice(0, 57)) /* owner 26/10 18:45: 'ji' added on the bill automatically (Prachi -> Prachi ji) */, city: $("bcity").value.trim(), mobile: $("bmob").value.trim().slice(0, 20), addr: $("baddr").value.trim().slice(0, 160), area: $("barea").value.trim().slice(0, 80), state: $("bstate").value.trim().slice(0, 40), pin: $("bpin").value.replace(/\s/g, "").slice(0, 6), /* C-20261102-BILLADDR */
-      date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, g2g: B.g2g, title: B.title, nbb: !!B.nbb, ids: B.items.slice(), disc: Object.assign({}, B.disc), rates: JSON.parse(JSON.stringify(B.rates)), frates: Object.assign({}, B.frates), prates: Object.assign({}, B.prates), pdrates: Object.assign({}, B.pdrates), mkamt: Object.assign({}, B.mkamt), og: ogNow(), final: B.final || 0, edit: B.editNo || "", fromEst: B.title === "Bill" && !B.editNo ? B.fromEst || "" : "", option: B.option || "", usd: B.usd || 0, cust: B.cust || "",
+      date: $("bdate").value, F: F(), mode: B.mode, settle: B.settle, g2g: B.g2g, title: B.title, nbb: !!B.nbb, ids: B.items.slice(), disc: Object.assign({}, B.disc), rates: JSON.parse(JSON.stringify(B.rates)), quals: JSON.parse(JSON.stringify(B.quals)), oth: Object.assign({}, B.oth), frates: Object.assign({}, B.frates), prates: Object.assign({}, B.prates), pdrates: Object.assign({}, B.pdrates), mkamt: Object.assign({}, B.mkamt), og: ogNow(), final: B.final || 0, edit: B.editNo || "", fromEst: B.title === "Bill" && !B.editNo ? B.fromEst || "" : "", option: B.option || "", ...(B.option === "own" ? { ownQ: (B.own && B.own.q) || "", ownRate: num(B.own && B.own.rate), ownFancy: num(B.own && B.own.fancy) } : {}), usd: B.usd || 0, cust: B.cust || "", rev: B.title === "Estimate" && B.revOf ? B.revOf : "" /* C-20261105-ESTREOPEN */,
       designs: B.designs.map(d => { const v = vtags()[B.designs.indexOf(d)]; return { desc: v.label, k: d.k, net: v.gold[0].net, tunch: v.gold[0].tunch || 0, dias: v.dias, ppcs: v.polki ? v.polki.pcs : 0, prate: v.polki ? v.polki.rate : 300, other: v.other ? v.other.amt : 0 }; }) }; // C-20261027-ESTBILL
-    body.ogNo = $("bogno").value.trim().slice(0, 20); // C-20261101-OGREG (owner 15:00: optional - the party may give the gold later)
+    body.ogNo = $("bogno").value.trim().slice(0, 80); // C-20261101-OGREG (owner 15:00: optional - the party may give the gold later)
     if (!body.name) { m.textContent = "Enter the customer's name."; return; }
     let dg = body.mobile.replace(/\D/g, ""); if (dg.length === 12 && dg.startsWith("91")) dg = dg.slice(2); // phone copy like "+91 98xxx xxxxx" is fine
     const mobNote = body.mobile && !/^[6-9]\d{9}$/.test(dg) ? ` Note: the mobile has ${dg.replace(/^91/, "").length} digits after +91 (a mobile usually has 10) - saved as typed.` : "";
@@ -902,8 +971,9 @@
       const file = new File([blob], fname, { type: "application/pdf" }), url = URL.createObjectURL(file);
       loadBook(); m.textContent = j.estimate ? `Estimate ${b.no} made: ${fmt(b.total)}. It is NOT saved as a bill - download or send the PDF now (no copy is kept). Only the name and number are kept for the follow-up: ${({ mihir: "Mihir", shilpi: "Shilpi ji", abhinav: "Abhinav" })[b.cust] || "the owner"} gets a WhatsApp reminder in 2 days.` + mobNote
         : `${b.title} ${b.no} saved: ${fmt(b.total)}${b.fine ? " + " + g3(b.fine) + " fine gold" : ""}.` + mobNote; // C-20261028-ESTNOTBILL
+      if (j.revised) { m.textContent = `Estimate ${j.revised} revised → ${b.no} (${fmt(b.total)}); ${j.revised} is kept, marked revised. The follow-up reminder moved to ${b.no}.` + mobNote; B.revOf = b.no; { const n = $("beditnote"); if (n) { n.hidden = false; n.textContent = `Now showing ${b.no}. Change again and save = the next revision; Clear = a fresh estimate.`; } } } /* C-20261105-ESTREOPEN */
       if (B.fromEst && b.title === "Bill") { m.textContent += " Estimate " + B.fromEst + " marked Converted → " + b.no + "."; B.fromEst = ""; loadEst(); } /* C-20261104-SAVEBILLFIX */
-      if (j.estimate) { await estSend(b, blob, m, out); $("bsave").disabled = false; return; } // owner 29/10 12:44: estimate = one button, straight to my WhatsApp
+      if (j.estimate) { await estSend(b, blob, m, out); if (j.revised) m.textContent = `Revised ${j.revised} → ${b.no} (${j.revised} kept, follow-up moved to ${b.no}). ` + m.textContent; $("bsave").disabled = false; return; } // owner 29/10 12:44: estimate = one button, straight to my WhatsApp
       out.textContent = ""; out.hidden = false;
       const op = document.createElement("a"); op.className = "btn"; op.href = url; op.target = "_blank"; op.rel = "noopener"; op.textContent = "Open PDF (print)";
       const dl = document.createElement("a"); dl.className = "btn ghost"; dl.href = url; dl.download = fname; dl.textContent = "Download";
@@ -1046,23 +1116,26 @@
     b.addEventListener("click", () => { const on = f.style.display === "none"; f.style.display = on ? "flex" : "none"; vcVendors(); if (on) v.focus(); });
     // 2. owner tab
     if (!vcOwner()) return;
-    const nav = document.querySelector("nav"), tb = vcEl("button", { id: "t-vchain", textContent: "Sundry Creditors" }); /* C-20261103-SUNDRY (owner 17:47): was "Chains (vendors)" - vendor chains now; the purchase register (diamonds / other vendors) comes here after Diwali */ tb.setAttribute("role", "tab"); tb.dataset.tab = "vchain"; tb.setAttribute("aria-selected", "false");
+    const nav = document.querySelector("nav"), tb = vcEl("button", { id: "t-vchain", textContent: "Sundry Creditors" }); /* 04/11 17:02 C-20261104-CASHBOOKOFF: only two registers inside (Chains, Colour stones / malas) + Tally check; accounts and payments are in Tally */ /* C-20261103-SUNDRY (owner 17:47): was "Chains (vendors)" - vendor chains now; the purchase register (diamonds / other vendors) comes here after Diwali */ tb.setAttribute("role", "tab"); tb.dataset.tab = "vchain"; tb.setAttribute("aria-selected", "false");
     const place = () => { const after = nav.querySelector('[data-tab="bill"]'); if (after && after.nextSibling !== tb) after.after(tb); else if (!after && !tb.parentNode) nav.append(tb); };
     place(); setTimeout(place, 1600); setTimeout(place, 5200);
     const sec = vcEl("section", { id: "p-vchain", className: "card", hidden: true });
     const fv = vcEl("select", { id: "vcfv" }), fs = vcEl("input", { type: "checkbox", id: "vcfs" }); fs.style.width = "auto";
     const fsl = vcEl("label", {}, [fs, " Show removed"]); fsl.style.cssText = "flex-direction:row;align-items:center;gap:6px";
-    const row = vcEl("div", { className: "row" }, [vcLab("Vendor", fv), fsl, vcEl("button", { type: "button", className: "btn ghost", textContent: "Refresh", onclick: () => vcList() })]); row.style.cssText = "align-items:end;gap:8px";
+    const vreg = vcEl("select", { id: "vcreg" }); [["chain", "Register: Chains"], ["cs", "Register: Colour stones / malas"], ["tally", "Tally check (payable vs Tally)"], ["out", "To Tally outbox (bills + purchases)"]].forEach(([v, l]) => vreg.append(vcEl("option", { value: v, textContent: l })));
+    const fm = vcEl("input", { type: "month", id: "vcfm" }), crx = vcEl("select", { id: "vcx" }); [["", "Export…"], ["xlsx", "Excel (vendor + month chosen)"], ["pdf", "PDF (vendor + month chosen)"]].forEach(([v, l]) => crx.append(vcEl("option", { value: v, textContent: l })));
+    crx.addEventListener("change", () => { const v = crx.value; crx.value = ""; if (v) vcReg(v); });
+    const row = vcEl("div", { className: "row" }, [vcLab("Register", vreg), vcLab("Vendor", fv), vcLab("Month", fm), fsl, crx, vcEl("button", { type: "button", className: "btn ghost", textContent: "Refresh", onclick: () => vcList() })]); row.style.cssText = "align-items:end;gap:8px";
     const t = vcEl("table", { className: "items" }); t.style.minWidth = "900px";
     t.innerHTML = "<thead><tr><th></th><th>Chain</th><th>Vendor</th><th>Received</th><th>Gold</th><th>Sale tunch</th><th>Purchase tunch</th><th>Purchase rate 24K/g</th><th>Purchase amount</th><th>Sold on</th><th>Status</th></tr></thead>";
     t.append(vcEl("tbody", { id: "vcrows" }));
-    sec.append(vcEl("h2", { textContent: "Sundry Creditors" }), vcEl("div", { id: "vcpay" }), vcEl("h3", { textContent: "Vendor chains", style: "margin:12px 0 4px" }), vcEl("p", { className: "hint", textContent: "Every chain tagged with a vendor name (New tag > Chain > Vendor), sold on a bill or used in a karigar piece. Chains with no vendor are the karigar's / own and are not listed. Tally the vendor's bill with the totals; after the entry in Tally, tick the chains and remove them." }),
-      row, vcEl("div", { className: "list" }, [t]), vcEl("p", { className: "hint", id: "vcsum" }),
+    sec.append(vcEl("h2", { textContent: "Sundry Creditors" }), vcEl("div", { id: "vcpay" }), vcEl("h3", { id: "vch3", textContent: "Vendor chains and chain parts", style: "margin:12px 0 4px" }), vcEl("p", { className: "hint", id: "vchint", textContent: "Every chain tagged with a vendor name (New tag > Chain > Vendor), sold on a bill or used in a karigar piece. Chains with no vendor are the karigar's / own and are not listed. Tally the vendor's bill with the totals; after the entry in Tally, tick the chains and remove them." }),
+      row, vcEl("div", { className: "list", id: "vcwrap" }, [t]), vcEl("div", { id: "vccs" }), vcEl("p", { className: "hint", id: "vcsum" }),
       vcEl("button", { type: "button", className: "btn", id: "vcdone", textContent: "Entered in Tally - remove ticked", onclick: vcDone }), vcEl("span", { className: "hint", id: "vcdmsg" }));
     $("p-rates").parentNode.insertBefore(sec, $("p-rates"));
     nav.addEventListener("click", e => { const x = e.target.closest("button"); if (!x || !nav.contains(x)) return; const on = x === tb; sec.hidden = !on;
       if (on) { document.querySelectorAll('[id^="p-"]').forEach(p => { if (p !== sec) p.hidden = true; }); nav.querySelectorAll("button").forEach(y => y.setAttribute("aria-selected", y === tb ? "true" : "false")); vcList(); window.scrollTo({ top: 0 }); } });
-    [fv, fs].forEach(x => x.addEventListener("change", () => vcList()));
+    [fv, fs, fm].forEach(x => x.addEventListener("change", () => vcList())); vreg.addEventListener("change", () => vcList());
     setInterval(() => { if (!document.hidden && !sec.hidden && !(document.activeElement && document.activeElement.closest && document.activeElement.closest("#vcrows"))) vcList(true); }, 20000);
   }
   async function vcAdd() {
@@ -1095,10 +1168,48 @@
     $("vcgo").disabled = false;
   }
   async function vcSet(t, ch) { const db = await window.claude.use("db"), a = Object.assign({}, t.approval, ch); await db.doc("tags/" + t.id).update({ approval: a }); t.approval = a; }
+  // C-20261104-CASHBOOKOFF (owner 17:02): register 2 (colour stones / malas from a vendor) and the Tally check come from the server
+  // owner 17:03 / 17:04: To Tally outbox - sales bills (narration with design no. + tag) and creditor purchases, Pending / Sent / Failed + Tally voucher no.
+  async function vcOut(box) { const r = await fetch("/api/vj/tally-outbox?view=screen", { credentials: "same-origin", cache: "no-store" }), j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+    box.textContent = ""; const fs = vcEl("select"); [["", "All (" + (j.rows.length) + ")"], ["pending", "Pending (" + (j.count.pending || 0) + ")"], ["sent", "Sent (" + (j.count.sent || 0) + ")"], ["failed", "Failed (" + (j.count.failed || 0) + ")"]].concat(j.count.void ? [["void", "Cancelled before sending (" + j.count.void + ")"]] : []).forEach(([v, l]) => fs.append(vcEl("option", { value: v, textContent: l })));
+    const fk = vcEl("select"); [["", "Rupee + gold"], ["rs", "Rupee vouchers (bills, purchases)"], ["g", "Gold vouchers (grams)"]].forEach(([v, l]) => fk.append(vcEl("option", { value: v, textContent: l }))); const TY = { gold_og: "Gold OG (Receipt)", gold_issue: "Gold issue (Payment)", gold_stock: "Gold to stock (Payment)" };
+    const t = vcEl("table", { className: "items" }), hd = vcEl("tr"), bd = vcEl("tbody"); t.style.minWidth = "0"; t.style.width = "100%"; ["Date", "Type", "Ledger (Dr / Cr)", "Amount", "Narration", "Status", "Tally voucher"].forEach(h => hd.append(vcEl("th", { textContent: h }))); t.append(vcEl("thead", {}, [hd]), bd);
+    const draw = () => { bd.textContent = ""; const R = j.rows.filter(x => (!fs.value || x.status === fs.value) && (!fk.value || (fk.value === "g") === (x.unit === "g"))); R.slice(0, 500).forEach(x => { const tr = vcEl("tr");
+        [dmy(x.date || ""), TY[x.type] || x.type, x.dr ? "Dr " + x.dr + " / Cr " + x.cr : x.ledger, x.unit === "g" ? Number(x.amount).toFixed(3) + " g" : Math.round(x.amount).toLocaleString("en-IN"), x.narr, x.status === "sent" ? "Sent" : x.status === "failed" ? "Failed" : x.status === "void" ? "Cancelled" : "Pending", x.vno || (x.err ? x.err : "")].forEach((c, i) => tr.append(vcEl("td", { textContent: c, style: (i === 3 ? "text-align:right;" : "") + (i === 4 ? "white-space:normal;min-width:220px;" : "") + (i === 5 && x.status === "failed" ? "color:var(--bad);font-weight:700" : "") })));
+        if (x.status === "failed") { const b = vcEl("button", { type: "button", className: "btn ghost", textContent: "Retry", onclick: async () => { const q = await fetch("/api/vj/tally-outbox", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "retry", src: x.src }) }); if (q.ok) vcSrv("out"); } }); tr.lastChild.append(" ", b); }
+        bd.append(tr); }); if (!R.length) bd.append(vcEl("tr", {}, [vcEl("td", { textContent: "Nothing here." })])); };
+    fs.addEventListener("change", draw); fk.addEventListener("change", draw); draw();
+    box.append(vcEl("div", { className: "row" }, [vcLab("Show", fs), vcLab("Kind", fk)]), vcEl("div", { className: "list" }, [t]), vcEl("p", { className: "hint", textContent: (j.bridge ? "" : "Tally bridge not connected yet - everything waits as Pending. ") + "Each bill / purchase / gold entry goes to Tally only once. Gold vouchers carry fine grams as the amount." })); }
+  // the gold ledgers in his Tally (owner 04/11, Gold Fine Showroom export) - offered as a drop-down, still typeable
+  const VC_TG = ["Gold Fine Showroom", "Gold Old Gold", "Gold Montu", "Gold Hiru", "G Badshah", "Gold Nr", "Gold Aa Home", "Gold Refinery", "Gold Safe", "Gold Sold", "Gold in Payment(Gm)", "Gold Priyank", "Gold Priyank Mounting", "Chain Siddharth Creditor Fine Gold", "Chain Arun Creditor Fine Gold", "Nanu Bhai Gold", "Profit From Old Gold", "Gold Profit", "Reconciled"];
+  async function vcSrv(reg) { const box = $("vccs"), fv = $("vcfv"), cur = fv.value; box.textContent = "Loading…";
+    try { if (reg === "out") { await vcOut(box); return; } const q = reg === "tally" ? "?view=tally" : "?reg=cs&vendor=" + encodeURIComponent(cur) + "&month=" + encodeURIComponent($("vcfm").value || ""), r = await fetch("/api/vj/chainreg" + q, { credentials: "same-origin", cache: "no-store" }), j = await r.json(); if (!r.ok) throw new Error(j.error || r.status);
+      box.textContent = ""; const t = vcEl("table", { className: "items" }), hd = vcEl("tr"), bd = vcEl("tbody"); t.style.minWidth = "0"; t.style.width = "100%";
+      const H = reg === "tally" ? ["Vendor", "Tally ledger", "Payable (VJ Tags)", "Paid (from Tally)", "Balance", "Tally ledger balance", "Difference"] : ["Date", "Vendor", "Karigar entry", "Design", "Item", "Wt", "Pcs", "Rate", "Amount payable"];
+      H.forEach(h => hd.append(vcEl("th", { textContent: h }))); t.append(vcEl("thead", {}, [hd]), bd); const n0 = v => v ? Math.round(v).toLocaleString("en-IN") : "";
+      const tr = (cells, bold, warn) => { const x = vcEl("tr"); cells.forEach((c, i) => x.append(vcEl("td", { textContent: c == null ? "" : String(c), style: (i >= (reg === "tally" ? 2 : 5) ? "text-align:right;" : "") + (bold ? "font-weight:700;" : "") + (warn && i === cells.length - 1 ? "color:var(--bad);font-weight:700" : "") }))); bd.append(x); };
+      if (reg === "tally") { j.rows.forEach(x => tr([x.vendor, x.ledger, n0(x.payable), n0(x.paid), n0(x.balance), x.tallyBal == null ? "not synced" : n0(x.tallyBal), x.diff == null ? "" : n0(x.diff)], false, x.diff)); if (!j.rows.length) tr(["Nothing payable yet."]);
+        // C-20261104-TALLYGOLD: gold check (grams) - VJ Tags fine in hand vs Tally "Gold Fine Showroom", each karigar's gold vs his Tally gold ledger
+        const gt = vcEl("table", { className: "items" }), gh = vcEl("tr"), gb = vcEl("tbody"); gt.style.minWidth = "0"; gt.style.width = "100%"; ["Gold (grams)", "Tally ledger", "VJ Tags", "Tally", "Difference"].forEach(h => gh.append(vcEl("th", { textContent: h }))); gt.append(vcEl("thead", {}, [gh]), gb);
+        (j.gold || []).forEach(x => { const r = vcEl("tr"); [x.what, x.ledger, x.vj.toFixed(3), x.tally == null ? "not synced" : Number(x.tally).toFixed(3), x.diff == null ? "" : x.diff.toFixed(3)].forEach((c, i) => r.append(vcEl("td", { textContent: c, style: (i >= 2 ? "text-align:right;" : "") + (i === 4 && x.diff ? "color:var(--bad);font-weight:700" : "") }))); gb.append(r); });
+        const nm = vcEl("div", { hidden: true }), ed = vcEl("button", { type: "button", className: "btn ghost", textContent: "Tally ledger names", onclick: () => { if (!nm.hidden) { nm.hidden = true; return; } nm.textContent = ""; nm.hidden = false;
+            const K = [["gold:showroom", "Gold - showroom (fine in hand)", (j.gold || [])[0] ? j.gold[0].ledger : "Gold Fine Showroom"], ["gold:og", "OG from a party (Cr)", j.ogLedger], ["gold:own", "OG own gold / own piece (Cr)", (j.ownLedgers || [])[0]], ["gold:home", "OG own gold marked 'home' (Cr)", (j.ownLedgers || [])[1]], ["gold:refinery", "OG refinery gold (Cr)", (j.ownLedgers || [])[2] || "Gold Refinery"], ["gold:stock", "OG gold moved to our stock (Dr)", (j.ownLedgers || [])[3] || "Gold Aa Home"]].concat((j.ogVendors || []).map(([v, l]) => ["gold:v:" + v, "OG bought from " + v + " (Cr)", l]),(j.gold || []).slice(1).map(x => [x.key, x.what.replace("Gold with ", "Karigar gold - "), x.ledger]), j.rows.map(x => [x.vendor, "Vendor - " + x.vendor, x.ledger]));
+            const it = vcEl("table", { className: "items" }), ib = vcEl("tbody"); it.style.minWidth = "0"; it.style.width = "100%"; it.append(ib);
+            K.forEach(([k, l, v]) => { const r = vcEl("tr"), inp = vcEl("input", { value: v || "", style: "width:100%" }); if (String(k).startsWith("gold:")) inp.setAttribute("list", "vctgl"); inp.dataset.k = k; r.append(vcEl("td", { textContent: l }), vcEl("td", {}, [inp])); ib.append(r); });
+            const sv = vcEl("button", { type: "button", className: "btn", textContent: "Save names", onclick: async () => { const m = Object.assign({}, j.map); it.querySelectorAll("input").forEach(i => { if (i.value.trim()) m[i.dataset.k] = i.value.trim(); });
+                const r2 = await fetch("/api/vj/chainreg", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ op: "map", map: m }) }); if (r2.ok) vcSrv("tally"); else sv.textContent = "Not saved - try again"; } });
+            const dl = vcEl("datalist", { id: "vctgl" }); VC_TG.forEach(n => dl.append(vcEl("option", { value: n }))); nm.append(dl, vcEl("div", { className: "list" }, [it]), sv); } });
+        box.append(vcEl("h3", { textContent: "Rupees (Sundry Creditors)", style: "margin:8px 0 4px" }));
+        box.append(vcEl("div", { className: "list" }, [t]), vcEl("p", { className: "hint", textContent: (j.bridge ? "" : "Tally bridge not connected yet - Paid and Tally balance fill in by themselves once it is. ") + "Payments come back from Tally; bills, purchases and gold go to Tally through the To Tally outbox." }), vcEl("h3", { textContent: "Gold (fine grams)", style: "margin:12px 0 4px" }), vcEl("div", { className: "list" }, [gt]), ed, nm); return; }
+      j.rows.forEach(x => tr([dmy(x.date || ""), x.vendor, x.ref, x.design, x.item, x.wt === "" ? "" : x.wt + " " + x.unit, x.pcs, n0(x.rate), n0(x.amount)])); if (!j.rows.length) tr(["No colour stones / malas from a vendor for this filter."]);
+      Object.entries(j.tot).forEach(([v, s]) => tr(["TOTAL", v + " (" + s.n + ")", "", "", "", "", "", "Paid " + n0(s.paid) + " · Bal " + n0(s.balance), n0(s.amount)], true));
+      box.append(vcEl("div", { className: "list" }, [t])); } catch (e) { box.textContent = "Could not load (" + (e.message || e) + ")."; } }
   function vcList(quiet) {
-    const body = $("vcrows"); if (!body) return; vcPayLoad(!quiet); const fv = $("vcfv"), cur = fv.value, vs = vcVendors();
+    const body = $("vcrows"); if (!body) return; const vrg = ($("vcreg") || {}).value || "chain";
+    ["vcwrap", "vcsum", "vcdone", "vcpay", "vcfs", "vchint"].forEach(i => { const e = $(i); if (e) (i === "vcfs" ? e.parentNode : e).style.display = vrg === "chain" ? "" : "none"; }); ["vcfv", "vcfm", "vcx"].forEach(i => { const e = $(i); if (e) (i === "vcx" ? e : e.parentNode).style.display = vrg === "tally" || vrg === "out" ? "none" : ""; }); $("vch3").textContent = vrg === "chain" ? "Vendor chains and chain parts" : vrg === "cs" ? "Colour stones / malas from vendors" : vrg === "out" ? "To Tally outbox" : "Tally check";
+    if (vrg !== "chain") { vcSrv(vrg); return; } $("vccs").textContent = ""; vcPayLoad(!quiet); const fv = $("vcfv"), cur = fv.value, vs = vcVendors();
     fv.textContent = ""; fv.append(vcEl("option", { value: "", textContent: "All vendors" })); vs.forEach(x => fv.append(vcEl("option", { value: x, textContent: x, selected: x === cur })));
-    const showOld = $("vcfs").checked, L = vcTags().filter(t => (!cur || t.approval.vendor === cur) && (showOld || !t.approval.settled))
+    const showOld = $("vcfs").checked, mon = ($("vcfm") || {}).value || "", L = vcTags().filter(t => (!cur || t.approval.vendor === cur) && (showOld || !t.approval.settled) && (!mon || String(t.approval.at || "").slice(0, 7) === mon))
       .sort((a, b) => String(a.approval.vendor).localeCompare(String(b.approval.vendor)) || String(a.approval.at).localeCompare(String(b.approval.at)));
     body.textContent = ""; const tot = {};
     L.forEach(t => { const a = t.approval, g = (t.gold || [])[0] || {}, net = Number(g.net) || 0, tn = Number(g.tunch) || 0, pt = Number(a.pTunch) || tn, pr = Number(a.pRate) || 0, fine = vcR3(net * pt), amt = Math.round(net * pt * pr);
@@ -1113,7 +1224,7 @@
       const st = td(done ? "Removed " + (a.settledAt ? dmy(String(a.settledAt).slice(0, 10)) : "") : sold ? (t.sold.ko ? "Used in piece" : "Sold") : "With us"); if (!done && sold) st.style.fontWeight = "600";
       if (!done) { const s = tot[a.vendor] = tot[a.vendor] || { n: 0, g: 0, f: 0, a: 0 }; s.n++; s.g += net; s.f += fine; s.a += amt; }
       body.append(tr); });
-    VC.pay.filter(x => (!cur || x.vendor === cur) && (showOld || !x.settled)).forEach(x => { const tr = document.createElement("tr"), td = v => { const e = document.createElement("td"); if (v instanceof Node) e.append(v); else e.textContent = v; tr.append(e); return e; }; /* CHAINVEND: a part typed in a karigar receive */
+    VC.pay.filter(x => (!cur || x.vendor === cur) && (showOld || !x.settled) && (!mon || String(x.date || "").slice(0, 7) === mon)).forEach(x => { const tr = document.createElement("tr"), td = v => { const e = document.createElement("td"); if (v instanceof Node) e.append(v); else e.textContent = v; tr.append(e); return e; }; /* CHAINVEND: a part typed in a karigar receive */
       const cb = vcEl("input", { type: "checkbox" }); cb.style.width = "auto"; cb.dataset.pay = x.id; td(x.settled ? "" : cb);
       td(x.part + " · " + x.karigar + " " + x.no); td(x.vendor); td(x.date ? dmy(x.date) : ""); td(Number(x.net).toFixed(3) + " g"); td(Number(x.tunch).toFixed(3)); td(Number(x.tunch).toFixed(3)); td(x.rate ? fmt(x.rate) : "no rate");
       td((x.rate ? fmt(x.amt) : "-") + " (fine " + Number(x.fine).toFixed(3) + " g)"); td("Karigar order " + x.karigar + " " + x.no + (x.date ? " · " + dmy(x.date) : "") + (x.cancelled ? " (order cancelled)" : ""));
@@ -1128,6 +1239,18 @@
     const ks = Object.keys(tot); $("vcsum").textContent = !L.length && !VC.pay.length ? "No vendor chains." : ks.length ? ks.map(v => `${v}: ${tot[v].n} chain${tot[v].n > 1 ? "s" : ""}, ${tot[v].g.toFixed(3)} g, fine ${tot[v].f.toFixed(3)} g, ${fmt(tot[v].a)}`).join("  |  ") : "All removed.";
     if (!quiet) { $("vcdmsg").textContent = ""; VC.arm = false; $("vcdone").textContent = "Entered in Tally - remove ticked"; }
   }
+  // C-20261104-CASHBOOKOFF (owner 16:55): Chain register export - every vendor chain / chain part, payable to vendor, vendor totals (server /api/vj/chainreg)
+  async function vcReg(kind) { const rg = ($("vcreg") || {}).value === "cs" ? "cs" : "chain", q = "?reg=" + rg + "&vendor=" + encodeURIComponent($("vcfv").value || "") + "&month=" + encodeURIComponent(($("vcfm") || {}).value || ""), m = $("vcdmsg");
+    try { if (kind === "xlsx") { const r = await fetch("/api/vj/chainreg.xlsx" + q, { credentials: "same-origin" }); if (!r.ok) throw new Error(r.status); const u = URL.createObjectURL(await r.blob()), a = vcEl("a", { href: u, download: "VJ_Chain_Register.xlsx" }); document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(u); a.remove(); }, 3000); return; }
+      const r = await fetch("/api/vj/chainreg" + q, { credentials: "same-origin", cache: "no-store" }), j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); if (!window.jspdf) throw new Error("PDF maker not loaded");
+      const doc = new window.jspdf.jsPDF({ unit: "mm", format: "a4", orientation: "landscape" }); let y = 14; const X = [10, 30, 60, 125, 150, 165, 185, 205, 228, 250, 287], P = (s, i, b) => { doc.setFont("helvetica", b ? "bold" : "normal"); doc.setFontSize(8); doc.text(String(s == null ? "" : s), X[i], y, i >= 5 ? { align: "right" } : undefined); };
+      doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text((rg === "cs" ? "Colour stones / malas" : "Chain register") + (($("vcfm") || {}).value ? " - " + $("vcfm").value : "") + ($("vcfv").value ? " - " + $("vcfv").value : ""), 10, y); y += 8;
+      ["Date", "Vendor", "Karigar entry / tag", "Design", "KT", "Wt g", "Tunch", "Fine g", "Rate", "Amount", "Payable"].forEach((h, i) => P(h, i, 1)); y += 5;
+      const nl = () => { y += 5; if (y > 200) { doc.addPage(); y = 14; } }, n0 = v => v ? Math.round(v).toLocaleString("en-IN") : "";
+      if (rg === "cs") { ["Date", "Vendor", "Karigar entry", "Design", "Item", "Wt", "Pcs", "", "Rate", "Amount", "Payable"].forEach((h, i) => P(h, i, 1)); nl(); j.rows.forEach(x => { [dmy(x.date || ""), x.vendor, String(x.ref).slice(0, 40), String(x.design).slice(0, 14), String(x.item).slice(0, 12), x.wt === "" ? "" : x.wt + " " + x.unit, x.pcs, "", n0(x.rate), n0(x.amount), n0(x.payable)].forEach((v, i) => P(v, i)); nl(); }); }
+      else j.rows.forEach(x => { [dmy(x.date || ""), x.vendor, String(x.ref).slice(0, 40), String(x.design).slice(0, 14), x.kt, x.wt.toFixed(3), x.tunch, x.fine.toFixed(3), n0(x.rate), n0(x.amount), n0(x.payable) + (x.tally ? " (Tally)" : "")].forEach((v, i) => P(v, i)); nl(); });
+      Object.entries(j.tot).forEach(([v, t]) => { ["TOTAL", v + " (" + t.n + ")", "", "", "", rg === "cs" ? "" : t.wt.toFixed(3), "", rg === "cs" ? "" : t.fine.toFixed(3), "Paid " + n0(t.paid), n0(t.amount), n0(t.payable) + " / bal " + n0(t.balance)].forEach((s, i) => P(s, i, 1)); nl(); });
+      doc.save("VJ_Chain_Register.pdf"); } catch (e) { m.textContent = "Could not export (" + (e.message || e) + ")."; } }
   async function vcDone() {
     const ids = [...document.querySelectorAll("#vcrows input[type=checkbox]:checked")].map(x => x.dataset.id).filter(Boolean), pids = [...document.querySelectorAll("#vcrows input[type=checkbox]:checked")].map(x => x.dataset.pay).filter(Boolean), m = $("vcdmsg");
     if (!ids.length && !pids.length) { m.textContent = "Tick the chains you have entered in Tally."; return; } const nn = ids.length + pids.length;

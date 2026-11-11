@@ -34,7 +34,7 @@ Our guides on [how to read an IGI certificate](/blog/lab-grown-diamond-jewellery
 
 We have certified solitaires in [natural diamond jewellery](/natural-diamond-jewellery) and in [lab-grown diamond jewellery](/lab-grown-diamond-jewellery). Each one is shown with its own report, and each report states its origin clearly. You can also browse our [solitaire rings](/solitaire-rings), with settings in yellow, white and rose gold.
 
-Because we make jewellery in our own manufacturing unit, you can choose a stone and then the setting, band width and gold karat, made to suit your budget. Custom pieces usually take 2 to 4 weeks depending on the design.
+Because we make jewellery in our own manufacturing unit, you can choose a stone and then the setting, band width and gold karat, made to suit your budget. Custom pieces take 4 days to 3 weeks depending on the design.
 
 ## Can I still see the inscription once the stone is set?
 
@@ -44,7 +44,7 @@ Usually, yes. In most solitaire settings the girdle is visible between the prong
 
 - **The BIS HUID hallmark** on the gold of the ring, which you can verify in the BIS Care app.
 - **The invoice:** it should list the report number, the stone details and the gold weight and purity.
-- **After-care:** ask about resizing (charged on actuals) and periodic prong checks.
+- **After-care:** ask about resizing (free for a new piece bought from us) and periodic prong checks.
 
 ## What if I cannot visit Surat?
 

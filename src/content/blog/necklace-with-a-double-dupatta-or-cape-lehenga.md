@@ -41,7 +41,7 @@ Layers of net, organza and embroidered borders can snag jewellery. Before the da
 
 ## Can the jewellery be adjusted for my outfit?
 
-Yes. Because we make every piece in our own manufacturing unit, our team can adjust necklace length, change a clasp, add a sahara chain or shorten a long necklace into a choker-length piece. We can set the gold karat and diamond quality you prefer and make a design to suit your budget. Custom pieces usually take 2 to 4 weeks depending on the design, so bring your outfit or a photo early.
+Yes. Because we make every piece in our own manufacturing unit, our team can adjust necklace length, change a clasp, add a sahara chain or shorten a long necklace into a choker-length piece. We can set the gold karat and diamond quality you prefer and make a design to suit your budget. Custom pieces take 4 days to 3 weeks depending on the design, so bring your outfit or a photo early.
 
 With over 3,000 designs at the showroom, you can try chokers, collars and earrings against your actual drape. Our [bridal jewellery](/bridal-jewellery) and [Polki jewellery](/polki-jewellery) pages show the range.
 

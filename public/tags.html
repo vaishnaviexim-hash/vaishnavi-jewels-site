@@ -311,8 +311,8 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="/tags/shim.js?v=20261104cg"></script>
-<script src="/tags/navsel.js?v=20261104cf" defer></script>
+<script src="/tags/shim.js?v=20261107za"></script>
+<script src="/tags/navsel.js?v=20261107za" defer></script>
 <script src="/tags/boxes.js?v=20261029a" defer></script>
 <script src="/tags/similar.js?v=20261103pf" defer></script>
 <script>
@@ -507,6 +507,7 @@ function readForm(){
 }
 /* ---------- price (Brain F-025 / F-044) ---------- */
 window.VJ_PRICE=t=>{try{const p=price(t);return p&&p.final}catch(e){return 0}}; /* C-20261029-SIMILAR */
+window.VJ_DEFRATE=(sh,q)=>{try{return defRate(sh,q)||0}catch(e){return 0}}; /* C-20261106-RECVPRICE: karigar Received form shows the tag price live */
 /* owner 01/11/2026 13:43 (C-20261101-TAGMAKING): a piece can carry its own making per g (makingPerG, Italian / special pieces); empty = the default 650 / 750 */
 function mkOwn(t){const v=Number(t&&t.makingPerG);return v>=1&&v<=100000?Math.round(v):0}
 function mkDef(gold){const m=st().making,g0=(gold||[]).find(g=>g&&g.net>0&&!(g.tunch>=0.3&&g.tunch<=1.1));return g0?(g0.net>m.limit?m.base:m.small):m.small}window.VJ_MKDEF=mkDef;

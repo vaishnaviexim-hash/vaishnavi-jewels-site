@@ -54,7 +54,7 @@ Velvet outfits are heavy. Jewellery should not add strain over a long evening:
 - Use a sahara chain for long earrings.
 - Check that clasps do not catch on velvet pile or embroidery.
 
-We make jewellery in our own manufacturing unit, so weight, length, clasps and gold karat can be adjusted, and a design can be made to suit your budget. Custom pieces usually take 2 to 4 weeks depending on the design. With over 3,000 designs at the showroom, you can try several looks against your outfit colour.
+We make jewellery in our own manufacturing unit, so weight, length, clasps and gold karat can be adjusted, and a design can be made to suit your budget. Custom pieces take 4 days to 3 weeks depending on the design. With over 3,000 designs at the showroom, you can try several looks against your outfit colour.
 
 Every piece comes with a jewellery grading report from IGI, EGL or TGL, every solitaire is laser-inscribed with its report number that you can verify online, and the gold carries a BIS HUID hallmark you can check in the BIS Care app.
 
