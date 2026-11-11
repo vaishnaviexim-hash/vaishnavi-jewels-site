@@ -3,6 +3,7 @@ import { getCollection } from 'astro:content';
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import SiteHeader from '../../components/SiteHeader.astro';
 import SiteFooter from '../../components/SiteFooter.astro';
+import { LOGO_DARK } from '../../data/images.js';
 
 // Pulls every .md file in src/content/blog/, drops drafts, sorts newest first.
 // This list updates automatically — nothing to maintain by hand when a new
@@ -31,7 +32,10 @@ const description = "Guides on certified diamonds, solitaires, HUID and Polki je
           {posts.map((post) => (
             <a href={`/blog/${post.slug}`} class="card">
               {post.data.heroImage && (
-                <img src={post.data.heroImage} alt={post.data.title} class="card-img" />
+                <span class="vj-photo card-pic">
+                  <img src={post.data.heroImage.replace('w_900', 'w_600')} alt={post.data.heroAlt || post.data.title} class="vj-photo-img card-img" width="600" height="450" loading="lazy" decoding="async" />
+                  <span class="vj-mark sm" aria-hidden="true"><img src={LOGO_DARK} alt="" width="45" height="30" loading="lazy" /></span>
+                </span>
               )}
               <p class="card-date">
                 {post.data.pubDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
@@ -79,13 +83,8 @@ const description = "Guides on certified diamonds, solitaires, HUID and Polki je
   }
   .card:hover { transform: translateY(-3px); box-shadow: var(--shadow-card); border-color: rgba(169, 133, 46, 0.55); }
   .card:hover::before { width: 88px; }
-  .card-img {
-    width: 100%;
-    aspect-ratio: 4 / 3;
-    object-fit: cover;
-    object-position: center 30%;
-    margin-bottom: 16px;
-  }
+  .card-pic { display: block; aspect-ratio: 4 / 3; margin-bottom: 16px; }
+  .card-img { width: 100%; height: 100%; object-fit: cover; object-position: center 22%; }
   .card-date {
     font-size: 11.5px;
     letter-spacing: 0.14em;
