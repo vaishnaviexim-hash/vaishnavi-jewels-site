@@ -352,8 +352,12 @@ async function vjSaveGold(env, per10, source) {
 // each task time, only if nobody saved a rate since then, at most once every 10 minutes - a few Make operations a day.
 // A rate typed by the owner after the task time is never overwritten.
 let vjGoldAskedAt = 0;
+// 11/11/2026 (C-20261111-MOVEDTON8N): gold now comes from n8n, which reads the NR feed live on each ask (read-only, returns only {per10g, at}).
+// The Make relay VJ_GOLD_HOOK stays as a fallback only.
+const VJ_GOLD_N8N = 'https://n8n-epei.srv2114308.hstgr.cloud/webhook/vj-gold-a0d5a7fd47e8f61af3b0';
+function vjGoldUrl(env) { return VJ_GOLD_N8N || (env.VJ_GOLD_HOOK && /^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_GOLD_HOOK) ? env.VJ_GOLD_HOOK : ''); }
 async function vjMaybeRefreshGold(env) {
-  if (!env.VJ_GOLD_HOOK || !/^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_GOLD_HOOK)) return;
+  if (!vjGoldUrl(env)) return;
   // 14/10/2026 owner: market days are Monday-Friday only; Friday has a last rate at 8 pm. So the tasks run Mon-Fri 13:00,
   // 15:30, 17:00 and Fri 20:00 IST. Find the latest task time (looking back up to 3 days, so Sat/Sun/Monday morning still
   // pick up Friday 8 pm).
@@ -379,7 +383,7 @@ async function vjMaybeRefreshGold(env) {
   try { await waTables(env); const a = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'gold_asked'").first(); if (a && Number(a.v) >= slotAt) return;
     await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('gold_asked', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(String(Date.now())).run(); } catch (e) { return; }
   try {
-    const r = await fetch(env.VJ_GOLD_HOOK, { signal: AbortSignal.timeout(8000) });
+    const r = await fetch(vjGoldUrl(env), { signal: AbortSignal.timeout(20000) });
     const j = await r.json();
     const per10 = Number(j && j.per10g), at = Date.parse(j && j.at) || 0;
     if (per10 >= 50000 && per10 <= 400000 && at > goldAt && Date.now() - at < 80 * 3600e3)
