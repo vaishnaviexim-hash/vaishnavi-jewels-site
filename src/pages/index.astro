@@ -4,7 +4,7 @@ import SiteHeader from '../components/SiteHeader.astro';
 import SiteFooter from '../components/SiteFooter.astro';
 import InstagramFeed from '../components/InstagramFeed.astro';
 import { business as b } from '../data/business.js';
-import { plain, plainSet, LOGO_DARK } from '../data/images.js';
+import { plain, plainSet } from '../data/images.js';
 
 // Photos: beautified images of our own pieces (Cloudinary vj/design_gemini), light transforms only.
 const HERO = { id: 'vj/design_gemini/vs2_bridal_s3_20261012170959', alt: 'Bride wearing a Vaishnavi Jewels Polki and emerald bridal set with maang tikka and jhumkas' };
@@ -12,7 +12,7 @@ const SHOWROOM = { id: 'vj/design_gemini/showroom_people_20261021_20261021115745
 // Same collection links as before (same order and words); the first five now show a photo.
 const cards = [
   { href: '/natural-diamond-jewellery', label: 'Natural diamond jewellery', id: 'vj/design_gemini/ww_diamond_line_necklace_20261028152845', alt: 'Natural diamond necklace by Vaishnavi Jewels on a velvet bust' },
-  { href: '/lab-grown-diamond-jewellery', label: 'Lab-grown diamond jewellery', id: 'vj/design_gemini/gbp_tennis_lgd_20261022153712', alt: 'Lab-grown diamond bracelet in rose gold by Vaishnavi Jewels, worn on the wrist' },
+  { href: '/lab-grown-diamond-jewellery', label: 'Lab-grown diamond jewellery', id: 'vj/design_gemini/web_lgd_tennis_cream_20261111070317', alt: 'Lab-grown diamond bracelet in rose gold by Vaishnavi Jewels, worn on the wrist' },
   { href: '/solitaire-rings', label: 'Solitaire rings', id: 'vj/design_gemini/gbp_round_solitaire_20261022153639', alt: 'Round solitaire ring in rose gold with pave shoulders by Vaishnavi Jewels' },
   { href: '/bridal-jewellery', label: 'Bridal jewellery', id: 'vj/design_gemini/ww_polki_bridal_set_20261028152801', alt: 'Bridal necklace and earrings set by Vaishnavi Jewels on a velvet stand' },
   { href: '/polki-jewellery', label: 'Polki jewellery', id: 'vj/design_gemini/vs2_bridal_s2_20261012170916', alt: 'Bride wearing a Vaishnavi Jewels three-tier Polki necklace set with emeralds' },
@@ -42,7 +42,7 @@ const description = "Certified diamond jewellery made in Surat since 2005: natur
           <div class="hero-actions">
             <a href="#collections" class="btn btn-solid">Explore Collections</a>
             <a href={b.whatsapp} target="_blank" rel="noopener" class="btn btn-maroon">WhatsApp Us</a>
-            <a href="/book-a-visit" class="btn btn-outline">Book a Visit</a>
+            <a href="/book-a-visit" class="btn btn-outline">Book a Visit or Video Call</a>
           </div>
           <div class="hero-social">
             <a href="https://instagram.com/vaishnavijewels.surat" target="_blank" rel="noopener" class="btn btn-outline btn-sm">Follow Us on Instagram</a>
@@ -54,7 +54,6 @@ const description = "Certified diamond jewellery made in Surat since 2005: natur
             <img class="vj-photo-img" src={plain(HERO.id, 900)} srcset={plainSet(HERO.id, [480, 720, 900, 1200])}
                  sizes="(max-width: 900px) 88vw, 460px" width="768" height="960" alt={HERO.alt}
                  fetchpriority="high" decoding="async" />
-            <span class="vj-mark" aria-hidden="true"><img src={LOGO_DARK} alt="" width="60" height="40" /></span>
           </div>
         </figure>
       </div>
@@ -81,7 +80,6 @@ const description = "Certified diamond jewellery made in Surat since 2005: natur
                   <img class="vj-photo-img" src={plain(c.id, 480)} srcset={plainSet(c.id, [320, 480, 720])}
                        sizes="(max-width: 640px) 46vw, (max-width: 1000px) 30vw, 210px"
                        width="480" height="600" alt={c.alt} loading="lazy" decoding="async" />
-                  <span class="vj-mark" aria-hidden="true"><img src={LOGO_DARK} alt="" width="45" height="30" loading="lazy" /></span>
                 </span>
                 <span class="card-label">{c.label}</span>
               </a>
@@ -180,7 +178,6 @@ const description = "Certified diamond jewellery made in Surat since 2005: natur
             <img class="vj-photo-img" src={plain(SHOWROOM.id, 720)} srcset={plainSet(SHOWROOM.id, [480, 720, 928])}
                  sizes="(max-width: 900px) 92vw, 420px" width="720" height="894" alt={SHOWROOM.alt}
                  loading="lazy" decoding="async" />
-            <span class="vj-mark" aria-hidden="true"><img src={LOGO_DARK} alt="" width="60" height="40" loading="lazy" /></span>
           </div>
         </figure>
       </div>
