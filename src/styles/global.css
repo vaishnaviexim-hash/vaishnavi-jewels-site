@@ -143,16 +143,10 @@ a:focus-visible, .btn:focus-visible, summary:focus-visible {
 /* Small plate with the owner's original logo on every photo (logo itself never altered). */
 .vj-photo { position: relative; overflow: hidden; background: var(--color-maroon-deep); }
 .vj-photo > img.vj-photo-img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.vj-mark {
-  position: absolute !important; right: 22px; bottom: 22px; z-index: 3;
-  background: rgba(251, 246, 236, 0.9);
-  padding: 5px 9px; border-radius: 2px; line-height: 0;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
-  pointer-events: none;
-}
-.vj-mark img { height: 28px !important; width: auto !important; max-width: none !important; aspect-ratio: auto !important; position: static !important; box-shadow: none !important; object-fit: contain !important; margin: 0 !important; display: block; }
-.vj-mark.sm { right: 16px; bottom: 16px; padding: 4px 7px; }
-.vj-mark.sm img { height: 22px !important; }
+.vj-mark { position: absolute !important; right: 18px; bottom: 16px; z-index: 3; background: none !important; padding: 0 !important; border-radius: 0; line-height: 0; box-shadow: none !important; pointer-events: none; opacity: 0.92; }
+.vj-mark img { height: 34px !important; width: auto !important; max-width: none !important; aspect-ratio: auto !important; position: static !important; box-shadow: none !important; object-fit: contain !important; margin: 0 !important; display: block; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.55)) drop-shadow(0 0 6px rgba(0,0,0,0.25)); }
+.vj-mark.sm { right: 12px; bottom: 10px; }
+.vj-mark.sm img { height: 26px !important; }
 
 /* Ornamental gold rule with a small diamond */
 .orn-rule { display: block; width: 72px; height: 1px; background: var(--color-gold); position: relative; margin: 22px 0; }

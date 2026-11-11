@@ -22,4 +22,4 @@ export function plainSet(publicId, widths = [400, 640, 900, 1200]) {
 }
 
 /** The owner's original dark logo (never altered), shown on a small plate on every photo. */
-export const LOGO_DARK = 'https://res.cloudinary.com/rknejib2/image/upload/e_trim/f_auto,q_auto,h_200/v1790950786/vj/brand/logo_original_dark.png';
+export const LOGO_DARK = '/logo_mark_light.png';
