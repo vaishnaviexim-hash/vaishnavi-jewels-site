@@ -38,6 +38,9 @@ const crumbs = {
   ],
 };
 const ogImage = hero && !hero.noOg ? img(hero.id, 1200, '1.91') : undefined;
+// Main page image for Google (thumbnail next to our search result). Owner 13/11.
+const imageSchema = hero ? [{ '@context': 'https://schema.org', '@type': 'WebPage', url: 'https://vaishnavijewels.com' + path, name: heading,
+  primaryImageOfPage: { '@type': 'ImageObject', url: img(hero.id, 1200, '1'), width: 1200, height: 1200, caption: hero.alt } }] : [];
 const trust = [
   { icon: 'diamond', title: 'Certified diamonds', text: 'Grading report with every piece' },
   { icon: 'shield', title: 'BIS HUID hallmark', text: 'Check it yourself in BIS Care' },
@@ -45,7 +48,7 @@ const trust = [
   { icon: 'truck', title: 'Insured delivery', text: 'Free to major Indian cities' },
 ];
 ---
-<BaseLayout title={title} description={description} canonicalPath={path} ogImage={ogImage} noindex={noindex} extraSchema={[crumbs, ...extraSchema, ...faqSchema]}>
+<BaseLayout title={title} description={description} canonicalPath={path} ogImage={ogImage} noindex={noindex} extraSchema={[crumbs, ...extraSchema, ...faqSchema, ...imageSchema]}>
   <SiteHeader />
   <main>
     <article class="info">

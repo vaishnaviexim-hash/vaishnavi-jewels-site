@@ -68,6 +68,13 @@ const absoluteOgImage = ogImage.startsWith('http') ? ogImage : new URL(ogImage, 
   <!-- Canonical URL -->
   <link rel="canonical" href={canonicalUrl} />
 
+  <!-- Favicon (Google search shows this next to our name; was missing -> grey globe. Owner 13/11) -->
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192x192.png" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <meta property="og:image:alt" content="Vaishnavi Jewels, Surat" />
+
   <!-- Schema.org Structured Data -->
   <script type="application/ld+json" set:html={JSON.stringify(storeSchema())} />
   {extraSchema.map((sch) => <script type="application/ld+json" set:html={JSON.stringify(sch)} />)}
