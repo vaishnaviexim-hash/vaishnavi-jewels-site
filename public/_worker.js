@@ -376,7 +376,7 @@ async function vjMaybeRefreshGold(env) {
   for (let back = 0; back <= 3 && !slotAt; back++) {
     const d = (ist.getUTCDay() - back + 7) % 7;
     if (d === 0 || d === 6) continue;
-    const slots = [13 * 60 + 4, 15 * 60 + 36, 17 * 60 + 4].concat(d === 5 ? [20 * 60 + 4] : []).filter(s => back > 0 || s <= m);
+    const slots = [11, 13, 15, 17, 19, 21].map(h => h * 60 + 4).filter(s => back > 0 || s <= m); // owner 13/11/2026 16:05: NR rate every 2 hours (was 13:04, 15:36, 17:04 + Fri 20:04)
     if (slots.length) slotAt = Date.now() - (back * 1440 + m - slots[slots.length - 1]) * 60e3;
   }
   if (!slotAt) return;
