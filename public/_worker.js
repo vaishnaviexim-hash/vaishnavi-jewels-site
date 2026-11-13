@@ -354,6 +354,11 @@ async function vjSaveGold(env, per10, source) {
 let vjGoldAskedAt = 0;
 // 11/11/2026 (C-20261111-MOVEDTON8N): gold now comes from n8n, which reads the NR feed live on each ask (read-only, returns only {per10g, at}).
 // The Make relay VJ_GOLD_HOOK stays as a fallback only.
+// C-20261113-TAGSCORE: VJ Tags Core (quote alert, bill PDF to customer, nightly backup) and the contact hand-off now go to n8n;
+// the Make hook in VJ_QUOTE_HOOK stays only as a fallback if the n8n URL is ever blanked. Only one-time tokens or the quote text are sent.
+const VJ_CORE_N8N = 'https://n8n-epei.srv2114308.hstgr.cloud/webhook/vj-core-f462b281892edfb1ef38';
+const VJ_CONTACT_N8N = 'https://n8n-epei.srv2114308.hstgr.cloud/webhook/vj-contact-868e73e976a77b6b06c3';
+function vjCoreHook(env) { return VJ_CORE_N8N || (env.VJ_QUOTE_HOOK && /^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_QUOTE_HOOK) ? env.VJ_QUOTE_HOOK : ''); }
 const VJ_GOLD_N8N = 'https://n8n-epei.srv2114308.hstgr.cloud/webhook/vj-gold-a0d5a7fd47e8f61af3b0';
 function vjGoldUrl(env) { return VJ_GOLD_N8N || (env.VJ_GOLD_HOOK && /^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_GOLD_HOOK) ? env.VJ_GOLD_HOOK : ''); }
 async function vjMaybeRefreshGold(env) {
@@ -943,11 +948,11 @@ async function vjQuote(request, env, who, ctx) {
   const doc = { qno, kind: design ? 'design' : 'tags', name, mobile: mobile.slice(-10), city, option, mk, pay, items, total, fineTotal, gold24g: st.g, by: who.email, at: new Date().toISOString() };
   await env.DB.prepare('INSERT INTO docs (path, data, version, updated_at, updated_by) VALUES (?, ?, 1, ?, ?)').bind('quotes/' + qno, JSON.stringify(doc), Date.now(), who.email).run();
   await vjAudit(env, who, 'quote', 'quotes/' + qno, (design ? 'estimate ' : '') + name + ' ' + doc.mobile + ' ' + total);
-  if (env.VJ_QUOTE_HOOK && /^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_QUOTE_HOOK)) {
+  if (vjCoreHook(env)) {
     const inr = n => 'Rs ' + Number(n).toLocaleString('en-IN'), fg = n => n ? ' + fine gold ' + Number(n).toFixed(3) + ' g' : '';
     const txt = i => i.newDesign ? 'New design: ' + [i.desc + ' ' + i.k + ' ' + vjGTxt(i.net) + ' g' + (i.tunch ? ' tunch ' + i.tunch.toFixed(3) : ''), ...i.dias.map(x => x.ct.toFixed(2) + ' ct ' + x.q), ...(i.polki ? ['Polki ' + i.polki.pcs + ' pc'] : [])].join(', ')
       : (i.design ? i.design + ' (' + i.label + ')' : i.label) + (i.polki ? ', Polki ' + i.polki.pcs + ' pc' : '');
-    ctx.waitUntil(fetch(env.VJ_QUOTE_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000),
+    ctx.waitUntil(fetch(vjCoreHook(env), { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000),
       body: JSON.stringify({ qno, name, mobile: '+91 ' + doc.mobile, city, option, total: inr(total) + ' incl. GST' + fg(fineTotal) + (pay === 'amount' ? '' : pay === 'g2g' ? ' (Gold to Gold W/s)' : ' (Gold to Gold Nett)'), by: who.name && who.name !== 'Owner' ? who.name : who.email,
         items: items.map(i => txt(i) + ' ' + inr(i.price) + fg(i.fine)).join('; ') }) }).catch(() => {}));
   }
@@ -1311,7 +1316,7 @@ const vjMetaT = env => env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_meta (k TEX
 async function vjBillSend(request, env, who) {
   const len = Number(request.headers.get('content-length') || 0);
   if (!len || len > 7e6) return vjDeny(413, 'the PDF is too large to send');
-  if (!env.VJ_QUOTE_HOOK || !/^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_QUOTE_HOOK)) return vjJson({ error: 'WhatsApp sending is not set up' }, 503);
+  if (!vjCoreHook(env)) return vjJson({ error: 'WhatsApp sending is not set up' }, 503);
   let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
   const no = String(b && b.no || '').trim().toUpperCase().slice(0, 20);
   const isQ = /^Q-\d{6}-[2-9A-Z]{4}$/.test(no); // C-20261017-QUOTEWA: a saved quote / estimate goes the same way (from docs quotes/)
@@ -1339,7 +1344,7 @@ async function vjBillSend(request, env, who) {
       env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('billsend:' + token, JSON.stringify({ no, status: 'queued', at: Date.now(), by: who.email, team: est.cust })),
       env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = CAST(CAST(v AS INTEGER) + 1 AS TEXT)').bind(ck, '1')]);
     let ok = false;
-    try { const r = await fetch(env.VJ_QUOTE_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000), body: JSON.stringify({ kind: 'bill-pdf', token }) }); ok = r.ok; } catch (e) {}
+    try { const r = await fetch(vjCoreHook(env), { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000), body: JSON.stringify({ kind: 'bill-pdf', token }) }); ok = r.ok; } catch (e) {}
     await vjAudit(env, who, 'estimate-whatsapp', 'estimates/' + no, (ok ? 'queued' : 'hook failed') + ' to ' + tg[1]);
     if (!ok) { try { await env.PHOTOS.delete('billpdf-' + token); } catch (e) {} return vjJson({ error: 'could not reach Aashvi, try again' }, 502); }
     return vjJson({ ok: true, token, to: tg[1] });
@@ -1366,7 +1371,7 @@ async function vjBillSend(request, env, who) {
     env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('billsend:' + token, JSON.stringify({ no, status: 'queued', at: Date.now(), by: who.email })),
     env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = CAST(CAST(v AS INTEGER) + 1 AS TEXT)').bind(ck, '1')]);
   let ok = false;
-  try { const r = await fetch(env.VJ_QUOTE_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000), body: JSON.stringify({ kind: 'bill-pdf', token }) }); ok = r.ok; } catch (e) {}
+  try { const r = await fetch(vjCoreHook(env), { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000), body: JSON.stringify({ kind: 'bill-pdf', token }) }); ok = r.ok; } catch (e) {}
   await vjAudit(env, who, 'bill-whatsapp', (isR ? 'receipts/' : isQ ? 'quotes/' : 'bills/') + no, (ok ? 'queued' : 'hook failed') + ' to +91 ' + bill.mobile);
   if (!ok) { try { await env.PHOTOS.delete('billpdf-' + token); } catch (e) {} return vjJson({ error: 'could not reach Aashvi, try again' }, 502); }
   return vjJson({ ok: true, token, to: '+91 ' + bill.mobile });
@@ -1388,7 +1393,7 @@ async function vjContactPush(env, ctx, c) {
     await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('contact:' + token, JSON.stringify({ name, phone: '91' + d, city: vjClean(c.city, 40), type: c.type === 'Visitor' ? 'Visitor' : 'Customer', src: vjClean(c.src, 60), at: Date.now() })).run();
     // Make scenario 8188589 (hook 3980538). Only the random token is sent; the scenario fetches the contact once from /hooks/vj-contact, so a stranger
     // posting to this hook gets nothing and can add nothing.
-    const p = fetch('https://hook.eu1.make.com/fm6vpfid6yh8ist1jrl7e2n39tsno1nl', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000), body: JSON.stringify({ token }) }).catch(() => {});
+    const p = fetch(VJ_CONTACT_N8N, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(15000), body: JSON.stringify({ token }) }).catch(() => {});
     if (ctx && ctx.waitUntil) ctx.waitUntil(p); else await p;
   } catch (e) {}
 }
@@ -4691,14 +4696,14 @@ async function vjEnqBillSync(env) {
 async function vjDailyReport(env) {
   const ist = new Date(Date.now() + 5.5 * 3600e3), mins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
   if (mins < 20 * 60 + 10) return reply('not yet', 200);
-  if (!env.DB || !env.VJ_QUOTE_HOOK || !/^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_QUOTE_HOOK)) return reply('not set up', 503);
+  if (!env.DB || !vjCoreHook(env)) return reply('not set up', 503);
   const ymd = ist.toISOString().slice(0, 10), dayStart = Date.parse(ymd + 'T00:00:00Z') - 5.5 * 3600e3;
   await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_meta (k TEXT PRIMARY KEY, v TEXT)').run();
   await vjTables(env);
   const key = 'daily-report:' + ymd;
   const claim = await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO NOTHING').bind(key, new Date().toISOString()).run();
   if (!claim.meta || claim.meta.changes !== 1) return reply('already done today', 200);
-  const post = body => fetch(env.VJ_QUOTE_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(20000), body: JSON.stringify(body) });
+  const post = body => fetch(vjCoreHook(env), { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(20000), body: JSON.stringify(body) });
   let sentText = false;
   // owner 26/10/2026 20:20 (C-20261026-TAGSUMMARY): only a SHORT summary, no details and no Excel - new tags made (order tags not
   // counted: they are billed straight away), old tags edited, tags deleted, bills and estimates made with their amounts. It no longer
@@ -4827,7 +4832,7 @@ async function vjBackup(env) {
   const now = Date.now(), ist = new Date(now + 5.5 * 3600e3), mins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
   const inWin = VJ_BK_WIN[0] <= VJ_BK_WIN[1] ? (mins >= VJ_BK_WIN[0] && mins < VJ_BK_WIN[1]) : (mins >= VJ_BK_WIN[0] || mins < VJ_BK_WIN[1]);
   if (!inWin) return reply('not now', 200);
-  if (!env.DB || !env.PHOTOS || !env.VJ_QUOTE_HOOK || !/^https:\/\/hook\.[a-z0-9]+\.make\.com\//.test(env.VJ_QUOTE_HOOK)) return reply('not set up', 503);
+  if (!env.DB || !env.PHOTOS || !vjCoreHook(env)) return reply('not set up', 503);
   const ymd = new Date(now + 5.5 * 3600e3 + 10 * 60e3).toISOString().slice(0, 10); // IST date of the run (23:55-23:59 counts as the next day)
   await vjMetaT(env);
   // tidy: an export Make has collected, or never collected within 60 minutes, is removed
@@ -4843,7 +4848,7 @@ async function vjBackup(env) {
     if (vjIsR2(env)) await env.PHOTOS.put('backup-' + token, gz, { httpMetadata: { contentType: 'application/gzip' } });
     else await env.PHOTOS.put('backup-' + token, gz, { expirationTtl: 3600, metadata: { type: 'application/gzip' } });
     await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('backupfile:' + token, JSON.stringify({ status: 'queued', at: now, ymd, bytes: gz.length })).run();
-    const r = await fetch(env.VJ_QUOTE_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(20000), body: JSON.stringify({ kind: 'vj-backup', token }) });
+    const r = await fetch(vjCoreHook(env), { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(20000), body: JSON.stringify({ kind: 'vj-backup', token }) });
     if (!r.ok) throw new Error('hook ' + r.status);
     await vjAudit(env, { email: 'backup (Make)' }, 'backup', 'backup/' + ymd, 'queued ' + gz.length + ' bytes; ' + Object.entries(counts).map(([k, v]) => k + ' ' + v).join(', '));
     return reply('ok', 200);
