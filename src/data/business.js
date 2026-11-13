@@ -54,7 +54,7 @@ export const infoPages = [
   { path: '/diamond-mangalsutra', label: 'Diamond Mangalsutra' },
   { path: '/diamond-earrings', label: 'Diamond Earrings' },
   { path: '/visit-us', label: 'Visit Our Showroom' },
-  { path: '/book-a-visit', label: 'Book a Visit or Video Call' },
+  { path: '/book-a-visit', label: 'Book a Showroom Visit' },
   { path: '/delivery-across-india', label: 'Delivery Across India' },
   { path: '/faq', label: 'FAQ' },
   { path: '/facts', label: 'Facts' },

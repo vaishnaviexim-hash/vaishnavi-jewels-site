@@ -3769,19 +3769,19 @@ function vjEnqMsg(q, sender) {
   let m;
   // owner 23:03: no designs / photos on WhatsApp - every message invites a call, a video call (pieces shown live) or a showroom visit
   if (!hi) {
-    const open = 'Hi ' + nm + ", I'm " + who + ' from Vaishnavi Jewels, Surat.', ask = " Could we have a quick call? I'd be happy to show you the pieces on a video call at a time that suits you.";
-    if (occ === 'wedding') m = open + " Congratulations on the wedding! We'd love to help with the bridal " + (item && item !== 'set' ? item : 'set') + (bud ? ' around ' + bud : '') + ". Can we talk for a few minutes? I can show you our Polki and diamond bridal pieces on a video call, or you're welcome at our showroom at Parle Point.";
-    else if (lab && !item) m = open + " We have certified lab-grown diamond pieces with IGI reports. Could we discuss what you're looking for? I can show you the options live on a video call.";
+    const open = 'Hi ' + nm + ", I'm " + who + ' from Vaishnavi Jewels, Surat.', ask = " Could we have a quick call? I'd be happy to help you personally at a time that suits you.";
+    if (occ === 'wedding') m = open + " Congratulations on the wedding! We'd love to help with the bridal " + (item && item !== 'set' ? item : 'set') + (bud ? ' around ' + bud : '') + ". Can we talk for a few minutes? I'd be happy to help you personally, or you're welcome at our showroom at Parle Point.";
+    else if (lab && !item) m = open + " We have certified lab-grown diamond pieces with IGI reports. Could we discuss what you're looking for? I'd be happy to help you personally.";
     else if (item) m = open + ' Thank you for your enquiry about ' + (/s$/.test(item) ? '' : /^[aeiou]/i.test(adj + item) ? 'an ' : 'a ') + adj + item + (occ ? ' for the ' + occ : '') + (bud ? ' around ' + bud : '') + ' - we have a lovely range' + (bud ? ' in that budget' : '') + (lab && !/natural/.test(all) ? ', certified with IGI reports' : sol ? ', with certified diamonds' : '') + ', and we can also make one to your own design.' + ask;
-    else if (polki) m = open + " Thank you for your interest in our Polki jewellery! Can we talk for a few minutes? I can show you our Polki pieces on a video call, or you're welcome at our showroom at Parle Point.";
-    else m = open + " Thank you for reaching out! Can we have a quick chat about what you're looking for? I'd be glad to show you pieces on a video call whenever convenient.";
+    else if (polki) m = open + " Thank you for your interest in our Polki jewellery! Can we talk for a few minutes? I'd be happy to help you personally, or you're welcome at our showroom at Parle Point.";
+    else m = open + " Thank you for reaching out! Can we have a quick chat about what you're looking for? I'd be glad to help you personally whenever convenient.";
   } else {
-    const open = 'Namaste ' + nm + ', main ' + who + ', Vaishnavi Jewels, Surat se.', ask = ' Kya hum thodi baat kar sakte hain? Aapke suvidha ke samay video call par main aapko designs dikha sakta hoon.';
-    if (occ === 'wedding') m = open + ' Shaadi ki bahut badhai! Bridal ' + (item && item !== 'set' ? item : 'set') + (bud ? ' (' + bud + ' ke aas-paas)' : '') + ' mein hum aapki madad karna chahenge. Kya hum thodi baat kar sakte hain? Video call par main hamare Polki aur diamond bridal designs dikha sakta hoon, ya aap Parle Point showroom aa sakte hain.';
+    const open = 'Namaste ' + nm + ', main ' + who + ', Vaishnavi Jewels, Surat se.', ask = ' Kya hum thodi baat kar sakte hain? Aapke suvidha ke samay main aapki personally madad kar sakta hoon.';
+    if (occ === 'wedding') m = open + ' Shaadi ki bahut badhai! Bridal ' + (item && item !== 'set' ? item : 'set') + (bud ? ' (' + bud + ' ke aas-paas)' : '') + ' mein hum aapki madad karna chahenge. Kya hum thodi baat kar sakte hain? Main aapki personally madad kar sakta hoon, ya aap Parle Point showroom aa sakte hain.';
     else if (lab && !item) m = open + ' Hamare paas IGI report ke saath certified lab-grown diamond jewellery hai.' + ask;
     else if (item) m = open + ' Aapne ' + (bud ? bud + ' ke aas-paas ' : '') + adj + item + ' ke baare mein poocha tha - ' + (bud ? 'is budget mein ' : '') + 'hamare paas bahut sundar designs hain, aur hum aapki pasand ka design bana bhi sakte hain.' + ask;
     else if (polki) m = open + ' Aapne Polki jewellery mein ruchi dikhayi, dhanyavaad!' + ask;
-    else m = open + ' Sampark karne ke liye dhanyavaad! Kya hum thodi baat kar sakte hain ki aap kya dhoondh rahe hain? Aapke suvidha ke samay video call par main aapko designs dikha sakta hoon.';
+    else m = open + ' Sampark karne ke liye dhanyavaad! Kya hum thodi baat kar sakte hain ki aap kya dhoondh rahe hain? Aapke suvidha ke samay main aapki personally madad kar sakta hoon.';
   }
   if (sender && sender !== 'Abhinav Agarwal' && sender !== 'Shilpi Agarwal') m = m.replace(/ main aapko designs dikha sakta hoon/g, ' hum aapko designs dikha sakte hain').replace(/ main hamare/g, ' hum hamare');
   if (sender === 'Shilpi Agarwal') m = m.replace(/sakta hoon/g, 'sakti hoon');

@@ -81,4 +81,4 @@ Choose one focal piece, such as a Polki choker or diamond necklace, and keep the
 
 Wipe it gently with a soft dry cloth, keep it away from water, perfume and creams, and store each piece separately in a soft pouch. Bring heavy sets to us for professional cleaning.
 
-See jewel-tone combinations in person at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886 for a video call.
+See jewel-tone combinations in person at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886.

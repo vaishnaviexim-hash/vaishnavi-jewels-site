@@ -74,4 +74,4 @@ Polki, uncut diamonds, pearls or a touch of emerald suit soft floral colours. Pi
 
 Yes, a well-set diamond ring can be worn daily. Take it off for the gym, heavy housework and chemicals, and get the prongs checked once or twice a year.
 
-Try sangeet looks at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886 for a video call.
+Try sangeet looks at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886.

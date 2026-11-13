@@ -8,7 +8,7 @@ heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fil
 heroAlt: "Lab-grown solitaire ring in rose gold"
 ---
 
-If you have been looking at lab-grown diamond jewellery in Surat, you have probably noticed that every serious piece comes with a laboratory report. That report is your most useful tool as a buyer, but only if you know what the lines on it mean. At Vaishnavi Jewels, our [lab-grown diamond jewellery](/lab-grown-diamond-jewellery) is made in-house at our Parle Point showroom, and diamond certificates from recognised labs such as IGI, TGL and EGL accompany our pieces where applicable. This guide walks you through an IGI lab-grown diamond report line by line, so that you can read one with confidence, whether you are sitting across the counter from us or viewing a piece on a video call from Ahmedabad, Vadodara or Mathura.
+If you have been looking at lab-grown diamond jewellery in Surat, you have probably noticed that every serious piece comes with a laboratory report. That report is your most useful tool as a buyer, but only if you know what the lines on it mean. At Vaishnavi Jewels, our [lab-grown diamond jewellery](/lab-grown-diamond-jewellery) is made in-house at our Parle Point showroom, and diamond certificates from recognised labs such as IGI, TGL and EGL accompany our pieces where applicable. This guide walks you through an IGI lab-grown diamond report line by line, so that you can read one with confidence, whether you are sitting across the counter from us or buying from Ahmedabad, Vadodara or Mathura.
 
 ## What an IGI lab-grown diamond report actually tells you
 
@@ -53,7 +53,7 @@ Because we make our jewellery in-house, the gold karat, diamond quality and desi
 
 ## Buying lab-grown diamond jewellery when you cannot visit Surat
 
-Many of our customers are not in Surat. If you are in Ahmedabad, Vadodara, Mathura or any other city, we can show you pieces and their reports over a video call, hold the report up to the camera, and walk you through each line together. Once you have chosen, payment is by NEFT or UPI, and we offer free insured [delivery across India](/delivery-across-india) to major cities. The laboratory report and hallmarked piece travel together.
+Many of our customers are not in Surat. If you are in Ahmedabad, Vadodara, Mathura or any other city, send us the report on WhatsApp and we will walk you through each line together. Once you have chosen, payment is by NEFT or UPI, and we offer free insured [delivery across India](/delivery-across-india) to major cities. The laboratory report and hallmarked piece travel together.
 
 If you are in or near Surat, the simplest approach is to [visit our showroom](/visit-us) at 120, Rajhans Ornate, Parle Point, where you can look at the stone under a loupe, read the report alongside it and see the girdle inscription for yourself. We are open Monday to Saturday, 11 AM to 8 PM, and closed on Sunday.
 
@@ -71,4 +71,4 @@ Diamond certificates from recognised labs such as IGI, TGL and EGL accompany our
 
 Yes. Alongside our lab-grown range we offer [natural diamond jewellery](/natural-diamond-jewellery), also made in-house and also BIS HUID hallmarked, with laboratory reports where applicable. Each range is presented on its own so that you can choose what suits you.
 
-Whenever you are ready to read a report together, visit our Parle Point showroom in Surat or WhatsApp us at +91 99980 43886 to arrange a video call.
+Whenever you are ready to read a report together, visit our Parle Point showroom in Surat or WhatsApp us at +91 99980 43886.

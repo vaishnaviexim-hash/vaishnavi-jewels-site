@@ -71,4 +71,4 @@ Pick one hero piece, usually the necklace, and keep the rest in proportion. Echo
 
 Choose one focal piece, such as a Polki choker or a diamond necklace, and keep everything else light. A minimal outfit lets a single piece stand out, so pick the one that suits your neckline.
 
-Plan your wedding looks with us at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886 for a video call.
+Plan your wedding looks with us at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886.

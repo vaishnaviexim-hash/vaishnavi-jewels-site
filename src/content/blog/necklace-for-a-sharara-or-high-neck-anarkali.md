@@ -65,4 +65,4 @@ Not if it is a light one. A slim Polki or pearl choker suits mehendi well; keep 
 
 Keep the necklace short and close to the neck so the dupatta does not hide it, and let statement earrings and a maang tikka do most of the work. Pin the dupatta so it stays clear of the choker.
 
-To see chokers and earrings for your outfit, WhatsApp us on +91 99980 43886 for a video call, or book a visit to our Parle Point showroom.
+To see chokers and earrings for your outfit, WhatsApp us on +91 99980 43886, or book a visit to our Parle Point showroom.

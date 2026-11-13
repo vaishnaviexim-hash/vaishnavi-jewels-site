@@ -75,4 +75,4 @@ When the outfit already shines, choose fewer pieces with a clean, structured sha
 
 Choose one focal piece, such as a Polki choker or diamond necklace, and keep everything else light.
 
-Match pieces to your floral lehenga at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886 for a video call.
+Match pieces to your floral lehenga at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886.

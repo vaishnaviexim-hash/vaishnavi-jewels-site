@@ -7,7 +7,7 @@ const faqs: [string, string][] = [
   ['Do you have solitaire rings in both natural and lab-grown diamonds?', 'Yes. We make solitaire rings in natural diamonds and in lab-grown diamonds. The report for each stone states clearly which it is.'],
   ['Is the gold in the ring hallmarked?', 'Yes. Our gold jewellery carries a BIS HUID hallmark, a 6-character code you can check yourself in the BIS Care app.'],
   ['Can I choose my own diamond and ring design?', 'Yes. We manufacture in our own unit in Surat, so you can choose the diamond, the gold karat and colour, and the setting, or bring a photo of a design you like. Most custom pieces take about 3 weeks (simple designs can be faster) depending on the design.'],
-  ['Can I buy a solitaire from outside Surat?', 'Yes. We show the stone and the ring live on a video call, share the report number so you can check it online before paying, accept NEFT or UPI and send the ring with free insured delivery to major Indian cities.'],
+  ['Can I buy a solitaire from outside Surat?', 'Yes. We share the report number so you can check it online before paying, accept NEFT or UPI and send the ring with free insured delivery to major Indian cities.'],
   ['Can you make an oval, east-west or two-stone engagement ring?', 'Yes. We make engagement rings to your design, so an oval or elongated solitaire set east-west (sideways), a bezel setting or a two-stone (toi-et-moi) ring can all be made in our own manufacturing unit in Surat. Each solitaire comes with its own grading report and laser-inscribed report number.'],
 ];
 const pageSchema = {
@@ -49,5 +49,5 @@ const pageSchema = {
   <figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_karigar_20261111131036" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/concept/web_sec_karigar_20261111131036 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_karigar_20261111131036 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/concept/web_sec_karigar_20261111131036 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Craftsman setting diamonds into a gold necklace in the Vaishnavi Jewels manufacturing unit, Surat" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
 
   <h2>See it before you decide</h2>
-  <p>Visit us at {b.addressText} ({b.hoursText}) or ask for a video call on WhatsApp at <a href={b.whatsapp} target="_blank" rel="noopener">{b.whatsappDisplay}</a>. Shopping from another city? See <a href="/delivery-across-india">Delivery across India</a>.</p>
+  <p>Visit us at {b.addressText} ({b.hoursText}) or WhatsApp us at <a href={b.whatsapp} target="_blank" rel="noopener">{b.whatsappDisplay}</a>. Shopping from another city? See <a href="/delivery-across-india">Delivery across India</a>.</p>
 </InfoPage>

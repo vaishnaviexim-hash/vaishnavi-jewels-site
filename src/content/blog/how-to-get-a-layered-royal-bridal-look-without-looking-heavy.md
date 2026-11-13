@@ -75,4 +75,4 @@ A single drop tikka suits most faces and a centre parting; a matha patti suits a
 
 Warm gold, Polki and uncut diamonds, or emeralds and pearls that pick up the outfit colour, suit velvet and jewel tones. Keep one strong necklace.
 
-Try a layered royal look at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886 for a video call.
+Try a layered royal look at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886.

@@ -43,7 +43,7 @@ A jeweller you can trust lets you take your time, shows you several options with
 
 ## How Vaishnavi Jewels works
 
-We have sold certified diamond jewellery from our showroom at Rajhans Ornate Mall, Parle Point, Surat, since 2005. Every piece is made in our own manufacturing unit, every solitaire has its own grading report and laser inscription, our gold is BIS HUID hallmarked, and the invoice lists everything separately. If you live outside Surat, we can show you pieces and their reports on a video call and deliver anywhere in India. [Plan your visit](/visit-us) or WhatsApp us on +91 99980 43886.
+We have sold certified diamond jewellery from our showroom at Rajhans Ornate Mall, Parle Point, Surat, since 2005. Every piece is made in our own manufacturing unit, every solitaire has its own grading report and laser inscription, our gold is BIS HUID hallmarked, and the invoice lists everything separately. If you live outside Surat, WhatsApp us and we will guide you personally, and we deliver anywhere in India. [Plan your visit](/visit-us) or WhatsApp us on +91 99980 43886.
 
 ## Frequently asked questions
 
@@ -55,6 +55,6 @@ Reports from recognised laboratories such as IGI, GIA, EGL and TGL are widely us
 
 Yes. The inscription is on the girdle and can be read under a 10x loupe or a microscope. In an open prong setting it usually stays visible; in a bezel setting it may be covered, so check it before the stone is set.
 
-### Is it safe to buy diamond jewellery on a video call?
+### Is it safe to buy diamond jewellery without visiting the showroom?
 
 It can be, if the jeweller shows you the piece live, shares the grading report details before you pay, and sends the report and invoice with an insured delivery.

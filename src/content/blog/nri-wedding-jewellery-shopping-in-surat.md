@@ -1,6 +1,6 @@
 ---
 title: "NRI Wedding Jewellery Shopping in Surat: How Does It Work?"
-description: "Shortlist on a video call before you fly, choose in Surat or have it delivered within India, keep the itemised bill and reports, and check customs."
+description: "Plan with us on WhatsApp before you fly, choose in Surat or have it delivered within India, keep the itemised bill and reports, and check customs."
 pubDate: 2026-11-09
 tags: ["nri","wedding planning","diamond jewellery","surat"]
 draft: false
@@ -8,7 +8,7 @@ heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fil
 heroAlt: "Vaishnavi Jewels gift boxes used for insured delivery"
 ---
 
-NRI families can plan most of their wedding jewellery from abroad: shortlist designs on a WhatsApp video call before the trip, order any custom pieces early, and then see, try and collect everything in Surat during the visit, or have it delivered to a family address in India. Keep the itemised invoice and grading reports with the jewellery when you travel, and check the customs allowance of the country you are flying back to before you leave.
+NRI families can plan most of their wedding jewellery from abroad: shortlist designs on a WhatsApp before the trip, order any custom pieces early, and then see, try and collect everything in Surat during the visit, or have it delivered to a family address in India. Keep the itemised invoice and grading reports with the jewellery when you travel, and check the customs allowance of the country you are flying back to before you leave.
 
 ## Why do NRI families shop for wedding jewellery in Surat?
 
@@ -18,11 +18,11 @@ Surat is where much of the world's diamonds are cut and polished, so families fi
 
 Start four to eight weeks before your travel date:
 
-<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_videocall_20261111130856" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/concept/web_sec_videocall_20261111130856 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_videocall_20261111130856 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/concept/web_sec_videocall_20261111130856 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Customer shortlisting a diamond and polki choker set on a WhatsApp video call with Vaishnavi Jewels" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+<figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_videocall_20261111130856" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/concept/web_sec_videocall_20261111130856 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_videocall_20261111130856 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/concept/web_sec_videocall_20261111130856 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Customer choosing a diamond and polki choker set with Vaishnavi Jewels" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
 
 
 1. **Message us on WhatsApp** with the wedding date, the functions, the outfits and the budget you have in mind.
-2. **See a shortlist on a video call.** Our team shows pieces live, with grading report details for diamond pieces, at a time that suits your time zone.
+2. **Plan the shortlist with us.** Our team guides you personally, with grading report details for diamond pieces, at a time that suits your time zone.
 3. **Order custom pieces early.** Custom and bridal pieces take about 3 weeks (simple designs can be faster) from the final design, so order before you fly if you want them ready on arrival.
 4. **Book a visit slot** for your first days in Surat, so the shortlisted pieces are ready to try.
 
@@ -47,7 +47,7 @@ Most families plan a set for each function. A Polki set for the wedding ceremony
 
 ## How do I make the most of a short trip?
 
-Many NRI families have only a few days in Surat between other wedding errands, so a little planning helps. Fix the shortlist on video calls before you fly and share outfit photos for every function. Book your showroom visit for the first or second day of the trip, so there is time for small changes before you leave. Bring the outfits, or at least the blouses and dupattas, to try the pieces against real fabric. If a family member in India can attend the final fitting or receive the delivery, tell us early. Finally, keep a simple list of every piece, its function and its papers, so packing and travel are calm.
+Many NRI families have only a few days in Surat between other wedding errands, so a little planning helps. Plan the shortlist with us on WhatsApp before you fly and share outfit photos for every function. Book your showroom visit for the first or second day of the trip, so there is time for small changes before you leave. Bring the outfits, or at least the blouses and dupattas, to try the pieces against real fabric. If a family member in India can attend the final fitting or receive the delivery, tell us early. Finally, keep a simple list of every piece, its function and its papers, so packing and travel are calm.
 
 ## Frequently asked questions
 

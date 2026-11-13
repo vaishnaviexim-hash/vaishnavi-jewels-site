@@ -61,7 +61,7 @@ Light, delicate jewellery still deserves careful checking. At our Parle Point sh
 - **The laser inscription.** Every solitaire is laser-inscribed with its report number, which you can verify online on the laboratory's website.
 - **The BIS HUID hallmark.** All our gold jewellery carries a BIS HUID, which you can check yourself in the BIS Care app in a minute.
 
-If you are shortlisting from another city, we can show pieces on a video call, and payment is by NEFT or UPI with free insured [delivery across India](/delivery-across-india) to major cities.
+If you are shortlisting from another city, WhatsApp us and we will guide you personally, and payment is by NEFT or UPI with free insured [delivery across India](/delivery-across-india) to major cities.
 
 ## Frequently asked questions
 
@@ -77,4 +77,4 @@ A single bold necklace, either a wide diamond collar or a Polki choker, is the b
 
 Let the embroidery lead and keep the jewellery to two or three pieces with clean, open settings. Match the metal to the embroidery thread, rose or yellow gold for warm zari and white settings for silver work, and avoid large coloured stones that repeat what the fabric is already doing. A necklace that sits above the embroidered neckline, rather than over it, keeps both from clashing.
 
-Come and try pastel-friendly sets in natural daylight at Vaishnavi Jewels, 120 & 220, Rajhans Ornate, Parle Point, Surat, Monday to Saturday from 11 AM to 8 PM; [visit our showroom](/visit-us) or WhatsApp +91 99980 43886 to book a time or a video call.
+Come and try pastel-friendly sets in natural daylight at Vaishnavi Jewels, 120 & 220, Rajhans Ornate, Parle Point, Surat, Monday to Saturday from 11 AM to 8 PM; [visit our showroom](/visit-us) or WhatsApp +91 99980 43886 to book a time.

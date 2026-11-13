@@ -5,26 +5,25 @@
 import InfoPage from '../layouts/InfoPage.astro';
 import { business as b } from '../data/business.js';
 const faqs: [string, string][] = [
-  ['How do I book a visit to the Vaishnavi Jewels showroom?', 'Choose a showroom visit or a video call, pick a day and a 30-minute time, add your name and what you are looking for, and press "Send on WhatsApp". Our team confirms your time on WhatsApp.'],
-  ['Can I book a video call if I live outside Surat or abroad?', 'Yes. Choose "Video call" and we will show you pieces live, share certificates before anything is sent, and deliver by insured courier anywhere in India.'],
-  ['Is there any charge for booking?', 'No. Booking a showroom visit or a video call is free and you are under no obligation to buy.'],
+  ['How do I book a visit to the Vaishnavi Jewels showroom?', 'Pick a day and a 30-minute time, add your name and what you are looking for, and press "Send on WhatsApp". Our team confirms your time on WhatsApp.'],
+  ['Can I buy if I live outside Surat?', 'Yes. WhatsApp us and we will guide you personally, share certificates before anything is sent, and deliver by insured courier anywhere in India.'],
+  ['Is there any charge for booking?', 'No. Booking a showroom visit is free and you are under no obligation to buy.'],
 ];
 ---
 <InfoPage
-  title="Book a Showroom Visit or Video Call | Vaishnavi Jewels, Parle Point, Surat"
-  description="Book a free 30-minute showroom visit or video call with Vaishnavi Jewels, Rajhans Ornate Mall, Parle Point, Surat. Certified diamond jewellery from Rs 25,000."
+  title="Book a Showroom Visit | Vaishnavi Jewels, Parle Point, Surat"
+  description="Book a free 30-minute showroom visit with Vaishnavi Jewels, Rajhans Ornate Mall, Parle Point, Surat. Certified diamond jewellery from Rs 25,000."
   path="/book-a-visit"
   eyebrow="BOOK A VISIT"
-  heading="Book a showroom visit or video call"
+  heading="Book a showroom visit"
   intro="Pick a time that suits you. We keep the pieces you want to see ready, so your visit is unhurried."
-  hero={{ id: 'vj/concept/web_sec_videocall_20261111130856', alt: 'Customer shortlisting a diamond and polki choker set on a WhatsApp video call with Vaishnavi Jewels' }}
+  hero={{ id: 'vj/concept/web_sec_videocall_20261111130856', alt: 'Customer choosing a diamond and polki choker set with Vaishnavi Jewels' }}
   faqs={faqs}
 >
   <form id="vj-book" class="vj-book" novalidate>
     <fieldset>
-      <legend>1. How would you like to meet?</legend>
+      <legend>1. Your visit</legend>
       <label class="opt"><input type="radio" name="type" value="Showroom visit" checked /> Showroom visit at Parle Point</label>
-      <label class="opt"><input type="radio" name="type" value="Video call" /> Video call (outside Surat or abroad)</label>
     </fieldset>
 
     <fieldset>

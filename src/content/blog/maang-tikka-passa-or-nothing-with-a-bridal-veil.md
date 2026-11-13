@@ -65,7 +65,7 @@ Because we make jewellery in our own manufacturing unit, we can adjust a tikka's
 
 ## How do I try this at Vaishnavi Jewels?
 
-Bring your dupatta or veil to our showroom, or a photo of how it will be draped, and we will try a few tikkas, passas and earrings with it. We have a wide variety of [bridal jewellery](/bridal-jewellery) and [Polki jewellery](/polki-jewellery), and we help you get exactly the look you want, made to suit your budget. If you are outside Surat, we can do this on a video call, and we offer free insured delivery to major Indian cities.
+Bring your dupatta or veil to our showroom, or a photo of how it will be draped, and we will try a few tikkas, passas and earrings with it. We have a wide variety of [bridal jewellery](/bridal-jewellery) and [Polki jewellery](/polki-jewellery), and we help you get exactly the look you want, made to suit your budget. If you are outside Surat, WhatsApp us and we will guide you personally, and we offer free insured delivery to major Indian cities.
 
 ## Frequently asked questions
 

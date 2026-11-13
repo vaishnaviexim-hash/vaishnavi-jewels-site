@@ -35,7 +35,7 @@ Uncut diamonds are flat and irregular in outline, with a soft glow rather than t
 
 ## Buying Polki at Vaishnavi Jewels
 
-We make Polki chokers, long necklaces, earrings and full bridal sets in our own manufacturing unit in Surat, so we can tell you exactly how each piece is made and adjust a design to suit your budget. See our [Polki jewellery](/polki-jewellery) and [bridal jewellery](/bridal-jewellery) pages, or WhatsApp +91 99980 43886 for a video call.
+We make Polki chokers, long necklaces, earrings and full bridal sets in our own manufacturing unit in Surat, so we can tell you exactly how each piece is made and adjust a design to suit your budget. See our [Polki jewellery](/polki-jewellery) and [bridal jewellery](/bridal-jewellery) pages, or WhatsApp +91 99980 43886.
 
 ## Frequently asked questions
 

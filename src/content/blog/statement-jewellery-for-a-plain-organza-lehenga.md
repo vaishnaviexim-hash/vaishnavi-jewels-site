@@ -84,4 +84,4 @@ Lighter diamond or rose-gold pieces, pearls and soft coloured stones suit daylig
 
 Pick one hero piece, echo one stone colour from the embroidery, and keep the rest in proportion. Skip extra layers where the work is heaviest.
 
-Try statement pieces against your outfit at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886 for a video call.
+Try statement pieces against your outfit at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886.

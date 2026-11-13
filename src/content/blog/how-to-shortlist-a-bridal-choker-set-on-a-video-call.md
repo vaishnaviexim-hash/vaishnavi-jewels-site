@@ -3,7 +3,7 @@ title: "Can I See Bridal Choker Sets in My Budget Before I Visit?"
 description: "Yes. Share your wedding date, outfit and budget on WhatsApp, see a shortlist of bridal chokers on a video call, then visit to try your favourites."
 pubDate: 2026-11-09
 tags: ["bridal","choker","video call","wedding planning"]
-draft: false
+draft: true
 heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_900/vj/concept/web_sec_videocall_20261111130856"
 heroAlt: "Customer shortlisting a diamond and polki choker set on a WhatsApp video call with Vaishnavi Jewels"
 ---

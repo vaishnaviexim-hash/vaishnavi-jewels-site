@@ -62,7 +62,7 @@ Whatever look you choose, ask for the papers. Every solitaire comes with its own
 
 The easiest way is to bring a photo of your lehenga, or a swatch of the fabric, to our showroom. We will place a few necklaces against it so you can see which stones stand out. We have a wide variety of [bridal jewellery](/bridal-jewellery) and [Polki jewellery](/polki-jewellery), and we can make a design to order, made to suit your budget. Custom bridal pieces take about 3 weeks (simple designs can be faster), so plan ahead of your wedding date.
 
-If you live outside Surat, we can show pieces on a video call against your outfit photo and share the report details on WhatsApp before you decide. We offer free insured delivery to major Indian cities.
+If you live outside Surat, send us your outfit photo on WhatsApp and we will share the report details before you decide. We offer free insured delivery to major Indian cities.
 
 ## Frequently asked questions
 

@@ -63,4 +63,4 @@ Yes. Many traditional Polki pieces are set with fine gold foil in the Kundan way
 
 The gold in a Polki piece can carry a BIS HUID hallmark, and at Vaishnavi Jewels every piece is HUID hallmarked. You can check the code in the BIS Care app. You can also read [our FAQ](/faq) for more on hallmarks and papers.
 
-To see Polki and Kundan pieces side by side, WhatsApp us on +91 99980 43886 for a video call, or book a visit to our Parle Point showroom.
+To see Polki and Kundan pieces side by side, WhatsApp us on +91 99980 43886, or book a visit to our Parle Point showroom.

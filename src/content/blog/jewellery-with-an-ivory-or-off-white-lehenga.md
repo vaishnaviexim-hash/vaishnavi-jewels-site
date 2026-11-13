@@ -76,4 +76,4 @@ Choose one focal piece, such as a Polki choker or a diamond necklace, and keep e
 
 Polki usually suits the ceremony with a heavy lehenga, diamonds suit the reception in a lighter outfit, and lighter pieces of either work for the sangeet and mehendi.
 
-See ivory-friendly combinations at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886 for a video call.
+See ivory-friendly combinations at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886.

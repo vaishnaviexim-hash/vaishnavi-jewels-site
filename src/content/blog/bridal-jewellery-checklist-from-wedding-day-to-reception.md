@@ -89,4 +89,4 @@ Polki usually suits the wedding ceremony with a heavy lehenga, diamonds suit the
 
 Graceful, comfortable sets that complement the bride without competing, such as a classic diamond set or a medium Polki necklace. Families often choose together so the looks feel connected.
 
-Start your checklist with us at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886 for a video call.
+Start your checklist with us at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886.

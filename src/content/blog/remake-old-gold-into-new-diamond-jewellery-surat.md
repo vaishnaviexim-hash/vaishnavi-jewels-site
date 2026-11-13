@@ -42,7 +42,7 @@ Yes. Some families want a completely new design, while others want to keep a mot
 
 ## Is it possible to do this without coming to Surat?
 
-You can start everything from home. Send photos of your old pieces and the designs you like on WhatsApp, and we can show options on a video call. Many families from Ahmedabad, Vadodara and Mathura shop with us this way. Because old gold has to be weighed and checked in person, the exchange itself is done when the gold reaches us; our team will explain the simplest way for your city. See [delivery across India](/delivery-across-india) for how finished pieces are sent.
+You can start everything from home. Send photos of your old pieces and the designs you like on WhatsApp, and we will guide you personally. Many families from Ahmedabad, Vadodara and Mathura shop with us this way. Because old gold has to be weighed and checked in person, the exchange itself is done when the gold reaches us; our team will explain the simplest way for your city. See [delivery across India](/delivery-across-india) for how finished pieces are sent.
 
 ## Which designs work well for a remake?
 

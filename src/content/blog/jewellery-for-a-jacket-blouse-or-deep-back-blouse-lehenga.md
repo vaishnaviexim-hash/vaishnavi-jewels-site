@@ -66,4 +66,4 @@ Long drops, chandbalis or ear chains work well, as they lead the eye towards the
 
 Yes, ideally. A back piece in the same metal and stone colour as the choker makes the front and the back read as one look.
 
-To try chokers and collars with your blouse, WhatsApp us on +91 99980 43886 for a video call, or book a visit to our Parle Point showroom.
+To try chokers and collars with your blouse, WhatsApp us on +91 99980 43886, or book a visit to our Parle Point showroom.

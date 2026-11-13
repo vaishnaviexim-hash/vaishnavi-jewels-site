@@ -53,7 +53,7 @@ Usually, yes. In most solitaire settings the girdle is visible between the prong
 
 ## What if I cannot visit Surat?
 
-We offer video-call viewing, where we show you the stone, the report and the inscription on camera, and share the report number so you can check it online before paying. Payment is by NEFT or UPI, and we offer free insured delivery to major Indian cities. See [delivery across India](/delivery-across-india).
+We share the report number so you can check it online before paying. Payment is by NEFT or UPI, and we offer free insured delivery to major Indian cities. See [delivery across India](/delivery-across-india).
 
 ## How long does a solitaire viewing take?
 

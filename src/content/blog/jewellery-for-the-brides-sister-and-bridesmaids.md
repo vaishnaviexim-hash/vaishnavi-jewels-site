@@ -48,7 +48,7 @@ Yes. Because we make jewellery in our own manufacturing unit, we can create ligh
 
 ## How can the family plan everyone's jewellery together?
 
-The easiest way is to start from the bride's set and work outwards. Fix the bride's jewellery for each function first, note its metal tone and main stone colour, and share a photo with the sisters and cousins. Each person then picks one piece that echoes that detail and suits her own outfit. A shared WhatsApp group with photos of everyone's outfits helps avoid two people choosing the same look. If several family members are buying together, a single video call with our team lets everyone see options side by side, and pieces can be kept aside for a joint visit. This keeps the family looking coordinated in photographs while letting each person wear something she loves.
+The easiest way is to start from the bride's set and work outwards. Fix the bride's jewellery for each function first, note its metal tone and main stone colour, and share a photo with the sisters and cousins. Each person then picks one piece that echoes that detail and suits her own outfit. A shared WhatsApp group with photos of everyone's outfits helps avoid two people choosing the same look. If several family members are buying together, tell us in advance and we will keep pieces aside for one joint visit. This keeps the family looking coordinated in photographs while letting each person wear something she loves.
 
 ## Frequently asked questions
 
@@ -64,4 +64,4 @@ Coordinated is better than identical. Agree on one metal tone and one shared det
 
 Diamond studs or drops, a slim Polki choker, a bracelet and a ring are easy to wear again at festivals and family functions. They also make thoughtful gifts from the bride.
 
-To plan the family's jewellery together, WhatsApp us on +91 99980 43886 for a video call, or book a visit to our Parle Point showroom.
+To plan the family's jewellery together, WhatsApp us on +91 99980 43886, or book a visit to our Parle Point showroom.

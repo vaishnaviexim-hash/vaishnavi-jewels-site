@@ -71,4 +71,4 @@ A diamond or light Polki necklace with matching earrings suits a saree, sitting 
 
 Keep it soft and clean: uncut or rose-cut diamonds, one hero necklace and slim earrings, so the fabric's shine does not compete.
 
-Choose your engagement look at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886 for a video call.
+Choose your engagement look at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886.

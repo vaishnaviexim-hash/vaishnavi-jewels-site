@@ -31,7 +31,7 @@ It is lovely when the mothers of the bride and groom wear a similar metal tone, 
 
 ## Planning wedding jewellery for the family
 
-We help families plan jewellery for every function, from the mother of the bride to the bridesmaids, in Polki and certified diamond jewellery made to suit the budget. See our [bridal jewellery](/bridal-jewellery) page, visit us at Rajhans Ornate Mall, Parle Point, Surat, or WhatsApp +91 99980 43886 for a video call.
+We help families plan jewellery for every function, from the mother of the bride to the bridesmaids, in Polki and certified diamond jewellery made to suit the budget. See our [bridal jewellery](/bridal-jewellery) page, visit us at Rajhans Ornate Mall, Parle Point, Surat, or WhatsApp +91 99980 43886.
 
 ## Frequently asked questions
 

@@ -76,4 +76,4 @@ Pick one hero piece, echo one stone colour from the embroidery, and keep the res
 
 Ivory is a clean base, so gold-set Polki, uncut diamonds, pearls with emeralds or a diamond choker can lead the look.
 
-Try reception looks against your outfit at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886 for a video call.
+Try reception looks against your outfit at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886.

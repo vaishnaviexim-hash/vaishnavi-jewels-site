@@ -51,7 +51,7 @@ Usually, yes, because in most prong settings the girdle stays visible between th
 
 ## What if I cannot come to Surat?
 
-We can show the solitaires and their reports on a video call, share the report number so you can check it online, and discuss the design with sketches and photos. Payment is by NEFT or UPI, and we offer free insured delivery to major Indian cities. See [delivery across India](/delivery-across-india).
+We can share the report number so you can check it online, and discuss the design with sketches and photos. Payment is by NEFT or UPI, and we offer free insured delivery to major Indian cities. See [delivery across India](/delivery-across-india).
 
 ## Where can I see these solitaires?
 

@@ -43,11 +43,11 @@ Ring sizes change over the years, so ask how resizing works and how exchange or 
 
 ## Choosing a solitaire at Vaishnavi Jewels
 
-We show every solitaire with its report and inscription, help you compare stones in person or on a video call, and set the diamond in our own manufacturing unit to suit your budget. See our [solitaire rings](/solitaire-rings) or WhatsApp +91 99980 43886.
+We show every solitaire with its report and inscription, help you compare stones in person, and set the diamond in our own manufacturing unit to suit your budget. See our [solitaire rings](/solitaire-rings) or WhatsApp +91 99980 43886.
 
 ## Frequently asked questions
 
-### Can I see a solitaire on a video call before visiting?
+### Can you help me choose a solitaire before I visit?
 
 Yes. We show the stone live and share the report details on WhatsApp before you decide.
 

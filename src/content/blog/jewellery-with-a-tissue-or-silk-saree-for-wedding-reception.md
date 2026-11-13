@@ -73,4 +73,4 @@ Polki usually suits the wedding ceremony with a heavy lehenga, while diamonds su
 
 Often a rani haar or long necklace with a choker, a nath, a maang tikka or matha patti, earrings and bangles. Polki and gold-set uncut diamonds suit these sarees well.
 
-Bring your reception saree to our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886 for a video call.
+Bring your reception saree to our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886.

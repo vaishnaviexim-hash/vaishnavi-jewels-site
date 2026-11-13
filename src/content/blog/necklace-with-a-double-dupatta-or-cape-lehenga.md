@@ -72,4 +72,4 @@ A single drop tikka suits most faces and a centre parting; a matha patti suits a
 
 Pick one hero piece, echo one stone colour from the embroidery and keep the rest in proportion. Skip extra layers where the work is heaviest.
 
-Bring your dupatta and outfit photos to our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886 for a video call.
+Bring your dupatta and outfit photos to our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886.
