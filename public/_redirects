@@ -14,11 +14,10 @@
 /v/kc     https://res.cloudinary.com/rknejib2/video/upload/v1793099100/vj/flowstory/flow_20261029_1.mp4  302
 /v/bride  https://res.cloudinary.com/rknejib2/video/upload/v1793176501/vj/flowstory/flow_20261030_1.mp4  302
 # Review short links for customers (owner 14/11/2026, R-REVIEWLINKS)
-/r/google  https://g.page/r/Ce9kbGlQK0O8EBE/review  302
-/r/jd      https://jsdl.in/RSL-CTJ1794629486  302
-/r/tp      https://www.trustpilot.com/evaluate/vaishnavijewels.com  302
-/r/wmg     https://www.wedmegood.com/profile/Vaishnavi-Jewels-26774430/reviews  302
-/r/ww      https://www.weddingwire.in/bridal-jewellery/vaishnavi-jewels--e497557  302
+/rate/jd   https://jsdl.in/RSL-CTJ1794629486  302
+/rate/tp   https://www.trustpilot.com/evaluate/vaishnavijewels.com  302
+/rate/wmg  https://www.wedmegood.com/profile/Vaishnavi-Jewels-26774430/reviews  302
+/rate/ww   https://www.weddingwire.in/bridal-jewellery/vaishnavi-jewels--e497557  302
 # Any other old blog address -> new blog
 /blog/f     /blog  301
 /blog/f/*   /blog  301
