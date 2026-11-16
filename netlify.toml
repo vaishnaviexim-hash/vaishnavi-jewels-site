@@ -1,6 +1,9 @@
+# Live site is served by Cloudflare Pages. Netlify copy is not used (owner 16/11):
+# every Netlify build is skipped so it uses no Netlify credits. Remove the ignore line to re-enable.
 [build]
   command = "npm run build"
   publish = "dist"
+  ignore = "exit 0"
 
 # Pings IndexNow (Bing etc.) with all sitemap URLs after each production deploy
 [[plugins]]
