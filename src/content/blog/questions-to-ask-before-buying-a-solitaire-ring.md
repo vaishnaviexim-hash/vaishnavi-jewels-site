@@ -12,7 +12,7 @@ Before you buy a solitaire ring, ask to see the grading report, ask for the lase
 
 ## 1. Which laboratory graded this diamond, and may I see the report?
 
-Every solitaire should have its own report from a recognised laboratory such as IGI, EGL or TGL. You can check the report number on the laboratory's website.
+Every solitaire should have its own report from a recognised laboratory such as GIA or IGI. You can check the report number on the laboratory's website.
 
 ## 2. Can you show me the inscription on the stone?
 
