@@ -1,6 +1,6 @@
 ---
 title: "Where in Surat Can I See Certified Solitaires Under a Loupe?"
-description: "At Vaishnavi Jewels, Parle Point, Surat, you can match each solitaire's IGI, EGL or TGL report to its laser inscription under a loupe."
+description: "At Vaishnavi Jewels, Parle Point, Surat, you can match each solitaire's GIA or IGI report to its laser inscription under a loupe."
 pubDate: 2026-10-26
 tags: ["solitaire rings","surat","diamond certificate","laser inscription"]
 draft: false
@@ -8,7 +8,7 @@ heroImage: "https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fil
 heroAlt: "Close-up of a certified diamond held in tweezers, showing the report number laser-inscribed on its girdle"
 ---
 
-You can see certified solitaires under a loupe at Vaishnavi Jewels, 120, Rajhans Ornate - High Street Retail Mall, Parle Point, Surat. Every solitaire we sell has its own grading report from IGI, EGL or TGL, and its report number is laser-inscribed on the stone. At the counter, we show you the inscription under a 10x loupe, match it to the report, and help you check the number on the laboratory's website before you pay.
+You can see certified solitaires under a loupe at Vaishnavi Jewels, 120, Rajhans Ornate - High Street Retail Mall, Parle Point, Surat. Every solitaire we sell has its own grading report from GIA or IGI, and its report number is laser-inscribed on the stone. At the counter, we show you the inscription under a 10x loupe, match it to the report, and help you check the number on the laboratory's website before you pay.
 
 ## Why should I see a solitaire under a loupe before buying?
 
