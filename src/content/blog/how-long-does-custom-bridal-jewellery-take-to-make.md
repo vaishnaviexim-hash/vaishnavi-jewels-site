@@ -37,11 +37,11 @@ Work backwards from the wedding date, not forwards from today.
 - **1 week before:** keep this free for last-minute resizing and for packing. Do not plan to collect a bridal set the day before.
 - **2 to 4 weeks before:** this is the making window. The design must be final before it starts.
 - **6 to 8 weeks before:** place the order. This gives the full making time plus a buffer for a trial and for delivery.
-- **Earlier than that:** start shortlisting. Visit the showroom or do a video-call viewing, decide between Polki, Jadau or diamond, and settle the budget so the design can be made to suit it.
+- **Earlier than that:** start shortlisting. Visit the showroom or ask for photos and videos of pieces on WhatsApp, decide between Polki, Jadau or diamond, and settle the budget so the design can be made to suit it.
 
 If you are ordering a complete trousseau with several sets, or if you want pieces that match an outfit that is itself being stitched, start even earlier so the jewellery and the lehenga can be finalised together.
 
-Outstation and NRI brides should add delivery time on top. We offer free insured [delivery across India](/delivery-across-india) to major cities, with viewing on video call and payment by NEFT or UPI, so you can approve the final piece before it ships.
+Outstation and NRI brides should add delivery time on top. We offer free insured [delivery across India](/delivery-across-india) to major cities, with photos and videos of the finished piece on WhatsApp and payment by NEFT or UPI, so you can approve the final piece before it ships.
 
 ## What can delay a custom bridal order?
 
@@ -72,10 +72,10 @@ Confirm the design at least 6 to 8 weeks before the wedding, which for a late-No
 
 ### How do I choose a wedding band that sits flush with my solitaire engagement ring?
 
-Bring the engagement ring with you, or send clear photos on a video call, and we will shape the band to follow the solitaire's setting so the two sit together without a gap. Because the band is made in our own manufacturing unit, its curve, width and gold karat can be matched to your ring. A matched band is a custom piece, so allow the same 2 to 4 weeks for it.
+Bring the engagement ring with you, or send us clear photos of it on WhatsApp, and we will shape the band to follow the solitaire's setting so the two sit together without a gap. Because the band is made in our own manufacturing unit, its curve, width and gold karat can be matched to your ring. A matched band is a custom piece, so allow the same 2 to 4 weeks for it.
 
 ### Polki, Kundan or Jadau: which lasts and can be re-worn after the wedding?
 
 Polki (uncut diamonds set in gold) and Jadau (stones embedded in gold using the traditional jadau technique) are both gold-based and can be re-worn, re-set or passed on, while traditional Kundan is often glass-based and is mainly a style choice. If re-wearing matters, choose a [Polki jewellery](/polki-jewellery) or Jadau set where the choker and earrings also work on their own with sarees. Ask for the BIS HUID hallmark on the gold and the grading report for the Polki so the piece can be identified years later.
 
-Planning a wedding date? Tell us when it is, and we will plan the jewellery timeline with you. Visit us at Rajhans Ornate Mall, Parle Point, Surat, Monday to Saturday, 11 AM to 8 PM, or WhatsApp +91 99980 43886 to [book a visit or a video call](/visit-us).
+Planning a wedding date? Tell us when it is, and we will plan the jewellery timeline with you. Visit us at Rajhans Ornate Mall, Parle Point, Surat, Monday to Saturday, 11 AM to 8 PM, or WhatsApp +91 99980 43886 to [book a visit](/visit-us).
