@@ -31,7 +31,7 @@ Think contrast, not matching. Stones in the same red family can disappear agains
 4. **White diamonds:** faceted diamonds give the sharpest contrast and the most modern finish. A diamond choker with a slim long necklace keeps the look light and bright.
 5. **Rubies:** use them carefully. Small ruby accents inside a Polki set add depth, but a full ruby necklace on a deep red lehenga can merge into the outfit.
 
-If you are choosing diamond pieces, every solitaire we sell comes with its own grading report from IGI, EGL or TGL, and the report number is laser-inscribed on the stone so you can verify it on the laboratory's website. Small diamonds are described by total weight, number of pieces and quality, so you know exactly what is in your necklace.
+If you are choosing diamond pieces, every solitaire we sell comes with its own grading report from GIA or IGI, and the report number is laser-inscribed on the stone so you can verify it on the laboratory's website. Small diamonds are described by total weight, number of pieces and quality, so you know exactly what is in your necklace.
 
 ## Choker or long necklace for a red lehenga?
 
