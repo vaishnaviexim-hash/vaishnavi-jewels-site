@@ -28,7 +28,7 @@ Start four to eight weeks before your travel date:
 
 ## What happens during the visit?
 
-In the showroom you can try the shortlisted pieces with your outfits, see each solitaire under a loupe and match its laser-inscribed number to its IGI, EGL or TGL report, and check the BIS HUID on the gold in the BIS Care app. Payment is by NEFT, UPI or cash. If you cannot come to Surat, we deliver within India with free insured delivery to major Indian cities, so the jewellery can go to a family address before you arrive. We do not ship overseas. See [delivery across India](/delivery-across-india) for details.
+In the showroom you can try the shortlisted pieces with your outfits, see each solitaire under a loupe and match its laser-inscribed number to its GIA or IGI report, and check the BIS HUID on the gold in the BIS Care app. Payment is by NEFT, UPI or cash. If you cannot come to Surat, we deliver within India with free insured delivery to major Indian cities, so the jewellery can go to a family address before you arrive. We do not ship overseas. See [delivery across India](/delivery-across-india) for details.
 
 ## Which papers should I keep for travel?
 
