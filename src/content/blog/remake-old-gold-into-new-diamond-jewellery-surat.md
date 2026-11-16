@@ -31,7 +31,7 @@ A clear bill protects you, so look for these on every remake:
 
 - **The weight and karat of the old gold** you gave, shown separately.
 - **The new piece's gold weight and karat.** We make diamond jewellery in 9K, 14K and 18K gold.
-- **The diamond details:** for a solitaire, the grading report number from IGI, EGL or TGL; for smaller diamonds, the total weight, number of pieces and quality.
+- **The diamond details:** for a solitaire, the grading report number from GIA or IGI; for smaller diamonds, the total weight, number of pieces and quality.
 - **The BIS HUID** stamped on the new piece, which you can check yourself in the BIS Care app.
 
 If you want to understand the hallmark first, our guide on [how to check gold purity at home](/faq) explains why the HUID is a more dependable check than home tests.
