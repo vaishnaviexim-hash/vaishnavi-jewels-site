@@ -14,7 +14,7 @@ Surat is the diamond city, so you have a lot of choice. These six checks work wh
 
 ## 1. Ask to see the grading report before you decide
 
-Every solitaire should come with its own report from a recognised laboratory such as IGI, EGL or TGL. The report states the carat weight, colour, clarity and cut, and whether the diamond is natural or lab-grown. Read it before you agree a deal, not after. You can enter the report number on the laboratory's own website and check that the details match.
+Every solitaire should come with its own report from a recognised laboratory such as GIA or IGI. The report states the carat weight, colour, clarity and cut, and whether the diamond is natural or lab-grown. Read it before you agree a deal, not after. You can enter the report number on the laboratory's own website and check that the details match.
 
 For pieces with many small diamonds, such as earrings, pendants and necklace sets, the report or invoice should show the total diamond weight, the number of diamonds and their quality.
 
@@ -57,4 +57,4 @@ Yes. The inscription is on the girdle and can be read under a 10x loupe or a mic
 
 ### Is it safe to buy diamond jewellery without visiting the showroom?
 
-It can be, if the jeweller shows you the piece live, shares the grading report details before you pay, and sends the report and invoice with an insured delivery.
+It can be, if the jeweller sends clear photos and videos of the actual piece, shares the grading report details before you pay, and sends the report and invoice with an insured delivery.
