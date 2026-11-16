@@ -22,7 +22,7 @@ Here is how a custom solitaire ring comes together with us:
 
 
 1. **Tell us what you are looking for.** Share the shape, approximate size and the look you have in mind on WhatsApp or at the showroom. We keep suitable stones ready for your visit.
-2. **See the stones with their reports.** Every solitaire comes with its own grading report from IGI, EGL or TGL, which states its quality and its origin, natural or lab-grown.
+2. **See the stones with their reports.** Every solitaire comes with its own grading report from GIA or IGI, which states its quality and its origin, natural or lab-grown.
 3. **Check the laser inscription.** Under a 10x loupe, read the report number inscribed on the girdle and match it to the report. You can also check the number on the laboratory's website.
 4. **Choose the design.** Pick the setting style (prongs, bezel, halo or side stones), the band width and profile, and the gold: yellow, white or rose, in the karat you prefer.
 5. **Approve the design.** We confirm the design, the finger size and the timeline with you before work begins.
@@ -44,7 +44,7 @@ Usually, yes, because in most prong settings the girdle stays visible between th
 
 ## What papers will I receive?
 
-- The grading report for the solitaire from IGI, EGL or TGL.
+- The grading report for the solitaire from GIA or IGI.
 - The BIS HUID hallmark on the gold mount, which you can check in the BIS Care app.
 - An itemised invoice with the report number, the stone details and the gold weight and purity.
 - If the band has small diamonds, these are described with their total weight, number of pieces and quality.
