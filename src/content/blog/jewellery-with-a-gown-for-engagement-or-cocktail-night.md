@@ -47,7 +47,7 @@ Yes, in small amounts. A single emerald, ruby or sapphire-coloured drop on a dia
 
 ## What should I check before buying?
 
-Every solitaire at Vaishnavi Jewels comes with its own grading report from IGI, EGL or TGL, and its report number is laser-inscribed on the stone, which you can verify on the laboratory's website. Every jewellery piece comes with a jewellery grading report that states the quality and origin, natural or lab-grown. The gold carries a BIS HUID hallmark you can check in the BIS Care app.
+Every solitaire at Vaishnavi Jewels comes with its own grading report from GIA or IGI, and its report number is laser-inscribed on the stone, which you can verify on the laboratory's website. Every jewellery piece comes with a jewellery grading report that states the quality and origin, natural or lab-grown. The gold carries a BIS HUID hallmark you can check in the BIS Care app.
 
 We make jewellery in our own manufacturing unit, so a design can be customised in gold karat, diamond quality and size, made to suit your budget. Custom pieces take about 3 weeks (simple designs can be faster) depending on the design. With over 3,000 designs in the showroom, you can try several looks with a photo of your outfit.
 
