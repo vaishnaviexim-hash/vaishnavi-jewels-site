@@ -47,7 +47,7 @@ Our guide on [how to read an IGI certificate for lab-grown diamond jewellery](/b
 
 ## How can I verify my lab-grown diamond myself?
 
-At Vaishnavi Jewels, every solitaire comes with its own grading report from IGI, EGL or TGL, and its report number is laser-inscribed on the stone. You can:
+At Vaishnavi Jewels, every solitaire comes with its own grading report from GIA or IGI, and its report number is laser-inscribed on the stone. You can:
 
 1. Look at the girdle under a 10x loupe to read the inscription.
 2. Check that it matches the number on your report.
@@ -71,7 +71,7 @@ Yes, they test as diamond because they are diamond. A tester cannot show how a d
 
 ### Does a lab-grown diamond come with an IGI certificate and a laser inscription?
 
-At Vaishnavi Jewels, every lab-grown solitaire comes with a grading report from IGI, EGL or TGL stating that it is laboratory-grown, and the report number is laser-inscribed on the stone so you can verify it online.
+At Vaishnavi Jewels, every lab-grown solitaire comes with a grading report from GIA or IGI stating that it is laboratory-grown, and the report number is laser-inscribed on the stone so you can verify it online.
 
 ### How do I verify an IGI diamond report online?
 
