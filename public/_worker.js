@@ -1586,7 +1586,7 @@ async function vjContactHook(url, env) {
 // The template's button is https://vaishnavijewels.com/r/<token> (random, no personal data): the click is logged and the customer goes
 // straight on to Google's write-review page (unknown / old tokens go there too, so nobody ever sees an error).
 // The header photo is the piece's own tag photo (jpg/png) through /hooks/vj-reviewimg?t=<random> for 3 days, otherwise the brand image.
-const VJ_RV_HOOK = 'https://hook.eu1.make.com/1rdirr1j8xtk4ifnvvnuk1fbzhnys7ro'; // Make hook 4022375 (S-REVIEWASK sender)
+const VJ_RV_HOOK = 'https://n8n-epei.srv2114308.hstgr.cloud/webhook/vj-rv-in-d487500b32c00b2c'; // n8n S-REVIEWASK sender 11UyYdcSxtUmajyk (moved from Make 8320282, R-20261117-OFFMAKE)
 const VJ_RV_LINK = 'https://g.page/r/Ce9kbGlQK0O8EBE/review'; // owner 02/11 14:27: official GBP review link (opens the Google Maps app where the customer is signed in); was search.google.com/local/writereview?placeid=ChIJa5MF_XNS4DsR72RsaVArQ7w
 const VJ_RV_BRAND_PID = 'v1793975074/vj/design_gemini/review_header_model_emerald_20261106195410.jpg'; // owner 06/11 19:13: model-worn poster, not the grey logo card
 // owner 06/11 19:16-19:17: the header shows THE piece the customer bought (its tag photo) in a Vaishnavi Jewels frame, so they can post that very photo in the
@@ -3641,7 +3641,7 @@ async function vjEnqWho(env, who) { if (!who) return null; if (who.role === 'adm
 const VJ_ENQ_ST = ['New', 'Messaged', 'Called', 'Visit booked', 'Visited', 'Quote', 'Bought', 'Not interested', 'Not relevant', 'Closed'];
 const VJ_ENQ_CLOSED = new Set(['Bought', 'Not interested', 'Not relevant', 'Closed']);
 const VJ_ENQ_TEAM = new Set(['7567400099', '9374050969', '9099763201']); // owners / Mihir testing Aashvi - not enquiries
-const VJ_ENQ_HOOK = 'https://hook.eu1.make.com/s5gudt23wsigqws6v3t11vi7rl6wojug'; // Make hook 4026811 (scenario 8333273, sends to Abhinav only): gets only a one-time token
+const VJ_ENQ_HOOK = 'https://n8n-epei.srv2114308.hstgr.cloud/webhook/vj-enq-in-5c4b51340d413f39'; // n8n twkjv4YkW7sMYOK9 (moved from Make 8333273, R-20261117-OFFMAKE; sends to Abhinav only): gets only a one-time token
 let vjEnqOk = false, vjEnqMem = null;
 async function vjEnqT(env) {
   if (vjEnqOk) return;
