@@ -1,6 +1,6 @@
 ---
 title: "Red Lehenga Jewellery Combinations for Your Wedding"
-description: "The best jewellery combinations for a red bridal lehenga: Polki or Jadau with emeralds and pearls, or a diamond choker with a layered long necklace - with simple styling tips."
+description: "Best jewellery for a red bridal lehenga: Polki or Jadau with emeralds and pearls, or a diamond choker with a layered long necklace - plus styling tips."
 pubDate: 2026-10-08
 tags: ["bridal jewellery","red lehenga","polki","wedding look"]
 draft: false

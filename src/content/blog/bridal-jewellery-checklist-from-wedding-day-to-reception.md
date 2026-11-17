@@ -1,6 +1,6 @@
 ---
 title: "Complete Bridal Jewellery Checklist for an Indian Wedding"
-description: "The full bridal jewellery list, function by function - wedding, reception, sangeet, mehendi - with what to buy, what to repeat and when to order. Save it for your planning."
+description: "The full bridal jewellery list, function by function - wedding, reception, sangeet, mehendi - with what to buy, what to repeat and when to order."
 pubDate: 2026-10-26
 tags: ["bridal jewellery","checklist","wedding planning","trousseau"]
 draft: false
