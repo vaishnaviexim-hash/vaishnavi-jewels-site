@@ -1,6 +1,6 @@
 ---
-title: "Bridal Jewellery Checklist: Wedding Day to Reception"
-description: "A bride needs a main necklace set, earrings, tikka, bangles, rings and nath for the wedding, then lighter sets for the reception and other functions."
+title: "Complete Bridal Jewellery Checklist for an Indian Wedding"
+description: "The full bridal jewellery list, function by function - wedding, reception, sangeet, mehendi - with what to buy, what to repeat and when to order. Save it for your planning."
 pubDate: 2026-10-26
 tags: ["bridal jewellery","checklist","wedding planning","trousseau"]
 draft: false

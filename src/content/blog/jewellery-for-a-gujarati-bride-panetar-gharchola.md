@@ -1,6 +1,6 @@
 ---
-title: "Jewellery for a Gujarati Bride With a Panetar or Gharchola"
-description: "A Gujarati bride often wears a rani haar or long necklace with a choker, a nath, a maang tikka, earrings and bangles alongside her chudo."
+title: "Gujarati Wedding Jewellery Checklist: Panetar & Gharchola"
+description: "What a Gujarati bride wears with her panetar and gharchola - rani haar, choker, nath, tikka, chudo and bangles - and which Polki or diamond sets suit them best."
 pubDate: 2026-10-26
 tags: ["gujarati bride","panetar","gharchola","bridal jewellery"]
 draft: false
