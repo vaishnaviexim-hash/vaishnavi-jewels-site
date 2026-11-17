@@ -1417,7 +1417,7 @@ async function vjSummaryHook(url, env) { // C-20261026-TAGSUMMARY: one-time hand
 // {token} to the Make hook below; Make fetches /hooks/vj-estdue?t=token once and sends each reminder (template lead_alert_v1) to that
 // person's own WhatsApp. "Done" on the Estimates list stops the reminders.
 let vjEstOk = false;
-const VJ_EST_HOOK = 'https://hook.eu1.make.com/j22cautbbhusa86ul6uhp4p64ixpkdqs';
+const VJ_EST_HOOK = 'https://n8n-epei.srv2114308.hstgr.cloud/webhook/vj-est-in-f8043cb1e7874068'; // n8n H35QzvKlLdMxjoyE (moved from Make 8234447, R-20261117-OFFMAKE)
 const VJ_EST_TO = { mihir: ['919099763201', 'Mihir'], shilpi: ['919374050969', 'Shilpi ji'], abhinav: ['917567400099', 'Abhinav'] }; // Team_Access 28/10
 async function vjEstT(env) { if (!vjEstOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_estimates (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjEstOk = true; } }
 const vjAddDays = (ymd, n) => new Date(Date.parse(ymd + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10);
