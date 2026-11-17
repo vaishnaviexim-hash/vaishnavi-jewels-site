@@ -22,7 +22,7 @@ This is your fullest look. A typical ceremony list:
 6. **Rings:** one statement ring, or a haathphool that links ring and bracelet.
 7. **Anklets and toe rings:** as per family tradition.
 
-Polki is a popular choice for the ceremony because its warm, uncut look suits heavy, richly coloured lehengas. See our [Polki jewellery](/polki-jewellery) range.
+Polki is a popular choice for the ceremony because its warm, uncut look suits heavy, richly coloured lehengas. See our [Polki jewellery](/polki-jewellery) range and our [wedding jewellery in Surat](/bridal-jewellery) page.
 
 ## What do I need for the reception?
 

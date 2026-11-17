@@ -35,7 +35,7 @@ Families often add heirloom pieces. A new set can be designed to sit comfortably
 
 The panetar's white or ivory body with a red border gives a clean base. Warm gold Polki, uncut diamonds and pearls look beautiful against it. A few red or green stones can echo the border. Because the pallu is usually draped over the head, the choker, earrings and tikka are the pieces seen most, so give them priority.
 
-See our [Polki jewellery](/polki-jewellery) and [bridal jewellery](/bridal-jewellery) collections.
+See our [Polki jewellery](/polki-jewellery) and [wedding and bridal jewellery in Surat](/bridal-jewellery) collections.
 
 ## Which jewellery suits the gharchola and Banarasi saree?
 

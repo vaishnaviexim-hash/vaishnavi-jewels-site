@@ -58,7 +58,7 @@ The more work on the lehenga, the fewer separate pieces you need. Use this simpl
 
 Bring your lehenga, or even just the dupatta and a clear photo on your phone, when you [visit our showroom](/visit-us) at Rajhans Ornate Mall, Parle Point. We hold pieces against the fabric under good light so you can see which gold tone and which stone colour actually work with your particular shade of red, because a maroon, a tomato red and a wine red each behave differently.
 
-With over 3,000 designs across Polki, Jadau, natural diamond and lab-grown diamond jewellery, most brides find a set they love on the day. If you want a change, say emerald drops instead of pearls or a longer chain on the rani haar, we make it in our own manufacturing unit to suit your budget and your timeline, usually in about 3 weeks (simple designs can be faster). Brides outside Surat can plan this with us on WhatsApp; see our [bridal jewellery](/bridal-jewellery) page for how that works. Every gold piece carries a BIS HUID hallmark that you can check in the BIS Care app, and every piece comes with its grading report.
+With over 3,000 designs across Polki, Jadau, natural diamond and lab-grown diamond jewellery, most brides find a set they love on the day. If you want a change, say emerald drops instead of pearls or a longer chain on the rani haar, we make it in our own manufacturing unit to suit your budget and your timeline, usually in about 3 weeks (simple designs can be faster). Brides outside Surat can plan this with us on WhatsApp; see our [wedding jewellery in Surat](/bridal-jewellery) page for how that works. Every gold piece carries a BIS HUID hallmark that you can check in the BIS Care app, and every piece comes with its grading report.
 
 ## Frequently asked questions
 
