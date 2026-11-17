@@ -3963,7 +3963,7 @@ async function vjEnqDue(url, env) {
 // "- <first name>, Vaishnavi Jewels", rate limits, every send logged in vj_chat_out. Templates (reminders after the window
 // closed) only from the approved vj_ list, only by admins or staff the owner allows, a human taps send every time,
 // max 1 per customer per 48 h, 3 per enquiry, daily cap (20, owner-editable), STOP / opt-outs honoured.
-const VJ_CHAT_HOOK = 'https://hook.eu1.make.com/gksjp9q8bqiis8p4ltzrfjsngowqvx7x'; // Make hook 4028791 (A20 Chats sender): gets only a one-time token
+const VJ_CHAT_HOOK = 'https://n8n-epei.srv2114308.hstgr.cloud/webhook/vj-a20-in-76e0e575bab73409'; // n8n A20 Chats sender TaT4g7ysZOVVDPdR (moved from Make 8339420, R-20261117-OFFMAKE): gets only a one-time token
 const VJ_CHAT_PEOPLE = { Abhinav: { full: 'Abhinav Agarwal', first: 'Abhinav', wa: '917567400099' }, Mihir: { full: 'Mihir', first: 'Mihir', wa: '919099763201' }, Shilpiji: { full: 'Shilpi Agarwal', first: 'Shilpi', wa: '919374050969' } };
 const VJ_CHAT_TPL = {
   visit: { cat0: 'UTILITY', vars: 4, hi: 'vj_visit_remind_hi_v1', en: 'vj_visit_remind_en_v1', label: 'Visit / video-call reminder' },
