@@ -217,7 +217,7 @@
       <div class="actions" style="margin:0 0 8px"><button type="button" class="btn ghost" id="bback">&larr; Back to Bill</button></div>
       <h2>1 · Customer &amp; bill</h2>
       <p class="hint" id="bcusthint"></p>
-      <div class="row" style="align-items:center"><button type="button" class="btn ghost" id="bshot">&#128247; Contact screenshot &rarr; fill name &amp; mobile</button><input type="file" id="bshotf" accept="image/*" hidden><span class="hint" id="bshotmsg">or paste a screenshot here (Ctrl+V)</span></div>
+      <div class="row" style="align-items:center"><button type="button" class="btn ghost" id="bshot">&#128247; Contact screenshot &rarr; fill name &amp; mobile<#128247; Contact screenshot &rarr; fill name, mobile &amp; city</button><input type="file" id="bshotf" accept="image/*" hidden><span class="hint" id="bshotmsg">or paste a screenshot here (Ctrl+V)</span></div>
       <div class="row"><label>Mobile No. <input id="bmob" inputmode="tel" autocomplete="off" maxlength="20" placeholder="98xxxxxxxx"></label>
         <label>Name <input id="bname" autocomplete="off" maxlength="60"></label>
         <label>City <input id="bcity" autocomplete="off" maxlength="40"></label></div>
@@ -330,13 +330,14 @@
       btn.disabled = true; msg.textContent = "Reading the screenshot...";
       try {
         const photo = await shrink(f);
-        const r = await fetch("/api/vj/contactshot", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ photo, type: "image/jpeg" }) });
+        const r = await fetch("/api/vj/contactshot", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ photo, type: "image/jpeg", city: true }) }); // owner 17/11 14:12: city from the screenshot too
         const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status);
-        if (!j.name && !j.mobile) { msg.textContent = "Could not read a name or number in this screenshot - please type them."; return; }
+        if (!j.name && !j.mobile && !j.city) { msg.textContent = "Could not read a name or number in this screenshot - please type them."; return; }
+        if (j.city) setTimeout(() => { const c = $("bcity"); if (c && !c.value.trim()) { c.value = j.city; c.dispatchEvent(new Event("input", { bubbles: true })); } }, 1600);
         if (j.mobile) { const m = $("bmob"); m.value = j.mobile; m.dispatchEvent(new Event("input", { bubbles: true })); m.dispatchEvent(new Event("change", { bubbles: true })); }
         if (j.name && !$("bname").value.trim()) $("bname").value = j.name;
         setTimeout(() => { if (j.name && !$("bname").value.trim()) $("bname").value = j.name; }, 1500);
-        msg.textContent = "From screenshot: " + (j.name || "(no name)") + ", " + (j.mobile || "(no number)") + (j.others && j.others.length ? " - other numbers: " + j.others.join(", ") : "") + ". Please check before saving.";
+        msg.textContent = "From screenshot: " + (j.name || "(no name)") + ", " + (j.mobile || "(no number)") + ", " + (j.city || "(no city)") + (j.others && j.others.length ? " - other numbers: " + j.others.join(", ") : "") + ". Please check before saving.";
       } catch (e) { msg.textContent = "Could not read the screenshot (" + (e.message || e) + "). Please type the name and mobile."; }
       finally { btn.disabled = false; fi.value = ""; }
     };
