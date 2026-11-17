@@ -4735,7 +4735,7 @@ async function vjDailyReport(env) {
     // only a random one-time token leaves the worker; Make 8190722 (hook 3981296) fetches the summary once from /hooks/vj-summary
     const token = [...crypto.getRandomValues(new Uint8Array(16))].map(x => x.toString(16).padStart(2, '0')).join('');
     await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('summary:' + token, JSON.stringify({ text, date: ymd, at: Date.now() })).run();
-    const r = await fetch('https://n8n-epei.srv2114308.hstgr.cloud/webhook/vj-sum-in-31616c67bbfb29e8', { // n8n J4XNCjIWxBYeA9KF (moved from Make 8190722, R-20261117-OFFMAKE) method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(20000), body: JSON.stringify({ token }) });
+    const r = await fetch('https://n8n-epei.srv2114308.hstgr.cloud/webhook/vj-sum-in-31616c67bbfb29e8', { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(20000), body: JSON.stringify({ token }) }); // n8n J4XNCjIWxBYeA9KF (moved from Make 8190722, R-20261117-OFFMAKE)
     if (!r.ok) throw new Error('hook ' + r.status);
     return reply('sent summary', 200);
   } catch (e) {
