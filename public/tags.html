@@ -314,6 +314,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
 <script src="/tags/shim.js?v=20261117b"></script>
 <script src="/tags/navsel.js?v=20261107za" defer></script>
 <script src="/tags/boxes.js?v=20261118a" defer></script>
+<script src="/tags/rfid.js?v=20261118a" defer></script>
 <script src="/tags/similar.js?v=20261103pf" defer></script>
 <script>
 (function(){
@@ -384,6 +385,8 @@ function renderCheck(){
   /* Owner 13/10/2026: type only the code printed on the tag (11 digits) or just the number (e.g. 809); the full label still works */
   /* 13/10/2026: a scanner (Zebra RFD40 barcode side, HID keyboard mode) types the whole QR text "<app url>#<TAG-ID>": keep only the part after # */
   let q=raw.trim().replace(/\s+/g,"");if(q.includes("#"))q=q.slice(q.lastIndexOf("#")+1);
+  if(window.VJ_RFID&&window.VJ_RFID[q.toUpperCase()])q=window.VJ_RFID[q.toUpperCase()]; /* C-20261118-RFIDMAP: RFID number opens its piece */
+  else if(/^([0-9A-F]{2}){4,16}$/i.test(q)&&!/^\d+$/.test(q)){const d=q.match(/../g).map(h=>parseInt(h,16)).filter(c=>c).map(c=>String.fromCharCode(c)).join("");if(/^[A-Za-z]{1,6}[\/-]\d{1,6}$/.test(d))q=d} /* final tags: RFID holds the same value as the QR (Techub 18/11); reader may give it as hex */
   if(/^(box|bx)\d{1,5}$/i.test(q)&&window.VJ_BOX_NUMS){const bn=+q.replace(/\D/g,""),hits=S.tags.filter(x=>window.VJ_BOX_NUMS(x).includes(bn)).sort((a,b)=>String(a.designNo||"").localeCompare(String(b.designNo||""),"en",{numeric:true})); /* owner 18/11/2026 14:28 (C-20261118-BOXSEARCH): type "box 31" to list every piece in that box */
     const c0=document.createElement("div");c0.className="card";c0.style.cssText="display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:var(--r);padding:14px";const p0=document.createElement("p");p0.style.fontWeight="700";p0.textContent=hits.length?`📦 Box ${bn}: ${hits.length} piece${hits.length===1?"":"s"}. Tap one to open it.`:`📦 Box ${bn}: no pieces found in the box list.`;c0.appendChild(p0);
     if(hits.length){const w0=document.createElement("div");w0.style.cssText="display:flex;flex-wrap:wrap;gap:8px";hits.forEach(x=>{const b=document.createElement("button");b.type="button";b.className="btn ghost";b.textContent=(x.designNo?x.designNo+" · ":"")+x.label+(x.catName?" · "+x.catName:"");b.addEventListener("click",()=>{$("cq").value=x.label;renderCheck()});w0.appendChild(b)});c0.appendChild(w0)}
@@ -440,7 +443,7 @@ function renderCheck(){
   box.appendChild(card);
 }
 $("cgo").addEventListener("click",renderCheck);$("cq").addEventListener("keydown",e=>{if(e.key==="Enter"){e.preventDefault();renderCheck();$("cq").select()}});/* select after Enter so the next scan replaces the last one */
-function fromHash(){const h=(location.hash||"").replace(/^#/,"");if(/^[A-Za-z0-9][A-Za-z0-9_\-.~]{2,40}$/.test(h)&&/-\d+$/.test(h)){$("cq").value=h.replace(/-(\d+)$/,"/$1");showTab("check");renderCheck()}}
+function fromHash(){const h=(location.hash||"").replace(/^#/,"");if(window.VJ_RFID&&window.VJ_RFID[h.toUpperCase()]){$("cq").value=h;showTab("check");renderCheck();return}if(/^[A-Za-z0-9][A-Za-z0-9_\-.~]{2,40}$/.test(h)&&/-\d+$/.test(h)){$("cq").value=h.replace(/-(\d+)$/,"/$1");showTab("check");renderCheck()}}
 window.addEventListener("hashchange",fromHash);
 
 /* ---------- form lines ---------- */
