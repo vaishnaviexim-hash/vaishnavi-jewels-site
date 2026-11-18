@@ -27,6 +27,7 @@
     return hits.length === 1 ? M[hits[0]][k] : null;
   }
   window.VJ_BOX = t => { const b = find(t); return b ? "Box " + b.slice().sort((x, y) => x - y).join(" / ") : ""; };
+  window.VJ_BOX_NUMS = t => { const b = find(t); return b ? b.slice() : []; }; // C-20261118-BOXSEARCH
   window.VJ_BOX_COUNT = () => M ? Object.values(M).reduce((n, d) => n + Object.keys(d).length, 0) : 0;
   async function load(fresh) {
     try {
