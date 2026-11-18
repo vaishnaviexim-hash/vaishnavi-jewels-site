@@ -212,7 +212,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
   <!-- PRICE CHECK -->
   <section id="p-check" class="card" hidden>
     <div class="row" style="align-items:end">
-      <label style="flex:2 1 220px">Code on the tag, tag number or design number <input id="cq" autocomplete="off" placeholder="e.g. abc270xyz, 809 or design 1436" inputmode="text"></label>
+      <label style="flex:2 1 220px">Code on the tag, tag number or design number <input id="cq" autocomplete="off" placeholder="e.g. abc270xyz, 809, design 1436 or box 31" inputmode="text"></label>
       <div><button type="button" class="btn" id="cgo">Check price</button></div>
       <div><button type="button" class="btn ghost" id="cest" onclick="window.VJ_EST_NEW&&window.VJ_EST_NEW()">New estimate</button></div>
     </div>
@@ -313,7 +313,7 @@ table.items img{width:44px;height:44px;object-fit:cover;border-radius:4px;backgr
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="/tags/shim.js?v=20261117b"></script>
 <script src="/tags/navsel.js?v=20261107za" defer></script>
-<script src="/tags/boxes.js?v=20261029a" defer></script>
+<script src="/tags/boxes.js?v=20261118a" defer></script>
 <script src="/tags/similar.js?v=20261103pf" defer></script>
 <script>
 (function(){
@@ -384,6 +384,10 @@ function renderCheck(){
   /* Owner 13/10/2026: type only the code printed on the tag (11 digits) or just the number (e.g. 809); the full label still works */
   /* 13/10/2026: a scanner (Zebra RFD40 barcode side, HID keyboard mode) types the whole QR text "<app url>#<TAG-ID>": keep only the part after # */
   let q=raw.trim().replace(/\s+/g,"");if(q.includes("#"))q=q.slice(q.lastIndexOf("#")+1);
+  if(/^(box|bx)\d{1,5}$/i.test(q)&&window.VJ_BOX_NUMS){const bn=+q.replace(/\D/g,""),hits=S.tags.filter(x=>window.VJ_BOX_NUMS(x).includes(bn)).sort((a,b)=>String(a.designNo||"").localeCompare(String(b.designNo||""),"en",{numeric:true})); /* owner 18/11/2026 14:28 (C-20261118-BOXSEARCH): type "box 31" to list every piece in that box */
+    const c0=document.createElement("div");c0.className="card";c0.style.cssText="display:flex;flex-direction:column;gap:10px;border:1px solid var(--line);border-radius:var(--r);padding:14px";const p0=document.createElement("p");p0.style.fontWeight="700";p0.textContent=hits.length?`📦 Box ${bn}: ${hits.length} piece${hits.length===1?"":"s"}. Tap one to open it.`:`📦 Box ${bn}: no pieces found in the box list.`;c0.appendChild(p0);
+    if(hits.length){const w0=document.createElement("div");w0.style.cssText="display:flex;flex-wrap:wrap;gap:8px";hits.forEach(x=>{const b=document.createElement("button");b.type="button";b.className="btn ghost";b.textContent=(x.designNo?x.designNo+" · ":"")+x.label+(x.catName?" · "+x.catName:"");b.addEventListener("click",()=>{$("cq").value=x.label;renderCheck()});w0.appendChild(b)});c0.appendChild(w0)}
+    box.appendChild(c0);return}
   const id=tagId(q);let t=null,many=[];
   if(/^[a-z]{3}\d+[a-z]{3}$/i.test(q))t=S.tags.find(x=>x.code&&x.code.toLowerCase()===q.toLowerCase())||null;
   else if(/^\d{1,6}$/.test(q)){many=S.tags.filter(x=>String(x.no)===String(+q)||String(x.designNo||"")===q);if(many.length===1){t=many[0];many=[]}}
