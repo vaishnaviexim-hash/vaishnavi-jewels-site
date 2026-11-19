@@ -2866,14 +2866,19 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
     const csCost = Math.round(vjKoNum(b.csCost)), csIn = b.csCharge === '' || b.csCharge == null ? null : Math.round(vjKoNum(b.csCharge));
     const others = (Array.isArray(b.others) ? b.others : []).slice(0, 20).map(x => ({ desc: vjClean(x && x.desc, 40), pcs: Math.round(vjKoNum(x && x.pcs)), kRate: vjKo3R2(vjKoNum(x && x.kRate)), tRate: x && x.tRate !== '' && x.tRate != null ? vjKo3R2(vjKoNum(x.tRate)) : ((cfg.trates || []).find(t => t.name === vjClean(x && x.desc, 40)) || {}).rate || 0 })).filter(x => x.desc && x.pcs > 0);
     // C-20261119-WTLESS (owner 19/11 16:57): stone rate written -> stone weight must be less; diamonds / AD set -> their weight must be less from gross
-    if ((csCost > 0 || (csIn || 0) > 0) && !(csWt > 0)) return vjDeny(400, 'Stone (CS) ka rate/charge likha hai par CS WT (g) 0 hai - stone ka weight gross se less kijiye');
-    if (others.some(x => /\b(AD|CZ|stones?|ruby|emerald|pearl|moti|kundan)\b/i.test(x.desc)) && !(csWt > 0)) return vjDeny(400, 'AD / stone lage hain par CS WT (g) 0 hai - unka weight gross se less kijiye');
-    if (UA.ct > 0 && !(vjOgMg(dWt) > 0)) return vjDeny(400, 'Diamond lage hain (' + UA.ct.toFixed(3) + ' ct) par D.WT (g) 0 hai - diamond ka weight (' + vjR3(UA.ct / 5) + ' g) less kijiye');
-    if (UA.ct > 0 && vjOgMg(dWt) < Math.round(vjOgMg(UA.ct / 5) * 0.9)) return vjDeny(400, 'D.WT (g) ' + dWt + ' kam hai: ' + UA.ct.toFixed(3) + ' ct = ' + vjR3(UA.ct / 5) + ' g - diamond ka poora weight less kijiye');
-    if (nIn !== null && vjOgMg(nIn) > vjOgMg(nAuto) + 5) return vjDeny(400, 'N GOLD ' + nIn + ' g zyada hai: gross - diamond - stone = ' + nAuto + ' g. Diamond/stone ka weight less nahi hua');
+    // C-20261119-WTCHECK (owner 17:20): not a hard stop - colour stones can be changeable. Without the tick it stops and explains; with the tick it saves
+    // with CHECK codes (shown on the order and the list) until Abhinav/Shilpiji mark it 'Checked - OK' (or the karigar figures are corrected and re-saved).
+    const wtF = [], wtM = [];
+    if ((csCost > 0 || (csIn || 0) > 0) && !(csWt > 0)) { wtF.push('CS-WT0'); wtM.push('CS-WT0: stone ka rate likha hai par CS WT (g) 0 hai'); }
+    if (others.some(x => /\b(AD|CZ|stones?|ruby|emerald|pearl|moti|kundan)\b/i.test(x.desc)) && !(csWt > 0)) { wtF.push('AD-WT0'); wtM.push('AD-WT0: AD / stone lage hain par CS WT (g) 0 hai'); }
+    if (UA.ct > 0 && !(vjOgMg(dWt) > 0)) { wtF.push('DIA-WT0'); wtM.push('DIA-WT0: diamond ' + UA.ct.toFixed(3) + ' ct par D.WT 0 (hona chahiye ' + vjR3(UA.ct / 5) + ' g)'); }
+    else if (UA.ct > 0 && vjOgMg(dWt) < Math.round(vjOgMg(UA.ct / 5) * 0.9)) { wtF.push('DIA-WTLOW'); wtM.push('DIA-WTLOW: D.WT ' + dWt + ' g kam hai (' + UA.ct.toFixed(3) + ' ct = ' + vjR3(UA.ct / 5) + ' g)'); }
+    if (nIn !== null && vjOgMg(nIn) > vjOgMg(nAuto) + 5) { wtF.push('NG-HIGH'); wtM.push('NG-HIGH: N GOLD ' + nIn + ' g, gross - diamond - stone = ' + nAuto + ' g'); }
+    if (wtF.length && b.wtOk !== true) return vjDeny(400, 'Weight check: ' + wtM.join(' | ') + '. Theek kijiye, ya colour stone changeable ho to "phir bhi save karo" tick karke save kijiye');
     const t = { date, kt: String(b.tKt || o.kt || '').replace(/[^0-9PT]/gi, '').toUpperCase().slice(0, 3), gGold: gG, csWt, dWt, dWtAuto: b.dWt === '' || b.dWt == null, nGold: nIn !== null ? nIn : nAuto, nGoldAuto: nAuto, nGoldMan: nIn !== null,
       csCost, csCharge: csIn !== null ? csIn : vjKo3Up500(csCost * 2), csChargeMan: csIn !== null, others, otherTag: vjKo3R2(others.reduce((a, x) => a + x.pcs * x.tRate, 0)), labour: vjKo3R2(others.reduce((a, x) => a + x.pcs * x.kRate, 0)),
       making: vjKo3R2(vjKoNum(b.making)), lab: vjClean(b.lab, 30), details: vjClean(b.details, 200) };
+    if (wtF.length) { t.wtFlags = wtF; t.wtMsg = wtM.join(' | ').slice(0, 400); t.wtCheck = 'pending'; t.wtBy = who.email; t.wtAt = now; } // C-20261119-WTCHECK
     if (chains.length) { t.chains = chains; t.chG = chG; t.chAdd = true; }
     { const src = v => { const x = vjClean(v, 40); return !x || x.toLowerCase() === String(o.karigar).toLowerCase() ? '' : /^cash/i.test(x) ? 'Cash (self)' : x; }; // C-20261103-CSSRC: '' = this karigar (his account)
       const cS = src(b.csSrc), oS = src(b.othSrc); if (cS) { t.csSrc = cS; t.csSrcAmt = csCost; } if (oS) { t.othSrc = oS; t.othSrcAmt = vjKo3R2(others.reduce((a, x) => a + x.pcs * x.kRate, 0)); } }
@@ -2884,6 +2889,8 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
         t.slip = sl; t.slipPdf = b.slipPdf === true; o.slips = [...new Set((old.slips || []).concat(sl))].slice(-10); } else if (old.tag && old.tag.slip) { t.slip = old.tag.slip; t.slipPdf = !!old.tag.slipPdf; } } // C-20261105-KSLIP: the karigar's hisaab slip stays on the order
     Object.assign(o, { tag: t, rec, used, usedMan: !!(used0 && used0.length) }); t.deliv = vjKo3Deliv(o, cfg); chOld = vjKoChIds(old.tag); chNew = vjKoChIds(t);
     if (o.status === 'open' || o.status === 'karigar') { o.status = 'received'; o.stage = o.stage || 'Ready'; o.statusAt = Object.assign({}, o.statusAt || {}, { received: now }); } post = true; }
+  else if (op === 'wtok') { if (!adm) return vjDeny(403, 'only Abhinav or Shilpiji can mark the weight check OK'); if (!old.tag || !(old.tag.wtFlags || []).length) return vjDeny(400, 'nothing to check on this order'); // C-20261119-WTCHECK
+    o.tag = Object.assign({}, old.tag, { wtCheck: 'ok', wtOkBy: who.email, wtOkAt: now }); }
   else if (op === 'diaadd') { if (!live) return vjDeny(409, 'this order is cancelled'); if (!canDia) return vjDeny(403, VJ_KO_DIAMSG); const rows = vjKo3Rows(b.iss, adm, []); if (!rows || !rows.length) return vjDeny(400, 'type pcs / ct of the diamonds issued');
     { const e = vjKoClash(cfg, o.dq, rows, adm, b.override, o); if (e) return vjDeny(400, e); } const nIss = (o.iss || []).concat(rows).slice(0, 60);
     { const e = vjKoOver(o, o.dct, nIss, o.iss || [], b, who); if (e) return deny(e); } o.iss = nIss; if (o.overIssues && o.overIssues.length && b.confirmOver) act = 'over-issue'; }
