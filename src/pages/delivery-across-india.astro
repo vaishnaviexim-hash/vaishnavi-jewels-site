@@ -21,6 +21,53 @@ const howTo = {
   intro="You do not need to be in Surat to buy from us. Here is how it works."
   extraSchema={[howTo]}
 >
+  <section class="vj-pin" aria-labelledby="vj-pin-h">
+    <h2 id="vj-pin-h">Check delivery to your pincode</h2>
+    <form class="vj-pin-form" id="vjPinForm" novalidate>
+      <label for="vjPin" class="vj-pin-label">Enter your 6-digit pincode</label>
+      <div class="vj-pin-row">
+        <input id="vjPin" name="pin" inputmode="numeric" autocomplete="postal-code" maxlength="6" pattern="[0-9]{6}" placeholder="e.g. 560064" />
+        <button type="submit">Check</button>
+      </div>
+    </form>
+    <div class="vj-pin-out" id="vjPinOut" role="status" aria-live="polite"></div>
+  </section>
+  <style>
+    .vj-pin{margin:0 0 2rem;padding:1.25rem;border:1px solid rgba(160,120,70,.35);border-radius:12px;background:rgba(160,120,70,.06)}
+    .vj-pin h2{margin-top:0}
+    .vj-pin-label{display:block;margin-bottom:.5rem;font-weight:600}
+    .vj-pin-row{display:flex;gap:.5rem;flex-wrap:wrap}
+    .vj-pin-row input{flex:1 1 10rem;min-width:0;font-size:1.1rem;padding:.6rem .8rem;border:1px solid rgba(0,0,0,.25);border-radius:8px;letter-spacing:.08em}
+    .vj-pin-row button{font-size:1rem;padding:.6rem 1.4rem;border:0;border-radius:8px;background:#5b2c3a;color:#fff;cursor:pointer}
+    .vj-pin-out{margin-top:1rem;line-height:1.55}
+    .vj-pin-out .ok{color:#1d6b35;font-weight:700}
+    .vj-pin-out .warn{color:#8a5a00;font-weight:700}
+  </style>
+  <script is:inline>
+  (function(){
+    var f=document.getElementById('vjPinForm'),i=document.getElementById('vjPin'),o=document.getElementById('vjPinOut'),data=null;
+    function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+    function wa(pin){return 'https://wa.me/919998043886?text='+encodeURIComponent('Hi Vaishnavi Jewels, please confirm delivery to pincode '+pin)}
+    function show(pin){
+      var r=data.p[pin];
+      if(!r){o.innerHTML='We could not find pincode <strong>'+esc(pin)+'</strong>. Please check it, or <a href="'+wa(pin)+'" rel="noopener">WhatsApp us</a> and we will confirm.';return}
+      var place=esc(r[0]<0?r[1]:data.c[r[0]][0]);
+      if(r[0]<0){o.innerHTML='<span class="warn">We will confirm delivery to '+place+' ('+esc(pin)+') personally.</span><br><a href="'+wa(pin)+'" rel="noopener"><strong>WhatsApp us your pincode</strong></a> and we will share the best delivery option for your location.';return}
+      var c=data.c[r[0]];
+      if(c[1]){o.innerHTML='<span class="ok">Yes, we deliver to '+place+' ('+esc(pin)+').</span><br>Fully insured courier, usually 2 to 5 days. An <strong>extra delivery charge of Rs '+c[2].toLocaleString('en-IN')+'</strong> applies for this location. <a href="'+wa(pin)+'" rel="noopener">WhatsApp us</a> to order.'}
+      else{o.innerHTML='<span class="ok">Yes! Free insured delivery to '+place+' ('+esc(pin)+').</span><br>Fully insured courier, usually 2 to 5 days, with certificate and invoice. <a href="'+wa(pin)+'" rel="noopener">WhatsApp us</a> to order.'}
+    }
+    i.addEventListener('input',function(){i.value=i.value.replace(/\D/g,'').slice(0,6)});
+    f.addEventListener('submit',function(e){
+      e.preventDefault();var pin=i.value.trim();
+      if(!/^[1-9][0-9]{5}$/.test(pin)){o.textContent='Please enter a valid 6-digit pincode.';return}
+      if(data){show(pin);return}
+      o.textContent='Checking...';
+      fetch('/delivery-pins.json').then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(d){data=d;show(pin)}).catch(function(){o.innerHTML='Could not check right now. Please <a href="'+wa(pin)+'" rel="noopener">WhatsApp us</a> and we will confirm.'});
+    });
+  })();
+  </script>
+
   <h2>How it works</h2>
   <ul>
     <li><strong>Tell us what you want.</strong> WhatsApp us at <a href="https://wa.me/919998043886">+91 99980 43886</a> with the piece, occasion or a reference photo.</li>
