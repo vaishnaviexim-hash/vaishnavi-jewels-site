@@ -54,7 +54,7 @@ const howTo = {
       var place=esc(r[0]<0?r[1]:data.c[r[0]][0]);
       if(r[0]<0){o.innerHTML='<span class="warn">We will confirm delivery to '+place+' ('+esc(pin)+') personally.</span><br><a href="'+wa(pin)+'" rel="noopener"><strong>WhatsApp us your pincode</strong></a> and we will share the best delivery option for your location.';return}
       var c=data.c[r[0]];
-      if(c[1]){o.innerHTML='<span class="ok">Yes, we deliver to '+place+' ('+esc(pin)+').</span><br>Fully insured courier, usually 2 to 5 days. An <strong>extra delivery charge of Rs '+c[2].toLocaleString('en-IN')+'</strong> applies for this location. <a href="'+wa(pin)+'" rel="noopener">WhatsApp us</a> to order.'}
+      if(c[1]){o.innerHTML='<span class="ok">Yes, we deliver to '+place+' ('+esc(pin)+').</span><br>Fully insured courier, usually 2 to 5 days. An <strong>extra delivery charge</strong> applies for this location - <a href="'+wa(pin)+'" rel="noopener">WhatsApp us</a> and we will share the details.'}
       else{o.innerHTML='<span class="ok">Yes! Free insured delivery to '+place+' ('+esc(pin)+').</span><br>Fully insured courier, usually 2 to 5 days, with certificate and invoice. <a href="'+wa(pin)+'" rel="noopener">WhatsApp us</a> to order.'}
     }
     i.addEventListener('input',function(){i.value=i.value.replace(/\D/g,'').slice(0,6)});
