@@ -1,5 +1,5 @@
 ---
-import { infoPages, business } from '../data/business.js';
+import { business } from '../data/business.js';
 ---
 <footer class="site-footer">
   <div class="container footer-inner">
@@ -12,23 +12,43 @@ import { infoPages, business } from '../data/business.js';
       <p class="footer-line">{business.name} is a brand of {business.legalName}.</p>
       <p class="footer-line">&copy; 2005&ndash;{new Date().getFullYear()} {business.legalName}. All rights reserved.</p>
     </div>
-    <div class="footer-links">
-      <a href="/">Home</a>
-      {infoPages.map((p) => <a href={p.path}>{p.label}</a>)}
-      <a href="/blog">Journal</a>
+    <div class="footer-col">
+      <p class="footer-h">Jewellery</p>
+      <a href="/new-designs">New Designs</a>
+      <a href="/solitaire-rings">Certified Solitaire Rings</a>
+      <a href="/natural-diamond-jewellery">Natural Diamond Jewellery</a>
+      <a href="/lab-grown-diamond-jewellery">Lab-Grown Diamond Jewellery</a>
+      <a href="/bridal-jewellery">Bridal Jewellery</a>
+      <a href="/polki-jewellery">Polki Jewellery</a>
+      <a href="/jadau-jewellery">Jadau Jewellery</a>
+      <a href="/diamond-earrings">Diamond Earrings</a>
+      <a href="/diamond-mangalsutra">Diamond Mangalsutra</a>
     </div>
-    <div class="footer-links">
+    <div class="footer-col">
+      <p class="footer-h">Visit &amp; Help</p>
+      <a href="/visit-us">Visit Our Showroom</a>
+      <a href="/book-a-visit">Book a Showroom Visit</a>
+      <a href="/delivery-across-india">Delivery Across India</a>
+      <a href="/faq">FAQ</a>
+      <a href="/facts">Facts</a>
+      <p class="footer-h sp">About Us</p>
+      <a href="/blog">Journal</a>
+      <a href="/press">Press</a>
+      <a href="/careers">Careers</a>
+      <a href="/privacy">Privacy Policy</a>
+    </div>
+    <div class="footer-col">
+      <p class="footer-h">Connect</p>
       <a href="https://wa.me/919998043886?text=Hi%20Vaishnavi%20Jewels%2C%20I%20found%20you%20on%20your%20website." target="_blank" rel="noopener">WhatsApp</a>
-      <a href="https://instagram.com/vaishnavijewels.surat" target="_blank" rel="noopener">Instagram</a>
-      <a href="https://www.facebook.com/122368924568460" target="_blank" rel="noopener">Facebook</a>
-      <a href="https://pinterest.com/vaishnavijewels01" target="_blank" rel="noopener">Pinterest</a>
-      <a href="https://x.com/vaishnavi_jewel" target="_blank" rel="noopener">X</a>
-      <a href="https://youtube.com/@VaishnaviJewelsSurat" target="_blank" rel="noopener">YouTube</a>
-      <a href="https://www.linkedin.com/company/86855728/" target="_blank" rel="noopener">LinkedIn</a>
+      <a href="mailto:surat@vaishnavijewels.com">Email</a>
       <a href="https://g.page/r/Ce9kbGlQK0O8EBM/review" target="_blank" rel="noopener">Google Reviews</a>
       <a href="https://share.google/P1oHICy1oT9OOlPHS" target="_blank" rel="noopener">Google Profile</a>
-      <a href="mailto:surat@vaishnavijewels.com">Email</a>
-      <a href="/privacy">Privacy Policy</a>
+      <a href="https://instagram.com/vaishnavijewels.surat" target="_blank" rel="noopener">Instagram</a>
+      <a href="https://www.facebook.com/122368924568460" target="_blank" rel="noopener">Facebook</a>
+      <a href="https://youtube.com/@VaishnaviJewelsSurat" target="_blank" rel="noopener">YouTube</a>
+      <a href="https://pinterest.com/vaishnavijewels01" target="_blank" rel="noopener">Pinterest</a>
+      <a href="https://www.linkedin.com/company/86855728/" target="_blank" rel="noopener">LinkedIn</a>
+      <a href="https://x.com/vaishnavi_jewel" target="_blank" rel="noopener">X</a>
     </div>
   </div>
 </footer>
@@ -54,7 +74,7 @@ import { infoPages, business } from '../data/business.js';
   }
   .footer-inner {
     display: grid;
-    grid-template-columns: 1.3fr 1fr 1fr;
+    grid-template-columns: 1.3fr 1fr 1fr 1fr;
     gap: 40px;
   }
   .footer-brand {
@@ -81,14 +101,20 @@ import { infoPages, business } from '../data/business.js';
     border-left: 1px solid var(--color-line);
     padding-left: 28px;
   }
+  .footer-col { display: flex; flex-direction: column; gap: 10px; font-size: 14px; padding-top: 6px; }
+  .footer-col a { color: var(--color-ink-soft); transition: color 0.2s ease; }
+  .footer-col a:hover { color: var(--color-gold-deep); }
+  .footer-h { margin: 0 0 4px; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-maroon); font-weight: 600; }
+  .footer-h.sp { margin-top: 14px; }
   .footer-links a { color: var(--color-ink-soft); transition: color 0.2s ease; }
   .footer-links a:hover { color: var(--color-gold-deep); }
 
-  @media (max-width: 860px) {
-    .footer-inner { grid-template-columns: 1fr 1fr; }
+  @media (max-width: 980px) {
+    .footer-inner { grid-template-columns: 1fr 1fr 1fr; }
     .footer-inner > div:first-child { grid-column: 1 / -1; }
     .footer-links { border-left: 0; padding-left: 0; }
   }
+  @media (max-width: 640px) { .footer-inner { grid-template-columns: 1fr 1fr; } }
   @media (max-width: 520px) {
     .site-footer { margin-top: 72px; padding-top: 48px; }
     .footer-inner { gap: 28px; }
