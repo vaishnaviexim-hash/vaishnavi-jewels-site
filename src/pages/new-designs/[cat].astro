@@ -2,10 +2,10 @@
 import InfoPage from '../../layouts/InfoPage.astro';
 import { business as b } from '../../data/business.js';
 import { plain, plainSet } from '../../data/images.js';
-import { groups } from '../../data/new-designs.js';
+import { groups, HOME, catLink } from '../../data/new-designs.js';
 // One page per category (owner 20/11 16:45). Pages appear automatically when a category gets its first design.
 export function getStaticPaths() {
-  return groups().map((g) => ({ params: { cat: g.slug }, props: { g, all: groups() } }));
+  return groups().filter((g) => !HOME[g.cat]).map((g) => ({ params: { cat: g.slug }, props: { g, all: groups() } }));
 }
 const { g, all } = Astro.props;
 const wa = (code: string, name: string) =>
@@ -29,7 +29,7 @@ const pageSchema = {
 >
   <nav class="nd-cats" aria-label="Design categories">
     <a href="/new-designs">All categories</a>
-    {all.map((x) => <a href={'/new-designs/' + x.slug} aria-current={x.slug === g.slug ? 'page' : undefined}>{x.cat} <span>({x.items.length})</span></a>)}
+    {all.map((x) => <a href={catLink(x.cat)} aria-current={x.slug === g.slug ? 'page' : undefined}>{x.cat} <span>({x.items.length})</span></a>)}
   </nav>
   <div class="nd-grid">
     {g.items.map((d) => (

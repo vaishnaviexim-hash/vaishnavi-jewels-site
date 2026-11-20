@@ -23,3 +23,4 @@
 # Any other old blog address -> new blog
 /blog/f     /blog  301
 /blog/f/*   /blog  301
+/new-designs/earrings /diamond-earrings#fresh-designs 301

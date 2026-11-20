@@ -1,6 +1,6 @@
 import { getCollection } from 'astro:content';
 import { infoPages } from '../data/business.js';
-import { groups as ndGroups } from '../data/new-designs.js';
+import { groups as ndGroups, HOME as ndHome } from '../data/new-designs.js';
 
 // Self-built sitemap (avoids @astrojs/sitemap, which has a known version
 // compatibility bug against recent Astro releases). This runs at build
@@ -16,7 +16,7 @@ export async function GET() {
     { loc: '/', changefreq: 'weekly', priority: '1.0' },
     { loc: '/blog', changefreq: 'weekly', priority: '0.8' },
     ...infoPages.map((p) => ({ loc: p.path, changefreq: 'monthly', priority: '0.7' })),
-    ...ndGroups().map((g) => ({ loc: '/new-designs/' + g.slug, changefreq: 'weekly', priority: '0.6' })),
+    ...ndGroups().filter((g) => !ndHome[g.cat]).map((g) => ({ loc: '/new-designs/' + g.slug, changefreq: 'weekly', priority: '0.6' })),
     // Every job page under /careers/ is listed automatically (C-20261016-SITEMAPJOBS):
     // a new opening only needs its .astro file, nothing to add here by hand.
     ...Object.keys(import.meta.glob('./careers/*.astro'))

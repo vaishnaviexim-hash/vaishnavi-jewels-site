@@ -6,6 +6,7 @@ import InstagramFeed from '../components/InstagramFeed.astro';
 import { business as b } from '../data/business.js';
 import { plain, plainSet, LOGO_DARK } from '../data/images.js';
 import newDesigns from '../data/new-designs.json';
+import { catLink } from '../data/new-designs.js';
 const latest = newDesigns.slice(0, 4); // C-20261120-WEBNEWDESIGNS
 
 // Photos: beautified images of our own pieces (Cloudinary vj/design_gemini), light transforms only.
@@ -104,7 +105,7 @@ const description = "Certified diamond jewellery made in Surat since 2005: natur
         <h2 class="center">Latest Designs</h2>
         <div class="latest-grid">
           {latest.map((d) => (
-            <a class="latest-card" href={'/new-designs/' + d.cat.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}>
+            <a class="latest-card" href={catLink(d.cat)}>
               <img src={plain(d.id, 480)} srcset={plainSet(d.id, [320, 480, 720])} sizes="(max-width: 640px) 46vw, 260px" width="480" height="600" alt={d.alt} loading="lazy" decoding="async" />
               <span>{d.name}</span>
               <small>{d.cat}</small>
