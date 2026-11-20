@@ -5,6 +5,8 @@ import SiteFooter from '../components/SiteFooter.astro';
 import InstagramFeed from '../components/InstagramFeed.astro';
 import { business as b } from '../data/business.js';
 import { plain, plainSet, LOGO_DARK } from '../data/images.js';
+import newDesigns from '../data/new-designs.json';
+const latest = newDesigns.slice(0, 4); // C-20261120-WEBNEWDESIGNS
 
 // Photos: beautified images of our own pieces (Cloudinary vj/design_gemini), light transforms only.
 const HERO = { id: 'vj/design_gemini/vs2_bridal_s3_20261012170959', alt: 'Bride wearing a Vaishnavi Jewels Polki and emerald bridal set with maang tikka and jhumkas' };
@@ -93,6 +95,22 @@ const description = "Certified diamond jewellery made in Surat since 2005: natur
             <a href="/blog">Journal</a>
           </p>
         </nav>
+      </div>
+    </section>
+
+    <section class="latest" aria-label="Latest designs">
+      <div class="container">
+        <p class="eyebrow center">NEW DESIGNS</p>
+        <h2 class="center">Latest Designs</h2>
+        <div class="latest-grid">
+          {latest.map((d) => (
+            <a class="latest-card" href="/new-designs">
+              <img src={plain(d.id, 480)} srcset={plainSet(d.id, [320, 480, 720])} sizes="(max-width: 640px) 46vw, 260px" width="480" height="600" alt={d.alt} loading="lazy" decoding="async" />
+              <span>{d.name}</span>
+            </a>
+          ))}
+        </div>
+        <p class="center"><a class="btn" href="/new-designs">See all new designs</a></p>
       </div>
     </section>
 
@@ -192,6 +210,14 @@ const description = "Certified diamond jewellery made in Surat since 2005: natur
 
 <style>
   /* Hero */
+  .latest { padding: 56px 0 24px; }
+  .latest .center { text-align: center; }
+  .latest h2 { margin: 6px 0 24px; }
+  .latest-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; margin-bottom: 24px; }
+  @media (max-width: 760px) { .latest-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .latest-card { display: flex; flex-direction: column; gap: 8px; text-decoration: none; color: var(--color-ink); }
+  .latest-card img { width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; display: block; }
+  .latest-card span { font-size: 15px; }
   .hero {
     background:
       radial-gradient(90% 70% at 88% 18%, rgba(227, 194, 122, 0.22) 0%, rgba(227, 194, 122, 0) 60%),

@@ -1,0 +1,54 @@
+---
+import InfoPage from '../layouts/InfoPage.astro';
+import { business as b } from '../data/business.js';
+import { plain, plainSet } from '../data/images.js';
+import designs from '../data/new-designs.json';
+// New designs gallery (owner OK 20/11/2026, C-20261120-WEBNEWDESIGNS).
+// Photos already carry our plain logo, so no extra logo overlay here.
+// New entries are added at the TOP of src/data/new-designs.json after the owner OKs a design.
+const wa = (code: string, name: string) =>
+  'https://wa.me/' + b.whatsappE164.replace('+', '') + '?text=' + encodeURIComponent(`Hi Vaishnavi Jewels, I saw design ${code} (${name}) on your website. Please share details.`);
+const pageSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'CollectionPage',
+  name: 'New Designs by Vaishnavi Jewels',
+  url: 'https://vaishnavijewels.com/new-designs',
+  about: { '@id': 'https://vaishnavijewels.com/#store' },
+  hasPart: designs.map((d) => ({ '@type': 'ImageObject', name: d.name, caption: d.text, contentUrl: plain(d.id, 1200) })),
+};
+---
+<InfoPage
+  title="New Jewellery Designs | Made to Order in Surat | Vaishnavi Jewels"
+  description="Our newest diamond and gemstone jewellery designs, made to order in our own manufacturing unit in Surat. Enquire on WhatsApp for any design."
+  path="/new-designs"
+  eyebrow="NEW DESIGNS"
+  heading="Our Newest Designs"
+  intro="Fresh designs from Vaishnavi Jewels, each crafted to order in our own manufacturing unit in Surat. Tap any design to ask about it on WhatsApp."
+  extraSchema={[pageSchema]}
+>
+  <div class="nd-grid">
+    {designs.map((d) => (
+      <figure class="nd-card">
+        <img src={plain(d.id, 720)} srcset={plainSet(d.id, [480, 720, 960])} sizes="(max-width: 640px) 92vw, 360px" width="720" height="900" alt={d.alt} loading="lazy" decoding="async" />
+        <figcaption>
+          <span class="nd-code">{d.code}</span>
+          <strong>{d.name}</strong>
+          <span class="nd-text">{d.text}</span>
+          <a class="nd-btn" href={wa(d.code, d.name)} target="_blank" rel="noopener">Enquire on WhatsApp</a>
+        </figcaption>
+      </figure>
+    ))}
+  </div>
+  <h2>Made to order, to your choice</h2>
+  <p>Every design is made in our own unit in Surat. You can choose the gold karat and colour, natural or <a href="/lab-grown-diamond-jewellery">lab-grown diamonds</a>, and the stone colours. Most custom pieces are ready in about 3 weeks. Visit us at {b.addressText} or see <a href="/delivery-across-india">delivery across India</a>.</p>
+</InfoPage>
+<style>
+  .nd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 24px; margin: 8px 0 40px; }
+  .nd-card { margin: 0; background: var(--color-ivory-deep, #f6efe4); border: 1px solid var(--color-line, #e6dccb); }
+  .nd-card img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; }
+  .nd-card figcaption { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px 18px; }
+  .nd-code { font-size: 12px; letter-spacing: 0.12em; color: var(--color-gold-deep, #8a6a2f); }
+  .nd-text { color: var(--color-ink-soft, #5a4a44); font-size: 15px; }
+  .nd-btn { margin-top: 6px; align-self: flex-start; padding: 9px 16px; border: 1px solid var(--color-maroon, #5a1a2a); color: var(--color-maroon, #5a1a2a); text-decoration: none; font-size: 14px; }
+  .nd-btn:hover { background: var(--color-maroon, #5a1a2a); color: #fff; }
+</style>

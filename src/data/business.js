@@ -53,6 +53,7 @@ export const infoPages = [
   { path: '/bridal-jewellery', label: 'Bridal Jewellery' },
   { path: '/diamond-mangalsutra', label: 'Diamond Mangalsutra' },
   { path: '/diamond-earrings', label: 'Diamond Earrings' },
+  { path: '/new-designs', label: 'New Designs' },
   { path: '/visit-us', label: 'Visit Our Showroom' },
   { path: '/book-a-visit', label: 'Book a Showroom Visit' },
   { path: '/delivery-across-india', label: 'Delivery Across India' },
