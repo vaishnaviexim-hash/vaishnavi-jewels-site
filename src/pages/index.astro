@@ -107,6 +107,7 @@ const description = "Certified diamond jewellery made in Surat since 2005: natur
             <a class="latest-card" href="/new-designs">
               <img src={plain(d.id, 480)} srcset={plainSet(d.id, [320, 480, 720])} sizes="(max-width: 640px) 46vw, 260px" width="480" height="600" alt={d.alt} loading="lazy" decoding="async" />
               <span>{d.name}</span>
+              <small>{d.cat}</small>
             </a>
           ))}
         </div>
@@ -218,6 +219,7 @@ const description = "Certified diamond jewellery made in Surat since 2005: natur
   .latest-card { display: flex; flex-direction: column; gap: 8px; text-decoration: none; color: var(--color-ink); }
   .latest-card img { width: 100%; height: auto; aspect-ratio: 4 / 5; object-fit: cover; display: block; }
   .latest-card span { font-size: 15px; }
+  .latest-card small { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-gold-deep); }
   .hero {
     background:
       radial-gradient(90% 70% at 88% 18%, rgba(227, 194, 122, 0.22) 0%, rgba(227, 194, 122, 0) 60%),
