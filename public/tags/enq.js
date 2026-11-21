@@ -124,6 +124,7 @@
     if (!e.open) add(c, line("Result", e.status + (e.bought ? " " + inr(e.bought) : "") + (e.billNo ? " · bill " + e.billNo : "") + (e.lost && e.status !== "Bought" ? " · " + e.lost : "") + (e.closedAt ? " · " + dmy(e.closedAt) : "") + (e.closedBy ? " by " + e.closedBy : "")));
     if (e.quote && e.open) add(c, line("Quote", inr(e.quote)));
     if (e.earlier && e.earlier.length) add(c, line("Earlier", e.earlier.map(p => "from " + dmy(p.from) + ": " + p.status + (p.closedAt ? " (" + dmy(p.closedAt) + ")" : "")).join("; ")));
+    if (e.wa && data.canEdit) c.append(talk(e));
     if (e.notes.length) {
       const ul = el("ul"); ul.style.cssText = "margin:6px 0 0 18px;padding:0;font-size:14px";
       const N = e.notes.slice().reverse(), shown = N.slice(0, 3);
@@ -140,6 +141,40 @@
       c.append(r);
     }
     return c;
+  }
+  /* C-20261121-ENQTALK (owner 21/11 14:52): the whole Aashvi conversation inside the enquiry card, with a short "what they want / where it
+     stands" on top, so the owner reads it and takes over. Read from the saved chat (D1, same data as Chats; kept, not only 10 days). Rule-based, no AI cost. */
+  const talkOpen = new Set(), talkCache = new Map();
+  const tm = t => { const d = new Date(Number(t) + 5.5 * 3600e3).toISOString(); return dmy(d.slice(0, 10)).slice(0, 5) + " " + d.slice(11, 16); };
+  function talkBody(e, box) {
+    box.textContent = ""; const j = talkCache.get(e.id);
+    if (!j) { box.append(el("p", { className: "hint", textContent: "Loading the chat…" })); return; }
+    if (j.err) { box.append(el("p", { className: "hint", textContent: "Could not load: " + j.err })); return; }
+    const th = (j.thread || []).filter(m => m.text);
+    if (!th.length) { box.append(el("p", { className: "hint", textContent: "No saved WhatsApp chat with Aashvi for this number yet (maybe the enquiry came another way)." })); return; }
+    const ins = th.filter(m => m.who === "customer"), outs = th.filter(m => m.who !== "customer"), lastM = th[th.length - 1], v = j.vars || {};
+    const sum = el("div"); sum.style.cssText = "padding:8px 10px;border-radius:var(--r);background:var(--gold-soft);margin-bottom:8px;font-size:14px";
+    const row = (k, val) => val ? el("div", { style: "margin:2px 0" }, [el("strong", { textContent: k + ": " }), document.createTextNode(val)]) : null;
+    add(sum, row("Requirement", (v.v3en || "").replace(/^the /, "") + (j.enq && j.enq.what ? " — " + j.enq.what.slice(0, 160) : "")),
+      row("Customer's last words", ins.length ? ins.slice(-2).map(m => m.text.slice(0, 160)).join(" / ") : ""),
+      row("Our / Aashvi's last reply", outs.length ? outs[outs.length - 1].text.slice(0, 200) : ""),
+      row("Visit booked", j.enq && j.enq.visitBooked ? dmy(j.enq.visitBooked) : ""),
+      row("Now", lastM.who === "customer" ? "Customer is waiting for our reply (last message " + tm(lastM.t) + ")" : "We replied last (" + tm(lastM.t) + ") - waiting for the customer"),
+      row("Chat", th.length + " messages, " + tm(th[0].t) + " to " + tm(lastM.t) + (j.mode === "human" ? " · with " + (j.to || "team") : " · Aashvi answering")));
+    const list = el("div"); list.style.cssText = "max-height:340px;overflow:auto;display:flex;flex-direction:column;gap:6px;padding-right:4px";
+    th.forEach(m => { const mine = m.who !== "customer", b = el("div"); b.style.cssText = "max-width:88%;padding:6px 9px;border-radius:10px;font-size:14px;white-space:pre-wrap;word-break:break-word;" + (mine ? "align-self:flex-end;background:var(--sunk)" : "align-self:flex-start;border:1px solid var(--line)");
+      b.append(el("div", { className: "hint", style: "font-size:12px", textContent: (m.who === "customer" ? (j.name || "Customer") : m.who === "aashvi" ? "Aashvi" : (m.by || "Us")) + " · " + tm(m.t) }), document.createTextNode(m.text.slice(0, 1500))); list.append(b); });
+    box.append(sum, list); setTimeout(() => { list.scrollTop = list.scrollHeight; }, 0);
+  }
+  function talk(e) {
+    const w = el("div"); w.style.marginTop = "6px";
+    const b = el("button", { type: "button", className: "btn ghost", textContent: (talkOpen.has(e.id) ? "Hide" : "Read") + " chat with Aashvi" }); b.style.cssText = "padding:5px 12px;font-size:14px";
+    const box = el("div"); box.style.cssText = "margin-top:6px;padding:8px;border:1px solid var(--line);border-radius:var(--r)"; box.hidden = !talkOpen.has(e.id);
+    const fetchIt = async () => { try { const j = await api("/api/vj/chat?wa=" + encodeURIComponent(e.wa)); talkCache.set(e.id, j); } catch (x) { talkCache.set(e.id, { err: x.message }); } if (talkOpen.has(e.id)) talkBody(e, box); };
+    b.addEventListener("click", () => { if (talkOpen.has(e.id)) { talkOpen.delete(e.id); box.hidden = true; b.textContent = "Read chat with Aashvi"; return; }
+      talkOpen.add(e.id); box.hidden = false; b.textContent = "Hide chat with Aashvi"; talkBody(e, box); fetchIt(); });
+    if (talkOpen.has(e.id)) talkBody(e, box);
+    w.append(b, box); return w;
   }
   function composer(e) {
     const w = el("div"); w.style.cssText = "margin-top:8px;padding:10px;border:1px solid var(--line);border-radius:var(--r);background:var(--sunk)";
