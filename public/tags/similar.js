@@ -136,7 +136,7 @@
   function card(t, r) {
     const c = document.createElement("div"); c.className = "pf-card"; c.setAttribute("role", "button"); c.tabIndex = 0;
     const im = document.createElement("img"); im.alt = t.label; im.loading = "lazy"; im.src = "/_blob/" + t.photo; c.appendChild(im);
-    const s = document.createElement("span"); s.className = "pf-sim"; s.textContent = (r.ai != null ? "AI " + Math.round(r.ai) : Math.round(Math.max(0, r.s) * 100)) + "%"; s.title = r.ai != null ? "AI re-check score" : "Similar %"; c.appendChild(s);
+    const s = document.createElement("span"); s.className = "pf-sim"; if (r.s != null || r.ai != null) { s.textContent = (r.ai != null ? "AI " + Math.round(r.ai) : Math.round(Math.max(0, r.s) * 100)) + "%"; s.title = r.ai != null ? "AI re-check score" : "Similar %"; c.appendChild(s); }
     if (mode === "design") { const ck = document.createElement("input"); ck.type = "checkbox"; ck.className = "pf-ck"; ck.dataset.sim = "1"; ck.checked = picked.has(t.id); ck.setAttribute("aria-label", "Select " + t.label);
       ck.addEventListener("click", e => e.stopPropagation()); ck.addEventListener("change", () => { if (ck.checked) picked.add(t.id); else picked.delete(t.id); }); c.appendChild(ck); }
     const info = document.createElement("div"); info.className = "pf-info";
@@ -163,16 +163,26 @@
   }
 
   function candidates() {
-    const cat = g("scat").value, kd = g("skd").value, w1 = num(g("sw1").value), w2 = num(g("sw2").value), p1 = num(g("sp1").value) * 1000, p2 = num(g("sp2").value) * 1000;
+    const cat = g("scat").value, kd = g("skd").value, w1 = num(g("sw1").value), w2 = num(g("sw2").value), p1 = rs(g("sp1").value), p2 = rs(g("sp2").value);
     return tagsNow().filter(t => okPid(t.photo) && (!cat || t.cat === cat) && (!kd || t.kind === kd || (kd === "sale" && !t.kind))
       && (!(w1 || w2) || ((w => (!w1 || w >= w1) && (!w2 || w <= w2))(grossOf(t)) || (w => (!w1 || w >= w1) && (!w2 || w <= w2))(netOf(t))))
       && (!(p1 || p2) || ((p => p && (!p1 || p >= p1) && (!p2 || p <= p2))(priceOf(t)))));
   }
+  /* C-20261121-FINDBUDGET (owner 21/11 15:09): price boxes take rupees (50000); a small number like 50 is read as thousands */
+  const rs = v => { const x = num(v); return x > 0 && x < 2000 ? x * 1000 : x; };
+  const hasFilter = () => !!(g("scat").value || g("skd").value || num(g("sw1").value) || num(g("sw2").value) || num(g("sp1").value) || num(g("sp2").value));
   function line(box, txt) { const p = document.createElement("p"); p.className = "hint"; p.style.margin = "0"; p.textContent = txt; box.appendChild(p); return p; }
 
   async function run() {
     const box = g("sres"), btn = g("sgo"); box.textContent = "";
-    if (!photo) { line(box, "Pehle photo daaliye (choose, take or paste)."); return; }
+    if (!photo) { /* C-20261121-FINDBUDGET: no photo -> list pieces by category / budget / weight (closest to the middle of the price range first) */
+      if (mode !== "design" || !hasFilter()) { line(box, "Photo daaliye - ya bina photo ke Category aur Price (Rs) bhar kar Find dabaiye."); return; }
+      const pool = candidates(), p1 = rs(g("sp1").value), p2 = rs(g("sp2").value), mid = p1 && p2 ? (p1 + p2) / 2 : p1 || p2 || 0;
+      if (!pool.length) { line(box, "Is category / budget mein koi photo wala piece nahi mila - range thodi badhaiye."); return; }
+      const rows = pool.map(t => ({ t, p: priceOf(t) })).sort((a, b) => mid ? Math.abs(a.p - mid) - Math.abs(b.p - mid) : b.p - a.p).slice(0, 40).map(x => ({ t: x.t, s: null }));
+      line(box, rows.length + (pool.length > 40 ? " of " + pool.length : "") + " pieces" + (mid ? " · closest to " + inr(mid) + " first" : "") + " · tick and Send on WhatsApp / PDF");
+      render(rows); return;
+    }
     btn.disabled = true; const head = line(box, "Searching…"), t0 = Date.now();
     try {
       if (!engReady) { head.textContent = "Loading the photo matcher (first time on this device only)…"; engine(p => { head.textContent = `Loading the photo matcher (first time on this device only)… ${p}%`; }); }
@@ -231,27 +241,28 @@
       c.width = Math.max(1, Math.round(im.width * k)); c.height = Math.max(1, Math.round(im.height * k)); const x = c.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, c.width, c.height); x.drawImage(im, 0, 0, c.width, c.height);
       return { d: c.toDataURL("image/jpeg", 0.85), w: c.width, h: c.height }; } catch (e) { return null; }
   }
-  async function makePdf(msg) {
+  async function makePdf(msg, cust) {
     const list = pickedTags(); if (!list.length) { msg.textContent = "Tick at least one piece first."; return; }
     if (!window.jspdf) { msg.textContent = "PDF maker did not load - reload the page and try again."; return; }
     msg.textContent = "Making the PDF...";
     const { jsPDF } = window.jspdf, doc = new jsPDF({ unit: "mm", format: "a4" }), M = 14, W = 210 - 2 * M; let y = 18;
     const d = new Date(), dd = String(d.getDate()).padStart(2, "0") + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + d.getFullYear();
-    doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.text("Similar designs from our stock", M, y); doc.setFont("helvetica", "normal"); doc.setFontSize(11); doc.text(dd, 210 - M, y, { align: "right" }); y += 8;
-    if (photoB64) { const im = await loadImg("data:image/jpeg;base64," + photoB64).catch(() => null); if (im) { const s = 45 / Math.max(im.width, im.height), w = im.width * s, h = im.height * s; doc.setFontSize(11); doc.text("Party's design:", M, y + 4); doc.addImage("data:image/jpeg;base64," + photoB64, "JPEG", M + 32, y, w, h); y += h + 8; } }
+    doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.text(cust ? "Vaishnavi Jewels - designs for you" : "Similar designs from our stock", M, y); doc.setFont("helvetica", "normal"); doc.setFontSize(11); doc.text(dd, 210 - M, y, { align: "right" }); y += 8;
+    if (photoB64 && !cust) { const im = await loadImg("data:image/jpeg;base64," + photoB64).catch(() => null); if (im) { const s = 45 / Math.max(im.width, im.height), w = im.width * s, h = im.height * s; doc.setFontSize(11); doc.text("Party's design:", M, y + 4); doc.addImage("data:image/jpeg;base64," + photoB64, "JPEG", M + 32, y, w, h); y += h + 8; } }
     for (const t of list) {
       if (y > 250) { doc.addPage(); y = 18; }
       const r = lastRows.find(z => z.t.id === t.id), p = priceOf(t), pic = await thumb(t.photo, 500);
       if (pic) { const s = 40 / Math.max(pic.w, pic.h); doc.addImage(pic.d, "JPEG", M + (40 - pic.w * s) / 2, y + (40 - pic.h * s) / 2, pic.w * s, pic.h * s); }
-      const x0 = M + 46; doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text((t.designNo ? t.designNo + "  " : "") + t.label + (window.VJ_BOX && window.VJ_BOX(t) ? "   " + window.VJ_BOX(t) : ""), x0, y + 6);
+      const x0 = M + 46; doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.text((t.designNo ? t.designNo + "  " : "") + t.label + (!cust && window.VJ_BOX && window.VJ_BOX(t) ? "   " + window.VJ_BOX(t) : ""), x0, y + 6);
       doc.setFont("helvetica", "normal"); doc.setFontSize(11);
       const lines = [(t.catName || "") + "   G.Wt. " + grossOf(t).toFixed(3) + " g" + (p ? "   Today about Rs " + Math.round(p).toLocaleString("en-IN") : ""),
         (t.dias || []).map(z => `${z.q} ${(z.ct || 0).toFixed(2)} ct (${z.pcs} pcs)`).join(", ") || "No diamonds",
-        r ? (r.ai != null ? Math.round(r.ai) : Math.round(Math.max(0, r.s) * 100)) + "% similar" + (r.why ? " - " + r.why : "") : ""].filter(Boolean);
+        !cust && r && (r.ai != null || r.s != null) ? (r.ai != null ? Math.round(r.ai) : Math.round(Math.max(0, r.s) * 100)) + "% similar" + (r.why ? " - " + r.why : "") : ""].filter(Boolean);
       let yy = y + 13; lines.forEach(L => { doc.splitTextToSize(L, W - 46).forEach(s => { doc.text(s, x0, yy); yy += 5.5; }); });
       y = Math.max(y + 44, yy + 2); doc.setDrawColor(220); doc.line(M, y - 2, 210 - M, y - 2); y += 3;
     }
-    doc.setFontSize(9); doc.setTextColor(120); doc.text("Prices are approximate at today's gold rate.", M, 290);
+    doc.setFontSize(9); doc.setTextColor(120); doc.text(cust ? "Prices are approximate at today's gold rate. Shop 120, Rajhans Ornate, Parle Point, Surat · +91 99980 43886 · vaishnavijewels.com" : "Prices are approximate at today's gold rate.", M, 290);
+    if (cust) return { blob: doc.output("blob"), name: "Vaishnavi Jewels designs " + dd + ".pdf", n: list.length };
     doc.save("Similar designs " + dd + ".pdf"); msg.textContent = "PDF downloaded (" + list.length + " piece" + (list.length === 1 ? "" : "s") + ").";
   }
   function makeEstimate(msg) {
@@ -273,7 +284,14 @@
       const pdf = document.createElement("button"); pdf.type = "button"; pdf.className = "btn ghost"; pdf.textContent = "PDF (ticked)";
       const est = document.createElement("button"); est.type = "button"; est.className = "btn ghost"; est.textContent = fromEst && g("bform") && !g("bform").hidden ? "Add ticked to open estimate" : "Estimate (ticked)";
       pdf.addEventListener("click", async () => { pdf.disabled = true; try { await makePdf(msg); } catch (e) { msg.textContent = "Could not make the PDF (" + (e.message || e) + ")."; } pdf.disabled = false; });
-      est.addEventListener("click", () => makeEstimate(msg)); bar.append(pdf, est);
+      est.addEventListener("click", () => makeEstimate(msg));
+      /* C-20261121-FINDBUDGET: customer PDF (no box no., no % similar) straight to WhatsApp through the phone's share sheet */
+      const wa = document.createElement("button"); wa.type = "button"; wa.className = "btn"; wa.textContent = "Send on WhatsApp (ticked)";
+      wa.addEventListener("click", async () => { wa.disabled = true; try { const r = await makePdf(msg, true); if (r) { const f = new File([r.blob], r.name, { type: "application/pdf" });
+          if (navigator.canShare && navigator.canShare({ files: [f] })) { await navigator.share({ files: [f], title: r.name }); msg.textContent = "Shared (" + r.n + " pieces) - pick the customer in WhatsApp."; }
+          else { const u = URL.createObjectURL(r.blob), a = document.createElement("a"); a.href = u; a.download = r.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 5000); msg.textContent = "This device cannot share directly - PDF downloaded, attach it in WhatsApp."; } } }
+        catch (e) { if (!(e && e.name === "AbortError")) msg.textContent = "Could not send (" + (e.message || e) + ")."; } wa.disabled = false; });
+      bar.append(wa, pdf, est);
     }
     bar.appendChild(msg); box.appendChild(bar);
   }
@@ -283,7 +301,7 @@
     const sel = g("pfMode"); if (sel && sel.value !== m) sel.value = m;
     const photoMode = m !== "lostw";
     g("simCard").hidden = !photoMode; const wr = g("pfWtRow"); if (wr) wr.hidden = photoMode; const fr = g("fres"); if (fr) fr.hidden = photoMode;
-    g("sgo").textContent = m === "design" ? "Find similar" : "Find piece";
+    g("sgo").textContent = m === "design" ? "Find (photo or budget)" : "Find piece"; const mo = g("pfMore"); if (mo && m === "design") mo.open = true;
     if (photo && photoMode && lastRows.length) render(lastRows);
     if (photoMode && engReady) { loadVecs().then(showFill).catch(() => {}); }
   }
@@ -304,7 +322,7 @@
         <label>Category <select id="scat"></select></label></div>
       <details id="pfMore"><summary>More filters ▾</summary><div class="pf-two" style="margin-top:8px">
         <label>Wt from (g) <input id="sw1" inputmode="decimal" placeholder="any"></label><label>Wt to (g) <input id="sw2" inputmode="decimal" placeholder="any"></label>
-        <label>Price from (Rs 000) <input id="sp1" inputmode="decimal" placeholder="any"></label><label>Price to (Rs 000) <input id="sp2" inputmode="decimal" placeholder="any"></label></div></details>
+        <label>Price from (Rs) <input id="sp1" inputmode="numeric" placeholder="e.g. 50000"></label><label>Price to (Rs) <input id="sp2" inputmode="numeric" placeholder="e.g. 55000"></label></div></details>
       <button type="button" class="btn" id="sgo">Find similar</button>
       <div id="pfFill"></div>
       <div id="sres" style="display:flex;flex-direction:column;gap:10px"></div>`;
