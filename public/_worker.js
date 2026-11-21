@@ -1748,7 +1748,7 @@ async function vjReviewDue(url, env) { // one-time hand-out to Make
 // C-20261107-XLAUTO (owner 07/11 13:52-16:24): the karigar Excel (D.A.) and CUSTOMERS ACCOUNT update themselves 3x a day (09:30 / 15:00 / 21:30 IST), all in the cloud.
 // A Make schedule rings GET /hooks/vj-xlbell (no data, no secret). The worker keeps a random one-time token (10 min) and sends ONLY {token} to the Make hook;
 // Make fetches /hooks/vj-xldata?t=token once: the karigar orders of Montu / Hiru / Badshah, the bills since 01/10 and the OG register - Make edits the two files.
-const VJ_XL_HOOK = 'https://hook.eu1.make.com/os3j9tnxi3gcffnrl292tud7z9xzqqyh'; // Make hook 4059853 (VJ XLAUTO)
+const VJ_XL_HOOK = 'https://n8n-epei.srv2114308.hstgr.cloud/webhook/vj-xlauto-3f3faea8a6eb5b0b19d6'; // n8n 1Q7kahoQF82WZgO8 (VJ XLAUTO; was Make 8436141)
 async function vjXlBell(url, env) {
   if (!env.DB) return reply('not set up', 503); await vjRvT(env);
   const ymd = new Date(Date.now() + 5.5 * 3600e3).toISOString().slice(0, 10);
