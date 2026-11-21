@@ -1683,7 +1683,8 @@ async function vjReviewBell(url, env) {
     await env.DB.prepare('INSERT INTO vj_review_ask (tok, no, mobile, ts, img, itok) VALUES (?, ?, ?, ?, ?, ?)').bind(tok, no, test ? '' : mobile, now, img, itok || null).run();
     items.push({ no, date: day, name: name || 'Customer', to: '91' + mobile, masked: '+91 ' + mobile.slice(0, 2) + 'XXXXX' + mobile.slice(-3), tok,
       img: img ? vjRvFrame('https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok) : pf[0], photo: img ? 'their piece (tag photo, framed)' : pf[1], sname: sg[0], sphone: sg[1], items: await itemsOf(rows) }); };
-  if (test) await add('TEST', '7567400099', 'Abhinav', [{ cat: 'Ring' }, { cat: 'Pendant set' }], { cust: 'abhinav' });
+  if (test && url.searchParams.get('more') === '1') items.push({ no: 'TEST', date: day, name: 'Abhinav', to: '917567400099', masked: '+91 75XXXXX099', tok: 'M' + vjRvTok(15), more: 'jd', siteName: 'Justdial', items: 'Ring', sname: 'Team Vaishnavi Jewels', sphone: '+91 99980 43886' }); // C-20261121-REVIEWMORE test to Abhinav only
+  else if (test) await add('TEST', '7567400099', 'Abhinav', [{ cat: 'Ring' }, { cat: 'Pendant set' }], { cust: 'abhinav' });
   else if (!onlyClicks) {
     if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
     const bills = ((((await env.DB.prepare("SELECT no, data FROM vj_bills WHERE no LIKE 'B-%'").all()).results) || [])).map(vjParse).filter(b => b && b.date <= day && b.date >= vjAddDays(day, -15)); // C-20261106-REVIEWASK2: last 16 days (skipped Sundays / festivals are caught up) (a missed day is caught up; the 6-month rule stops repeats)
@@ -1722,6 +1723,22 @@ async function vjReviewBell(url, env) {
       rem.push({ no: r.no, date: b.date, name: clean(b.name).replace(/\s+ji$/i, '').slice(0, 40) || 'Customer', to: '91' + r.mobile, masked: '+91 ' + r.mobile.slice(0, 2) + 'XXXXX' + r.mobile.slice(-3), tok, reminder: k,
         img: itok ? vjRvFrame('https://' + VJ_HOST + '/hooks/vj-reviewimg?t=' + itok) : (pf = await posterFor(b.rows, r.no))[0], photo: itok ? 'their piece (tag photo, framed)' : pf[1], sname: signOf(b)[0], sphone: signOf(b)[1], items: await itemsOf(b.rows) }); if (rem.length >= 60) break; } }
   items.push(...rem);
+  // C-20261121-REVIEWMORE (owner 21/11 12:14 'make it mandatory like Google'): once the customer's GOOGLE review is posted, ONE more ask for ONE other site
+  // (bridal pieces -> WedMeGood / WeddingWire, others -> Justdial / Sulekha / Facebook; picked by the bill no.). The worker offers every sent first ask that is
+  // 2-21 days old and has no sent 'M' ask yet; n8n sends it ONLY if that customer's Google review is found (else it is dropped quietly and offered again tomorrow).
+  const more = []; if (!test && !onlyClicks) { await env.DB.prepare("DELETE FROM vj_review_ask WHERE tok LIKE 'M%' AND ts < ? AND ('reviewsent:' || tok) NOT IN (SELECT k FROM vj_meta WHERE k LIKE 'reviewsent:M%')").bind(now - 6 * 3600e3).run();
+    const SITES = { jd: 'Justdial', sl: 'Sulekha', fb: 'Facebook', wmg: 'WedMeGood', ww: 'WeddingWire' };
+    const FA = (((await env.DB.prepare("SELECT tok, no, mobile, ts FROM vj_review_ask WHERE mobile <> '' AND ts BETWEEN ? AND ? AND tok NOT LIKE 'R%' AND tok NOT LIKE 'M%'").bind(now - 21 * 864e5, now - 2 * 864e5).all()).results) || []);
+    for (const r of FA) { if (more.length >= 40) break;
+      if (await env.DB.prepare("SELECT 1 FROM vj_meta WHERE k = ?").bind('reviewsent:' + r.tok).first() === null) continue; // first ask never went out
+      if (await env.DB.prepare("SELECT 1 FROM vj_review_ask WHERE tok LIKE 'M%' AND no = ?").bind(r.no).first()) continue; // already offered today / sent
+      let stop = false; try { const t = ((await env.DB.prepare('SELECT text FROM wa_inbox WHERE sender = ? AND length(text) < 40').bind('91' + r.mobile).all()).results) || []; stop = t.some(x => WA_OPTOUT.test(String(x.text || '').trim()) || /^stop\b/i.test(String(x.text || '').trim())); } catch (e) {}
+      if (stop) continue; const bl = await env.DB.prepare("SELECT data FROM vj_bills WHERE no = ?").bind(r.no).first(), b = bl ? vjParse(bl) : null; if (!b || b.cancelled) continue;
+      const its = await itemsOf(b.rows), bridal = /polki|necklace|mangal|bridal|choker|set/i.test(its); let h = 0; for (const ch of String(r.no)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+      const L = bridal ? ['wmg', 'ww'] : ['jd', 'sl', 'fb'], site = L[h % L.length], tok = 'M' + vjRvTok(15);
+      await env.DB.prepare('INSERT INTO vj_review_ask (tok, no, mobile, ts, img, itok) VALUES (?, ?, ?, ?, ?, ?)').bind(tok, r.no, r.mobile, now, '', null).run();
+      more.push({ no: r.no, date: b.date, name: clean(b.name).replace(/\s+ji$/i, '').slice(0, 40) || 'Customer', to: '91' + r.mobile, masked: '+91 ' + r.mobile.slice(0, 2) + 'XXXXX' + r.mobile.slice(-3), tok, more: site, siteName: SITES[site], items: its, sname: signOf(b)[0], sphone: signOf(b)[1] }); } }
+  items.push(...more);
   // first click per asked bill since the last hand-out (for Review_Requests 'Clicked')
   let clicks = []; if (!test) { clicks = (((await env.DB.prepare('SELECT no, MIN(ts) AS ts FROM vj_review_clicks WHERE reported = 0 GROUP BY no').all()).results) || []).map(c => ({ no: c.no, at: waIst(Number(c.ts)) }));
     await env.DB.prepare('UPDATE vj_review_clicks SET reported = 1 WHERE reported = 0').run(); }
