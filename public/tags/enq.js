@@ -111,7 +111,8 @@
     const who = el("div"); who.style.cssText = "display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px";
     who.append(el("strong", { textContent: e.name || "(no name)" }));
     const onCall = () => { if (data.canEdit && e.open) quick(e, "called", "Called ✓"); }; /* C-20261103-ENQTABS: tapping Call records it (Undo for 10 s) */
-    if (e.number) { const n = e.tel ? el("a", { href: "tel:" + e.tel, textContent: e.number }) : el("span", { className: "hint", textContent: e.number }); if (e.tel) n.addEventListener("click", onCall); who.append(n); }
+    /* owner 22/11 17:18: tapping the number opens WhatsApp on HIS phone (direct chat with the customer); the Call button still calls */
+    if (e.number) { const n = e.wa ? el("a", { href: "https://wa.me/" + e.wa, target: "_blank", rel: "noopener", textContent: "🟢 " + e.number, title: "Open WhatsApp chat on this phone" }) : e.tel ? el("a", { href: "tel:" + e.tel, textContent: e.number }) : el("span", { className: "hint", textContent: e.number }); if (!e.wa && e.tel) n.addEventListener("click", onCall); who.append(n); }
     if (e.tel && data.canEdit) {
       const call = el("a", { href: "tel:" + e.tel, className: "btn ghost", textContent: "Call" }); call.style.cssText = "text-decoration:none;padding:6px 12px;border:1px solid var(--line);border-radius:var(--r);color:var(--fg);font-weight:600";
       call.addEventListener("click", onCall); who.append(call);
