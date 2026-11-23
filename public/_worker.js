@@ -2700,13 +2700,14 @@ async function vjKo3Save(request, env, who) { if (who.role === 'sales') return v
     const grp = one.ref ? all.filter(l => l.ref === one.ref && l.status === 'ok' && !l.rev && !all.some(z => z.rev === l.id && z.status !== 'deleted')) : [one];
     { const lk = await vjKoLockMsg(env, grp.map(l => [l.karigar, l.date])); if (lk) return vjDeny(409, lk); }
     let ord = null, warn = ''; if (one.ref) { const r0 = await env.DB.prepare('SELECT data FROM vj_kord WHERE id = ?').bind(one.ref).first(); ord = r0 ? vjKo3Up(vjParse(r0)) : null;
-      if (ord && (ord.tagNo || ord.status === 'tagged') && !b.tagOk) return vjJson({ error: 'Order ' + ord.no + ' already has a tag' + (ord.tagNo ? ' (' + ord.tagNo + ')' : '') + '. The tag is NOT touched - delete anyway?', needTag: true }, 409);
-      if (ord && ord.tagNo) warn = 'tag ' + ord.tagNo + ' kept as it is'; }
+      if (ord && (ord.tagNo || ord.status === 'tagged') && !b.tagOk) return vjJson({ error: 'Order ' + ord.no + ' already has a tag' + (ord.tagNo ? ' (' + ord.tagNo + ')' : '') + '. Its tag and any bill on it will ALSO be cancelled - delete anyway?', needTag: true }, 409); }
     const g = 'DG' + Date.now().toString(36), st = grp.map((l, i) => putL(Object.assign({}, l, { status: 'deleted', delGrp: g, delAt: now, delBy: who.email, delByName: byName }, i === 0 && ord ? { delOrder: { tag: ord.tag, rec: ord.rec, used: ord.used, status: ord.status, stage: ord.stage } } : {})));
     const chFree = ord && ord.tag ? vjKoChIds(ord.tag) : [], chLab = ord && ord.tag && ord.tag.chains ? ord.tag.chains.filter(c => c.tag).map(c => c.label || c.tag) : []; // CHAINREC
     if (ord && ord.tag) { ord.tagDeleted = (ord.tagDeleted || []).concat([{ at: now, by: byName, tag: ord.tag, rec: ord.rec, used: ord.used, status: ord.status }]).slice(-10); ord.tag = null; ord.rec = []; ord.used = []; if (ord.status !== 'cancelled') ord.status = 'karigar'; ord.stage = ord.stage === 'Ready' ? '' : ord.stage;
       st.push(env.DB.prepare('UPDATE vj_kord SET status = ?, data = ? WHERE id = ?').bind(ord.status, JSON.stringify(ord), ord.id)); }
+    const tagId0 = ord && (ord.tagId || (ord.tagNo ? String(ord.tagNo).replace('/', '-') : '')), tagNo0 = ord && ord.tagNo;
     await env.DB.batch(st); if (chFree.length) { await vjKoChainUse(env, who, chFree, ord, today, false); warn = (warn ? warn + '; ' : '') + 'chain tags freed: ' + chLab.join(', '); } // CHAINREC
+    if (tagId0 && /^[A-Za-z0-9_\-.~]{1,60}$/.test(tagId0)) { const c = await vjKoCascade(env, who, tagId0, ord.no); warn = (warn ? warn + '; ' : '') + c; } // C-20261123-KODELCASCADE
     await vjAudit(env, who, 'ko-leddel', 'kledger/' + g, JSON.stringify(grp).slice(0, 480)); return vjJson({ ok: true, warn }); }
   if (op === 'ledrev') { if (!adm) return vjDeny(403, 'only Abhinav or Shilpiji can reverse a karigar entry'); const row = await env.DB.prepare('SELECT data FROM vj_karigar_ledger WHERE id = ?').bind(vjClean(b.id, 60)).first(), l = row ? vjParse(row) : null;
     if (!l || l.status !== 'ok' || l.rev || !['pay', 'opening'].includes(l.type)) return vjDeny(400, 'only a payment or opening balance row can be reversed here (an order is changed on the order)');
@@ -4549,6 +4550,29 @@ async function vjWaReady(env) {
 }
 
 // receipts (not reversed) against one bill - a bill with receipts is not cancelled or erased (owner 17/10)
+// C-20261123-KODELCASCADE (owner 23/11 18:31): deleting a tagged delivery in the karigar account means something went wrong -
+// its bill(s) are cancelled and its tag is deleted too (copy kept in Deleted entries). A bill with receipts / settled is only reported.
+async function vjKoCascade(env, who, tagId, no) {
+  const out = [], byName = who.role === 'admin' ? (who.email === 'vaishnavijewels@gmail.com' ? 'Shilpiji' : 'Abhinav') : (who.name || String(who.email).split('@')[0]);
+  try {
+    if (!vjBillsOk) { await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_bills (no TEXT PRIMARY KEY, ts INTEGER, email TEXT, data TEXT)').run(); vjBillsOk = true; }
+    const bl = ((await env.DB.prepare('SELECT no, data FROM vj_bills WHERE data LIKE ?').bind('%' + tagId + '%').all()).results) || [];
+    for (const r of bl) { const bill = vjParse(r); if (!bill || bill.cancelled || !(bill.rows || []).some(x => String(x.id || '') === tagId)) continue;
+      if (bill.settled || (await vjBillRc(env, r.no)).length) { out.push('bill ' + r.no + ' NOT cancelled (has receipts / settled) - cancel it by hand'); continue; }
+      bill.cancelled = { reason: 'Wrong entry', note: 'karigar order ' + no + ' delivery deleted', by: who.email, byName, at: new Date().toISOString() };
+      const res = await env.DB.prepare('UPDATE vj_bills SET data = ? WHERE no = ? AND data = ?').bind(JSON.stringify(bill), r.no, r.data).run();
+      if (res.meta && res.meta.changes === 1) { out.push('bill ' + r.no + ' cancelled'); await vjAudit(env, who, 'bill-cancel', 'bills/' + r.no, 'Wrong entry - karigar order ' + no + ' delivery deleted | ' + bill.total); }
+      else out.push('bill ' + r.no + ' NOT cancelled (changed meanwhile)'); }
+    const path = 'tags/' + tagId, t = await env.DB.prepare('SELECT data FROM docs WHERE path = ?').bind(path).first();
+    if (t) { const now = Date.now(); await vjTables(env);
+      await env.DB.batch([env.DB.prepare('INSERT INTO vj_deleted (ts, email, path, reason, data) VALUES (?, ?, ?, ?, ?)').bind(now, who.email, path, 'Wrong entry', t.data),
+        env.DB.prepare('DELETE FROM docs WHERE path = ?').bind(path),
+        env.DB.prepare('INSERT INTO tomb (path, deleted_at) VALUES (?, ?) ON CONFLICT(path) DO UPDATE SET deleted_at = excluded.deleted_at').bind(path, now)]);
+      await vjAudit(env, who, 'delete', path, 'Wrong entry | karigar order ' + no + ' delivery deleted'); out.push('tag ' + tagId.replace('-', '/') + ' deleted (copy in Deleted entries)'); }
+  } catch (e) { out.push('cancel bill/tag failed: ' + (e.message || e)); }
+  return out.join('; ') || 'no bill or tag found';
+}
+
 async function vjBillRc(env, no) {
   await vjRcT(env);
   return ((((await env.DB.prepare('SELECT data FROM vj_receipts ORDER BY ts').all()).results) || []).map(vjParse)).filter(r => r && !r.reversed && r.bill === no);
