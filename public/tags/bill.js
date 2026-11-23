@@ -1267,3 +1267,23 @@
   function boot() { if (document.querySelector("nav") && $("p-rates")) { build(); setInterval(() => { const s = $("p-bill"); if (s && !s.hidden && !(document.activeElement && (document.activeElement.classList.contains("bdisc") || document.activeElement.classList.contains("brate")))) render(); }, 20000); } else setTimeout(boot, 300); }
   boot();
 })();
+
+// owner 23/11/2026 16:58 (C-20261123-BILLFINEBAL): when a bill is made for a gold-account party (e.g. Tiniji), show at once
+// how much fine gold (and rupees) is still pending from them. Reads the party gold account (/api/vj/g2g?key=m:<mobile>),
+// which only Abhinav / Shilpiji can see - for anyone else nothing is shown.
+(() => {
+  let last = "", tmr = 0;
+  const g3x = n => (Math.round((Number(n) || 0) * 1000) / 1000).toFixed(3) + " g";
+  const rs = n => "Rs " + Math.round(Math.abs(Number(n) || 0)).toLocaleString("en-IN");
+  const box = () => { const m = document.getElementById("bmob"); if (!m) return null; let h = document.getElementById("bfinebal");
+    if (!h) { h = document.createElement("div"); h.id = "bfinebal"; h.className = "hint"; h.style.cssText = "margin-top:4px;font-weight:600"; (m.closest("label") || m).insertAdjacentElement("afterend", h); } return h; };
+  const look = async mob => { const h = box(); if (!h) return; h.textContent = "";
+    try { const r = await fetch("/api/vj/g2g?key=" + encodeURIComponent("m:" + mob), { credentials: "same-origin" }); if (!r.ok) return; const a = await r.json(); if (!a || !a.bal) return;
+      const f = Number(a.bal.fine) || 0, amt = Number(a.bal.amount) || 0; if (!f && !amt) { h.textContent = (a.name || "Party") + ": gold account clear (nothing pending)."; return; }
+      const parts = []; if (f) parts.push(f > 0 ? "fine gold pending from party: " + g3x(f) : "fine gold with us (jama): " + g3x(-f)); if (amt) parts.push(amt > 0 ? "amount pending: " + rs(amt) : "amount with us: " + rs(amt));
+      h.textContent = (a.name || "Party") + " - " + parts.join(" · "); h.style.color = f > 0 || amt > 0 ? "#b45309" : ""; } catch (e) {} };
+  const chk = () => { const m = document.getElementById("bmob"); if (!m) return; const mob = String(m.value || "").replace(/\D/g, "").slice(-10);
+    if (mob.length !== 10) { last = ""; const h = document.getElementById("bfinebal"); if (h) h.textContent = ""; return; } if (mob === last) return; last = mob; look(mob); };
+  ["input", "change"].forEach(ev => document.addEventListener(ev, e => { if (e.target && e.target.id === "bmob") { clearTimeout(tmr); tmr = setTimeout(chk, 400); } }, true));
+  setInterval(chk, 2500); // a bill opened for Edit / a party picked from the list fills the mobile without typing
+})();
