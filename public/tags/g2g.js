@@ -62,6 +62,7 @@
     ov.addEventListener("click", e => { if (e.target === ov) close(); }); ovKey = e => { if (e.key === "Escape") close(); }; document.addEventListener("keydown", ovKey); document.body.append(ov); return d; }
   function close() { const o = $("cbOv"); if (o) o.remove(); if (ovKey) document.removeEventListener("keydown", ovKey); ovKey = null; }
   function build() {
+    return; // owner 23/11/2026 13:07 (C-20261123-G2GOFF): 'Party accounts (gold)' section removed from VJ Tags - gold accounts are read from the CUSTOMERS ACCOUNT Excel in the new VJ Accounts. Server data + /api/vj/g2g kept; Reconcile helper below still loads. To bring back: delete this line.
     const nav = document.querySelector("nav"); if (!nav || $("t-g2g")) return; style();
     const b = el("button", { id: "t-g2g", textContent: "Party accounts (gold)" }); b.setAttribute("role", "tab"); b.dataset.tab = "g2g"; b.setAttribute("aria-selected", "false");
     const tl = $("t-ledger"); nav.insertBefore(b, tl ? tl.nextSibling : nav.querySelector('[data-tab="rates"]'));
