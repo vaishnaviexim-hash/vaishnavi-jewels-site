@@ -1037,7 +1037,7 @@ function vjBillCalc(tags, o) {
   // plus figure) is set against the fine due; the balance fine x the party's fine gold rate (24K/g, default F) is added in rupees (more gold received = taken off)
   const fineDue = Math.round(rows.reduce((a, r) => a + r.fine, 0) * 1000) / 1000; let og = null;
   if (mode === 'g2g' && settle === 'fine' && o.og && Number(o.og.fine) > 0) { const recv = Math.round(Number(o.og.fine) * 1000) / 1000, rt = Number(o.og.rate) >= 2000 && Number(o.og.rate) <= 50000 ? Number(o.og.rate) : F, bal = Math.round((fineDue - recv) * 1000) / 1000, amt = Math.round(bal * rt);
-    og = { no: String(o.og.no || '').slice(0, 20), due: fineDue, recv, bal, rate: rt, amt }; sum += amt; }
+    const keep = !!o.og.keep; og = { no: String(o.og.no || '').slice(0, 20), due: fineDue, recv, bal, rate: rt, amt: keep ? 0 : amt }; if (keep) og.keep = true; else sum += amt; } // owner 23/11 16:56 (C-20261123-G2GKEEP): 'Keep balance as gold' - the balance fine stays as gold (grams), never rupees
   const after = Math.max(0, sum - disc);
   // owner 27/10/2026 13:35 (C-20261027-FINALAMT): a final amount typed for the bill - the discount is set so that total less discount + GST = that
   // amount exactly (no Rs 500 round-up); the bill prints only 'Final amount', the GST inside it stays in the record for the accountant
@@ -1051,7 +1051,7 @@ function vjBillCalc(tags, o) {
     if (mode !== 'item' && r.mkWt > 0) { r.making += roundIn; r.mkRate = Math.round(r.making / r.mkWt); } else r.other += roundIn;
     r.amount += roundIn; r.net += roundIn; sum += roundIn; }
   const fine = Math.round(rows.reduce((a, r) => a + r.fine, 0) * 1000) / 1000;
-  return { mode, settle, g2g: mode === 'g2g' ? (g2gN ? 'nett' : 'ws') : '', rows, fine: settle === 'fine' && !og ? fine : 0, fineIn: fine, og, sum, disc, after, roundOff: 0, roundIn, sub, gstPct, gst, total: sub + gst, final: finOk ? fin : 0 };
+  return { mode, settle, g2g: mode === 'g2g' ? (g2gN ? 'nett' : 'ws') : '', rows, fine: settle === 'fine' ? (og ? (og.keep ? og.bal : 0) : fine) : 0, fineIn: fine, og, sum, disc, after, roundOff: 0, roundIn, sub, gstPct, gst, total: sub + gst, final: finOk ? fin : 0 };
 }
 // VJ_BILL_CALC_END
 
@@ -1098,7 +1098,7 @@ async function vjBill(request, env, who, ctx) { // every login may make bills (o
   const date = String(b && b.date || ''), F = Math.round(Number(b && b.F) * 100) / 100, mode = ['ws', 'nett', 'g2g', 'item'].includes(b && b.mode) ? b.mode : '';
   const settle = b && b.settle === 'amount' ? 'amount' : 'fine';
   const final = Math.round(Number(b && b.final) || 0); if (final && !(final >= 1 && final <= 1e8)) return vjDeny(400, 'final amount looks wrong'); // C-20261027-FINALAMT
-  const og = b && b.og && typeof b.og === 'object' && Number(b.og.fine) > 0 ? { no: vjClean(b.og.no, 20), fine: Math.round(Number(b.og.fine) * 1000) / 1000, rate: Math.round(Number(b.og.rate) || 0) } : null; // C-20261027-OGBAL
+  const og = b && b.og && typeof b.og === 'object' && Number(b.og.fine) > 0 ? { no: vjClean(b.og.no, 20), fine: Math.round(Number(b.og.fine) * 1000) / 1000, rate: Math.round(Number(b.og.rate) || 0), keep: b.og.keep === true } : null; // C-20261027-OGBAL (+ keep: C-20261123-G2GKEEP)
   if (og && !(og.fine <= 2000)) return vjDeny(400, 'old gold received (fine g) looks wrong');
   if (og && og.rate && !(og.rate >= 2000 && og.rate <= 50000)) return vjDeny(400, 'party fine gold rate per g looks wrong');
   const title = b && b.title === 'Estimate' ? 'Estimate' : 'Bill';
@@ -3167,7 +3167,7 @@ const vjAgainst = r => r.bill || 'on account';
 function vjCustEv(L, c) {
     const ev = []; if (c.open || c.fineOpen) ev.push({ date: String(((L.ob || {})[c.key] || {}).date || ''), at: '', vch: 'Opening', part: 'Opening balance', dr: c.open > 0 ? c.open : 0, cr: c.open < 0 ? -c.open : 0, fdr: c.fineOpen > 0 ? c.fineOpen : 0, fcr: c.fineOpen < 0 ? -c.fineOpen : 0 }); // C-20261104-CASHBOOK
     c.bills.forEach(b => { const ps = c.pos.find(x => x.no === b.no);
-      ev.push({ date: b.date, at: b.at || '', vch: b.no, part: 'Bill ' + b.no + (b.settle === 'fine' && b.fine ? ' (+ ' + Number(b.fine).toFixed(3) + ' g fine gold)' : '') + (b.og && b.og.no ? ' - Gold to Gold, OG ' + b.og.no + ': fine ' + Number(b.og.due).toFixed(3) + ' g due, ' + Number(b.og.recv).toFixed(3) + ' g received' + (b.og.bal ? ', difference ' + Number(b.og.bal).toFixed(3) + ' g @ ' + b.og.rate + ' in rupees' : '') : ''), dr: ps.orig, cr: 0,
+      ev.push({ date: b.date, at: b.at || '', vch: b.no, part: 'Bill ' + b.no + (b.settle === 'fine' && b.fine ? ' (+ ' + Number(b.fine).toFixed(3) + ' g fine gold)' : '') + (b.og && b.og.no ? ' - Gold to Gold, OG ' + b.og.no + ': fine ' + Number(b.og.due).toFixed(3) + ' g due, ' + Number(b.og.recv).toFixed(3) + ' g received' + (b.og.bal ? (b.og.keep ? ', balance ' + Number(b.og.bal).toFixed(3) + ' g kept as gold' : ', difference ' + Number(b.og.bal).toFixed(3) + ' g @ ' + b.og.rate + ' in rupees') : '') : ''), dr: ps.orig, cr: 0,
         fdr: b.settle === 'fine' ? (b.og ? vjR3(b.og.due) : vjR3(b.fine)) : 0, fcr: b.settle === 'fine' && b.og ? vjR3(b.og.recv) : 0 }); // fine columns: C-20261104-CASHBOOK (OG in = fine in, only the difference is in rupees on the bill)
       (Array.isArray(b.discs) ? b.discs : []).forEach(d => ev.push({ date: d.date, at: d.at, part: 'Discount allowed on ' + b.no + (d.note ? ' (' + d.note + ')' : '') + ' - ' + (d.byName || ''), dr: 0, cr: Number(d.amount) || 0 })); // BILLDISC
       if (b.settled) ev.push({ date: String(b.settled.at).slice(0, 10), at: b.settled.at, vch: b.no, part: 'Settlement discount on ' + b.no + (b.settled.fineWaived ? ', fine gold waived ' + Number(b.settled.fineWaived).toFixed(3) + ' g' : ''), dr: 0, cr: ps.sd, fcr: vjR3(b.settled.fineWaived || 0) }); });
