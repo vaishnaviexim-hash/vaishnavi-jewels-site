@@ -1,14 +1,24 @@
 ---
 import InfoPage from '../layouts/InfoPage.astro';
+// C-20261124-KWPLAN (owner 'go now' 17:22): aim this page at "diamond jewellery surat" (1k-10k searches/month, we were at position 12-18).
+const faqs: [string, string][] = [
+  ['Where can I buy certified diamond jewellery in Surat?', 'At our showroom, 120, Rajhans Ornate - High Street Retail Mall, Parle Point, Surat. We have made diamond jewellery in Surat since 2005, and every piece comes with a grading report and BIS HUID hallmarked gold.'],
+  ['How do I check that a diamond is genuine?', 'Ask for the grading report and check its number online on the laboratory website (IGI or GIA for solitaires). Many solitaires also carry the report number laser-inscribed on the diamond, which you can see under a loupe in our showroom.'],
+  ['What is the difference between natural and lab-grown diamond jewellery?', 'A natural diamond formed in the earth; a lab-grown diamond is grown in a laboratory. Both are real diamonds with the same hardness and sparkle, and the grading report clearly states which one you are buying. Lab-grown diamonds cost less for the same size.'],
+  ['What is the starting price of diamond jewellery at Vaishnavi Jewels?', 'Our diamond jewellery starts from about Rs 25,000. Every estimate shows each part separately: gold weight at the day\'s rate, making charge, each diamond line and 3% GST.'],
+  ['Do you offer exchange or buy-back on diamond jewellery?', 'Yes, we offer both exchange and buy-back on jewellery bought from us. Please keep your original bill and original certificate; our team explains the terms for your piece at the showroom.'],
+  ['Can you make a diamond design from a photo?', 'Yes. Share a photo or an idea; we show you a sketch and a 3D (CAD) design to approve before making. Depending on the design it takes from about 4 days to 3-4 weeks.'],
+];
 ---
 <InfoPage
-  title="Natural Diamond Jewellery Surat | Certified | Vaishnavi Jewels"
-  description="Certified natural diamond jewellery in Surat since 2005: necklaces, solitaires, earrings, mangalsutras and bridal sets. Rajhans Ornate Mall, Parle Point."
+  title="Diamond Jewellery in Surat | Certified Natural Diamonds | Vaishnavi Jewels"
+  description="Diamond jewellery in Surat since 2005: certified natural diamond necklaces, rings, earrings, mangalsutras and bridal sets, BIS HUID gold. Parle Point showroom."
   path="/natural-diamond-jewellery"
   eyebrow="NATURAL DIAMONDS"
-  heading="Natural Diamond Jewellery in Surat"
+  heading="Diamond Jewellery in Surat"
   intro="Earth-formed diamonds, set in gold and made in our own manufacturing unit in Surat since 2005."
   hero={{ id: 'vj/design_gemini/ww_diamond_line_necklace_20261028152845', alt: 'Natural diamond necklace by Vaishnavi Jewels on a velvet bust' }}
+  faqs={faqs}
 >
   <h2>What we make</h2>
   <p>Our showroom at Rajhans Ornate, Parle Point, Surat holds natural diamond necklaces and sets, <a href="/solitaire-rings">certified solitaire rings</a>, cluster rings, earrings, bangles, bracelets, pendants and mangalsutras, from everyday pieces to bridal jewellery.</p>
@@ -21,6 +31,16 @@ import InfoPage from '../layouts/InfoPage.astro';
   <h2>Made your way</h2>
   <p>Because we manufacture in-house, you can take any design and change the gold karat, the diamond quality or the design itself. Share a photo or an idea and we will guide you through the options.</p>
   <figure class="vj-fig"><div class="vj-fig-frame"><img class="vj-photo-img" src="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_karigar_20261111131036" srcset="https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_480/vj/concept/web_sec_karigar_20261111131036 480w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_720/vj/concept/web_sec_karigar_20261111131036 720w, https://res.cloudinary.com/rknejib2/image/upload/f_auto,q_auto,c_fill,ar_4:5,g_auto,w_960/vj/concept/web_sec_karigar_20261111131036 960w" sizes="(max-width: 520px) 92vw, 460px" width="720" height="900" alt="Craftsman setting diamonds into a gold necklace in the Vaishnavi Jewels manufacturing unit, Surat" loading="lazy" decoding="async" /><span class="vj-mark sm" aria-hidden="true"><img src="/logo_mark_on_dark.png" alt="" width="45" height="30" loading="lazy" /></span></div></figure>
+
+  <h2>Buying diamond jewellery in Surat: what to check</h2>
+  <p>Surat is where most of the world's diamonds are cut and polished, so the choice here is wide. Before you buy any diamond piece, from us or anywhere else, check these four things:</p>
+  <ul>
+    <li><strong>A grading report</strong> from a recognised laboratory, with a number you can check online.</li>
+    <li><strong>BIS HUID hallmark</strong> on the gold: a 6-character code you can verify in the BIS Care app.</li>
+    <li><strong>A written estimate</strong> that shows gold weight and rate, making charge, diamonds and GST as separate lines.</li>
+    <li><strong>Exchange and buy-back terms</strong>, explained before you pay.</li>
+  </ul>
+  <p>Our showroom team walks you through all four on every piece. Compare natural with <a href="/lab-grown-diamond-jewellery">lab-grown diamond jewellery</a>, or see <a href="/bridal-jewellery">bridal jewellery in Surat</a>.</p>
 
   <h2>Buying from outside Surat</h2>
   <p>We guide you personally on WhatsApp, accept payment by NEFT or UPI, and ship with free insured delivery to major Indian cities. See <a href="/delivery-across-india">Delivery across India</a>, our <a href="/faq">FAQ</a>, or <a href="/visit-us">visit our showroom</a>.</p>
