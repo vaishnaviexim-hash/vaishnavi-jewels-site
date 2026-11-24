@@ -1895,6 +1895,7 @@ function vjOgCalc(r) { // the only place the OG figures are worked out
   const gMg = vjOgMg(r.gross), t0 = vjOgTun(r.tunch), t = t0 == null ? NaN : t0; // 02/11 14:51: a tunch saved as a fraction (0.351) by an old cached page counts as 35.1 %
   if (r.src === 'stock' || r.src === 'part' || r.src === 'own' || r.src === 'vendor') { const act = t > 0 && gMg > 0 ? Math.round(gMg * t / 100) : vjOgMg(r.fine); return { actFine: act / 1000, credTunch: null, credFine: 0, marginFine: 0 }; } // our own gold (whole piece / part of a piece / plain fine): no party, no margin
   if (!(t > 0)) { const f = vjOgMg(r.fine); return { actFine: f / 1000, credTunch: null, credFine: f / 1000, marginFine: 0 }; } // no tunch (old entries): fine as typed
+  if (Number(r.credMan) > 0 && gMg > 0) { const act = Math.round(gMg * t / 100), cred = vjOgMg(r.credMan); return { actFine: act / 1000, credTunch: Math.round(cred / gMg * 10000) / 100, credFine: cred / 1000, marginFine: (act - cred) / 1000 }; } // OGMANUAL owner 24/11: party credit fine typed by hand (no fixed 1/2 % margin)
   const m = Number(r.margin) >= 0 ? Number(r.margin) : 2, ct = Math.max(0, Math.round((t - m) * 100) / 100);
   const act = Math.round(gMg * t / 100), cred = Math.round(gMg * ct / 100);
   return { actFine: act / 1000, credTunch: ct, credFine: cred / 1000, marginFine: (act - cred) / 1000 };
@@ -1944,7 +1945,7 @@ async function vjOgs(env, who, url) { const all = await vjOgList(env), live = al
     if (r.acct) o.acct = { at: r.acct.at, byName: r.acct.byName || '', note: r.acct.note || '' }; // C-20261107-OGACCT
     if (r.cash) o.cash = { date: r.cash.date, fine: r.cash.fine, rate: who.role === 'sales' ? null : r.cash.rate, amount: who.role === 'sales' ? null : r.cash.amount, note: r.cash.note || '', byName: r.cash.byName || '', at: r.cash.at, edited: r.cash.editedAt ? { at: r.cash.editedAt, byName: r.cash.editedByName || '' } : null }; // C-20261102-OGCASH
     if (Array.isArray(r.cashOld) && r.cashOld.length) o.cashOld = r.cashOld.map(c => ({ date: c.date, fine: c.fine, amount: who.role === 'sales' ? null : c.amount, cancelled: c.cancelled ? { at: c.cancelled.at, byName: c.cancelled.byName, why: c.cancelled.why || '' } : null }));
-    if (adm) Object.assign(o, { tunch: r.tunch === '' || r.tunch == null ? null : Number(r.tunch), margin: r.src !== 'party' ? null : (Number(r.tunch) > 0 ? Number(r.margin) : null), credTunch: r.credTunch, actFine: r.actFine, marginFine: r.marginFine });
+    if (adm) Object.assign(o, { tunch: r.tunch === '' || r.tunch == null ? null : Number(r.tunch), margin: r.src !== 'party' ? null : Number(r.credMan) > 0 ? 'man' : (Number(r.tunch) > 0 ? Number(r.margin) : null), credMan: Number(r.credMan) > 0 ? Number(r.credMan) : null, credTunch: r.credTunch, actFine: r.actFine, marginFine: r.marginFine });
     else if (r.src === 'party') o.credTunch = r.credTunch;
     if (adm && r.src === 'vendor') Object.assign(o, { rate: r.rate == null ? null : r.rate, amount: r.amount == null ? null : r.amount });
     return o; }).sort((a, b) => vjOgNum(a.no) - vjOgNum(b.no) || String(a.no).localeCompare(String(b.no)));
@@ -2113,14 +2114,18 @@ async function vjOgSave(request, env, who) { if (who.role === 'sales') return vj
   } else { // party's old gold
     const name = vjClean(b && b.name, 60), city = vjClean(b && b.city, 40), mobile = vjPhone(b && b.mobile), item = vjClean(b && b.item, 120);
     const gross = b.gross === '' || b.gross == null ? 0 : vjR3(b.gross), fine = b.fine === '' || b.fine == null ? 0 : vjR3(b.fine);
-    const margin = adm && b.margin !== '' && b.margin != null ? Number(b.margin) : (old && Number(old.tunch) > 0 ? Number(old.margin) : 2); // staff never set the margin: default 2 (an edit by the owner keeps or changes it)
+    const man = adm ? (b.margin === 'man') : !!(old && Number(old.credMan) > 0); // OGMANUAL: only admin picks Manual; a staff edit keeps the owner's choice
+    const credMan = !man ? null : adm ? vjR3(b.credMan) : vjR3(old.credMan);
+    const margin = man ? 0 : adm && b.margin !== '' && b.margin != null ? Number(b.margin) : (old && Number(old.tunch) > 0 && !(Number(old.credMan) > 0) ? Number(old.margin) : 2); // staff never set the margin: default 2 (an edit by the owner keeps or changes it)
     if (!name) return vjDeny(400, 'party name is needed');
     if (!(gross >= 0 && gross <= 5000)) return vjDeny(400, 'gross weight (g) looks wrong');
     if (!(margin >= 0 && margin <= 10)) return vjDeny(400, 'tunch margin must be 0 to 10');
     if (tunchIn !== null && !(gross > 0)) return vjDeny(400, 'type the gross weight');
-    if (tunchIn !== null && margin >= tunchIn) return vjDeny(400, 'margin is bigger than the tunch');
+    if (man && tunchIn === null) return vjDeny(400, 'manual credit needs the tested tunch %');
+    if (man && !(credMan > 0 && credMan <= gross)) return vjDeny(400, 'party credit fine (g) looks wrong - must be more than 0 and not more than the gross');
+    if (!man && tunchIn !== null && margin >= tunchIn) return vjDeny(400, 'margin is bigger than the tunch');
     if (tunchIn === null && !(fine >= 0 && fine <= 2000)) return vjDeny(400, 'fine gold (g) looks wrong');
-    rec = Object.assign(old ? { by: old.by, byName: old.byName, at: old.at } : { by: who.email, byName, at: now }, { no, date, src: 'party', name, city, mobile, item, gross, tunch: tunchIn, margin: tunchIn !== null ? Math.round(margin * 100) / 100 : null, fine: tunchIn !== null ? 0 : fine, note });
+    rec = Object.assign(old ? { by: old.by, byName: old.byName, at: old.at } : { by: who.email, byName, at: now }, { no, date, src: 'party', name, city, mobile, item, gross, tunch: tunchIn, margin: tunchIn !== null && !man ? Math.round(margin * 100) / 100 : null, credMan: man ? credMan : null, fine: tunchIn !== null ? 0 : fine, note });
     if (sIn) stw = { src: 'party', rows: sIn.map(s => Object.assign(s, { line: null, st: '' })) }; // C-20261102-OGSTONES: party's diamonds (optional)
     if (old && old.cash) rec.cash = old.cash; if (old && old.cashOld) rec.cashOld = old.cashOld; // C-20261102-OGCASH: an edit keeps the cash conversion
   }
