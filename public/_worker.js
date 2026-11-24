@@ -1313,6 +1313,7 @@ const vjSendRow = (env, no, isR) => /^Q-/.test(no) ? env.DB.prepare('SELECT data
 function vjSendDoc(no, row) { const d = JSON.parse(row.data); if (!/^Q-/.test(no)) return d;
   return Object.assign({}, d, { no, title: d.kind === 'design' ? 'Estimate' : 'Quotation', date: '20' + no.slice(2, 4) + '-' + no.slice(4, 6) + '-' + no.slice(6, 8), mobile: String(d.mobile || '').replace(/\D/g, '').slice(-10) }); }
 const vjMetaT = env => env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_meta (k TEXT PRIMARY KEY, v TEXT)').run();
+const vjIsOwnerAbhinav = who => !!who && who.role === 'admin' && who.email === 'vaishnaviexim@gmail.com'; // C-20261124-OGCHECK: Abhinav's own check ticks
 async function vjBillSend(request, env, who) {
   const len = Number(request.headers.get('content-length') || 0);
   if (!len || len > 7e6) return vjDeny(413, 'the PDF is too large to send');
@@ -1975,7 +1976,8 @@ async function vjOgs(env, who, url) { const all = await vjOgList(env), live = al
   let koParty = []; if (who.role !== 'sales') try { // C-20261103-PARTYDIA: customer's own diamonds handed to a karigar on an open order, still with him
     koParty = ((((await env.DB.prepare('SELECT data FROM vj_kord').all()).results) || []).map(vjParse)).filter(o => o && o.status !== 'cancelled' && !o.tag && vjKoPty(o.iss).length).map(o => { const I = vjKoTot(vjKoPty(o.iss)), R = vjKoTot(vjKoPty(o.rec));
       return { karigar: o.karigar || '', no: o.no, name: o.name || '', pcs: Math.max(0, I.pcs - R.pcs), ct: Math.max(0, vjR3(I.ct - R.ct)), lines: vjKoPty(o.iss).map(r => ({ shape: r.shape || '', pcs: r.pcs || 0, ct: r.ct || 0 })) }; }).filter(x => x.pcs > 0 || x.ct > 0); } catch (e) { koParty = []; }
-  return vjJson({ ok: true, list, reg: regOut, free, orphans, next, koParty, last: lastB ? { og: lastB.og, no: lastB.no, name: lastB.name } : null, out: who.role === 'sales' ? [] : outOut, dias: (who.role === 'sales' ? [] : dias).map(d => ({ id: d.id, og: d.og, tag: d.tag, label: d.label || '', shape: d.shape || '', q: d.q || '', pcs: d.pcs || 0, ct: d.ct || 0, karigar: d.karigar || '', status: d.status, retAt: d.retAt || '', retByName: d.retByName || '' })),
+  let chk = null; if (vjIsOwnerAbhinav(who)) { chk = {}; try { (((await env.DB.prepare("SELECT k, v FROM vj_meta WHERE k LIKE 'ogchk:%'").all()).results) || []).forEach(r => { try { chk[r.k.slice(6)] = JSON.parse(r.v); } catch (e) {} }); } catch (e) {} } // C-20261124-OGCHECK
+  return vjJson({ ok: true, chk, list, reg: regOut, free, orphans, next, koParty, last: lastB ? { og: lastB.og, no: lastB.no, name: lastB.name } : null, out: who.role === 'sales' ? [] : outOut, dias: (who.role === 'sales' ? [] : dias).map(d => ({ id: d.id, og: d.og, tag: d.tag, label: d.label || '', shape: d.shape || '', q: d.q || '', pcs: d.pcs || 0, ct: d.ct || 0, karigar: d.karigar || '', status: d.status, retAt: d.retAt || '', retByName: d.retByName || '' })),
     sum, karigars: await vjOgKarigars(env), vendors: who.role === 'sales' ? [] : [...new Set(reg.filter(r => r.src === 'vendor').map(r => r.vendor || r.name).filter(Boolean))].sort((a, b) => a.localeCompare(b)), margins: [0, 1, 2], admin: adm, canDelete: adm, canAdd: who.role !== 'sales' }); }
 async function vjOgHist(env, who, kind, ref, action, old) { await env.DB.prepare('INSERT INTO vj_og_hist (ts, email, kind, ref, action, data) VALUES (?, ?, ?, ?, ?, ?)').bind(Date.now(), who.email, kind, ref, action, JSON.stringify(old || null)).run(); }
 async function vjOgSave(request, env, who) { if (who.role === 'sales') return vjDeny(403, 'read only');
@@ -1987,6 +1989,12 @@ async function vjOgSave(request, env, who) { if (who.role === 'sales') return vj
   if (op === 'out' || op === 'outcancel') return vjOgOutSave(b, env, who, adm, now, byName, op, dateOk);
   if (op === 'dia') return vjOgDiaSave(b, env, who, adm, now, byName);
   if (op === 'cash' || op === 'cashcancel') return vjOgCashSave(b, env, who, adm, now, byName, op, dateOk); // C-20261102-OGCASH
+  if (op === 'chk') { // C-20261124-OGCHECK (owner 24/11 12:20): his own "checked, entry proper" tick - only his login
+    if (!vjIsOwnerAbhinav(who)) return vjDeny(403, 'owner only');
+    const key = String(b && b.key || ''); if (!/^(in|out):[A-Za-z0-9\-\/]{1,40}$/.test(key)) return vjDeny(400, 'bad row');
+    if (b.on === true) await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v').bind('ogchk:' + key, JSON.stringify({ at: now, byName })).run();
+    else await env.DB.prepare('DELETE FROM vj_meta WHERE k = ?').bind('ogchk:' + key).run();
+    await vjAudit(env, who, 'og-check', 'ogs/' + key, b.on === true ? 'checked' : 'unchecked'); return vjJson({ ok: true }); }
   if (op === 'acct') { // owner 07/11 14:18 (C-20261107-OGACCT): a party OG adjusted ON ACCOUNT (not bill to bill) - his tick strikes it out; it never goes on a bill
     if (!adm) return vjDeny(403, 'only Abhinav or Shilpiji can mark an OG adjusted on account');
     const no = vjOgN(vjClean(b && b.no, 20)); const row = await env.DB.prepare('SELECT data FROM vj_ogs WHERE no = ?').bind(no).first(), old = row ? vjParse(row) : null; if (!old) return vjDeny(404, 'OG ' + no + ' is not in the register');

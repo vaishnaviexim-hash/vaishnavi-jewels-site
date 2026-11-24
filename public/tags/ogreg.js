@@ -224,10 +224,14 @@
     const q = String($("ogQ").value || "").trim().toLowerCase(), ym = $("ogLMon").value, only = $("ogFree").checked; $("ogFreeL").hidden = view !== "in";
     const t = el("table", { className: "items" }), hr = el("tr"), tb = el("tbody"), A = J.admin; let rows = [], head = [];
     const td = (tr, x, cl) => tr.appendChild(el("td", { className: cl || "", textContent: x == null ? "" : x }));
+    /* C-20261124-OGCHECK (owner 24/11 12:20): owner's own "checked - entry is proper" tick on every row; only his login sees it */
+    const CK = J.chk || null, ckCell = (tr, key) => { if (!CK) return; const c = el("input", { type: "checkbox" }), cell = el("td"); c.checked = !!CK[key]; c.style.cssText = "width:22px;height:22px;cursor:pointer"; c.title = CK[key] ? "Checked " + dmy(CK[key].at) : "Tick when you have checked this entry";
+      c.addEventListener("change", async () => { c.disabled = true; try { await post({ op: "chk", key, on: c.checked }); if (c.checked) CK[key] = { at: new Date().toISOString() }; else delete CK[key]; tr.style.background = c.checked ? "rgba(46,160,67,.10)" : ""; } catch (e) { c.checked = !c.checked; $("ogMsg").textContent = "Not saved: " + (e.message || e) + "."; } c.disabled = false; });
+      if (c.checked) tr.style.background = "rgba(46,160,67,.10)"; cell.appendChild(c); tr.appendChild(cell); };
     if (view === "in") {
       head = ["OG no.", "Date", "From", "Item", "Gross g"].concat(A ? ["Tunch %", "Margin", "Actual fine"] : []).concat(["Credit tunch", "Party credit fine"]).concat(A ? ["Margin fine"] : []).concat(["Diamonds", "Status", ""]);
       rows = (J.reg || []).filter(r => (!ym || String(r.date).slice(0, 7) === ym) && (!only || (!r.bill && !r.cancelled && r.src === "party" && !r.cash && !r.acct)) && (!q || [r.no, r.name, r.city, r.mobile, r.bill, r.item, r.tag && r.tag.label, r.vendor, r.inv].join(" ").toLowerCase().includes(q))).slice().reverse();
-      rows.forEach(r => { const tr = el("tr", { className: r.cancelled ? "ogx" : r.src === "party" && (r.bill || r.cash || r.acct) ? "ogdone" : "" }); /* C-20261102-OGDONE: party already credited (bill or cash) - greyed + struck, gold still in hand */ td(tr, r.no); td(tr, dmy(r.date));
+      rows.forEach(r => { const tr = el("tr", { className: r.cancelled ? "ogx" : r.src === "party" && (r.bill || r.cash || r.acct) ? "ogdone" : "" }); /* C-20261102-OGDONE: party already credited (bill or cash) - greyed + struck, gold still in hand */ ckCell(tr, "in:" + r.no); td(tr, r.no); td(tr, dmy(r.date));
         td(tr, r.src === "stock" ? "Own piece (whole) " + (r.tag ? r.tag.label : "") : r.src === "part" ? "Part of " + (r.tag ? r.tag.label : "") : r.src === "own" ? "Own gold: " + r.name : r.src === "vendor" ? "Vendor: " + (r.vendor || r.name) + (r.inv ? " (inv " + r.inv + ")" : "") : [r.name, r.city].filter(Boolean).join(", ") + (r.mobile ? " · " + r.mobile : "")); td(tr, r.item || (r.legacy ? "(old entry)" : "-"));
         td(tr, r.gross ? r3(r.gross) : "-", "num");
         if (A) { td(tr, r.tunch != null ? r.tunch : "-", "num"); td(tr, r.margin != null ? r.margin : "-", "num"); td(tr, r3(r.actFine), "num"); }
@@ -255,7 +259,7 @@
     } else if (view === "out") {
       head = ["Date", "OG no(s)", "To", "Fine g", "Gross g", "By", "Note", ""];
       rows = (J.out || []).filter(o => (!ym || String(o.date).slice(0, 7) === ym) && (!q || [o.karigar, o.note, (o.ogs || []).join(" "), o.to === "stock" ? "stock" : ""].join(" ").toLowerCase().includes(q)));
-      rows.forEach(o => { const tr = el("tr", { className: o.cancelled ? "ogx" : "" }); td(tr, dmy(o.date)); td(tr, (o.ogs || []).length ? o.ogs.join(", ") : "OG pool");
+      rows.forEach(o => { const tr = el("tr", { className: o.cancelled ? "ogx" : "" }); ckCell(tr, "out:" + o.id); td(tr, dmy(o.date)); td(tr, (o.ogs || []).length ? o.ogs.join(", ") : "OG pool");
         const to = el("td", { textContent: o.to === "karigar" ? "Karigar " + o.karigar : "Our stock (fine)" }); to.style.fontWeight = "600"; tr.appendChild(to);
         const f = el("td", { className: "num", textContent: r3(o.fine) }); f.style.fontWeight = "700"; f.style.fontSize = "17px"; tr.appendChild(f);
         td(tr, o.gross ? r3(o.gross) : "-", "num"); td(tr, o.byName); td(tr, (o.note || "") + (o.cancelled ? " · cancelled " + dmy(o.cancelled.at) + (o.cancelled.why ? " (" + o.cancelled.why + ")" : "") : ""));
@@ -276,6 +280,7 @@
         if (J.canDelete && d.status === "returned") { const u = el("button", { type: "button", className: "btn ghost", textContent: "Undo" }); sure(u, "Sure? back to pending", async () => { await post({ op: "dia", id: d.id, returned: false }); load(); }); x.appendChild(u); }
         tr.appendChild(x); tb.appendChild(tr); });
     }
+    if (CK && view !== "dia") head.unshift("✔ Checked");
     head.forEach(h => hr.appendChild(el("th", { textContent: h }))); t.appendChild(el("thead", {}, [hr])); t.style.minWidth = (head.length * 92) + "px";
     if (!rows.length) tb.appendChild(el("tr", {}, [el("td", { colSpan: head.length, className: "hint", textContent: view === "dia" ? "No diamonds to get back." : "Nothing here" + (ym ? " for " + ym.split("-").reverse().join("-") : "") + "." })]));
     t.appendChild(tb);
