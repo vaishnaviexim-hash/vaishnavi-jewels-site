@@ -1100,6 +1100,9 @@
   const vcLab = (t, el) => vcEl("label", {}, [t + " ", el]);
   const vcInp = (id, ph, w, mode) => { const i = vcEl("input", { id, placeholder: ph || "", autocomplete: "off", maxLength: 40 }); if (mode) i.inputMode = mode; if (w) i.style.maxWidth = w + "px"; return i; };
   const vcOwner = () => /owner/i.test(String(($("who") || {}).textContent || ""));
+  /* C-20261124-CHAINLOCK (owner 24/11 17:47): a vendor chain tag can carry a Chain line and a Lock line, each with its own tunch; purchase tunch is kept per part (approval.pTunch = chain, approval.pTunchLock = lock) */
+  function vcParts(t) { const a = t.approval || {}, gl = (t.gold || []).filter(g => Number(g.net) > 0), P = (gl.length ? gl : [(t.gold || [])[0] || {}]).map(g => { const lk = g.k === "Lock", tn = Number(g.tunch) || 0, pt = (lk ? Number(a.pTunchLock) : Number(a.pTunch)) || tn; return { k: g.k || "", lock: lk, net: Number(g.net) || 0, tn, pt, fine: (Number(g.net) || 0) * pt }; });
+    return { parts: P, net: P.reduce((x, y) => x + y.net, 0), fine: P.reduce((x, y) => x + y.fine, 0), hasLock: P.some(x => x.lock) }; }
   function vcTags() { return tags().filter(t => t && t.approval && t.approval.vendor); }
   function vcVendors() { const vs = [...new Set(vcTags().map(t => t.approval.vendor).concat(VC.pay.map(x => x.vendor)))].sort(); const dl = $("vcvl"); if (dl) { dl.textContent = ""; vs.forEach(x => dl.append(vcEl("option", { value: x }))); } return vs; }
   function vcInit() {
@@ -1213,13 +1216,13 @@
     const showOld = $("vcfs").checked, mon = ($("vcfm") || {}).value || "", L = vcTags().filter(t => (!cur || t.approval.vendor === cur) && (showOld || !t.approval.settled) && (!mon || String(t.approval.at || "").slice(0, 7) === mon))
       .sort((a, b) => String(a.approval.vendor).localeCompare(String(b.approval.vendor)) || String(a.approval.at).localeCompare(String(b.approval.at)));
     body.textContent = ""; const tot = {};
-    L.forEach(t => { const a = t.approval, g = (t.gold || [])[0] || {}, net = Number(g.net) || 0, tn = Number(g.tunch) || 0, pt = Number(a.pTunch) || tn, pr = Number(a.pRate) || 0, fine = vcR3(net * pt), amt = Math.round(net * pt * pr);
+    L.forEach(t => { const a = t.approval, VP = vcParts(t), g = VP.parts.find(x => !x.lock) || VP.parts[0] || {}, gL = VP.parts.find(x => x.lock), net = VP.net, tn = Number(g.tn) || 0, pt = Number(g.pt) || tn, pr = Number(a.pRate) || 0, fine = vcR3(VP.fine), amt = Math.round(VP.fine * pr);
       const sold = t.status === "sold" && t.sold, done = !!a.settled, tr = document.createElement("tr"), td = x => { const e = document.createElement("td"); if (x instanceof Node) e.append(x); else e.textContent = x; tr.append(e); return e; };
       const cb = vcEl("input", { type: "checkbox" }); cb.style.width = "auto"; cb.dataset.id = t.id; td(done ? "" : cb);
-      td(t.label + (a.note ? " · " + a.note : "")); td(a.vendor); td(a.at ? dmy(String(a.at).slice(0, 10)) : ""); td(`${g.k || ""} ${net.toFixed(3)} g`); td(tn.toFixed(3));
+      td(t.label + (a.note ? " · " + a.note : "")); td(a.vendor); td(a.at ? dmy(String(a.at).slice(0, 10)) : ""); td(VP.parts.map(x => `${x.k || ""} ${x.net.toFixed(3)} g`).join(" + ")); td(VP.parts.map(x => (x.lock ? "L " : "") + x.tn.toFixed(3)).join(" / "));
       const ip = (val, w, ok, key) => { const i = vcEl("input", { value: String(val), inputMode: "decimal" }); i.style.cssText = `width:${w}px;text-align:right;padding:4px 6px`; i.disabled = done;
-        i.addEventListener("change", async () => { const n = vcNum(i.value); if (!ok(n)) { i.style.borderColor = "#a12b2b"; return; } i.style.borderColor = ""; try { await vcSet(t, { [key]: key === "pTunch" ? vcR3(n) : Math.round(n * 100) / 100 }); vcList(true); } catch (e) { i.style.borderColor = "#a12b2b"; $("vcdmsg").textContent = "Could not save: " + ((e && (e.message || e.code)) || "error"); } }); return i; };
-      td(ip(pt.toFixed(3), 80, n => n >= 0.3 && n <= 1.1, "pTunch")); td(ip(pr || "", 100, n => n >= 2000 && n <= 50000, "pRate"));
+        i.addEventListener("change", async () => { const n = vcNum(i.value); if (!ok(n)) { i.style.borderColor = "#a12b2b"; return; } i.style.borderColor = ""; try { await vcSet(t, { [key]: /^pTunch/.test(key) ? vcR3(n) : Math.round(n * 100) / 100 }); vcList(true); } catch (e) { i.style.borderColor = "#a12b2b"; $("vcdmsg").textContent = "Could not save: " + ((e && (e.message || e.code)) || "error"); } }); return i; };
+      { const c = td(ip(pt.toFixed(3), 80, n => n >= 0.3 && n <= 1.1, "pTunch")); if (gL) { const li = ip(Number(gL.pt).toFixed(3), 80, n => n >= 0.3 && n <= 1.1, "pTunchLock"); li.title = "Lock purchase tunch"; c.append(vcEl("div", { className: "hint", textContent: "Lock:" }), li); } } td(ip(pr || "", 100, n => n >= 2000 && n <= 50000, "pRate"));
       td(`${fmt(amt)} (fine ${fine.toFixed(3)} g)`);
       td(sold ? (t.sold.ko ? `${t.sold.no || ""} · ${t.sold.date ? dmy(t.sold.date) : ""}` /* C-20261103-CHAINREC: used whole in a karigar piece */ : `${t.sold.no || ""} · ${t.sold.date ? dmy(t.sold.date) : ""}${t.sold.name ? " · " + t.sold.name : ""}`) : "not billed yet");
       const st = td(done ? "Removed " + (a.settledAt ? dmy(String(a.settledAt).slice(0, 10)) : "") : sold ? (t.sold.ko ? "Used in piece" : "Sold") : "With us"); if (!done && sold) st.style.fontWeight = "600";
@@ -1231,7 +1234,7 @@
       td((x.rate ? fmt(x.amt) : "-") + " (fine " + Number(x.fine).toFixed(3) + " g)"); td("Karigar order " + x.karigar + " " + x.no + (x.date ? " · " + dmy(x.date) : "") + (x.cancelled ? " (order cancelled)" : ""));
       td(x.settled ? "Removed " + (x.settledAt ? dmy(String(x.settledAt).slice(0, 10)) : "") : "Used in piece");
       if (!x.settled) { const s = tot[x.vendor] = tot[x.vendor] || { n: 0, g: 0, f: 0, a: 0 }; s.n++; s.g += Number(x.net) || 0; s.f += Number(x.fine) || 0; s.a += Number(x.amt) || 0; } body.append(tr); });
-    { const box = $("vcpay"), P = {}; if (box) { vcTags().filter(t => !t.approval.settled && t.status === "sold" && t.sold).forEach(t => { const a = t.approval, g = (t.gold || [])[0] || {}, net = Number(g.net) || 0, pt = Number(a.pTunch) || Number(g.tunch) || 0, x = P[a.vendor] = P[a.vendor] || { n: 0, f: 0, a: 0, m: 0 }; x.n++; x.f += net * pt; x.a += Math.round(net * pt * (Number(a.pRate) || 0)); if (!(Number(a.pRate) > 0)) x.m++; });
+    { const box = $("vcpay"), P = {}; if (box) { vcTags().filter(t => !t.approval.settled && t.status === "sold" && t.sold).forEach(t => { const a = t.approval, VF = vcParts(t).fine, x = P[a.vendor] = P[a.vendor] || { n: 0, f: 0, a: 0, m: 0 }; x.n++; x.f += VF; x.a += Math.round(VF * (Number(a.pRate) || 0)); if (!(Number(a.pRate) > 0)) x.m++; });
       VC.pay.filter(x => !x.settled).forEach(y => { const x = P[y.vendor] = P[y.vendor] || { n: 0, f: 0, a: 0, m: 0 }; x.n++; x.f += Number(y.fine) || 0; x.a += Number(y.amt) || 0; if (!(y.rate > 0)) x.m++; }); /* CHAINVEND */
       box.textContent = ""; const ks2 = Object.keys(P).sort(); /* C-20261103-SUNDRY: amount to pay per vendor = chains sold or used in a piece, not yet entered in Tally */
       if (!ks2.length) box.append(vcEl("p", { className: "hint", textContent: "Nothing to pay - no vendor chain sold or used that is not yet entered in Tally." }));

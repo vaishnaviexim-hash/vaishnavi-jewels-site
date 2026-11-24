@@ -36,7 +36,7 @@
     // gold lines
     const gBox = el("div", { style: "display:flex;flex-direction:column;gap:6px" });
     // C-20261017-CHAINTUNCH (owner 17/10/2026): a gold line with a tunch is a chain line (net x tunch x fine rate, no making); empty = not a chain
-    const addGold = g => { const k = sel(KARATS, (g && g.k) || "14K", 80), n = inp(g ? g.net : "", 100, "number"), tn = inp(g && g.tunch > 0 ? g.tunch : "", 90, "number"), rm = el("button", { type: "button", className: "btn ghost", textContent: "Remove" });
+    const addGold = g => { const k = sel(KARATS.concat(["Chain", "Lock"]), (g && g.k) || "14K", 80) /* C-20261124-CHAINLOCK */, n = inp(g ? g.net : "", 100, "number"), tn = inp(g && g.tunch > 0 ? g.tunch : "", 90, "number"), rm = el("button", { type: "button", className: "btn ghost", textContent: "Remove" });
       tn.placeholder = t.cat === "CH" ? "tunch 0.920" : "chain tunch";
       const r = el("div", { style: "display:flex;gap:6px;align-items:center;flex-wrap:wrap" }, [k, n, "g", tn, rm]);
       r._get = () => { const o = { k: k.value, net: num(n.value) }; if (String(tn.value).trim() !== "") o.tunch = Math.round(num(tn.value) * 1000) / 1000; return o; }; rm.onclick = () => r.remove(); gBox.append(r); };
@@ -77,7 +77,7 @@
       const priceChanged = JSON.stringify([t.gold || [], t.dias || [], (t.other && t.other.amt) || 0, (t.metal && t.metal.net) || 0, pk0 ? [pk0.pcs, pk0.rate] : null])
         !== JSON.stringify([data.gold || t.gold || [], dias, data.other.amt, (data.metal && data.metal.net) || (t.metal && t.metal.net) || 0, data.polki ? [data.polki.pcs, data.polki.rate] : null]) || JSON.stringify(pd0 ? [pd0.ct, pd0.rate] : null) !== JSON.stringify(data.pdia ? [data.pdia.ct, data.pdia.rate] : null) || (Number(t.makingPerG) || null) !== data.makingPerG; // C-20261101-TAGMAKING
       // C-20261027-EDITCAT: category and main karat decide the printed code (VBN18) and the label series (VBN18/7)
-      const cat = CATS.find(c => c.id === fCat.value), gl = (data.gold || t.gold || []), g1 = gl.find(g => g.net > 0 && g.k !== "Chain") || gl.find(g => g.k !== "Chain"), gc = gl.find(g => g.k === "Chain" && g.tunch > 0);
+      const cat = CATS.find(c => c.id === fCat.value), gl = (data.gold || t.gold || []), g1 = gl.find(g => g.net > 0 && g.k !== "Chain" && g.k !== "Lock") || gl.find(g => g.k !== "Chain" && g.k !== "Lock"), gc = gl.find(g => (g.k === "Chain" || g.k === "Lock") && g.tunch > 0);
       const mainK = g1 ? g1.k : gc ? (gc.tunch >= 0.88 ? "22K" : gc.tunch >= 0.7 ? "18K" : gc.tunch >= 0.5 ? "14K" : "9K") : "14K";
       let catChanged = false;
       if (cat && cat.id !== t.cat) { catChanged = true; Object.assign(data, { cat: cat.id, catName: cat.name.replace(/\s*\(.*\)$/, "") }); }
