@@ -1943,6 +1943,7 @@ async function vjOgs(env, who, url) { const all = await vjOgList(env), live = al
     const sr = r.cancelled ? stones.filter(s => s.og === r.no && s.status === 'cancelled') : stOf(r.no); // C-20261102-OGSTONES
     o.stones = sr.map(s => ({ row: s.row, src: s.src, pcs: s.pcs || 0, ct: s.ct || 0, q: s.q || '', shape: s.shape || '', note: s.note || '', st: s.st || '' }));
     if (r.acct) o.acct = { at: r.acct.at, byName: r.acct.byName || '', note: r.acct.note || '' }; // C-20261107-OGACCT
+    if (Array.isArray(r.photos) && r.photos.length) o.photos = r.photos; // OGPHOTO
     if (r.cash) o.cash = { date: r.cash.date, fine: r.cash.fine, rate: who.role === 'sales' ? null : r.cash.rate, amount: who.role === 'sales' ? null : r.cash.amount, note: r.cash.note || '', byName: r.cash.byName || '', at: r.cash.at, edited: r.cash.editedAt ? { at: r.cash.editedAt, byName: r.cash.editedByName || '' } : null }; // C-20261102-OGCASH
     if (Array.isArray(r.cashOld) && r.cashOld.length) o.cashOld = r.cashOld.map(c => ({ date: c.date, fine: c.fine, amount: who.role === 'sales' ? null : c.amount, cancelled: c.cancelled ? { at: c.cancelled.at, byName: c.cancelled.byName, why: c.cancelled.why || '' } : null }));
     if (adm) Object.assign(o, { tunch: r.tunch === '' || r.tunch == null ? null : Number(r.tunch), margin: r.src !== 'party' ? null : Number(r.credMan) > 0 ? 'man' : (Number(r.tunch) > 0 ? Number(r.margin) : null), credMan: Number(r.credMan) > 0 ? Number(r.credMan) : null, credTunch: r.credTunch, actFine: r.actFine, marginFine: r.marginFine });
@@ -2131,6 +2132,10 @@ async function vjOgSave(request, env, who) { if (who.role === 'sales') return vj
     if (old && old.cash) rec.cash = old.cash; if (old && old.cashOld) rec.cashOld = old.cashOld; // C-20261102-OGCASH: an edit keeps the cash conversion
   }
   Object.assign(rec, vjOgCalc(rec)); delete rec.cancelled;
+  { // OGPHOTO owner 24/11 13:07: party slip / screenshot photos (max 4) on an OG entry, for everyone who adds; only owners change them later (edit is owner-only above)
+    const ph = Array.isArray(b && b.photos) ? [...new Set(b.photos.map(String))].slice(0, 4) : (old && old.photos) || [];
+    for (const p of ph) { if (!/^[0-9a-f]{32}$/.test(p)) return vjDeny(400, 'photo not valid'); if (env.PHOTOS && !(old && (old.photos || []).includes(p)) && !(await vjPhotoHas(env, p))) return vjDeny(400, 'photo not found - add it again'); }
+    if (ph.length) rec.photos = ph; else delete rec.photos; }
   if (stw) { const st = [], ex = (((await env.DB.prepare('SELECT id FROM vj_og_stones WHERE og = ?').bind(no).all()).results) || []).map(x => x.id), ids = [];
     stw.rows.forEach((s, i) => { const id = no + '-' + (i + 1), d = { id, og: no, row: i + 1, src: stw.src, pcs: s.pcs, ct: s.ct, q: s.q, shape: s.shape || '', note: s.note || '', st: s.st || '', line: s.line == null ? null : s.line, tag: stw.tag || '', label: stw.label || '', status: stw.src === 'party' ? 'recd' : s.st === 'missing' ? 'missing' : 'out', at: now, by: who.email };
       ids.push(id); st.push(env.DB.prepare('INSERT INTO vj_og_stones (id, ts, og, row, src, status, data) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET data = excluded.data, status = excluded.status, ts = excluded.ts, src = excluded.src').bind(id, Date.now() + i, no, i + 1, stw.src, d.status, JSON.stringify(d))); });
@@ -2143,7 +2148,7 @@ async function vjOgSave(request, env, who) { if (who.role === 'sales') return vj
   const view = { no, src: rec.src, name: rec.name, gross: rec.gross, credFine: rec.credFine, fine: rec.credFine, credTunch: rec.credTunch };
   if (adm || rec.src !== 'party') Object.assign(view, { actFine: rec.actFine, tunch: rec.tunch });
   if (adm) Object.assign(view, { margin: rec.margin, marginFine: rec.marginFine });
-  if (rec.tag) view.tag = rec.tag;
+  if (rec.tag) view.tag = rec.tag; if (rec.photos) view.photos = rec.photos;
   return vjJson({ ok: true, og: view }); }
 // part of a piece (C-20261102-OGREG2, owner 02/11 14:35): take the part's gold (and any diamonds taken out) off the tag (sign 1) or put it back (sign -1, OG cancelled).
 // Same trail as a tag edit: vj_changes old -> new (gold / metal / dias) + a 'history' line, so the evening change Excel shows it; plus vj_moves and audit.
