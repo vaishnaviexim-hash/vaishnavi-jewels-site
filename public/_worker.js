@@ -4491,9 +4491,10 @@ async function vjAhBell(env, ctx) {
   if (!claim.meta || claim.meta.changes !== 1) return reply('already done today', 200);
   const rows = ((await env.DB.prepare("SELECT * FROM vj_chat_ah WHERE status = 'open' AND alerted_at IS NULL AND promised_at <= ? ORDER BY first_at").bind(Date.now() + 10 * 60e3).all()).results) || [];
   if (!rows.length) return reply('nothing waiting', 200);
-  const enqs = await vjChatEnq(env), by = {};
-  rows.forEach(r => { const q = enqs.get(r.number.slice(-10)); (by[r.assignee || 'Abhinav'] = by[r.assignee || 'Abhinav'] || []).push((r.name || 'Customer') + (q ? ' - ' + String(q.last.F || q.first.F || '').slice(0, 40) : '')); });
-  for (const [to, list] of Object.entries(by)) await vjChatAlert(env, ctx, to, 'Next-day handover: ' + list.length + ' lead' + (list.length === 1 ? '' : 's') + ' from after hours', 'Promised contact today from 11 AM', list.join('; '), false, '');
+  // C-20261124-AHFRESH (owner 24/11 12:55): only leads from the last 3 days are alerted (older backlog is marked, stays in VJ Tags > Chats); max 12 names per alert
+  const fresh = rows.filter(r => Number(r.first_at) >= Date.now() - 3 * 864e5), enqs = await vjChatEnq(env), by = {};
+  fresh.forEach(r => { const q = enqs.get(r.number.slice(-10)); (by[r.assignee || 'Abhinav'] = by[r.assignee || 'Abhinav'] || []).push((r.name || 'Customer') + (q ? ' - ' + String(q.last.F || q.first.F || '').slice(0, 40) : '')); });
+  for (const [to, list] of Object.entries(by)) await vjChatAlert(env, ctx, to, 'Next-day handover: ' + list.length + ' lead' + (list.length === 1 ? '' : 's') + ' from after hours', 'Promised contact today from 11 AM', list.slice(0, 12).join('; ') + (list.length > 12 ? '; +' + (list.length - 12) + ' more - VJ Tags > Chats > Next-day handover' : ''), false, '');
   await env.DB.prepare(`UPDATE vj_chat_ah SET alerted_at = ? WHERE id IN (${rows.map(() => '?').join(',')})`).bind(Date.now(), ...rows.map(r => r.id)).run();
   return reply('alerted ' + rows.length, 200);
 }
