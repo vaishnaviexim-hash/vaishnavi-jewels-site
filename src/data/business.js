@@ -40,6 +40,12 @@ export const business = {
     'https://www.facebook.com/122368924568460',
     'https://maps.google.com/maps?cid=13565734126936155375',
     'https://share.google/P1oHICy1oT9OOlPHS',
+    // C-20261124-SEONAME: our own directory profiles (third-party proof)
+    'https://www.justdial.com/Surat/Vaishnavi-Jewels-Near-Jaani-Farshan-Parle-Point/0261PX261-X261-101231105547-V6H9_BZDET',
+    'https://www.wedmegood.com/profile/Vaishnavi-Jewels-26774430',
+    'https://www.weddingwire.in/bridal-jewellery/vaishnavi-jewels--e497557',
+    'https://www.trustpilot.com/review/vaishnavijewels.com',
+    'https://m.indiamart.com/vaishnavi-jewels/',
   ],
   mapsUrl: 'https://www.google.com/maps/dir/?api=1&destination=Rajhans+Ornate+Mall%2C+Parle+Point%2C+Surat%2C+Gujarat',
 };
@@ -72,7 +78,7 @@ export function storeSchema(imageUrl) {
     '@id': SITE_URL + '/#store',
     name: b.name,
     legalName: b.legalName,
-    alternateName: [b.legalName, 'Vaishnavi Jewels Surat'],
+    alternateName: [b.legalName, 'Vaishnavi Jewels Surat', 'Vaishnavi Jewellers', 'Vaishnavi Jewellers Surat'], // C-20261124-SEONAME: people search 'Vaishnavi Jewellers'
     url: SITE_URL,
     logo: SITE_URL + '/logo_vaishnavi_jewels.png',
     image: imageUrl || SITE_URL + '/logo_vaishnavi_jewels.png',
