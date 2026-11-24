@@ -2114,9 +2114,10 @@ async function vjOgSave(request, env, who) { if (who.role === 'sales') return vj
   } else { // party's old gold
     const name = vjClean(b && b.name, 60), city = vjClean(b && b.city, 40), mobile = vjPhone(b && b.mobile), item = vjClean(b && b.item, 120);
     const gross = b.gross === '' || b.gross == null ? 0 : vjR3(b.gross), fine = b.fine === '' || b.fine == null ? 0 : vjR3(b.fine);
-    const man = adm ? (b.margin === 'man') : !!(old && Number(old.credMan) > 0); // OGMANUAL: only admin picks Manual; a staff edit keeps the owner's choice
-    const credMan = !man ? null : adm ? vjR3(b.credMan) : vjR3(old.credMan);
-    const margin = man ? 0 : adm && b.margin !== '' && b.margin != null ? Number(b.margin) : (old && Number(old.tunch) > 0 && !(Number(old.credMan) > 0) ? Number(old.margin) : 2); // staff never set the margin: default 2 (an edit by the owner keeps or changes it)
+    // OGSTAFFMARGIN owner 24/11 13:05: staff (Mihir bhai, Shyam) pick the margin / Manual too when they ADD; saved OGs are changed only by Abhinav / Shilpiji (checked above)
+    const man = b.margin === 'man';
+    const credMan = !man ? null : vjR3(b.credMan);
+    const margin = man ? 0 : b.margin !== '' && b.margin != null ? Number(b.margin) : (old && Number(old.tunch) > 0 && !(Number(old.credMan) > 0) ? Number(old.margin) : 2); // staff never set the margin: default 2 (an edit by the owner keeps or changes it)
     if (!name) return vjDeny(400, 'party name is needed');
     if (!(gross >= 0 && gross <= 5000)) return vjDeny(400, 'gross weight (g) looks wrong');
     if (!(margin >= 0 && margin <= 10)) return vjDeny(400, 'tunch margin must be 0 to 10');

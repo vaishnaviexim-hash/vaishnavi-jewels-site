@@ -41,7 +41,7 @@
     try { const r = await fetch("/api/vj/ogs", { credentials: "same-origin", cache: "no-store" }); const j = await r.json(); if (!r.ok) throw new Error(j.error || r.status); J = j;
       const n = $("ogNo"); if (n && !n.value && j.next) n.value = String(j.next);
       $("ogAddIn").hidden = !j.canAdd; $("ogAddOut").hidden = !j.canAdd; $("ogXl").hidden = !j.admin;
-      document.querySelectorAll("#p-ogreg .ogA").forEach(x => { x.hidden = !j.admin; });
+      document.querySelectorAll("#p-ogreg .ogA").forEach(x => { x.hidden = !j.admin; }); document.querySelectorAll("#p-ogreg .ogAdd").forEach(x => { x.hidden = !(j.admin || j.canAdd); }); /* OGSTAFFMARGIN */
       kList(); summary(); render();
     } catch (e) { if (m) m.textContent = "Could not load the OG register (" + (e.message || e) + ")."; }
   }
@@ -117,7 +117,7 @@
       const c = t > 0 && g > 0 ? { gross: g / 1000, act: Math.round(g * t / 100) / 1000, tunch: t } : f > 0 ? { gross: g / 1000, act: Math.round(f * 1000) / 1000, tunch: null } : null;
       if (c && s === "part" && stockTag && !stockTag.edit) { const ln = (stockTag.lines || [])[Number($("ogPLine").value) || 0]; c.after = (stockTag.gMg - g) / 1000; c.bad = !ln || g >= mg(ln.net) || g >= stockTag.gMg; }
       if (c && s === "vendor" && J && J.admin) { const rt = num($("ogVRate").value), am = num($("ogVAmt").value); c.amt = rt > 0 ? Math.round(rt * c.act * 100) / 100 : am > 0 ? am : null; } return c; }
-    const g = mg(num($("ogGross").value)), t = tun($("ogTunch").value), man = !!(J && J.admin && $("ogMargin").value === "man"), m = J && J.admin && !man ? num($("ogMargin").value) : 2;
+    const g = mg(num($("ogGross").value)), t = tun($("ogTunch").value), man = !!(J && (J.admin || J.canAdd) && $("ogMargin").value === "man"), m = J && (J.admin || J.canAdd) && !man ? num($("ogMargin").value) : 2;
     $("ogManL").hidden = !man;
     if (man && t > 0 && g > 0) { const a = Math.round(g * t / 100), c = mg(num($("ogCredMan").value)); if (!(c > 0)) return { gross: g / 1000, act: a / 1000, ct: "-", cred: 0, margin: 0, t }; return { gross: g / 1000, act: a / 1000, ct: Math.round(c / g * 10000) / 100, cred: c / 1000, margin: (a - c) / 1000, t }; }
     if (!(t > 0)) { const f = num($("ogFine").value); return f > 0 ? { gross: g / 1000, cred: Math.round(f * 1000) / 1000, act: Math.round(f * 1000) / 1000, margin: 0, ct: null } : null; }
@@ -129,8 +129,8 @@
     if (s === "stock") { b("Gold (gross) g", r3(c.gross)); b("Tunch %", String(c.tunch)); b("Fine in", g3(c.act), "main"); if (stockTag && stockTag.ct) b("Diamonds to get back", stockTag.pcs + " pcs · " + stockTag.ct.toFixed(3) + " ct"); return; }
     if (s === "part" || s === "own" || s === "vendor") { b(s === "part" ? "Part gross g" : "Gross g", c.gross ? r3(c.gross) : "-"); if (c.tunch) b("Tunch %", String(c.tunch)); b(s === "vendor" ? "Purchased fine" : "Fine in", g3(c.act), "main"); if (c.amt) b("Amount", "₹ " + c.amt.toLocaleString("en-IN"));
       if (s === "part" && c.after != null) b("Tag gold after", c.bad ? "too much - must be less than the gold line" : g3(c.after)); return; }
-    if (J && J.admin && c.ct != null) { b("Actual fine", g3(c.act)); b("Party credit tunch", c.ct + " %"); }
-    b("Party credit fine", g3(c.cred), "main"); if (J && J.admin && c.ct != null) b("Our margin fine", g3(c.margin)); }
+    const E = J && (J.admin || J.canAdd); if (E && c.ct != null) { b("Actual fine", g3(c.act)); b("Party credit tunch", c.ct + " %"); }
+    b("Party credit fine", g3(c.cred), "main"); if (E && c.ct != null) b("Our margin fine", g3(c.margin)); }
   function findTag() { const q = String($("ogCode").value || "").trim(), m = $("ogStockInfo"); stockTag = null; m.textContent = ""; $("ogSTunch").value = ""; $("ogPLine").textContent = ""; if (!$("ogNo").dataset.edit) stRows([]); if (!q) { prev(); return; }
     const all = (window.VJ_TAGS ? window.VJ_TAGS() : []), qu = q.toUpperCase().replace(/\s+/g, ""), nq = N(q);
     let hit = /^[A-Z]{3}\d+[A-Z]{3}$/.test(qu) ? all.filter(t => t.code && String(t.code).toUpperCase() === qu) : [];
@@ -182,7 +182,7 @@
     else if (s === "own") { Object.assign(body, { name: $("ogOwnDesc").value.trim(), gross: $("ogOwnGross").value.trim(), tunch: $("ogOwnTunch").value.trim(), fine: $("ogOwnFine").value.trim() });
       if (!body.tunch && !body.fine) { m.textContent = "Type the fine g, or gross + tunch %."; return; } }
     else { Object.assign(body, { name: $("ogName").value.trim(), mobile: $("ogMob").value.trim(), city: $("ogCity").value.trim(), item: $("ogItem").value.trim(), gross: $("ogGross").value.trim().replace(/[^0-9.]/g, ""), tunch: $("ogTunch").value.trim().replace(/[^0-9.]/g, ""), fine: $("ogFine").value.trim().replace(/[^0-9.]/g, "") });
-      if (J && J.admin) { body.margin = $("ogMargin").value; if (body.margin === "man") { body.credMan = $("ogCredMan").value.trim().replace(/[^0-9.]/g, ""); if (!(num(body.credMan) > 0)) { m.textContent = "Manual: type the party credit fine g (what you give the party)."; return; } if (!body.tunch) { m.textContent = "Manual: type the tested tunch % too."; return; } } } if (!body.name) { m.textContent = "Type the party name."; return; }
+      if (J && (J.admin || J.canAdd)) { body.margin = $("ogMargin").value; if (body.margin === "man") { body.credMan = $("ogCredMan").value.trim().replace(/[^0-9.]/g, ""); if (!(num(body.credMan) > 0)) { m.textContent = "Manual: type the party credit fine g (what you give the party)."; return; } if (!body.tunch) { m.textContent = "Manual: type the tested tunch % too."; return; } } } if (!body.name) { m.textContent = "Type the party name."; return; }
       if (!body.tunch && !body.fine) { m.textContent = "Type the gross weight and the tested tunch %."; return; } }
     if (s === "party" || (!edit && (s === "stock" || s === "part"))) body.stones = stGet(); // C-20261102-OGSTONES
     b.disabled = true; m.textContent = "Saving…";
@@ -323,7 +323,7 @@
       el("div", { id: "ogParty" }, [
         el("div", { className: "row" }, [lab("Party name", inp("ogName", "e.g. Rohit ji", { maxLength: 60 })), lab("Mobile", inp("ogMob", "98xxxxxxxx", { maxLength: 20, inputMode: "tel" })), lab("City (optional)", inp("ogCity", "", { maxLength: 40 }))]),
         el("div", { className: "row" }, [lab("Item", inp("ogItem", "e.g. old chain + 2 rings", { maxLength: 120 }), "flex:2 1 260px"), lab("GROSS weight, g", inp("ogGross", "e.g. 10.620", { maxLength: 10, inputMode: "decimal" })), lab("ACTUAL tunch % (tested)", inp("ogTunch", "e.g. 74", { maxLength: 6, inputMode: "decimal" })),
-          el("label", { className: "ogA", hidden: true }, ["Tunch margin ", mSel]), el("label", { id: "ogManL", hidden: true }, ["Party credit fine, g (given) ", inp("ogCredMan", "e.g. 9.000", { maxLength: 10, inputMode: "decimal" })])]),
+          el("label", { className: "ogAdd", hidden: true }, ["Tunch margin ", mSel]), el("label", { id: "ogManL", hidden: true }, ["Party credit fine, g (given) ", inp("ogCredMan", "e.g. 9.000", { maxLength: 10, inputMode: "decimal" })])]),
         el("div", { className: "row" }, [lab("Not tested? Fine g instead (optional)", inp("ogFine", "only if no tunch", { maxLength: 10, inputMode: "decimal" }))])]),
       el("div", { id: "ogStock", hidden: true }, [
         el("div", { className: "row", style: "align-items:flex-end" }, [lab("Tag code of the piece", inp("ogCode", "price code, tag no. or design no.", { maxLength: 30 })), el("div", {}, [el("button", { type: "button", className: "btn ghost", id: "ogFindB", textContent: "Find" })]), el("label", { id: "ogWhole" }, ["Tunch % (default = karat purity, e.g. 75) ", inp("ogSTunch", "e.g. 75", { maxLength: 6, inputMode: "decimal" })])]),
