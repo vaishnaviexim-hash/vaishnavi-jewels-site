@@ -1787,7 +1787,7 @@ async function vjXlData(url, env) {
   await vjKo3Tables(env); const G = await vjOg2Load(env), outs = new Map(G.outs.filter(o => o && !o.cancelled).map(o => [o.id, o]));
   const kord = ((((await env.DB.prepare('SELECT data FROM vj_kord ORDER BY karigar, no').all()).results) || []).map(vjParse)).filter(o => o && /montu|hiru|badshah/i.test(String(o.karigar || ''))).map(vjKo3Up)
     .map(o => { const tg = o.tag || {}, g = o.goldOut ? outs.get(o.goldOut) : null;
-      return { k: o.karigar, no: o.no, status: o.status, cancelled: o.status === 'cancelled', date: o.date || '', est: n3(o.estimate), rate: n3(o.goldRate), party: o.name || '', item: o.itemTxt || o.item || '', kt: o.kt || '',
+      return { k: o.karigar, no: o.no, status: o.status, cancelled: o.status === 'cancelled', date: o.date || '', est: n3(o.estimate), bud: n3(Number(o.budget) || Number(o.estimate) || 0), rate: n3(o.goldRate), party: o.name || '', item: o.itemTxt || o.item || '', kt: o.kt || '',
         del: tg.date ? { date: tg.date, net: n3(tg.nGold != null ? tg.nGold : tg.gGold), gross: n3(tg.gGold), cs: n3(tg.csWt), stones: n3(tg.csCost) } : null, given: g ? { fine: n3(g.fine), date: g.date || '' } : null }; });
   const bills = ((((await env.DB.prepare("SELECT data FROM vj_bills WHERE no LIKE 'B-%'").all()).results) || []).map(vjParse)).filter(b => b && b.title === 'Bill' && String(b.date || '') >= '2026-10-01')
     .map(b => ({ no: b.no, date: String(b.date || '').slice(0, 10), name: b.name || '', city: b.city || '', mobile: String(b.mobile || '').replace(/\D/g, '').slice(-10), cancelled: !!b.cancelled, ogNo: String(b.ogNo || (b.og && b.og.no) || ''),
