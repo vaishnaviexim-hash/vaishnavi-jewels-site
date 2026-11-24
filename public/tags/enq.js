@@ -20,6 +20,9 @@
   const CHATV = ["talking", "ah"], SUBS = VIEWS.filter(v => ["new", "followup", "waiting"].includes(v[0]));
   let sub = "new"; try { const v = localStorage.getItem("vjEnqView"); if (VIEWS.some(x => x[0] === v)) sub = v; } catch (e) {}
   let sec = null, data = null, busy = false, timer = 0, openComposer = "", openCounts = null;
+  /* C-20261124-WAAPP owner 14:28: on the computer open the WhatsApp APP directly (whatsapp://send), no wa.me page; phones keep wa.me (opens the app itself) */
+  const vjWaApp = !/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
+  const vjWaUrl = (n, t) => vjWaApp ? "whatsapp://send?phone=" + encodeURIComponent(String(n).replace(/\D/g, "")) + (t ? "&text=" + encodeURIComponent(t) : "") : "https://wa.me/" + String(n).replace(/\D/g, "") + (t ? "?text=" + encodeURIComponent(t) : "");
   /* quick actions (Send on WhatsApp / Call / Messaged): recorded at once, with ~10 s Undo */
   let toastT = 0;
   function toast(text, undo) {
@@ -112,7 +115,7 @@
     who.append(el("strong", { textContent: e.name || "(no name)" }));
     const onCall = () => { if (data.canEdit && e.open) quick(e, "called", "Called ✓"); }; /* C-20261103-ENQTABS: tapping Call records it (Undo for 10 s) */
     /* owner 22/11 17:18: tapping the number opens WhatsApp on HIS phone (direct chat with the customer); the Call button still calls */
-    if (e.number) { const n = e.wa ? el("a", { href: "https://wa.me/" + e.wa, target: "_blank", rel: "noopener", textContent: "🟢 " + e.number, title: "Open WhatsApp chat on this phone" }) : e.tel ? el("a", { href: "tel:" + e.tel, textContent: e.number }) : el("span", { className: "hint", textContent: e.number }); if (!e.wa && e.tel) n.addEventListener("click", onCall); who.append(n); }
+    if (e.number) { const n = e.wa ? el("a", { href: vjWaUrl(e.wa), target: vjWaApp ? "_self" : "_blank", rel: "noopener", textContent: "🟢 " + e.number, title: "Open this chat in your WhatsApp" }) : e.tel ? el("a", { href: "tel:" + e.tel, textContent: e.number }) : el("span", { className: "hint", textContent: e.number }); if (!e.wa && e.tel) n.addEventListener("click", onCall); who.append(n); }
     if (e.tel && data.canEdit) {
       const call = el("a", { href: "tel:" + e.tel, className: "btn ghost", textContent: "Call" }); call.style.cssText = "text-decoration:none;padding:6px 12px;border:1px solid var(--line);border-radius:var(--r);color:var(--fg);font-weight:600";
       call.addEventListener("click", onCall); who.append(call);
@@ -184,7 +187,7 @@
     const send = el("button", { type: "button", className: "btn", textContent: "Send on WhatsApp" });
     const done = el("button", { type: "button", className: "btn ghost", textContent: "Messaged ✓" });
     /* C-20261103-ENQTABS: Send on WhatsApp records "Messaged ✓" at once (next follow-up +2 days, Undo for 10 s); Messaged ✓ stays as a fallback */
-    send.addEventListener("click", () => { const txt = ta.value.trim(); if (!txt) return; window.open("https://wa.me/" + e.wa + "?text=" + encodeURIComponent(txt), "_blank", "noopener"); send.disabled = done.disabled = true; quick(e, "messaged", "Messaged ✓"); });
+    send.addEventListener("click", () => { const txt = ta.value.trim(); if (!txt) return; if (vjWaApp) location.href = vjWaUrl(e.wa, txt); else window.open(vjWaUrl(e.wa, txt), "_blank", "noopener"); send.disabled = done.disabled = true; quick(e, "messaged", "Messaged ✓"); });
     done.addEventListener("click", () => { send.disabled = done.disabled = true; quick(e, "messaged", "Messaged ✓"); });
     w.append(el("div", { className: "hint", textContent: "Opens your own WhatsApp with this message - change it if you like, then press send there. It is marked Messaged ✓ (next follow-up in 2 days); tap Undo if you did not send it." }), ta,
       el("div", { className: "actions", style: "display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:6px" }, [send, done, cnt]));
