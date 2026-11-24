@@ -244,6 +244,8 @@
     if (view === "in") {
       head = ["OG no.", "Date", "From", "Item", "Gross g"].concat(A ? ["Tunch %", "Margin", "Actual fine"] : []).concat(["Credit tunch", "Party credit fine"]).concat(A ? ["Margin fine"] : []).concat(["Diamonds", "Status", ""]);
       rows = (J.reg || []).filter(r => (!ym || String(r.date).slice(0, 7) === ym) && (!only || (!r.bill && !r.cancelled && r.src === "party" && !r.cash && !r.acct)) && (!q || [r.no, r.name, r.city, r.mobile, r.bill, r.item, r.tag && r.tag.label, r.vendor, r.inv].join(" ").toLowerCase().includes(q))).slice().reverse();
+      { const ogN = s => { const m = String(s || "").match(/^(\d+)(.*)$/); return m ? [Number(m[1]), m[2]] : [0, String(s || "")]; }, byOg = (a, b) => { const x = ogN(a.no), y = ogN(b.no); return y[0] - x[0] || String(y[1]).localeCompare(String(x[1])); };
+        rows.sort(($("ogSort") || {}).value === "og" ? byOg : (a, b) => String(b.date || "").localeCompare(String(a.date || "")) || byOg(a, b)); } /* OGSORT */
       rows.forEach(r => { const tr = el("tr", { className: r.cancelled ? "ogx" : r.src === "party" && (r.bill || r.cash || r.acct) ? "ogdone" : "" }); /* C-20261102-OGDONE: party already credited (bill or cash) - greyed + struck, gold still in hand */ ckCell(tr, "in:" + r.no); td(tr, r.no); td(tr, dmy(r.date));
         td(tr, r.src === "stock" ? "Own piece (whole) " + (r.tag ? r.tag.label : "") : r.src === "part" ? "Part of " + (r.tag ? r.tag.label : "") : r.src === "own" ? "Own gold: " + r.name : r.src === "vendor" ? "Vendor: " + (r.vendor || r.name) + (r.inv ? " (inv " + r.inv + ")" : "") : [r.name, r.city].filter(Boolean).join(", ") + (r.mobile ? " · " + r.mobile : "")); td(tr, r.item || (r.legacy ? "(old entry)" : "-"));
         if ((r.photos || []).length) { const c = tr.lastChild; c.append(" "); r.photos.forEach((p, i) => c.append(el("a", { href: "/_blob/" + p, target: "_blank", rel: "noopener", textContent: "📷" + (r.photos.length > 1 ? i + 1 : ""), title: "Party slip / screenshot", style: "margin-left:4px;text-decoration:none" }))); } /* OGPHOTO */
@@ -272,7 +274,7 @@
         tr.appendChild(x); tb.appendChild(tr); });
     } else if (view === "out") {
       head = ["Date", "OG no(s)", "To", "Fine g", "Gross g", "By", "Note", ""];
-      rows = (J.out || []).filter(o => (!ym || String(o.date).slice(0, 7) === ym) && (!q || [o.karigar, o.note, (o.ogs || []).join(" "), o.to === "stock" ? "stock" : ""].join(" ").toLowerCase().includes(q)));
+      rows = (J.out || []).filter(o => (!ym || String(o.date).slice(0, 7) === ym) && (!q || [o.karigar, o.note, (o.ogs || []).join(" "), o.to === "stock" ? "stock" : ""].join(" ").toLowerCase().includes(q))).slice().sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))); /* OGSORT: outward always date-wise, newest first */
       rows.forEach(o => { const tr = el("tr", { className: o.cancelled ? "ogx" : "" }); ckCell(tr, "out:" + o.id); td(tr, dmy(o.date)); td(tr, (o.ogs || []).length ? o.ogs.join(", ") : "OG pool");
         const to = el("td", { textContent: o.to === "karigar" ? "Karigar " + o.karigar : "Our stock (fine)" }); to.style.fontWeight = "600"; tr.appendChild(to);
         const f = el("td", { className: "num", textContent: r3(o.fine) }); f.style.fontWeight = "700"; f.style.fontSize = "17px"; tr.appendChild(f);
@@ -366,7 +368,7 @@
       el("div", { className: "ogsum", id: "ogSumBox" }),
       el("div", { className: "actions" }, [el("button", { type: "button", className: "btn", id: "ogAddIn", textContent: "+ Old gold IN", hidden: true }), el("button", { type: "button", className: "btn", id: "ogAddOut", textContent: "+ Old gold OUT (issue)", hidden: true }), el("button", { type: "button", className: "btn ghost", id: "ogXl", textContent: "Excel (inward + outward)", hidden: true })]),
       inForm, outForm, cashForm, el("p", { className: "hint", id: "ogMsg" }), tabs,
-      el("div", { className: "row", style: "align-items:center" }, [lab("Search", inp("ogQ", "OG no., party, mobile, karigar, tag", { maxLength: 40 })), lab("Month", inp("ogLMon", "", { type: "month" }), "flex:0 0 auto"),
+      el("div", { className: "row", style: "align-items:center" }, [lab("Search", inp("ogQ", "OG no., party, mobile, karigar, tag", { maxLength: 40 })), lab("Month", inp("ogLMon", "", { type: "month" }), "flex:0 0 auto"), lab("Sort", (s => { [["date", "Date-wise (newest first)"], ["og", "OG no.-wise (newest first)"]].forEach(([v, t]) => s.appendChild(el("option", { value: v, textContent: t }))); return s; })(el("select", { id: "ogSort" })), "flex:0 0 auto"), /* OGSORT owner 24/11 */
         el("label", { id: "ogFreeL", style: "flex:0 0 auto;flex-direction:row;align-items:center;gap:6px" }, [el("input", { type: "checkbox", id: "ogFree" }), "Only free OGs (party, not on a bill)"])]),
       el("div", { id: "ogList" }));
     rates.parentNode.insertBefore(sec, rates); $("ogOKSel").addEventListener("change", kNew);
@@ -380,7 +382,7 @@
     document.querySelectorAll("input[name=ogTo]").forEach(x => x.addEventListener("change", toSync));
     ["ogGross", "ogTunch", "ogFine", "ogSTunch", "ogPGross", "ogPTunch", "ogPFine", "ogOwnGross", "ogOwnTunch", "ogOwnFine", "ogVFine", "ogVGross", "ogVTunch", "ogVRate", "ogVAmt", "ogCredMan"].forEach(i => $(i).addEventListener("input", prev)); $("ogPhF").addEventListener("change", e => { phAdd(e.target.files); e.target.value = ""; }); $("ogInForm").addEventListener("paste", e => { const fs = [...((e.clipboardData || {}).files || [])]; if (fs.length) { e.preventDefault(); phAdd(fs); } }); $("ogMargin").addEventListener("change", prev);
     $("ogPLine").addEventListener("change", () => { const ln = stockTag && (stockTag.lines || [])[Number($("ogPLine").value) || 0]; if (ln) $("ogPTunch").value = String(Math.round(ln.p * 10000) / 100); prev(); });
-    $("ogMon").addEventListener("change", summary); $("ogQ").addEventListener("input", render); $("ogLMon").addEventListener("change", render); $("ogFree").addEventListener("change", render);
+    $("ogMon").addEventListener("change", summary); $("ogQ").addEventListener("input", render); $("ogLMon").addEventListener("change", render); $("ogFree").addEventListener("change", render); $("ogSort").addEventListener("change", render);
     nav.addEventListener("click", e => { const x = e.target.closest("nav button"); if (!x) return; show(x.dataset.tab === "ogreg"); });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", build); else build();
