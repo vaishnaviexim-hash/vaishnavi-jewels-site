@@ -24,15 +24,15 @@ import { business as biz } from '../../data/business.js';
 import { LOGO_DARK } from '../../data/images.js';
 const hay = (post.data.tags.join(' ') + ' ' + post.data.title + ' ' + post.slug).toLowerCase();
 const COLLECTIONS = [
-  [/polki|kundan/, '/polki-jewellery', 'Polki jewellery'],
-  [/bridal|bride|lehenga|wedding|sangeet|reception|groom|sherwani|saree|engagement/, '/bridal-jewellery', 'Bridal jewellery'],
+  [/polki|kundan/, '/polki-jewellery', 'Polki jewellery in Surat'],
+  [/bridal|bride|lehenga|wedding|sangeet|reception|groom|sherwani|saree|engagement/, '/bridal-jewellery', 'Bridal jewellery in Surat'],
   [/solitaire|inscription|loupe|certificate|igi/, '/solitaire-rings', 'Certified solitaire rings'],
-  [/lab[- ]?grown|cvd|hpht/, '/lab-grown-diamond-jewellery', 'Lab-grown diamond jewellery'],
+  [/lab[- ]?grown|cvd|hpht/, '/lab-grown-diamond-jewellery', 'Lab-grown diamond jewellery in Surat'],
   [/mangalsutra/, '/diamond-mangalsutra', 'Diamond mangalsutra'],
   [/earring/, '/diamond-earrings', 'Diamond earrings'],
 ];
 let related = COLLECTIONS.filter(([re]) => re.test(hay)).slice(0, 3).map(([, href, label]) => ({ href, label }));
-if (related.length === 0) related = [{ href: '/natural-diamond-jewellery', label: 'Natural diamond jewellery' }];
+if (related.length === 0) related = [{ href: '/natural-diamond-jewellery', label: 'Diamond jewellery in Surat' }];
 ---
 <BaseLayout
   title={`${post.data.title} | Vaishnavi Jewels Journal`}
