@@ -835,6 +835,8 @@
     const sh = ({ round: "R", choki: "C", fancy: "F", solitaire: "S", polki: "P" })[String(d.shape || "").trim().toLowerCase()] || (d.shape ? String(d.shape).trim().slice(0, 1).toUpperCase() : "");
     let q = q0.replace(/\b(cvd|lgd|lab[- ]?grown|lab)\b/ig, "").replace(/\s+/g, " ").trim().replace(/^[- ]+|[- ]+$/g, "");
     q = q.replace(/^(.*?)[- ]([D-N]{1,2})$/i, "$1 $2");
+    // owner 25/11/2026 14:56 (C-20261125-POLKINAME): polki never shows a quality (no VS SI IJ) - only "Natural Polki" or "CVD Polki"
+    if (!party && (String(d.shape || "").trim().toLowerCase() === "polki" || /polki/i.test(q0 + " " + String(d.code || "")))) return /cvd|lab|lgd|\blg\b/i.test(q0 + " " + String(d.code || "")) ? "CVD Polki" : "Natural Polki";
     if (!party && b && b.option === "own" && d.shape !== "Polki" && !NON_DIAMOND.test(q0 + " " + String(d.code || ""))) return [/cvd|lab|lgd|\blg\b/i.test(String(b.ownQ || "")) ? "LG" : "N", sh, String(b.ownQ || "").replace(/\b(cvd|lgd|lab[- ]?grown|lab)\b/ig, "").trim()].filter(Boolean).join(" ");
     if (!party && b && ({ gh: 1, ij: 1, fg: 1 })[b.option] && d.shape !== "Polki" && !NON_DIAMOND.test(q0 + " " + String(d.code || ""))) return ["N", sh, ({ gh: "VS GH", ij: "VS IJ", fg: "VVS FG" })[b.option]].filter(Boolean).join(" "); // diamonds choice decides the quality shown
     return [party ? "Party" : lab ? "LG" : "N", sh, party ? "" : q].filter(Boolean).join(" ");
