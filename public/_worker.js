@@ -1796,7 +1796,30 @@ async function vjXlData(url, env) {
   const used = (await vjOgList(env)).filter(x => !x.cancelled);
   const ogs = G.reg.filter(x => x && !x.cancelled && x.no).map(x => { const c = vjOgCalc(x), u = used.filter(y => vjOgN(y.og) === vjOgN(x.no)).map(y => y.no);
     return { no: x.no, date: String(x.date || '').slice(0, 10), src: x.src || 'party', name: x.name || '', city: x.city || '', mobile: String(x.mobile || '').replace(/\D/g, '').slice(-10), cred: n3(c.credFine), act: n3(c.actFine), acct: !!x.acct, cash: !!x.cash, cashAmt: n3(x.cashAmt || x.amount), bills: u }; });
-  return vjJson({ ok: true, test: !!s.test, at: new Date().toISOString(), kord, bills, ogs });
+  // owner 25/11/2026 13:04-13:07 (C-20261125-DABS): D.A. Balance Sheet fills itself - pending order pieces with the bill amount
+  // before GST (same maths as the VJ Tags tag price, tags.html price()) and the OG fine in hand (same as the OG register tile).
+  let pend = [], ogInHand = null;
+  try { const sr = await env.DB.prepare("SELECT data FROM docs WHERE path = 'settings/main'").first(); const st = vjXlSettings(sr ? vjParse(sr) : null);
+    pend = ((((await env.DB.prepare("SELECT path, data FROM docs WHERE path LIKE 'tags/%'").all()).results) || []).map(r => { try { return Object.assign({ id: r.path.slice(5) }, JSON.parse(r.data)); } catch (e) { return null; } }))
+      .filter(t => t && t.kind === 'order' && t.status !== 'sold' && t.order && t.order.name)
+      .map(t => { const p = vjXlPrice(t, st); return { code: String(t.designNo || ''), pcode: String(t.pcode || t.label || ''), item: String(t.catName || ''), party: String(t.order.name || '').trim(), city: String(t.order.city || ''), due: String(t.order.due || ''), net: n3((t.gold || []).reduce((a, g) => a + (Number(g && g.net) || 0), 0)), sub: p ? p.sub : null }; })
+      .sort((a, b) => a.party.toLowerCase().localeCompare(b.party.toLowerCase()) || a.code.localeCompare(b.code)); } catch (e) { pend = []; }
+  try { ogInHand = vjOg2Sum(G.reg.filter(r => !r.cancelled).map(r => Object.assign({}, r, vjOgCalc(r))), G.outs, []).inHand; } catch (e) { ogInHand = null; }
+  return vjJson({ ok: true, test: !!s.test, at: new Date().toISOString(), kord, bills, ogs, pend, ogInHand });
+}
+function vjXlSettings(s) { s = s || {}; const D = { purity: { '22K': 0.92, '18K': 0.76, '14K': 0.60, '9K': 0.385 }, making: { base: 650, small: 750, limit: 5, pct: 10 }, gst: 3 };
+  return { gold24g: s.gold24g == null ? null : Number(s.gold24g), purity: Object.assign({}, D.purity, s.purity || {}), making: Object.assign({}, D.making, s.making || {}), gst: s.gst == null ? D.gst : Number(s.gst) }; }
+function vjXlPrice(t, s) { // copy of tags.html price() - keep both the same
+  const up = (n, step) => Math.ceil(Math.round(n * 100) / 100 / step) * step;
+  const r24 = t.kind === 'order' && t.order && t.order.rate >= 2000 && t.order.rate <= 50000 ? t.order.rate : s.gold24g; if (!r24) return null;
+  const gl = Array.isArray(t.gold) ? t.gold : [], dl = Array.isArray(t.dias) ? t.dias : [], isT = g => g.tunch >= 0.3 && g.tunch <= 1.1, m = s.making, g0 = gl.find(g => g.net > 0 && !isT(g));
+  const pol = (t.polki && t.polki.pcs > 0 ? t.polki.pcs * (t.polki.rate || 0) : 0) + (t.pdia && t.pdia.ct > 0 ? Math.round(t.pdia.ct * (t.pdia.rate || 0)) : 0);
+  const oth = (t.other && t.other.amt) || 0, dia = dl.reduce((a, d) => a + (Number(d.ct) || 0) * (Number(d.rate) || 0), 0);
+  if (!gl.some(g => g.net > 0)) { const sub0 = up(dia + pol + oth, 10); return { sub: sub0 }; }
+  let gold = 0, ch = 0, nt = 0; gl.forEach(g => { if (!(g.net > 0)) return; if (isT(g)) { ch += g.net * g.tunch * r24; return; } gold += g.net * r24 * (s.purity[g.k] || 0); nt += g.net; });
+  const mo = Number(t.makingPerG), mkOwn = mo >= 1 && mo <= 100000 ? Math.round(mo) : 0;
+  const making = g0 ? Math.max((mkOwn || (g0.net > m.limit ? m.base : m.small)) * nt, Number(m.min) || 1000) + gold * m.pct / 100 : 0; gold += ch;
+  return { sub: up(gold + making + dia + pol + oth, 100) };
 }
 async function vjReviewImg(url, env) { // the tag photo for the WhatsApp header, 3 days, random link
   const t = String(url.searchParams.get('t') || ''); if (!/^[A-Za-z0-9_-]{20,24}$/.test(t)) return reply('not found', 404);
