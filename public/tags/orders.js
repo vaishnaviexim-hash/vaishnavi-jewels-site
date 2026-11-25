@@ -53,7 +53,7 @@
     const list = orders(), groups = new Map();
     list.forEach(t => { const k = String(t.order.name).trim().toLowerCase(); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(t); });
     const keys = [...groups.keys()].filter(k => !q || k.includes(q) || groups.get(k).some(t => String(t.order.mobile || "").includes(q) || String(t.designNo || "").toLowerCase().includes(q))).sort();
-    const used = new Set(); let tP = 0, tG = 0, tE = 0, tNo = 0, multi = false;
+    const used = new Set(); let tP = 0, tG = 0, tE = 0, tB = 0, tNo = 0, multi = false;
     sum.textContent = list.length ? `${list.length} piece${list.length === 1 ? "" : "s"} pending for ${groups.size} part${groups.size === 1 ? "y" : "ies"}.` : "No orders pending. Order tags are made in New tag > Order.";
     keys.forEach(k => {
       const ts = groups.get(k).sort((a, b) => String(a.order.due || "9999").localeCompare(String(b.order.due || "9999")) || String(a.createdAt || "").localeCompare(String(b.createdAt || "")));
@@ -64,9 +64,9 @@
       const all = el("button", { type: "button", className: "btn ghost", textContent: "Bill all " + ts.length });
       all.addEventListener("click", () => { if (!window.VJ_BILL_NOW) return; window.VJ_BILL_NOW(ts[0].id); ts.slice(1).forEach(t => window.VJ_BILL_ADD && window.VJ_BILL_ADD(t.id)); });
       head.append(who, el("div", {}, [cnt, " ", all])); card.appendChild(head);
-      const tb = el("table", { className: "items" }); tb.style.cssText = "min-width:560px;margin-top:8px";
-      tb.appendChild(el("thead", {}, [el("tr", {}, ["Piece", "Gold", "Gold rate", "Estimate", "Delivery", "Tagged", ""].map(h => el("th", { textContent: h })))]));
-      let pG = 0, pE = 0;
+      const tb = el("table", { className: "items" }); tb.style.cssText = "min-width:640px;margin-top:8px";
+      tb.appendChild(el("thead", {}, [el("tr", {}, ["Piece", "Gold", "Gold rate", "Estimate", "Bill (no GST)", "Delivery", "Tagged", ""].map(h => el("th", { textContent: h })))]));
+      let pG = 0, pE = 0, pB = 0;
       const body = el("tbody");
       ts.forEach(t => {
         const g = (t.gold || []).reduce((a, x) => a + (Number(x && x.net) || 0), 0), late = t.order.due && t.order.due < new Date().toISOString().slice(0, 10);
@@ -75,21 +75,24 @@
         const due = el("td", { textContent: t.order.due ? dmy(t.order.due) + (late ? " (late)" : "") : "-" }); if (late) due.style.color = "#b3261e";
         const ec = estCell(estFor(t.order.name, t.order.mobile, [t.designNo, t.label]), used); if (ec.text === "-") tNo++; if (/\*$/.test(ec.text)) multi = true;
         pG += g; pE += ec.amt;
+        /* owner 25/11/2026 12:53: "party ka budget - bill banaye to kitne ka padega, without GST" = the same tag price the bill uses (order rate if typed, else today's 24K rate), before GST */
+        const px = window.VJ_PRICE_SUB ? window.VJ_PRICE_SUB(t) : null, bAmt = px && px.sub > 0 ? px.sub : 0; pB += bAmt;
+        const bc = el("td", { className: "num", textContent: bAmt ? fmt(bAmt) : "-", title: bAmt ? "Bill amount before GST at " + (t.order.rate ? "the order's gold rate" : "today's gold rate") + " (GST extra: " + fmt(px.gst) + ")" : "No price - check gold rate / diamond rates on the tag" });
         const pc = el("td", { textContent: (t.designNo ? t.designNo + " · " : "") + (t.pcode || t.label || "") + (t.catName ? " · " + t.catName : "") });
         body.appendChild(el("tr", {}, [pc,
-          el("td", { className: "num", textContent: g ? g.toFixed(3) + " g" : "-" }), el("td", { className: "num", textContent: t.order.rate ? fmt(t.order.rate) : "-" }), el("td", { className: "num", textContent: ec.text, title: ec.title }), due,
+          el("td", { className: "num", textContent: g ? g.toFixed(3) + " g" : "-" }), el("td", { className: "num", textContent: t.order.rate ? fmt(t.order.rate) : "-" }), el("td", { className: "num", textContent: ec.text, title: ec.title }), bc, due,
           el("td", { textContent: dmy(t.createdAt) }), el("td", {}, [bn, ed])]));
       });
       tb.appendChild(body);
-      const ft = el("tr", {}, [el("td", { textContent: "Total " + ts.length + " pc" }), el("td", { className: "num", textContent: pG.toFixed(3) + " g" }), el("td"), el("td", { className: "num", textContent: pE ? fmt(pE) : "-" }), el("td"), el("td"), el("td")]);
+      const ft = el("tr", {}, [el("td", { textContent: "Total " + ts.length + " pc" }), el("td", { className: "num", textContent: pG.toFixed(3) + " g" }), el("td"), el("td", { className: "num", textContent: pE ? fmt(pE) : "-" }), el("td", { className: "num", textContent: pB ? fmt(pB) : "-" }), el("td"), el("td"), el("td")]);
       ft.style.fontWeight = "600"; tb.appendChild(el("tfoot", {}, [ft]));
-      tP += ts.length; tG += pG; tE += pE;
+      tP += ts.length; tG += pG; tE += pE; tB += pB;
       card.appendChild(el("div", { className: "list" }, [tb])); box.appendChild(card);
     });
     if (keys.length) { // owner 30/10: TOTAL at the bottom - pieces, gold, estimated value still to be billed
       const tot = el("div", { className: "card" }); tot.style.cssText = "margin:12px 0;padding:12px 14px;border:2px solid var(--fg)";
       const t2 = el("table", { className: "sum" }); const row = (a, b, c) => { const r = el("tr", {}, [el("td", { textContent: a }), el("td", { textContent: b })]); if (c) r.className = c; return r; };
-      t2.append(row("Pending pieces" + (q ? " (search)" : ""), String(tP)), row("Gold", tG.toFixed(3) + " g"), row("Estimated value still to bill", tE ? fmt(tE) : "-", "total"));
+      t2.append(row("Pending pieces" + (q ? " (search)" : ""), String(tP)), row("Gold", tG.toFixed(3) + " g"), row("Estimated value still to bill", tE ? fmt(tE) : "-"), row("Bill value today, without GST", tB ? fmt(tB) : "-", "total"));
       tot.append(el("h2", { textContent: "TOTAL - all pending orders" + (q ? " shown" : "") }), t2);
       const notes = [tNo ? tNo + " piece" + (tNo === 1 ? " has" : "s have") + " no saved estimate (not in the value)." : "", multi ? "* = estimate with several pieces, counted once (whole estimate amount)." : "", EST.list ? "" : "Loading estimates…"].filter(Boolean).join(" ");
       if (notes) tot.append(el("p", { className: "hint", textContent: notes }));

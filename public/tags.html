@@ -514,6 +514,7 @@ function readForm(){
 }
 /* ---------- price (Brain F-025 / F-044) ---------- */
 window.VJ_PRICE=t=>{try{const p=price(t);return p&&p.final}catch(e){return 0}}; /* C-20261029-SIMILAR */
+window.VJ_PRICE_SUB=t=>{try{const p=price(t);return p?{sub:p.sub,gst:p.gst,final:p.final,r24:p.r24}:null}catch(e){return null}}; /* owner 25/11/2026 12:53: Orders pending shows the bill amount without GST */
 window.VJ_DEFRATE=(sh,q)=>{try{return defRate(sh,q)||0}catch(e){return 0}}; /* C-20261106-RECVPRICE: karigar Received form shows the tag price live */
 /* owner 01/11/2026 13:43 (C-20261101-TAGMAKING): a piece can carry its own making per g (makingPerG, Italian / special pieces); empty = the default 650 / 750 */
 function mkOwn(t){const v=Number(t&&t.makingPerG);return v>=1&&v<=100000?Math.round(v):0}
