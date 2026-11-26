@@ -4292,6 +4292,8 @@ async function vjChatInbound(env, ctx, body, values) {
     const prev = await env.DB.prepare("SELECT max(t) AS t FROM vj_chat_in WHERE number = ? AND dir = 'in'").bind(from).first();
     const ins = await env.DB.prepare("INSERT OR IGNORE INTO vj_chat_in (id, number, name, dir, type, text, t, src) VALUES (?, ?, ?, 'in', ?, ?, ?, 'live')").bind(id, from, vjClean((ct.profile || {}).name, 60), type, text || '(' + type + ')', t).run();
     if (!ins.meta || ins.meta.changes !== 1) continue; // Meta re-delivery
+    if ((type === 'document' || type === 'image') && m[type] && m[type].id && await vjIsSupplier(from.slice(-10))) // C-20261126-SUPPLIERSEND: keep the media id of supplier stock files (bytes fetched later by the wamedia tool)
+      await env.DB.prepare("INSERT OR IGNORE INTO vj_meta (k, v) VALUES (?, ?)").bind('supdoc:' + id, JSON.stringify({ from: from.slice(-10), t, type, media_id: String(m[type].id), file: vjClean(m[type].filename, 120), mime: vjClean(m[type].mime_type, 80) })).run();
     const a = await env.DB.prepare('SELECT * FROM vj_chat_assign WHERE number = ?').bind(from).first();
     const lastTpl = await env.DB.prepare("SELECT max(at) AS at FROM vj_chat_out WHERE number = ? AND kind = 'tpl' AND status = 'sent'").bind(from).first();
     const prevIn = (prev && prev.t) || 0, closedBefore = prevIn > 0 && t - prevIn > VJ_CHAT_WIN, afterTpl = lastTpl && lastTpl.at && lastTpl.at > prevIn;
@@ -6083,10 +6085,9 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/supdocs' && request.method === 'GET') { // C-20261126-SUPPLIERSEND: stock-list files suppliers sent to Aashvi (owner-only, read-only; media ids only, no file bytes)
     if (who.role !== 'admin' || !(await vjDreqCan(env, who))) return vjDeny(403, 'owner only');
     const since = Math.max(0, Number(url.searchParams.get('since')) || Date.now() - 3 * 86400e3);
-    const rows = ((await env.DB.prepare("SELECT id, sender, type, ts, msg FROM wa_inbox WHERE type IN ('document', 'image') AND ts >= ? ORDER BY ts LIMIT 500").bind(since).all()).results) || [];
-    const out = []; for (const r of rows) { if (!(await vjIsSupplier(String(r.sender).slice(-10)))) continue; let m = {}; try { m = JSON.parse(r.msg); } catch (e) {} const d = m[r.type] || {};
-      out.push({ id: r.id, from: String(r.sender).slice(-10), ts: r.ts, type: r.type, media_id: String(d.id || ''), file: vjClean(d.filename, 120), mime: vjClean(d.mime_type, 80) }); }
-    return vjJson({ ok: true, docs: out }); }
+    await vjMetaT(env); const rows = ((await env.DB.prepare("SELECT k, v FROM vj_meta WHERE k LIKE 'supdoc:%' LIMIT 1000").all()).results) || [];
+    const out = []; for (const r of rows) { let d = {}; try { d = JSON.parse(r.v); } catch (e) { continue; } if ((d.t || 0) >= since) out.push(Object.assign({ id: r.k.slice(7) }, d)); }
+    out.sort((a, b) => a.t - b.t); return vjJson({ ok: true, docs: out }); }
   if (p === '/api/vj/staffadd') return vjStaffAdd(request, env, who); // C-20261126-FENILLOGIN
   if (p === '/api/vj/boxes' && request.method === 'GET') return vjBoxes(url, env, who); // C-20261029-BOXNO
   if (p === '/api/vj/write' && request.method === 'POST') return vjWrite(request, env, who, ctx);
