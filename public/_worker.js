@@ -333,7 +333,40 @@ function vjDreq(d, cur, who) {
   const ch = !was ? 'added' : [was.status !== out.status ? was.status + ' -> ' + out.status : '', (was.sent || 0) !== out.sent ? 'sent ' + out.sent : '', (was.replies || 0) !== out.replies ? 'replies ' + out.replies : ''].filter(Boolean).join(', ');
   if (ch) out.hist.push({ at: now, by: who.email, what: ch });
   if (out.status === 'Closed') out.closedAt = was && was.closedAt || now;
+  // supplier answers (owner 26/11 14:37-14:38, C-20261126-DREQVIEW): matching stones from WhatsApp replies / stock Excels / VDB / Kira,
+  // kept cheapest first (Rs per ct), max 200 (doc size); 'pick' Y/N + 'why' are the owner's / Fenil's choices that train the filter rules.
+  const st = (Array.isArray(d.stones) ? d.stones : (was && Array.isArray(was.stones) ? was.stones : [])).slice(0, 200);
+  const n2 = (v, hi) => { const x = Math.round(Number(v) * 100) / 100; return isFinite(x) && x >= 0 && x <= hi ? x : null; };
+  out.stones = st.slice(0, 300).filter(s => s && typeof s === 'object' && !Array.isArray(s)).map(s => ({ sup: vjClean(s.sup, 60), ph: vjClean(s.ph, 40), cert: vjClean(s.cert, 30), lab: vjClean(s.lab, 10),
+    shape: vjClean(s.shape, 20), ct: n2(s.ct, 100), col: vjClean(s.col, 12), cla: vjClean(s.cla, 8), cut: vjClean(s.cut, 10), pol: vjClean(s.pol, 10), sym: vjClean(s.sym, 10), fl: vjClean(s.fl, 10),
+    tbl: n2(s.tbl, 100), dep: n2(s.dep, 100), meas: vjClean(s.meas, 30), rpc: n2(s.rpc, 100000000), tot: n2(s.tot, 1000000000), src: vjClean(s.src, 12), at: vjClean(s.at, 20),
+    pick: s.pick === 'Y' || s.pick === 'N' ? s.pick : '', why: vjClean(s.why, 80) }))
+    .sort((a, b) => (a.rpc == null ? 1e15 : a.rpc) - (b.rpc == null ? 1e15 : b.rpc));
+  out.rules = vjClean(d.rules !== undefined ? d.rules : was && was.rules, 600);
   return { doc: out };
+}
+// Who may see / change diamond requirements (owner 26/11 14:38, C-20261126-DREQVIEW): "only me and Fenil". Abhinav (owner login, not
+// Shilpiji's) always; others only if listed by Abhinav in vj_meta 'dreq_view' (emails kept in the database, not in this code).
+const VJ_DQ_NOT = ['vaishnavijewels@gmail.com'];
+async function vjDreqList(env) { try { const r = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'dreq_view'").first(); const a = r ? JSON.parse(r.v) : []; return Array.isArray(a) ? a.map(x => String(x).toLowerCase()) : []; } catch (e) { return []; } }
+async function vjDreqCan(env, who) {
+  if (!who || !who.email) return false;
+  const e = String(who.email).toLowerCase();
+  if (who.role === 'admin' && !VJ_DQ_NOT.includes(e)) return true;
+  if (!['admin', 'staff'].includes(who.role)) return false;
+  return (await vjDreqList(env)).includes(e);
+}
+async function vjDreqViewApi(request, env, who) {
+  const e = String(who.email || '').toLowerCase();
+  if (who.role !== 'admin' || VJ_DQ_NOT.includes(e)) return vjDeny(403, 'only Abhinav');
+  if (request.method === 'GET') return vjJson({ ok: true, emails: await vjDreqList(env) });
+  if (request.method !== 'POST') return vjDeny(405, 'method');
+  let b; try { b = await request.json(); } catch (x) { return vjDeny(400, 'bad json'); }
+  const list = (Array.isArray(b && b.emails) ? b.emails : []).map(x => String(x).trim().toLowerCase()).filter(x => /^[^@\s]{1,64}@[^@\s]{1,190}$/.test(x)).slice(0, 10);
+  await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_meta (k TEXT PRIMARY KEY, v TEXT)').run();
+  await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('dreq_view', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(list)).run();
+  await vjAudit(env, who, 'dreq-view', 'vj_meta/dreq_view', list.join(', '));
+  return vjJson({ ok: true, emails: list });
 }
 // Public "Tell us your diamond" page on the website (owner 26/11 14:29: on the website so customers can use it too, not in VJ Tags).
 // POST /hooks/vj-req (outside the login, like the review page). Guarded: small JSON only, hidden honeypot field, max 5 per IP per hour and
@@ -354,7 +387,7 @@ async function vjPublicReq(request, env) {
   if ((hr && hr.n >= 5) || (day && day.n >= 300)) return json({ error: 'Too many requests - please call us or try again later.' }, 429);
   const mob = vjPhone(b.mobile); if (!/^\d{10}$/.test(mob)) return json({ error: 'Please give your 10-digit mobile number.' }, 400);
   const who = { email: 'website', role: 'staff', name: 'Website' };
-  const r = vjDreq(Object.assign({}, b, { from: 'Customer', status: 'New', sent: 0, replies: 0, matches: 0, ack: false, result: '', no: '' }), null, who);
+  const r = vjDreq(Object.assign({}, b, { from: 'Customer', status: 'New', sent: 0, replies: 0, matches: 0, ack: false, result: '', no: '', stones: [], rules: '' }), null, who);
   if (r.error) return json({ error: r.error.charAt(0).toUpperCase() + r.error.slice(1) + '.' }, 400);
   const cnt = await env.DB.prepare("SELECT count(*) AS n FROM docs WHERE path LIKE 'dreq/%'").first();
   const doc = r.doc; doc.no = 'REQ-' + String(((cnt && cnt.n) || 0) + 1).padStart(4, '0'); doc.web = true;
@@ -479,19 +512,20 @@ async function vjSync(request, env, who, ctx) {
   const since = Math.max(0, Number(new URL(request.url).searchParams.get('since')) || 0);
   const now = Date.now();
   const docs = (await env.DB.prepare('SELECT path, data, version, updated_at FROM docs WHERE updated_at > ? ORDER BY updated_at').bind(since).all()).results || [];
+  const dqOk = await vjDreqCan(env, who); // C-20261126-DREQVIEW: diamond requirements + supplier answers only for Abhinav and the people he lists (Fenil)
   const del = since ? ((await env.DB.prepare('SELECT path FROM tomb WHERE deleted_at > ?').bind(since).all()).results || []).map(r => r.path) : [];
   const out = docs.map(r => {
     const data = JSON.parse(r.data);
     if (who.role === 'sales' && (r.path === 'counters/main' || r.path.startsWith('quotes/'))) return null;
     if (who.role === 'tagger' && r.path.startsWith('quotes/')) return null;
     if (who.role === 'sales' && (r.path.startsWith('kdues/') || r.path.startsWith('karigars/'))) return null; // C-20261030-TAGSDROPDOWN: karigar dues not for the sales login
-    if ((who.role === 'sales' || who.role === 'tagger') && r.path.startsWith('dreq/')) return null; // C-20261126-DIAMONDREQ: owner + staff only
+    if (r.path.startsWith('dreq/') && !dqOk) return null; // C-20261126-DREQVIEW: only Abhinav + listed people (Fenil)
     if (who.role === 'sales' && data && data.order) delete data.order; // C-20261016-ORDERS: customer details never go to the sales login
     if (who.role === 'sales' && data && data.orderCancelled) delete data.orderCancelled;
     return { path: r.path, data, version: r.version };
   }).filter(Boolean);
   // 'now - 2000' so a write landing in the same millisecond is never missed on the next poll
-  return vjJson({ now: now - 2000, docs: out, deleted: del, me: { email: who.email, role: who.role, name: who.name, enq: !!(await vjEnqWho(env, who)), cash: false } }); /* cash: C-20261104-CASHBOOK, off 16:55 C-20261104-CASHBOOKOFF (Tally) */ // enq: C-20261103-ENQMERGE
+  return vjJson({ now: now - 2000, docs: out, deleted: del, me: { email: who.email, role: who.role, name: who.name, enq: !!(await vjEnqWho(env, who)), cash: false, dq: dqOk } }); /* cash: C-20261104-CASHBOOK, off 16:55 C-20261104-CASHBOOKOFF (Tally) */ // enq: C-20261103-ENQMERGE
 }
 
 async function vjWrite(request, env, who, ctx) {
@@ -506,7 +540,7 @@ async function vjWrite(request, env, who, ctx) {
   if (path === 'settings/main' && who.role !== 'admin') return vjDeny(403, 'owner only');
   if (op === 'delete' && who.role !== 'admin') return vjDeny(403, 'owner only');
   if (op === 'delete' && /^(kdues|karigars)\//.test(path)) return vjDeny(403, 'karigar dues are never deleted - mark Delivered'); // C-20261030-TAGSDROPDOWN
-  if (path.startsWith('dreq/') && (op === 'delete' || (who.role !== 'admin' && who.role !== 'staff'))) return vjDeny(403, op === 'delete' ? 'requirements are never deleted - mark Closed' : 'not allowed'); // C-20261126-DIAMONDREQ
+  if (path.startsWith('dreq/') && (op === 'delete' || !(await vjDreqCan(env, who)))) return vjDeny(403, op === 'delete' ? 'requirements are never deleted - mark Closed' : 'not allowed'); // C-20261126-DIAMONDREQ / DREQVIEW
   const row = await env.DB.prepare('SELECT data, version FROM docs WHERE path = ?').bind(path).first();
   if (ifv === null && row && op !== 'update') return vjDeny(409, 'version required');
   if (ifv !== null && (row ? row.version : 0) !== ifv) return vjJson({ error: 'conflict', version: row ? row.version : 0 }, 409);
@@ -5998,6 +6032,7 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/moves' && request.method === 'GET') return vjMovesGet(url, env, who);
   if (p === '/api/vj/repairs' && request.method === 'GET') return vjRepairsGet(url, env, who);
   if (p === '/api/vj/sync' && request.method === 'GET') return vjSync(request, env, who, ctx);
+  if (p === '/api/vj/dreqview') return vjDreqViewApi(request, env, who); // C-20261126-DREQVIEW
   if (p === '/api/vj/boxes' && request.method === 'GET') return vjBoxes(url, env, who); // C-20261029-BOXNO
   if (p === '/api/vj/write' && request.method === 'POST') return vjWrite(request, env, who, ctx);
   if (p === '/api/vj/photo' && request.method === 'POST') return vjPhotoUpload(request, env, who);
