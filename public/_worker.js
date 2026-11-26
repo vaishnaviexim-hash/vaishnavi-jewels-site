@@ -387,7 +387,7 @@ async function vjDreqViewApi(request, env, who) {
 // POST /hooks/vj-req (outside the login, like the review page). Guarded: small JSON only, hidden honeypot field, max 5 per IP per hour and
 // 300 a day in total, every field cleaned by vjDreq, mobile required, always from 'Customer' / status 'New'. Nothing is sent from here -
 // the daytime runner sends to suppliers (stone details + our number only) and the "requirement noted" reply from the owner's WhatsApp.
-async function vjPublicReq(request, env) {
+async function vjPublicReq(request, env, ctx) {
   const json = (o, s) => new Response(JSON.stringify(o), { status: s || 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
   if (request.method !== 'POST') return json({ error: 'method' }, 405);
   if (!/^application\/json/i.test(request.headers.get('content-type') || '')) return json({ error: 'bad request' }, 400);
@@ -410,7 +410,33 @@ async function vjPublicReq(request, env) {
   if (s.length > 8000) return json({ error: 'too large' }, 413);
   await env.DB.batch([env.DB.prepare('INSERT INTO docs (path, data, version, updated_at, updated_by) VALUES (?, ?, 1, ?, ?) ON CONFLICT(path) DO NOTHING').bind(path, s, now, 'website'),
     env.DB.prepare('INSERT INTO vj_req_rl (ip, ts) VALUES (?, ?)').bind(ip, now), env.DB.prepare('DELETE FROM vj_req_rl WHERE ts < ?').bind(now - 2 * 86400000)]);
+  if (ctx) ctx.waitUntil(vjReqAlert(env, doc).catch(() => {}));
   return json({ ok: true, no: doc.no });
+}
+// Instant phone alert to Abhinav + Fenil for every new requirement (owner 26/11 15:20, C-20261126-DREQALERT): approved template lead_alert_v1
+// via n8n eT7ea8Lbm5OpiSSh. Like the estimate reminders, only a random one-time token goes to n8n; n8n fetches the ready message bodies
+// once from /hooks/vj-reqdue (numbers come from the worker, never from n8n).
+const VJ_REQ_HOOK = 'https://n8n-epei.srv2114308.hstgr.cloud/webhook/vj-dreq-40dacddc7d2fb9868eb943fb';
+const VJ_REQ_TO = [['917567400099', 'Abhinav'], ['919930822640', 'Fenil']];
+async function vjReqAlert(env, d) {
+  const clip = (x, n) => String(x || '-').replace(/[\r\n\t]+/g, ' ').replace(/\s{4,}/g, '   ').slice(0, n) || '-';
+  const ct = d.ctMin != null && d.ctMax != null ? (d.ctMin === d.ctMax ? d.ctMin + ' ct' : d.ctMin + '-' + d.ctMax + ' ct') : d.ctMin != null ? d.ctMin + '+ ct' : 'up to ' + d.ctMax + ' ct';
+  const what = [d.type, (d.shape || []).join('/'), ct, (d.color || []).join(',') + (d.fancy ? ' ' + d.fancy : ''), (d.clarity || []).join(','), (d.cut || []).length ? 'Cut ' + d.cut.join(',') : '', (d.lab || []).join(','), d.qty ? d.qty + ' pcs' : '', d.pair ? 'pair' : '', d.remarks ? 'Note: ' + d.remarks : ''].filter(Boolean).join(' . ');
+  const params = [clip(d.name + (d.city ? ', ' + d.city : '') + (d.mobile ? ' (' + d.mobile + ')' : ''), 120), clip('New diamond requirement ' + d.no + ' from the website', 120),
+    clip(what, 400), clip((d.mobile ? 'Call / WhatsApp ' + d.mobile + '. ' : '') + 'Please check VJ Tags > Diamond requirements.', 160)];
+  const msgs = VJ_REQ_TO.map(([to]) => ({ body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template: { name: 'lead_alert_v1', language: { code: 'en' }, components: [{ type: 'body', parameters: params.map(text => ({ type: 'text', text })) }] } }) }));
+  await vjMetaT(env);
+  const token = [...crypto.getRandomValues(new Uint8Array(16))].map(x => x.toString(16).padStart(2, '0')).join('');
+  await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('reqdue:' + token, JSON.stringify({ msgs, at: Date.now() })).run();
+  await fetch(VJ_REQ_HOOK, { method: 'POST', headers: { 'content-type': 'application/json' }, signal: AbortSignal.timeout(20000), body: JSON.stringify({ token }) });
+}
+async function vjReqDue(url, env) {
+  const t = String(url.searchParams.get('t') || ''); if (!/^[a-f0-9]{32}$/.test(t)) return reply('not found', 404);
+  await vjMetaT(env);
+  const r = await env.DB.prepare('SELECT v FROM vj_meta WHERE k = ?').bind('reqdue:' + t).first(); if (!r) return reply('gone', 410);
+  const del = await env.DB.prepare('DELETE FROM vj_meta WHERE k = ? AND v = ?').bind('reqdue:' + t, r.v).run(); if (!del.meta || del.meta.changes !== 1) return reply('gone', 410);
+  const s = JSON.parse(r.v); if (Date.now() - s.at > 3600e3) return reply('gone', 410);
+  return vjJson({ msgs: s.msgs });
 }
 function vjKarigar(d) {
   const name = vjClean(d.name, 40); if (!name) return { error: 'karigar name needed' };
@@ -6184,7 +6210,8 @@ export default {
     if (p === '/hooks/vj-xlbell' || p === '/hooks/vj-xldata') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-xlbell' ? vjXlBell(url, env) : vjXlData(url, env)) : reply('Method not allowed', 405); // C-20261107-XLAUTO
     if (p === '/hooks/vj-reviewbell' || p === '/hooks/vj-reviewdue' || p === '/hooks/vj-reviewimg') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-reviewbell' ? vjReviewBell(url, env) : p === '/hooks/vj-reviewdue' ? vjReviewDue(url, env) : vjReviewImg(url, env)) : reply('Method not allowed', 405); // C-20261102-REVIEWASK
     if (p.startsWith('/r/')) return vjReviewClick(request, env, ctx, url);
-    if (p === '/hooks/vj-req') return (url.hostname === VJ_HOST && env.DB) ? vjPublicReq(request, env) : reply('Not found', 404); // C-20261126-DIAMONDREQ public page
+    if (p === '/hooks/vj-req') return (url.hostname === VJ_HOST && env.DB) ? vjPublicReq(request, env, ctx) : reply('Not found', 404); // C-20261126-DIAMONDREQ public page
+    if (p === '/hooks/vj-reqdue') return (request.method === 'GET' && url.hostname === VJ_HOST && env.DB) ? vjReqDue(url, env) : reply('Not found', 404); // C-20261126-DREQALERT one-time hand-out to n8n
     if (p === '/review' && (request.method === 'GET' || request.method === 'HEAD') && url.hostname === VJ_HOST) return vjReviewPage(); // HEAD too: link-preview crawlers // C-20261106-REVIEWLINK // C-20261102-REVIEWASK: tracked review button -> Google
     if (p === '/hooks/vj-enqbulk') return ((request.method === 'GET' || request.method === 'HEAD') && (url.hostname === VJ_HOST || env.VJ_DEV === '1')) ? vjEnqBulk(env, ctx) : reply('Method not allowed', 405); // C-20261103-ENQBULK (owner-approved one-off)
     if (p === '/hooks/vj-enqbell' || p === '/hooks/vj-enqdue') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-enqbell' ? vjEnqBell(env) : vjEnqDue(url, env)) : reply('Method not allowed', 405); // C-20261102-ENQREMIND
