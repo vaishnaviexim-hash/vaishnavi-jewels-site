@@ -8,7 +8,7 @@
   const $ = id => document.getElementById(id);
   const el = (tag, props, kids) => { const e = document.createElement(tag); Object.assign(e, props || {}); (kids || []).forEach(k => k != null && k !== "" && e.append(k)); return e; };
   let sec = null, db = null, reqs = [], subs = false, cur = "";
-  const fmt = n => n == null ? "" : "Rs " + Math.round(n).toLocaleString("en-IN");
+  const fmt = (n, cur) => n == null ? "" : (cur === "USD" ? "$ " + (Math.round(n * 100) / 100).toLocaleString("en-US") : "Rs " + Math.round(n).toLocaleString("en-IN")); /* 26/11: supplier Excel prices in USD */
   const dmy = iso => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("en-IN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }); };
   function say(t, bad) { const m = $("dqMsg"); if (!m) return; m.textContent = t || ""; m.style.color = bad ? "var(--bad)" : "var(--ok)"; }
   function what(r) {
@@ -44,7 +44,7 @@
     const rows = all.filter(s => (!f.tmin || (s.tbl != null && s.tbl >= f.tmin)) && (!f.tmax || (s.tbl != null && s.tbl <= f.tmax)) && (!f.dmin || (s.dep != null && s.dep >= f.dmin)) && (!f.dmax || (s.dep != null && s.dep <= f.dmax))
       && (!f.lab || s.lab === f.lab) && (!f.src || s.src === f.src) && !(f.hideNo && s.pick === "N"));
     if (!all.length) { box.appendChild(el("p", { className: "hint", textContent: "No supplier answers yet." })); return; }
-    const head = ["#", "Pick", "Rs/ct", "Total", "Carat", "Shape", "Col", "Cla", "Cut/Pol/Sym", "Lab", "Cert", "Table", "Depth", "mm", "Fl", "Supplier", "Phone", "From", "Why"];
+    const head = ["#", "Pick", "Price/ct", "Total", "Carat", "Shape", "Col", "Cla", "Cut/Pol/Sym", "Lab", "Cert", "Table", "Depth", "mm", "Fl", "Supplier", "Phone", "From", "Why"];
     const tb = el("table", { className: "dqtab" }), tr0 = el("tr"); head.forEach(h => tr0.appendChild(el("th", { textContent: h }))); tb.appendChild(el("thead", {}, [tr0]));
     const body = el("tbody");
     rows.forEach((s, k) => {
@@ -54,7 +54,7 @@
       y.addEventListener("click", () => setPick("Y")); n.addEventListener("click", () => setPick("N"));
       why.addEventListener("change", () => { const st = (r.stones || []).map((x, j) => j === s.i ? Object.assign({}, x, { why: why.value }) : x); patch(r, { stones: st }); });
       const tr = el("tr", { className: s.pick === "N" ? "dqno" : s.pick === "Y" ? "dqyes" : "" });
-      [String(k + 1), el("span", {}, [y, n]), fmt(s.rpc), fmt(s.tot), s.ct != null ? String(s.ct) : "", s.shape, s.col, s.cla, [s.cut, s.pol, s.sym].filter(Boolean).join("/"), s.lab, s.cert, s.tbl != null ? s.tbl + "%" : "", s.dep != null ? s.dep + "%" : "", s.meas, s.fl, s.sup, s.ph, s.src, why]
+      [String(k + 1), el("span", {}, [y, n]), fmt(s.rpc, /USD/.test(s.src || "") ? "USD" : ""), fmt(s.tot, /USD/.test(s.src || "") ? "USD" : ""), s.ct != null ? String(s.ct) : "", s.shape, s.col, s.cla, [s.cut, s.pol, s.sym].filter(Boolean).join("/"), s.lab, s.cert, s.tbl != null ? s.tbl + "%" : "", s.dep != null ? s.dep + "%" : "", s.meas, s.fl, s.sup, s.ph, s.src, why]
         .forEach(v => { const td = el("td"); if (typeof v === "string") td.textContent = v; else td.append(v); tr.appendChild(td); });
       body.appendChild(tr);
     });
