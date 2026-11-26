@@ -274,7 +274,7 @@ async function vjWho(request, env) {
   return { email, role: row.role, name: row.name || email };
 }
 
-const VJ_PATH = /^(tags\/[A-Za-z0-9_\-.~]{1,60}|settings\/main|counters\/main|kdues\/[A-Za-z0-9_\-.~]{1,60}|karigars\/[A-Za-z0-9_\-.~]{1,60})$/; // kdues/karigars: C-20261030-TAGSDROPDOWN
+const VJ_PATH = /^(tags\/[A-Za-z0-9_\-.~]{1,60}|settings\/main|counters\/main|kdues\/[A-Za-z0-9_\-.~]{1,60}|karigars\/[A-Za-z0-9_\-.~]{1,60}|dreq\/[A-Za-z0-9_\-.~]{1,60})$/; // kdues/karigars: C-20261030-TAGSDROPDOWN; dreq: C-20261126-DIAMONDREQ
 // Karigar dues (owner 30/10/2026 15:17, C-20261030-TAGSDROPDOWN): kdues/<id> = one job with a karigar (code, customer, item, stage),
 // karigars/<id> = karigar name + Total / Due grams. Every field is cleaned here; the history and who/when are written by the server.
 const VJ_KSTAGES = ['Design', 'CAD', 'Ghaat', 'Setting', 'Polish', 'Ready', 'Hold'];
@@ -294,6 +294,45 @@ function vjKdue(d, cur, who) {
   if (status === 'delivered') { const keep = was && was.status === 'delivered'; out.deliveredAt = keep && was.deliveredAt || now; out.deliveredBy = keep && was.deliveredBy || who.email; }
   const ch = !was ? 'added (' + stage + ')' : [was.stage !== stage ? was.stage + ' -> ' + stage : '', was.status !== status ? (status === 'delivered' ? 'delivered' : 'back to pending') : '', was.karigar !== k ? 'moved to ' + kname : ''].filter(Boolean).join(', ');
   if (ch) out.hist.push({ at: now, by: who.email, what: ch });
+  return { doc: out };
+}
+// Diamond requirement (owner 26/11/2026 12:46-14:12, C-20261126-DIAMONDREQ): dreq/<id> = one VDB-style stone requirement (what + who asked).
+// Owner + staff only (never sales / tagger). Never deleted - Closed instead. The buyer's name / mobile stay inside VJ Tags; only the stone
+// details go to suppliers (from the owner's WhatsApp, daytime). Every field is cleaned here; who/when/history are written by the server.
+const VJ_DQ = { type: ['Lab-grown', 'Natural'],
+  shape: ['Round', 'Oval', 'Pear', 'Cushion', 'Emerald', 'Radiant', 'Princess', 'Asscher', 'Marquise', 'Heart', 'Baguette', 'Trilliant', 'Old Miner', 'Rose Cut', 'Other'],
+  color: ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'Fancy'], clarity: ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'SI3', 'I1', 'I2'],
+  cut: ['8X', 'Ideal', 'Excellent', 'Very Good', 'Good'], lab: ['IGI', 'GIA', 'GCAL', 'SGL', 'Other', 'None'], fluor: ['None', 'Faint', 'Medium', 'Strong', 'V Strong'],
+  from: ['Abhinav', 'Shilpiji', 'Fenil', 'Staff', 'Customer'], status: ['New', 'Sending', 'Sent', 'Replies', 'Closed'] };
+function vjDreq(d, cur, who) {
+  const pick = (v, list) => Array.isArray(v) ? [...new Set(v.filter(x => list.includes(x)))] : [];
+  const num = (v, lo, hi) => { if (v === '' || v == null) return null; const x = Math.round(Number(v) * 1000) / 1000; return isFinite(x) && x >= lo && x <= hi ? x : NaN; };
+  const was = cur || null, now = new Date().toISOString();
+  const out = { type: VJ_DQ.type.includes(d.type) ? d.type : 'Lab-grown', shape: pick(d.shape, VJ_DQ.shape), color: pick(d.color, VJ_DQ.color), clarity: pick(d.clarity, VJ_DQ.clarity),
+    cut: pick(d.cut, VJ_DQ.cut), polish: pick(d.polish, VJ_DQ.cut), sym: pick(d.sym, VJ_DQ.cut), lab: pick(d.lab, VJ_DQ.lab), fluor: pick(d.fluor, VJ_DQ.fluor),
+    fancy: vjClean(d.fancy, 40), remarks: vjClean(d.remarks, 300), pair: d.pair === true,
+    name: vjClean(d.name, 60), mobile: vjPhone(d.mobile), city: vjClean(d.city, 40), from: VJ_DQ.from.includes(d.from) ? d.from : 'Staff',
+    status: VJ_DQ.status.includes(d.status) ? d.status : 'New' };
+  const ctMin = num(d.ctMin, 0.001, 100), ctMax = num(d.ctMax, 0.001, 100), qty = num(d.qty, 1, 100000);
+  if (Number.isNaN(ctMin) || Number.isNaN(ctMax)) return { error: 'carat must be 0.001 - 100' };
+  if (Number.isNaN(qty) || (qty !== null && !Number.isInteger(qty))) return { error: 'pieces must be a whole number' };
+  if (ctMin !== null && ctMax !== null && ctMin > ctMax) return { error: 'carat: min is more than max' };
+  out.ctMin = ctMin; out.ctMax = ctMax; out.qty = qty;
+  if (!out.shape.length) return { error: 'choose at least one shape' };
+  if (ctMin === null && ctMax === null) return { error: 'give the carat (min and/or max)' };
+  if (!out.name) return { error: 'who is asking? (name)' };
+  // automation fields (send / reply progress) - numbers and short text only
+  out.sent = Number.isInteger(d.sent) && d.sent >= 0 && d.sent <= 5000 ? d.sent : (was && was.sent) || 0;
+  out.replies = Number.isInteger(d.replies) && d.replies >= 0 && d.replies <= 5000 ? d.replies : (was && was.replies) || 0;
+  out.matches = Number.isInteger(d.matches) && d.matches >= 0 && d.matches <= 100000 ? d.matches : (was && was.matches) || 0;
+  out.ack = d.ack === true || !!(was && was.ack);
+  out.result = vjClean(d.result !== undefined ? d.result : was && was.result, 500);
+  out.no = was && was.no || vjClean(d.no, 12).toUpperCase().replace(/[^A-Z0-9\-]/g, '');
+  out.createdAt = was && was.createdAt || now; out.createdBy = was && was.createdBy || who.email;
+  out.hist = Array.isArray(was && was.hist) ? was.hist.slice(-40) : [];
+  const ch = !was ? 'added' : [was.status !== out.status ? was.status + ' -> ' + out.status : '', (was.sent || 0) !== out.sent ? 'sent ' + out.sent : '', (was.replies || 0) !== out.replies ? 'replies ' + out.replies : ''].filter(Boolean).join(', ');
+  if (ch) out.hist.push({ at: now, by: who.email, what: ch });
+  if (out.status === 'Closed') out.closedAt = was && was.closedAt || now;
   return { doc: out };
 }
 function vjKarigar(d) {
@@ -417,6 +456,7 @@ async function vjSync(request, env, who, ctx) {
     if (who.role === 'sales' && (r.path === 'counters/main' || r.path.startsWith('quotes/'))) return null;
     if (who.role === 'tagger' && r.path.startsWith('quotes/')) return null;
     if (who.role === 'sales' && (r.path.startsWith('kdues/') || r.path.startsWith('karigars/'))) return null; // C-20261030-TAGSDROPDOWN: karigar dues not for the sales login
+    if ((who.role === 'sales' || who.role === 'tagger') && r.path.startsWith('dreq/')) return null; // C-20261126-DIAMONDREQ: owner + staff only
     if (who.role === 'sales' && data && data.order) delete data.order; // C-20261016-ORDERS: customer details never go to the sales login
     if (who.role === 'sales' && data && data.orderCancelled) delete data.orderCancelled;
     return { path: r.path, data, version: r.version };
@@ -437,6 +477,7 @@ async function vjWrite(request, env, who, ctx) {
   if (path === 'settings/main' && who.role !== 'admin') return vjDeny(403, 'owner only');
   if (op === 'delete' && who.role !== 'admin') return vjDeny(403, 'owner only');
   if (op === 'delete' && /^(kdues|karigars)\//.test(path)) return vjDeny(403, 'karigar dues are never deleted - mark Delivered'); // C-20261030-TAGSDROPDOWN
+  if (path.startsWith('dreq/') && (op === 'delete' || (who.role !== 'admin' && who.role !== 'staff'))) return vjDeny(403, op === 'delete' ? 'requirements are never deleted - mark Closed' : 'not allowed'); // C-20261126-DIAMONDREQ
   const row = await env.DB.prepare('SELECT data, version FROM docs WHERE path = ?').bind(path).first();
   if (ifv === null && row && op !== 'update') return vjDeny(409, 'version required');
   if (ifv !== null && (row ? row.version : 0) !== ifv) return vjJson({ error: 'conflict', version: row ? row.version : 0 }, 409);
@@ -523,6 +564,7 @@ async function vjWrite(request, env, who, ctx) {
   }
   if (path.startsWith('kdues/')) { const r = vjKdue(next, cur, who); if (r.error) return vjDeny(400, r.error); next = r.doc; } // C-20261030-TAGSDROPDOWN
   if (path.startsWith('karigars/')) { const r = vjKarigar(next); if (r.error) return vjDeny(400, r.error); next = r.doc; }
+  if (path.startsWith('dreq/')) { const r = vjDreq(next, cur, who); if (r.error) return vjDeny(400, r.error); next = r.doc; } // C-20261126-DIAMONDREQ
   const s = JSON.stringify(next);
   if (s.length > 64000) return vjDeny(413, 'too large');
   const v = row ? row.version + 1 : 1;

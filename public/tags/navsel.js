@@ -4,7 +4,7 @@
    and role rule (hidden buttons) keeps working exactly as before. Opens on Karigar order since 06/11 (korder.js clicks it; nothing remembered). */
 (function () {
   "use strict";
-  const ORDER = ["korder" /* 06/11 C-20261106-NEWTAGSAMPLE: Karigar order first (new pieces come through it); New tag lower - samples only */, "ogreg", "check", "orders", "enq" /* C-20261102-ENQTAB */, "kdues", "list", "new", "find", "bill", "vchain", "ledger", "g2g" /* C-20261104-G2GACCOUNT (cash book off 16:55) */, "quote", "karigar", "rates"];
+  const ORDER = ["korder" /* 06/11 C-20261106-NEWTAGSAMPLE: Karigar order first (new pieces come through it); New tag lower - samples only */, "ogreg", "check", "orders", "enq" /* C-20261102-ENQTAB */, "dreq" /* C-20261126-DIAMONDREQ */,"kdues", "list", "new", "find", "bill", "vchain", "ledger", "g2g" /* C-20261104-G2GACCOUNT (cash book off 16:55) */, "quote", "karigar", "rates"];
   const rank = b => { const i = ORDER.indexOf(b.dataset.tab); return i >= 0 ? i : ORDER.indexOf("rates") - 0.5; };
   let nav = null, sel = null, ph = null, queued = false;
 
