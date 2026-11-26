@@ -1,0 +1,127 @@
+---
+// Diamond requirement (owner 26/11/2026 12:46-14:29, C-20261126-DIAMONDREQ): a VDB-style "tell us the stone you want" form on the
+// public website, for customers and our team. It posts to /hooks/vj-req (guarded in _worker.js: honeypot, 5 per IP per hour, every
+// field cleaned). Our team then sources the stone; the customer's details are never shared with anyone outside Vaishnavi Jewels.
+import InfoPage from '../layouts/InfoPage.astro';
+import { business as b } from '../data/business.js';
+const faqs: [string, string][] = [
+  ['Can Vaishnavi Jewels source a specific diamond for me?', 'Yes. Tell us the shape, carat, colour, clarity and certificate you want. We search our Surat sourcing network and call you with the best price.'],
+  ['Do you source both lab-grown and natural diamonds?', 'Yes. We source certified lab-grown (laboratory-grown) diamonds and natural diamonds, loose or set in jewellery made by us.'],
+  ['Is my number shared with anyone?', 'No. Your name and number stay with Vaishnavi Jewels only. We contact you ourselves.'],
+];
+const SHAPES = ['Round', 'Oval', 'Pear', 'Cushion', 'Emerald', 'Radiant', 'Princess', 'Asscher', 'Marquise', 'Heart', 'Baguette', 'Trilliant', 'Old Miner', 'Rose Cut', 'Other'];
+const COLORS = ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'Fancy'];
+const CLARITY = ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'SI3', 'I1', 'I2'];
+const CUT = ['8X', 'Ideal', 'Excellent', 'Very Good', 'Good'];
+const LAB = ['IGI', 'GIA', 'GCAL', 'SGL', 'Other', 'None'];
+const FLUOR = ['None', 'Faint', 'Medium', 'Strong', 'V Strong'];
+const RANGES = [['0.30', '0.39'], ['0.40', '0.49'], ['0.50', '0.69'], ['0.70', '0.89'], ['0.90', '0.99'], ['1.00', '1.49'], ['1.50', '1.99'], ['2.00', '2.99'], ['3.00', '3.99'], ['4.00', '4.99'], ['5.00', '5.99']];
+---
+<InfoPage
+  title="Diamond Requirement | Tell Us the Diamond You Want | Vaishnavi Jewels, Surat"
+  description="Looking for a specific lab-grown or natural diamond? Tell Vaishnavi Jewels the shape, carat, colour and clarity. We source it in Surat and call you with the best price."
+  path="/diamond-requirement"
+  eyebrow="DIAMOND REQUIREMENT"
+  heading="Tell us the diamond you want"
+  intro="Choose the shape, carat, colour and clarity. We source it from Surat, the diamond city, and our representative calls you with the best price."
+  faqs={faqs}
+>
+  <form id="vj-req" class="vj-req" novalidate>
+    <div class="grid">
+      <fieldset><legend>Type</legend><div class="chips" data-k="type" data-single="1">
+        <button type="button" class="chip" data-v="Lab-grown" aria-pressed="true">Lab-grown</button>
+        <button type="button" class="chip" data-v="Natural" aria-pressed="false">Natural</button></div></fieldset>
+      <fieldset><legend>Shape *</legend><div class="chips" data-k="shape">{SHAPES.map(s => <button type="button" class="chip" data-v={s} aria-pressed="false">{s}</button>)}</div></fieldset>
+      <fieldset><legend>Carat *</legend>
+        <div class="two"><label>Min ct<input type="text" inputmode="decimal" name="ctMin" maxlength="8" placeholder="e.g. 0.90" /></label>
+          <label>Max ct<input type="text" inputmode="decimal" name="ctMax" maxlength="8" placeholder="e.g. 1.20" /></label></div>
+        <div class="chips">{RANGES.map(([a, z]) => <button type="button" class="chip rng" data-a={a} data-z={z}>{a}-{z}</button>)}</div>
+        <div class="two"><label>Pieces<input type="text" inputmode="numeric" name="qty" maxlength="5" placeholder="e.g. 1" /></label>
+          <label class="opt"><input type="checkbox" name="pair" /> Matching pair</label></div>
+      </fieldset>
+      <fieldset><legend>Colour</legend><div class="chips" data-k="color">{COLORS.map(s => <button type="button" class="chip" data-v={s} aria-pressed="false">{s}</button>)}</div>
+        <label>Fancy colour (optional)<input type="text" name="fancy" maxlength="40" placeholder="e.g. Pink, Yellow" /></label></fieldset>
+      <fieldset><legend>Clarity</legend><div class="chips" data-k="clarity">{CLARITY.map(s => <button type="button" class="chip" data-v={s} aria-pressed="false">{s}</button>)}</div></fieldset>
+      <fieldset><legend>Cut</legend><div class="chips" data-k="cut">{CUT.map(s => <button type="button" class="chip" data-v={s} aria-pressed="false">{s}</button>)}</div></fieldset>
+      <fieldset><legend>Polish</legend><div class="chips" data-k="polish">{CUT.map(s => <button type="button" class="chip" data-v={s} aria-pressed="false">{s}</button>)}</div></fieldset>
+      <fieldset><legend>Symmetry</legend><div class="chips" data-k="sym">{CUT.map(s => <button type="button" class="chip" data-v={s} aria-pressed="false">{s}</button>)}</div></fieldset>
+      <fieldset><legend>Certificate (lab)</legend><div class="chips" data-k="lab">{LAB.map(s => <button type="button" class="chip" data-v={s} aria-pressed="false">{s}</button>)}</div></fieldset>
+      <fieldset><legend>Fluorescence</legend><div class="chips" data-k="fluor">{FLUOR.map(s => <button type="button" class="chip" data-v={s} aria-pressed="false">{s}</button>)}</div></fieldset>
+    </div>
+    <label>Anything else about the stone? (optional)<input type="text" name="remarks" maxlength="300" placeholder="e.g. eye clean, for an engagement ring" /></label>
+    <fieldset><legend>Your details</legend>
+      <div class="three"><label>Name *<input type="text" name="name" maxlength="60" autocomplete="name" required /></label>
+        <label>Mobile *<input type="tel" name="mobile" maxlength="15" autocomplete="tel" inputmode="tel" placeholder="10-digit mobile" required /></label>
+        <label>City<input type="text" name="city" maxlength="40" autocomplete="address-level2" /></label></div>
+    </fieldset>
+    <label class="hp" aria-hidden="true">Website<input type="text" name="website" tabindex="-1" autocomplete="off" /></label>
+    <p id="vj-req-err" class="err" role="alert" hidden></p>
+    <button type="submit" class="btn btn-solid" id="vj-req-go">Send requirement</button>
+    <p class="hint">Your name and number stay with Vaishnavi Jewels only. Prefer to talk? WhatsApp us on {b.whatsappDisplay}.</p>
+  </form>
+  <div id="vj-req-ok" class="ok" role="status" hidden>
+    <p class="big">Your requirement has been noted.</p>
+    <p>Our representative will contact you with the <strong>best pricing</strong>.</p>
+    <p class="hint" id="vj-req-no"></p>
+  </div>
+
+  <script is:inline>
+    (function () {
+      var form = document.getElementById('vj-req'), err = document.getElementById('vj-req-err'), go = document.getElementById('vj-req-go');
+      var pick = { type: ['Lab-grown'], shape: [], color: [], clarity: [], cut: [], polish: [], sym: [], lab: [], fluor: [] };
+      form.querySelectorAll('.chips[data-k]').forEach(function (g) {
+        var k = g.getAttribute('data-k'), single = g.getAttribute('data-single');
+        g.querySelectorAll('.chip').forEach(function (c) {
+          c.addEventListener('click', function () {
+            var v = c.getAttribute('data-v'), a = pick[k], i = a.indexOf(v);
+            if (single) pick[k] = [v]; else if (i >= 0) a.splice(i, 1); else a.push(v);
+            g.querySelectorAll('.chip').forEach(function (x) { x.setAttribute('aria-pressed', pick[k].indexOf(x.getAttribute('data-v')) >= 0 ? 'true' : 'false'); });
+          });
+        });
+      });
+      form.querySelectorAll('.rng').forEach(function (c) { c.addEventListener('click', function () { form.ctMin.value = c.getAttribute('data-a'); form.ctMax.value = c.getAttribute('data-z'); }); });
+      function bad(t) { err.textContent = t; err.hidden = false; err.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+      form.addEventListener('submit', function (e) {
+        e.preventDefault(); err.hidden = true;
+        var f = new FormData(form), g = function (n) { return String(f.get(n) || '').trim(); };
+        var mob = g('mobile').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '').replace(/^0(?=\d{10}$)/, '');
+        if (!pick.shape.length) return bad('Please choose at least one shape.');
+        if (!g('ctMin') && !g('ctMax')) return bad('Please give the carat (min and/or max).');
+        if (!g('name')) return bad('Please add your name.');
+        if (!/^\d{10}$/.test(mob)) return bad('Please give your 10-digit mobile number.');
+        var body = { type: pick.type[0], shape: pick.shape, color: pick.color, clarity: pick.clarity, cut: pick.cut, polish: pick.polish, sym: pick.sym, lab: pick.lab, fluor: pick.fluor,
+          ctMin: g('ctMin'), ctMax: g('ctMax'), qty: g('qty'), pair: !!f.get('pair'), fancy: g('fancy'), remarks: g('remarks'), name: g('name'), mobile: mob, city: g('city'), website: g('website') };
+        go.disabled = true; go.textContent = 'Sending…';
+        fetch('/hooks/vj-req', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+          .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+          .then(function (x) {
+            if (!x.ok || !x.j.ok) { bad(x.j && x.j.error ? x.j.error : 'Could not send. Please try again.'); return; }
+            form.hidden = true; document.getElementById('vj-req-ok').hidden = false;
+            document.getElementById('vj-req-no').textContent = 'Reference: ' + (x.j.no || '');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          })
+          .catch(function () { bad('Could not send. Please check your internet and try again.'); })
+          .finally(function () { go.disabled = false; go.textContent = 'Send requirement'; });
+      });
+    })();
+  </script>
+
+  <style is:global>
+    .vj-req { display: grid; gap: 18px; }
+    .vj-req .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+    .vj-req fieldset { border: 1px solid rgba(58, 15, 26, 0.15); padding: 12px 14px; margin: 0; min-width: 0; }
+    .vj-req legend { font-weight: 600; padding: 0 6px; }
+    .vj-req label { display: grid; gap: 6px; margin-top: 8px; }
+    .vj-req label.opt { display: flex; gap: 10px; align-items: center; margin-top: 30px; }
+    .vj-req input[type=text], .vj-req input[type=tel] { font: inherit; padding: 9px 11px; border: 1px solid rgba(58, 15, 26, 0.25); background: #fff; width: 100%; box-sizing: border-box; }
+    .vj-req .two, .vj-req .three { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+    .vj-req .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+    .vj-req .chip { font: inherit; font-size: 14px; padding: 6px 11px; border: 1px solid var(--color-gold); background: transparent; cursor: pointer; min-width: 40px; }
+    .vj-req .chip[aria-pressed=true] { background: var(--color-gold); color: #fff; }
+    .vj-req .hint, .ok .hint { font-size: 14px; color: var(--color-ink-soft); margin: 4px 0 0; }
+    .vj-req .err { color: #9b1c1c; margin: 0; }
+    .vj-req .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+    .ok { border: 1px solid var(--color-gold); padding: 22px; max-width: 640px; }
+    .ok .big { font-size: 22px; font-weight: 600; margin: 0 0 6px; }
+  </style>
+</InfoPage>

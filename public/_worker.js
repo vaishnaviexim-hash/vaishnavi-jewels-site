@@ -335,6 +335,35 @@ function vjDreq(d, cur, who) {
   if (out.status === 'Closed') out.closedAt = was && was.closedAt || now;
   return { doc: out };
 }
+// Public "Tell us your diamond" page on the website (owner 26/11 14:29: on the website so customers can use it too, not in VJ Tags).
+// POST /hooks/vj-req (outside the login, like the review page). Guarded: small JSON only, hidden honeypot field, max 5 per IP per hour and
+// 300 a day in total, every field cleaned by vjDreq, mobile required, always from 'Customer' / status 'New'. Nothing is sent from here -
+// the daytime runner sends to suppliers (stone details + our number only) and the "requirement noted" reply from the owner's WhatsApp.
+async function vjPublicReq(request, env) {
+  const json = (o, s) => new Response(JSON.stringify(o), { status: s || 200, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
+  if (request.method !== 'POST') return json({ error: 'method' }, 405);
+  if (!/^application\/json/i.test(request.headers.get('content-type') || '')) return json({ error: 'bad request' }, 400);
+  const len = Number(request.headers.get('content-length') || 0); if (!len || len > 4000) return json({ error: 'too large' }, 413);
+  let b; try { b = await request.json(); } catch (e) { return json({ error: 'bad request' }, 400); }
+  if (!b || typeof b !== 'object' || Array.isArray(b)) return json({ error: 'bad request' }, 400);
+  if (b.website) return json({ ok: true, no: 'REQ' }); // honeypot filled = bot; pretend ok, store nothing
+  const ip = String(request.headers.get('cf-connecting-ip') || '').slice(0, 64), now = Date.now();
+  await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_req_rl (ip TEXT, ts INTEGER)').run();
+  const hr = await env.DB.prepare('SELECT count(*) AS n FROM vj_req_rl WHERE ip = ? AND ts > ?').bind(ip, now - 3600000).first();
+  const day = await env.DB.prepare('SELECT count(*) AS n FROM vj_req_rl WHERE ts > ?').bind(now - 86400000).first();
+  if ((hr && hr.n >= 5) || (day && day.n >= 300)) return json({ error: 'Too many requests - please call us or try again later.' }, 429);
+  const mob = vjPhone(b.mobile); if (!/^\d{10}$/.test(mob)) return json({ error: 'Please give your 10-digit mobile number.' }, 400);
+  const who = { email: 'website', role: 'staff', name: 'Website' };
+  const r = vjDreq(Object.assign({}, b, { from: 'Customer', status: 'New', sent: 0, replies: 0, matches: 0, ack: false, result: '', no: '' }), null, who);
+  if (r.error) return json({ error: r.error.charAt(0).toUpperCase() + r.error.slice(1) + '.' }, 400);
+  const cnt = await env.DB.prepare("SELECT count(*) AS n FROM docs WHERE path LIKE 'dreq/%'").first();
+  const doc = r.doc; doc.no = 'REQ-' + String(((cnt && cnt.n) || 0) + 1).padStart(4, '0'); doc.web = true;
+  const path = 'dreq/w' + now + Math.floor(Math.random() * 1000), s = JSON.stringify(doc);
+  if (s.length > 8000) return json({ error: 'too large' }, 413);
+  await env.DB.batch([env.DB.prepare('INSERT INTO docs (path, data, version, updated_at, updated_by) VALUES (?, ?, 1, ?, ?) ON CONFLICT(path) DO NOTHING').bind(path, s, now, 'website'),
+    env.DB.prepare('INSERT INTO vj_req_rl (ip, ts) VALUES (?, ?)').bind(ip, now), env.DB.prepare('DELETE FROM vj_req_rl WHERE ts < ?').bind(now - 2 * 86400000)]);
+  return json({ ok: true, no: doc.no });
+}
 function vjKarigar(d) {
   const name = vjClean(d.name, 40); if (!name) return { error: 'karigar name needed' };
   const total = d.total === '' || d.total == null ? 0 : vjGrams(d.total), due = d.due === '' || d.due == null ? 0 : vjGrams(d.due);
@@ -6104,6 +6133,7 @@ export default {
     if (p === '/hooks/vj-xlbell' || p === '/hooks/vj-xldata') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-xlbell' ? vjXlBell(url, env) : vjXlData(url, env)) : reply('Method not allowed', 405); // C-20261107-XLAUTO
     if (p === '/hooks/vj-reviewbell' || p === '/hooks/vj-reviewdue' || p === '/hooks/vj-reviewimg') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-reviewbell' ? vjReviewBell(url, env) : p === '/hooks/vj-reviewdue' ? vjReviewDue(url, env) : vjReviewImg(url, env)) : reply('Method not allowed', 405); // C-20261102-REVIEWASK
     if (p.startsWith('/r/')) return vjReviewClick(request, env, ctx, url);
+    if (p === '/hooks/vj-req') return (url.hostname === VJ_HOST && env.DB) ? vjPublicReq(request, env) : reply('Not found', 404); // C-20261126-DIAMONDREQ public page
     if (p === '/review' && (request.method === 'GET' || request.method === 'HEAD') && url.hostname === VJ_HOST) return vjReviewPage(); // HEAD too: link-preview crawlers // C-20261106-REVIEWLINK // C-20261102-REVIEWASK: tracked review button -> Google
     if (p === '/hooks/vj-enqbulk') return ((request.method === 'GET' || request.method === 'HEAD') && (url.hostname === VJ_HOST || env.VJ_DEV === '1')) ? vjEnqBulk(env, ctx) : reply('Method not allowed', 405); // C-20261103-ENQBULK (owner-approved one-off)
     if (p === '/hooks/vj-enqbell' || p === '/hooks/vj-enqdue') return (request.method === 'GET' && url.hostname === VJ_HOST) ? (p === '/hooks/vj-enqbell' ? vjEnqBell(env) : vjEnqDue(url, env)) : reply('Method not allowed', 405); // C-20261102-ENQREMIND
