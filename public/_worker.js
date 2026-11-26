@@ -4313,6 +4313,7 @@ async function vjChatModeHook(url, env) {
   const n = vjChatNum(url.searchParams.get('n'));
   if (!n || !(await vjChatSigOk(env, n, url.searchParams.get('ts'), url.searchParams.get('sig')))) return reply('bad request', 403);
   await vjChatT(env);
+  if (await vjIsSupplier(String(n).replace(/\D/g, '').slice(-10))) return reply('human', 200); // owner 26/11 16:59: Aashvi bot never chats with suppliers (we reply as Vaishnavi Jewels, Surat)
   const a = await env.DB.prepare('SELECT mode, since FROM vj_chat_assign WHERE number = ?').bind(n).first();
   return reply(a && a.mode === 'human' && !(WA_TEAM.has(n) && Date.now() - a.since > 3600e3) ? 'human' : 'bot', 200); // team-number test chats expire after 60 min
 }
