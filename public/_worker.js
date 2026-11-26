@@ -356,6 +356,21 @@ async function vjDreqCan(env, who) {
   if (!['admin', 'staff'].includes(who.role)) return false;
   return (await vjDreqList(env)).includes(e);
 }
+// Add a staff login to VJ Tags (owner 26/11 14:43, C-20261126-FENILLOGIN: "2" = Fenil gets a normal staff login). Abhinav only, POST,
+// role staff only (never admin), logged in the audit. Cloudflare Access must also allow the email (done by the owner in Cloudflare).
+async function vjStaffAdd(request, env, who) {
+  const e0 = String(who.email || '').toLowerCase();
+  if (who.role !== 'admin' || VJ_DQ_NOT.includes(e0)) return vjDeny(403, 'only Abhinav');
+  if (request.method !== 'POST') return vjDeny(405, 'method');
+  let b; try { b = await request.json(); } catch (x) { return vjDeny(400, 'bad json'); }
+  const email = String(b && b.email || '').trim().toLowerCase(), name = vjClean(b && b.name, 40);
+  if (!/^[^@\s]{1,64}@[^@\s]{1,190}$/.test(email) || !name) return vjDeny(400, 'email and name needed');
+  const have = await env.DB.prepare('SELECT role FROM users WHERE email = ?').bind(email).first();
+  if (have) return vjJson({ ok: true, existed: true, role: have.role });
+  await env.DB.prepare('INSERT INTO users (email, name, role) VALUES (?, ?, ?)').bind(email, name, 'staff').run();
+  await vjAudit(env, who, 'staff-add', 'users/' + email, name + ' as staff');
+  return vjJson({ ok: true, added: true });
+}
 async function vjDreqViewApi(request, env, who) {
   const e = String(who.email || '').toLowerCase();
   if (who.role !== 'admin' || VJ_DQ_NOT.includes(e)) return vjDeny(403, 'only Abhinav');
@@ -6033,6 +6048,7 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/repairs' && request.method === 'GET') return vjRepairsGet(url, env, who);
   if (p === '/api/vj/sync' && request.method === 'GET') return vjSync(request, env, who, ctx);
   if (p === '/api/vj/dreqview') return vjDreqViewApi(request, env, who); // C-20261126-DREQVIEW
+  if (p === '/api/vj/staffadd') return vjStaffAdd(request, env, who); // C-20261126-FENILLOGIN
   if (p === '/api/vj/boxes' && request.method === 'GET') return vjBoxes(url, env, who); // C-20261029-BOXNO
   if (p === '/api/vj/write' && request.method === 'POST') return vjWrite(request, env, who, ctx);
   if (p === '/api/vj/photo' && request.method === 'POST') return vjPhotoUpload(request, env, who);
