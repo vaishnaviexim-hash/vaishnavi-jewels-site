@@ -424,7 +424,7 @@ async function vjReqAlert(env, d) {
   const what = [d.type, (d.shape || []).join('/'), ct, (d.color || []).join(',') + (d.fancy ? ' ' + d.fancy : ''), (d.clarity || []).join(','), (d.cut || []).length ? 'Cut ' + d.cut.join(',') : '', (d.lab || []).join(','), d.qty ? d.qty + ' pcs' : '', d.pair ? 'pair' : '', d.remarks ? 'Note: ' + d.remarks : ''].filter(Boolean).join(' . ');
   const params = [clip(d.name + (d.city ? ', ' + d.city : '') + (d.mobile ? ' (' + d.mobile + ')' : ''), 120), clip('New diamond requirement ' + d.no + ' from the website', 120),
     clip(what, 400), clip((d.mobile ? 'Call / WhatsApp ' + d.mobile + '. ' : '') + 'Please check VJ Tags > Diamond requirements.', 160)];
-  const msgs = VJ_REQ_TO.map(([to]) => ({ body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template: { name: 'lead_alert_v1', language: { code: 'en' }, components: [{ type: 'body', parameters: params.map(text => ({ type: 'text', text })) }] } }) }));
+  const msgs = VJ_REQ_TO.filter(([, n]) => !/^TEST/i.test(String(d.name || '')) || n === 'Abhinav').map(([to]) => // tests go to Abhinav only ({ body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template: { name: 'lead_alert_v1', language: { code: 'en' }, components: [{ type: 'body', parameters: params.map(text => ({ type: 'text', text })) }] } }) }));
   await vjMetaT(env);
   const token = [...crypto.getRandomValues(new Uint8Array(16))].map(x => x.toString(16).padStart(2, '0')).join('');
   await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('reqdue:' + token, JSON.stringify({ msgs, at: Date.now() })).run();
