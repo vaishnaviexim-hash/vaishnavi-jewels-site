@@ -77,4 +77,4 @@ It should share the same metal tone and ideally one stone colour, but stay small
 
 Graceful, comfortable sets that complement the bride without competing. See our guide on [what the mother of the bride should wear](/blog/what-jewellery-should-the-mother-of-the-bride-wear).
 
-Visit our Parle Point showroom together to match both looks, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886.
+Visit our Parle Point showroom together to match both looks, [visit our showroom](/visit-us), or WhatsApp +91 75674 00099.

@@ -71,4 +71,4 @@ Read the number laser-inscribed on the girdle under a loupe, enter it on the lab
 
 Yes. Resizing is free for a new piece bought from us. Rings with diamonds set all the way around the band can be harder to resize, so share the correct finger size when you order.
 
-Choose your solitaire at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886 to book a time.
+Choose your solitaire at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 75674 00099 to book a time.

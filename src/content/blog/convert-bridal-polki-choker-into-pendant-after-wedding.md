@@ -74,4 +74,4 @@ Yes, if the pieces are made in the same unit from the same design drawings. We k
 
 Custom and bridal pieces usually take 2 to 4 weeks, so confirm at least a month before the first function. For a convertible set with several fittings, add a little more time for a trial so you can practise opening and closing the pieces.
 
-To see a convertible Polki choker in hand and try the pendant and short versions on, [visit our showroom](/visit-us) at Rajhans Ornate, Parle Point, Surat (Monday to Saturday, 11 AM to 8 PM) or WhatsApp +91 99980 43886 for a video call.
+To see a convertible Polki choker in hand and try the pendant and short versions on, [visit our showroom](/visit-us) at Rajhans Ornate, Parle Point, Surat (Monday to Saturday, 11 AM to 8 PM) or WhatsApp +91 75674 00099 for a video call.

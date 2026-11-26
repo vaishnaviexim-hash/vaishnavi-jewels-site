@@ -63,4 +63,4 @@ Yes. Many families decide on the call, pay by NEFT or UPI and receive the jewell
 
 Start at least four to six weeks before the wedding if you want any changes made. Custom pieces take about 3 weeks (simple designs can be faster) from the final design, plus time for a trial.
 
-To get your shortlist, WhatsApp us on +91 99980 43886, or book a visit to our Parle Point showroom.
+To get your shortlist, WhatsApp us on +91 75674 00099, or book a visit to our Parle Point showroom.

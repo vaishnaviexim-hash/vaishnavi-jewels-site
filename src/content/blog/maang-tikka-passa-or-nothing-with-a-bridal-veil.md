@@ -81,4 +81,4 @@ A single drop tikka suits most faces and a centre parting; a matha patti suits a
 
 You can, but under a heavy veil it can feel crowded. With a passa, a small tikka or none at all usually looks cleaner.
 
-Try your veil with our tikkas and earrings at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886.
+Try your veil with our tikkas and earrings at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 75674 00099.

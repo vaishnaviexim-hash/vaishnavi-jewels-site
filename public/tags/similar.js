@@ -261,7 +261,7 @@
       let yy = y + 13; lines.forEach(L => { doc.splitTextToSize(L, W - 46).forEach(s => { doc.text(s, x0, yy); yy += 5.5; }); });
       y = Math.max(y + 44, yy + 2); doc.setDrawColor(220); doc.line(M, y - 2, 210 - M, y - 2); y += 3;
     }
-    doc.setFontSize(9); doc.setTextColor(120); doc.text(cust ? "Prices are approximate at today's gold rate. Shop 120, Rajhans Ornate, Parle Point, Surat · +91 99980 43886 · vaishnavijewels.com" : "Prices are approximate at today's gold rate.", M, 290);
+    doc.setFontSize(9); doc.setTextColor(120); doc.text(cust ? "Prices are approximate at today's gold rate. Shop 120, Rajhans Ornate, Parle Point, Surat · +91 75674 00099 · vaishnavijewels.com" : "Prices are approximate at today's gold rate.", M, 290);
     if (cust) return { blob: doc.output("blob"), name: "Vaishnavi Jewels designs " + dd + ".pdf", n: list.length };
     doc.save("Similar designs " + dd + ".pdf"); msg.textContent = "PDF downloaded (" + list.length + " piece" + (list.length === 1 ? "" : "s") + ").";
   }

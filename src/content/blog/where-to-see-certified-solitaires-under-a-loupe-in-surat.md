@@ -73,4 +73,4 @@ Ask for the grading report, check that the laser-inscribed number on the stone m
 
 A lower setting with sturdy prongs or a bezel catches less on clothes. Try several settings on your own hand before deciding.
 
-Come and check a solitaire yourself at our Parle Point showroom, Monday to Saturday from 11 AM to 8 PM, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886 to book a time.
+Come and check a solitaire yourself at our Parle Point showroom, Monday to Saturday from 11 AM to 8 PM, [visit our showroom](/visit-us), or WhatsApp +91 75674 00099 to book a time.

@@ -43,7 +43,7 @@ Ring sizes change over the years, so ask how resizing works and how exchange or 
 
 ## Choosing a solitaire at Vaishnavi Jewels
 
-We show every solitaire with its report and inscription, help you compare stones in person, and set the diamond in our own manufacturing unit to suit your budget. See our [solitaire rings](/solitaire-rings) or WhatsApp +91 99980 43886.
+We show every solitaire with its report and inscription, help you compare stones in person, and set the diamond in our own manufacturing unit to suit your budget. See our [solitaire rings](/solitaire-rings) or WhatsApp +91 75674 00099.
 
 ## Frequently asked questions
 

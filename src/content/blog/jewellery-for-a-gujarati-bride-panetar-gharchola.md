@@ -72,4 +72,4 @@ Graceful, comfortable sets that complement the bride without competing, such as 
 
 Custom and bridal pieces take about 3 weeks (simple designs can be faster), depending on the design. Order six to eight weeks before the wedding to leave time for fittings.
 
-Plan your Gujarati bridal set with us at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886.
+Plan your Gujarati bridal set with us at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 75674 00099.

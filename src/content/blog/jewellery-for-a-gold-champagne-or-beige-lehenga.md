@@ -78,4 +78,4 @@ Not completely. Yellow gold works when it is densely set with diamonds or carrie
 
 Ivory is a clean base, so Polki, diamonds or pearl-and-emerald pieces can lead. Read our guide on [jewellery with an ivory or off-white lehenga](/blog/jewellery-with-an-ivory-or-off-white-lehenga) for ideas.
 
-Bring your lehenga photo to our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886 to plan your look.
+Bring your lehenga photo to our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 75674 00099 to plan your look.

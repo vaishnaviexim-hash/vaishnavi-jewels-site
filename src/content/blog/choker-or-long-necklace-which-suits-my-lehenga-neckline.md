@@ -77,4 +77,4 @@ Choose one piece that sits close to the face, either a wide choker or a pair of 
 
 Let the embroidery lead and pick one necklace, not two, placed away from the heaviest work. If the neckline is embroidered, wear a long necklace that sits below it; if the neckline is plain, wear a choker and skip the rani haar. Matching the stone colour to one of the thread colours in the embroidery ties the look together without adding more pieces.
 
-Bring your lehenga blouse to our showroom at 120, Rajhans Ornate, Parle Point, Surat, or WhatsApp us on +91 99980 43886 to book a styling session in the showroom.
+Bring your lehenga blouse to our showroom at 120, Rajhans Ornate, Parle Point, Surat, or WhatsApp us on +91 75674 00099 to book a styling session in the showroom.

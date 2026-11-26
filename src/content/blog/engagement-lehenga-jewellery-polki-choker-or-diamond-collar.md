@@ -77,4 +77,4 @@ Yes, if the lehenga is not too heavily worked at the neckline. A diamond collar 
 
 A diamond choker, a solitaire pendant or statement diamond earrings suit most gown necklines. See our guide on [jewellery with a gown for engagement or cocktail night](/blog/jewellery-with-a-gown-for-engagement-or-cocktail-night).
 
-Visit our Parle Point showroom to try sets with your outfit photo, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886.
+Visit our Parle Point showroom to try sets with your outfit photo, [visit our showroom](/visit-us), or WhatsApp +91 75674 00099.

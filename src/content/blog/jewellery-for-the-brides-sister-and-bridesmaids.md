@@ -64,4 +64,4 @@ Coordinated is better than identical. Agree on one metal tone and one shared det
 
 Diamond studs or drops, a slim Polki choker, a bracelet and a ring are easy to wear again at festivals and family functions. They also make thoughtful gifts from the bride.
 
-To plan the family's jewellery together, WhatsApp us on +91 99980 43886, or book a visit to our Parle Point showroom.
+To plan the family's jewellery together, WhatsApp us on +91 75674 00099, or book a visit to our Parle Point showroom.

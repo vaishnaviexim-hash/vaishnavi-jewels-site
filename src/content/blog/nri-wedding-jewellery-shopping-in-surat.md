@@ -63,4 +63,4 @@ We accept NEFT, UPI and cash. Ask our team on WhatsApp how to arrange the paymen
 
 Yes. We share the grading report details on WhatsApp, and you can check each report on the laboratory's website using the report number. In Surat, you can match the laser inscription on the stone to the report under a loupe.
 
-To plan your family's wedding jewellery from abroad, WhatsApp us on +91 99980 43886, or book a visit to our Parle Point showroom for your trip.
+To plan your family's wedding jewellery from abroad, WhatsApp us on +91 75674 00099, or book a visit to our Parle Point showroom for your trip.

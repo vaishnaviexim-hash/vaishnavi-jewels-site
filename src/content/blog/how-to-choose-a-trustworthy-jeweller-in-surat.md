@@ -43,7 +43,7 @@ A jeweller you can trust lets you take your time, shows you several options with
 
 ## How Vaishnavi Jewels works
 
-We have sold certified diamond jewellery from our showroom at Rajhans Ornate Mall, Parle Point, Surat, since 2005. Every piece is made in our own manufacturing unit, every solitaire has its own grading report and laser inscription, our gold is BIS HUID hallmarked, and the invoice lists everything separately. If you live outside Surat, WhatsApp us and we will guide you personally, and we deliver anywhere in India. [Plan your visit](/visit-us) or WhatsApp us on +91 99980 43886.
+We have sold certified diamond jewellery from our showroom at Rajhans Ornate Mall, Parle Point, Surat, since 2005. Every piece is made in our own manufacturing unit, every solitaire has its own grading report and laser inscription, our gold is BIS HUID hallmarked, and the invoice lists everything separately. If you live outside Surat, WhatsApp us and we will guide you personally, and we deliver anywhere in India. [Plan your visit](/visit-us) or WhatsApp us on +91 75674 00099.
 
 ## Frequently asked questions
 

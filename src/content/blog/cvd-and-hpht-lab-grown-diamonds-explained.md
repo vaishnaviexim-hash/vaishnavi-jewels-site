@@ -77,4 +77,4 @@ At Vaishnavi Jewels, every lab-grown solitaire comes with a grading report from 
 
 Read the report number laser-inscribed on the stone under a loupe, then enter it on the laboratory's website and check that the details match your report. We can do this with you in the showroom.
 
-Ask us to walk you through a lab-grown diamond report at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886.
+Ask us to walk you through a lab-grown diamond report at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 75674 00099.

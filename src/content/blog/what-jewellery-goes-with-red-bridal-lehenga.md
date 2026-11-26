@@ -74,4 +74,4 @@ Polki or Jadau suits the wedding ceremony, especially with a red lehenga, becaus
 
 Custom and bridal pieces made in our own manufacturing unit take about 3 weeks (simple designs can be faster), depending on the design. Place your order at least six to eight weeks before the wedding so there is time for a trial with your lehenga and any final adjustments to length or fit.
 
-Bring your lehenga photo to our showroom at 120, Rajhans Ornate Mall, Parle Point, Surat (Monday to Saturday, 11 AM to 8 PM), or WhatsApp us at +91 99980 43886.
+Bring your lehenga photo to our showroom at 120, Rajhans Ornate Mall, Parle Point, Surat (Monday to Saturday, 11 AM to 8 PM), or WhatsApp us at +91 75674 00099.

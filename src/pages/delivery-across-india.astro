@@ -5,7 +5,7 @@ const howTo = {
   '@type': 'HowTo',
   name: 'How to buy jewellery from Vaishnavi Jewels from anywhere in India',
   step: [
-    { '@type': 'HowToStep', name: 'Tell us what you are looking for', text: 'Message us on WhatsApp at +91 99980 43886 with the piece, occasion or a reference photo.' },
+    { '@type': 'HowToStep', name: 'Tell us what you are looking for', text: 'Message us on WhatsApp at +91 75674 00099 with the piece, occasion or a reference photo.' },
     { '@type': 'HowToStep', name: 'Get personal guidance', text: 'We guide you personally on WhatsApp and share certificate details.' },
     { '@type': 'HowToStep', name: 'Confirm and pay', text: 'Confirm the final piece and pay by NEFT or UPI.' },
     { '@type': 'HowToStep', name: 'Receive insured delivery', text: 'We ship with free insured delivery to major Indian cities, along with the certificate and invoice.' },
@@ -47,7 +47,7 @@ const howTo = {
   (function(){
     var f=document.getElementById('vjPinForm'),i=document.getElementById('vjPin'),o=document.getElementById('vjPinOut'),data=null;
     function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
-    function wa(pin){return 'https://wa.me/919998043886?text='+encodeURIComponent('Hi Vaishnavi Jewels, please confirm delivery to pincode '+pin)}
+    function wa(pin){return 'https://wa.me/917567400099?text='+encodeURIComponent('Hi Vaishnavi Jewels, please confirm delivery to pincode '+pin)}
     function show(pin){
       var r=data.p[pin];
       if(!r){o.innerHTML='We could not find pincode <strong>'+esc(pin)+'</strong>. Please check it, or <a href="'+wa(pin)+'" rel="noopener">WhatsApp us</a> and we will confirm.';return}
@@ -70,7 +70,7 @@ const howTo = {
 
   <h2>How it works</h2>
   <ul>
-    <li><strong>Tell us what you want.</strong> WhatsApp us at <a href="https://wa.me/919998043886">+91 99980 43886</a> with the piece, occasion or a reference photo.</li>
+    <li><strong>Tell us what you want.</strong> WhatsApp us at <a href="https://wa.me/917567400099">+91 75674 00099</a> with the piece, occasion or a reference photo.</li>
     <li><strong>Personal guidance.</strong> We guide you personally on WhatsApp and share certificate details.</li>
     <li><strong>Pay securely.</strong> Payment by NEFT or UPI.</li>
     <li><strong>Insured delivery.</strong> Free insured shipping to major Indian cities, with the certificate and invoice.</li>

@@ -62,4 +62,4 @@ Custom pieces take about 3 weeks (simple designs can be faster) once the design 
 
 Yes. Every piece we make carries a BIS HUID hallmark, and you can verify the 6-character code in the BIS Care app. Diamond solitaires come with their own grading report as well.
 
-To start your remake, WhatsApp us on +91 99980 43886 with photos of your old jewellery, or book a visit to our Parle Point showroom.
+To start your remake, WhatsApp us on +91 75674 00099 with photos of your old jewellery, or book a visit to our Parle Point showroom.

@@ -79,4 +79,4 @@ Yes. Our mangalsutras come with a jewellery grading report from IGI, EGL or TGL 
 
 Usually yes. We can shorten or lengthen the chain in our own manufacturing unit; the work is charged on actuals.
 
-See our mangalsutra designs at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886.
+See our mangalsutra designs at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 75674 00099.

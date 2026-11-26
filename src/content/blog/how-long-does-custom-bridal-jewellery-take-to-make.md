@@ -78,4 +78,4 @@ Bring the engagement ring with you, or send us clear photos of it on WhatsApp, a
 
 Polki (uncut diamonds set in gold) and Jadau (stones embedded in gold using the traditional jadau technique) are both gold-based and can be re-worn, re-set or passed on, while traditional Kundan is often glass-based and is mainly a style choice. If re-wearing matters, choose a [Polki jewellery](/polki-jewellery) or Jadau set where the choker and earrings also work on their own with sarees. Ask for the BIS HUID hallmark on the gold and the grading report for the Polki so the piece can be identified years later.
 
-Planning a wedding date? Tell us when it is, and we will plan the jewellery timeline with you. Visit us at Rajhans Ornate Mall, Parle Point, Surat, Monday to Saturday, 11 AM to 8 PM, or WhatsApp +91 99980 43886 to [book a visit](/visit-us).
+Planning a wedding date? Tell us when it is, and we will plan the jewellery timeline with you. Visit us at Rajhans Ornate Mall, Parle Point, Surat, Monday to Saturday, 11 AM to 8 PM, or WhatsApp +91 75674 00099 to [book a visit](/visit-us).

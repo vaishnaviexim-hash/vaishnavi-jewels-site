@@ -65,4 +65,4 @@ No. The Kimberley Process is a government scheme for rough diamonds crossing bor
 
 Yes. Every Vaishnavi solitaire is laser-inscribed with its report number, which you can see under a loupe and enter on the laboratory's website. Our [FAQ](/faq) explains the steps.
 
-For any question about a diamond's papers, WhatsApp us on +91 99980 43886, or book a visit to our Parle Point showroom.
+For any question about a diamond's papers, WhatsApp us on +91 75674 00099, or book a visit to our Parle Point showroom.

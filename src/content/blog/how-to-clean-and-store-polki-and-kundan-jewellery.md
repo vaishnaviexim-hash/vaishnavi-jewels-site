@@ -77,4 +77,4 @@ Gently tap the ring near your ear and listen for a rattle, and look for gaps und
 
 Yes, a well-set diamond ring can be worn daily. Take it off for the gym, heavy housework and chemicals, and get the prongs checked once or twice a year.
 
-Bring your Polki and bridal pieces for a check at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886.
+Bring your Polki and bridal pieces for a check at our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 75674 00099.

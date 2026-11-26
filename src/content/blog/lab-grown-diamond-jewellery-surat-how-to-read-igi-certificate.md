@@ -71,4 +71,4 @@ Diamond certificates from recognised labs such as IGI, TGL and EGL accompany our
 
 Yes. Alongside our lab-grown range we offer [natural diamond jewellery](/natural-diamond-jewellery), also made in-house and also BIS HUID hallmarked, with laboratory reports where applicable. Each range is presented on its own so that you can choose what suits you.
 
-Whenever you are ready to read a report together, visit our Parle Point showroom in Surat or WhatsApp us at +91 99980 43886.
+Whenever you are ready to read a report together, visit our Parle Point showroom in Surat or WhatsApp us at +91 75674 00099.

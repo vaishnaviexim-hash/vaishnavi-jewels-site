@@ -72,4 +72,4 @@ Polki usually suits the wedding ceremony with a heavy lehenga, diamonds suit the
 
 Build the look in steps: a tikka or matha patti, one layered necklace instead of several separate ones, and matching kadas. Space the layers so each one shows, and ask for lighter construction.
 
-Bring a photo of your lehenga to our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 99980 43886 and we will try pieces against it with you.
+Bring a photo of your lehenga to our Parle Point showroom, [visit our showroom](/visit-us), or WhatsApp +91 75674 00099 and we will try pieces against it with you.
