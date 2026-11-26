@@ -63,11 +63,12 @@ const RANGES = [['0.30', '0.39'], ['0.40', '0.49'], ['0.50', '0.69'], ['0.70', '
     <p class="big">Your requirement has been noted.</p>
     <p>Our representative will contact you with the <strong>best pricing</strong>.</p>
     <p class="hint" id="vj-req-no"></p>
+    <p><a href="/diamond-requirement" class="btn">Send another requirement</a></p>
   </div>
 
   <script is:inline>
     (function () {
-      var form = document.getElementById('vj-req'), err = document.getElementById('vj-req-err'), go = document.getElementById('vj-req-go');
+      var form = document.getElementById('vj-req'), err = document.getElementById('vj-req-err'), go = document.getElementById('vj-req-go'), sent = false;
       var pick = { type: ['Lab-grown'], shape: [], color: [], clarity: [], cut: [], polish: [], sym: [], lab: [], fluor: [] };
       form.querySelectorAll('.chips[data-k]').forEach(function (g) {
         var k = g.getAttribute('data-k'), single = g.getAttribute('data-single');
@@ -82,7 +83,7 @@ const RANGES = [['0.30', '0.39'], ['0.40', '0.49'], ['0.50', '0.69'], ['0.70', '
       form.querySelectorAll('.rng').forEach(function (c) { c.addEventListener('click', function () { form.ctMin.value = c.getAttribute('data-a'); form.ctMax.value = c.getAttribute('data-z'); }); });
       function bad(t) { err.textContent = t; err.hidden = false; err.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
       form.addEventListener('submit', function (e) {
-        e.preventDefault(); err.hidden = true;
+        e.preventDefault(); err.hidden = true; if (sent || go.disabled) return; // no double send
         var f = new FormData(form), g = function (n) { return String(f.get(n) || '').trim(); };
         var mob = g('mobile').replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '').replace(/^0(?=\d{10}$)/, '');
         if (!pick.shape.length) return bad('Please choose at least one shape.');
@@ -96,9 +97,10 @@ const RANGES = [['0.30', '0.39'], ['0.40', '0.49'], ['0.50', '0.69'], ['0.70', '
           .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
           .then(function (x) {
             if (!x.ok || !x.j.ok) { bad(x.j && x.j.error ? x.j.error : 'Could not send. Please try again.'); return; }
-            form.hidden = true; document.getElementById('vj-req-ok').hidden = false;
+            var ok = document.getElementById('vj-req-ok');
+            form.hidden = true; ok.hidden = false; sent = true;
             document.getElementById('vj-req-no').textContent = 'Reference: ' + (x.j.no || '');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            ok.scrollIntoView({ block: 'center', behavior: 'smooth' }); // owner 26/11 15:17: the thank-you must be seen right where he pressed Send
           })
           .catch(function () { bad('Could not send. Please check your internet and try again.'); })
           .finally(function () { go.disabled = false; go.textContent = 'Send requirement'; });
@@ -121,7 +123,7 @@ const RANGES = [['0.30', '0.39'], ['0.40', '0.49'], ['0.50', '0.69'], ['0.70', '
     .vj-req .hint, .ok .hint { font-size: 14px; color: var(--color-ink-soft); margin: 4px 0 0; }
     .vj-req .err { color: #9b1c1c; margin: 0; }
     .vj-req .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
-    .ok { border: 1px solid var(--color-gold); padding: 22px; max-width: 640px; }
+    .ok { border: 2px solid var(--color-gold); padding: 26px; max-width: 640px; background: rgba(176, 141, 87, 0.08); }
     .ok .big { font-size: 22px; font-weight: 600; margin: 0 0 6px; }
   </style>
 </InfoPage>
