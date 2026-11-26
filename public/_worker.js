@@ -6080,6 +6080,13 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/repairs' && request.method === 'GET') return vjRepairsGet(url, env, who);
   if (p === '/api/vj/sync' && request.method === 'GET') return vjSync(request, env, who, ctx);
   if (p === '/api/vj/dreqview') return vjDreqViewApi(request, env, who); // C-20261126-DREQVIEW
+  if (p === '/api/vj/supdocs' && request.method === 'GET') { // C-20261126-SUPPLIERSEND: stock-list files suppliers sent to Aashvi (owner-only, read-only; media ids only, no file bytes)
+    if (who.role !== 'admin' || !(await vjDreqCan(env, who))) return vjDeny(403, 'owner only');
+    const since = Math.max(0, Number(url.searchParams.get('since')) || Date.now() - 3 * 86400e3);
+    const rows = ((await env.DB.prepare("SELECT id, sender, type, ts, msg FROM wa_inbox WHERE type IN ('document', 'image') AND ts >= ? ORDER BY ts LIMIT 500").bind(since).all()).results) || [];
+    const out = []; for (const r of rows) { if (!(await vjIsSupplier(String(r.sender).slice(-10)))) continue; let m = {}; try { m = JSON.parse(r.msg); } catch (e) {} const d = m[r.type] || {};
+      out.push({ id: r.id, from: String(r.sender).slice(-10), ts: r.ts, type: r.type, media_id: String(d.id || ''), file: vjClean(d.filename, 120), mime: vjClean(d.mime_type, 80) }); }
+    return vjJson({ ok: true, docs: out }); }
   if (p === '/api/vj/staffadd') return vjStaffAdd(request, env, who); // C-20261126-FENILLOGIN
   if (p === '/api/vj/boxes' && request.method === 'GET') return vjBoxes(url, env, who); // C-20261029-BOXNO
   if (p === '/api/vj/write' && request.method === 'POST') return vjWrite(request, env, who, ctx);
