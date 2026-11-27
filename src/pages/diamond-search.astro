@@ -40,6 +40,7 @@ const faqs: [string, string][] = [
         <label class="ds-sort">Sort <select id="f-sort"><option value="p">Price: low to high</option><option value="t">Total: low to high</option><option value="c">Carat: high to low</option><option value="m">Best make first</option></select></label>
         <button type="button" class="ds-reset" id="f-reset">Clear filters</button></div>
     </div>
+    <p class="ds-tip"><b>Want more than one stone?</b> Press <b>☐ Select</b> on each stone you like (up to 10), then <b>Enquire selected</b> in the bar at the bottom.</p>
     <ol class="ds-list" id="ds-list"></ol>
     <button type="button" class="btn btn-solid ds-moreb" id="ds-moreb" hidden>Show more stones</button>
     <div class="ds-selform" id="ds-selform" hidden></div>
@@ -112,6 +113,7 @@ const faqs: [string, string][] = [
     .ds-viewb img { width: 100%; max-height: 70vh; object-fit: contain; display: block; background: #fff; }
     .ds-viewf { margin: 0; padding: 8px 14px; font-size: 13px; color: var(--color-ink-soft); }
     .ds-view[hidden], .ds-sel[hidden], .ds-selform[hidden], .ds .ds-selm[hidden] { display: none !important; }
+    .ds-tip { margin: 0; font-size: 14px; padding: 8px 12px; background: rgba(176, 141, 87, 0.09); border-left: 3px solid var(--color-gold); }
     .ds-moreb { justify-self: center; }
     .ds-empty { text-align: center; }
     @media (max-width: 520px) { .ds-f { padding: 10px; gap: 8px; } .ds-row { grid-template-columns: minmax(0, 1fr); gap: 4px; } .ds-l { padding-top: 0; font-size: 13px; } .ds .chip { font-size: 13px; padding: 5px 9px; min-height: 32px; }
@@ -158,7 +160,7 @@ const faqs: [string, string][] = [
           '<div class="ds-d">' + esc(spec) + '</div>' + (prop ? '<div class="ds-d">' + esc(prop) + '</div>' : '') +
           '<div class="ds-c">' + esc(r[0]) + (r[10] ? ' · ' + esc(r[10]) + ' certified' : '') + ' · laboratory-grown</div></div>' +
           '<div class="ds-p"><div class="tot">USD ' + tot(r).toLocaleString('en-US') + '</div>' + (idx.inr ? '<div class="inr">≈ ₹' + (Math.round(tot(r) * idx.inr / 100) * 100).toLocaleString('en-IN') + '</div>' : '') + '<div class="ppc">USD ' + r[12].toLocaleString('en-US') + ' per ct</div></div>' +
-          '<div class="ds-a"><a class="go" data-enq="1" href="/diamond-requirement' + q + '">Enquire</a><button type="button" class="ds-selb" data-sel="1" aria-pressed="' + (SEL[r[0]] ? 'true' : 'false') + '">' + (SEL[r[0]] ? '✓ Selected' : 'Select') + '</button>' + (r[13] ? '<button type="button" class="ds-media" data-media="v">▶ Video</button>' : '') + (r[15] ? '<button type="button" class="ds-media" data-media="p">Photo</button>' : '') + '</div>';
+          '<div class="ds-a"><a class="go" data-enq="1" href="/diamond-requirement' + q + '">Enquire</a><button type="button" class="ds-selb" data-sel="1" aria-pressed="' + (SEL[r[0]] ? 'true' : 'false') + '">' + (SEL[r[0]] ? '✓ Selected' : '☐ Select') + '</button>' + (r[13] ? '<button type="button" class="ds-media" data-media="v">▶ Video</button>' : '') + (r[15] ? '<button type="button" class="ds-media" data-media="p">Photo</button>' : '') + '</div>';
         li._r = r; li._sh = sh;
         return li;
       }
@@ -237,7 +239,7 @@ const faqs: [string, string][] = [
         var sb = e.target.closest && e.target.closest('button[data-sel]');
         if (sb) { var li0 = sb.closest('.ds-st'), c0 = li0._r[0];
           if (SEL[c0]) delete SEL[c0]; else { if (Object.keys(SEL).length >= MAXSEL) { alertBox('You can select up to ' + MAXSEL + ' stones in one enquiry.'); return; } SEL[c0] = { r: li0._r, sh: li0._sh }; }
-          sb.setAttribute('aria-pressed', SEL[c0] ? 'true' : 'false'); sb.textContent = SEL[c0] ? '✓ Selected' : 'Select'; selBar(); return; }
+          sb.setAttribute('aria-pressed', SEL[c0] ? 'true' : 'false'); sb.textContent = SEL[c0] ? '✓ Selected' : '☐ Select'; selBar(); return; }
         var a = e.target.closest && e.target.closest('a[data-enq]'); if (!a) return; e.preventDefault();
         var li = a.closest('.ds-st'), box = li.querySelector('.ds-q'); if (box) { box.querySelector('input[name=nm]').focus(); return; }
         openForm(li, [{ r: li._r, sh: li._sh }]);
@@ -245,10 +247,10 @@ const faqs: [string, string][] = [
       function alertBox(t) { var m = $('ds-selmsg'); m.textContent = t; m.hidden = false; setTimeout(function () { m.hidden = true; }, 3000); }
       $('ds-selgo').addEventListener('click', function () {
         var ks = Object.keys(SEL); if (!ks.length) return; var host = $('ds-selform'); host.innerHTML = ''; host.hidden = false;
-        openForm(host, ks.map(function (k) { return SEL[k]; }), function () { SEL = {}; document.querySelectorAll('button[data-sel]').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); b.textContent = 'Select'; }); $('ds-sel').hidden = true; });
+        openForm(host, ks.map(function (k) { return SEL[k]; }), function () { SEL = {}; document.querySelectorAll('button[data-sel]').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); b.textContent = '☐ Select'; }); $('ds-sel').hidden = true; });
         host.scrollIntoView({ block: 'center', behavior: 'smooth' });
       });
-      $('ds-selclr').addEventListener('click', function () { SEL = {}; document.querySelectorAll('button[data-sel]').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); b.textContent = 'Select'; }); $('ds-selform').hidden = true; selBar(); });
+      $('ds-selclr').addEventListener('click', function () { SEL = {}; document.querySelectorAll('button[data-sel]').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); b.textContent = '☐ Select'; }); $('ds-selform').hidden = true; selBar(); });
       multi($('f-col'), 'col', COLS); multi($('f-cla'), 'cla', CLA); multi($('f-cut'), 'cut', CUT); multi($('f-lab'), 'lab', LABS);
       CTQ.forEach(function (q) { var b = chip(q[1] ? q[0] + '-' + q[1] : q[0] + '+', false); b.addEventListener('click', function () { $('f-ctmin').value = q[0]; $('f-ctmax').value = q[1]; run(); }); $('f-ctq').appendChild(b); });
       ['f-ideal', 'f-vid'].forEach(function (id) { $(id).addEventListener('click', function () { var k = id === 'f-ideal' ? 'ideal' : 'vid'; S[k] = !S[k]; $(id).setAttribute('aria-pressed', S[k] ? 'true' : 'false'); run(); }); });
