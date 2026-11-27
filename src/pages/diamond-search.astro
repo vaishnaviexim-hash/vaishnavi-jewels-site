@@ -77,6 +77,14 @@ const faqs: [string, string][] = [
     .ds-a a { min-height: 36px; box-sizing: border-box; font-size: 14px; padding: 7px 14px; border: 1px solid var(--color-gold); text-decoration: none; color: inherit; }
     .ds-a a.go { background: var(--color-gold); color: #fff !important; text-decoration: none !important; font-weight: 600; }
     .ds-a a { text-decoration: none !important; color: inherit !important; }
+    .ds-q { grid-column: 1 / -1; border-top: 1px dashed rgba(58, 15, 26, 0.2); padding-top: 10px; display: grid; gap: 8px; }
+    .ds-qh { margin: 0; font-size: 14.5px; }
+    .ds-qf { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+    .ds-qf input { font: inherit; font-size: 15px; padding: 9px 10px; border: 1px solid rgba(58, 15, 26, 0.25); background: #fff; min-width: 0; }
+    .ds-qs { font: inherit; font-weight: 600; background: var(--color-gold); color: #fff; border: 0; padding: 10px 14px; cursor: pointer; }
+    .ds-qe { color: #9b1c1c; margin: 0; font-size: 14px; } .ds-qn { margin: 0; font-size: 12.5px; color: var(--color-ink-soft); }
+    .ds-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+    .ds-ok { margin: 0; padding: 12px 14px; border: 2px solid var(--color-gold); background: rgba(176, 141, 87, 0.08); font-size: 15px; line-height: 1.6; }
     .ds-moreb { justify-self: center; }
     .ds-empty { text-align: center; }
     @media (max-width: 520px) { .ds-f { padding: 10px; gap: 8px; } .ds-row { grid-template-columns: minmax(0, 1fr); gap: 4px; } .ds-l { padding-top: 0; font-size: 13px; } .ds .chip { font-size: 13px; padding: 5px 9px; min-height: 32px; }
@@ -123,7 +131,8 @@ const faqs: [string, string][] = [
           '<div class="ds-d">' + esc(spec) + '</div>' + (prop ? '<div class="ds-d">' + esc(prop) + '</div>' : '') +
           '<div class="ds-c">' + esc(r[0]) + (r[10] ? ' · ' + esc(r[10]) + ' certified' : '') + ' · laboratory-grown</div></div>' +
           '<div class="ds-p"><div class="tot">USD ' + tot(r).toLocaleString('en-US') + '</div>' + (idx.inr ? '<div class="inr">≈ ₹' + (Math.round(tot(r) * idx.inr / 100) * 100).toLocaleString('en-IN') + '</div>' : '') + '<div class="ppc">USD ' + r[12].toLocaleString('en-US') + ' per ct</div></div>' +
-          '<div class="ds-a"><a class="go" href="/diamond-requirement' + q + '">Enquire</a>' + (r[13] ? '<a href="' + esc(r[13]) + '" target="_blank" rel="noopener noreferrer nofollow">Video</a>' : '') + '</div>';
+          '<div class="ds-a"><a class="go" data-enq="1" href="/diamond-requirement' + q + '">Enquire</a>' + (r[13] ? '<a href="' + esc(r[13]) + '" target="_blank" rel="noopener noreferrer nofollow">Video</a>' : '') + '</div>';
+        li._r = r; li._sh = sh;
         return li;
       }
       function more() { var f = document.createDocumentFragment(), end = Math.min(rows.length, shown + PAGE); for (var i = shown; i < end; i++) f.appendChild(card(rows[i])); $('ds-list').appendChild(f); shown = end; $('ds-moreb').hidden = shown >= rows.length; }
@@ -136,6 +145,41 @@ const faqs: [string, string][] = [
         fetch('/stock/' + s.file + '?v=' + (idx.v || idx.updated)).then(function (r) { return r.json(); }).then(function (j) { cache[s.file] = j; if (S.shape === s.name) { data = j; run(); } })
           .catch(function () { $('ds-count').textContent = 'Could not load stock. Please refresh the page.'; });
       }
+
+      // Quick enquiry right on the stone (owner 27/11 09:03): name + mobile -> /hooks/vj-req -> 'thank you + code number' at once.
+      var DQS = ['Round', 'Oval', 'Pear', 'Cushion', 'Emerald', 'Radiant', 'Princess', 'Asscher', 'Marquise', 'Heart', 'Baguette', 'Trilliant', 'Old Miner', 'Rose Cut'];
+      var DQC = ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'Fancy'], DQL = ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'SI3', 'I1', 'I2'];
+      $('ds-list').addEventListener('click', function (e) {
+        var a = e.target.closest && e.target.closest('a[data-enq]'); if (!a) return; e.preventDefault();
+        var li = a.closest('.ds-st'), box = li.querySelector('.ds-q'); if (box) { box.querySelector('input[name=nm]').focus(); return; }
+        box = document.createElement('form'); box.className = 'ds-q'; box.noValidate = true;
+        box.innerHTML = '<p class="ds-qh">Enquire about stone <b>' + esc(li._r[0]) + '</b></p>' +
+          '<div class="ds-qf"><input name="nm" type="text" maxlength="60" autocomplete="name" placeholder="Your name" aria-label="Your name" />' +
+          '<input name="mb" type="tel" maxlength="15" inputmode="tel" autocomplete="tel" placeholder="10-digit mobile" aria-label="Mobile number" />' +
+          '<input name="ct" type="text" maxlength="40" autocomplete="address-level2" placeholder="City (optional)" aria-label="City" />' +
+          '<input name="website" type="text" tabindex="-1" autocomplete="off" class="ds-hp" aria-hidden="true" />' +
+          '<button type="submit" class="ds-qs">Send enquiry</button></div><p class="ds-qe" role="alert" hidden></p>' +
+          '<p class="ds-qn">Your name and number stay with Vaishnavi Jewels only.</p>';
+        li.appendChild(box); box.querySelector('input[name=nm]').focus();
+        box.addEventListener('submit', function (ev) {
+          ev.preventDefault(); var er = box.querySelector('.ds-qe'), bt = box.querySelector('.ds-qs'); er.hidden = true; if (bt.disabled) return;
+          var nm = box.nm.value.trim(), mb = box.mb.value.replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '').replace(/^0(?=\d{10}$)/, '');
+          if (!nm) { er.textContent = 'Please add your name.'; er.hidden = false; return; }
+          if (!/^\d{10}$/.test(mb)) { er.textContent = 'Please give your 10-digit mobile number.'; er.hidden = false; return; }
+          var r = li._r, sh = DQS.indexOf(li._sh) >= 0 ? li._sh : 'Other';
+          var body = { type: 'Lab-grown', shape: [sh], color: DQC.indexOf(r[2]) >= 0 ? [r[2]] : ['Fancy'], clarity: DQL.indexOf(r[3]) >= 0 ? [r[3]] : [], ctMin: r[1], ctMax: r[1], qty: 1,
+            remarks: 'Stone ' + r[0] + ' from Diamond Search (' + li._sh + ' ' + r[1] + ' ct, USD ' + tot(r) + ')', name: nm, mobile: mb, city: box.ct.value.trim(), website: box.website.value };
+          bt.disabled = true; bt.textContent = 'Sending…';
+          fetch('/hooks/vj-req', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+            .then(function (x) { return x.json().then(function (j) { return { ok: x.ok, j: j }; }); })
+            .then(function (x) {
+              if (!x.ok || !x.j.ok) { er.textContent = (x.j && x.j.error) || 'Could not send. Please try again.'; er.hidden = false; return; }
+              box.innerHTML = '<p class="ds-ok"><b>Thank you, ' + esc(nm) + '!</b> We have received your enquiry for stone <b>' + esc(r[0]) + '</b>.<br>Your code number: <b>' + esc(x.j.no || '') + '</b> &middot; Our team will call you shortly.</p>';
+            })
+            .catch(function () { er.textContent = 'Could not send. Please check your internet and try again.'; er.hidden = false; })
+            .finally(function () { if (bt.isConnected) { bt.disabled = false; bt.textContent = 'Send enquiry'; } });
+        });
+      });
       multi($('f-col'), 'col', COLS); multi($('f-cla'), 'cla', CLA); multi($('f-cut'), 'cut', CUT); multi($('f-lab'), 'lab', LABS);
       CTQ.forEach(function (q) { var b = chip(q[1] ? q[0] + '-' + q[1] : q[0] + '+', false); b.addEventListener('click', function () { $('f-ctmin').value = q[0]; $('f-ctmax').value = q[1]; run(); }); $('f-ctq').appendChild(b); });
       ['f-ideal', 'f-vid'].forEach(function (id) { $(id).addEventListener('click', function () { var k = id === 'f-ideal' ? 'ideal' : 'vid'; S[k] = !S[k]; $(id).setAttribute('aria-pressed', S[k] ? 'true' : 'false'); run(); }); });
