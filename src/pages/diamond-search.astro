@@ -80,6 +80,8 @@ const faqs: [string, string][] = [
     .ds-q { grid-column: 1 / -1; border-top: 1px dashed rgba(58, 15, 26, 0.2); padding-top: 10px; display: grid; gap: 8px; }
     .ds-qh { margin: 0; font-size: 14.5px; }
     .ds-qf { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+    .ds-mb { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px; min-width: 0; }
+    .ds-mb select { font: inherit; font-size: 14px; padding: 8px 4px; border: 1px solid rgba(58, 15, 26, 0.25); background: #fff; max-width: 132px; }
     .ds-qf input { font: inherit; font-size: 15px; padding: 9px 10px; border: 1px solid rgba(58, 15, 26, 0.25); background: #fff; min-width: 0; }
     .ds-qs { font: inherit; font-weight: 600; background: var(--color-gold); color: #fff; border: 0; padding: 10px 14px; cursor: pointer; }
     .ds-qe { color: #9b1c1c; margin: 0; font-size: 14px; } .ds-qn { margin: 0; font-size: 12.5px; color: var(--color-ink-soft); }
@@ -147,6 +149,7 @@ const faqs: [string, string][] = [
       }
 
       // Quick enquiry right on the stone (owner 27/11 09:03): name + mobile -> /hooks/vj-req -> 'thank you + code number' at once.
+var CCS = [['+91', 'India +91'], ['+44', 'UK +44'], ['+971', 'UAE +971'], ['+1', 'USA/Canada +1'], ['+61', 'Australia +61'], ['+64', 'New Zealand +64'], ['+65', 'Singapore +65'], ['+60', 'Malaysia +60'], ['+968', 'Oman +968'], ['+974', 'Qatar +974'], ['+966', 'Saudi +966'], ['+965', 'Kuwait +965'], ['+973', 'Bahrain +973'], ['+230', 'Mauritius +230'], ['+41', 'Switzerland +41'], ['+47', 'Norway +47'], ['+49', 'Germany +49'], ['+33', 'France +33'], ['+31', 'Netherlands +31'], ['+81', 'Japan +81'], ['+82', 'Korea +82'], ['+977', 'Nepal +977'], ['+254', 'Kenya +254'], ['+27', 'South Africa +27']];
       var DQS = ['Round', 'Oval', 'Pear', 'Cushion', 'Emerald', 'Radiant', 'Princess', 'Asscher', 'Marquise', 'Heart', 'Baguette', 'Trilliant', 'Old Miner', 'Rose Cut'];
       var DQC = ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'Fancy'], DQL = ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'SI3', 'I1', 'I2'];
       $('ds-list').addEventListener('click', function (e) {
@@ -155,7 +158,7 @@ const faqs: [string, string][] = [
         box = document.createElement('form'); box.className = 'ds-q'; box.noValidate = true;
         box.innerHTML = '<p class="ds-qh">Enquire about stone <b>' + esc(li._r[0]) + '</b></p>' +
           '<div class="ds-qf"><input name="nm" type="text" maxlength="60" autocomplete="name" placeholder="Your name" aria-label="Your name" />' +
-          '<input name="mb" type="tel" maxlength="15" inputmode="tel" autocomplete="tel" placeholder="10-digit mobile" aria-label="Mobile number" />' +
+          '<div class="ds-mb"><select name="cc" aria-label="Country code">' + CCS.map(function (c) { return '<option value="' + c[0] + '">' + c[1] + '</option>'; }).join('') + '</select><input name="mb" type="tel" maxlength="15" inputmode="tel" autocomplete="tel-national" placeholder="Mobile number" aria-label="Mobile number" /></div>' +
           '<input name="ct" type="text" maxlength="40" autocomplete="address-level2" placeholder="City (optional)" aria-label="City" />' +
           '<input name="website" type="text" tabindex="-1" autocomplete="off" class="ds-hp" aria-hidden="true" />' +
           '<button type="submit" class="ds-qs">Send enquiry</button></div><p class="ds-qe" role="alert" hidden></p>' +
@@ -163,12 +166,14 @@ const faqs: [string, string][] = [
         li.appendChild(box); box.querySelector('input[name=nm]').focus();
         box.addEventListener('submit', function (ev) {
           ev.preventDefault(); var er = box.querySelector('.ds-qe'), bt = box.querySelector('.ds-qs'); er.hidden = true; if (bt.disabled) return;
-          var nm = box.nm.value.trim(), mb = box.mb.value.replace(/\D/g, '').replace(/^91(?=\d{10}$)/, '').replace(/^0(?=\d{10}$)/, '');
+          var nm = box.nm.value.trim(), cc = box.cc.value, mb = box.mb.value.replace(/\D/g, '').replace(/^0+/, '');
+          if (cc === '+91') mb = mb.replace(/^91(?=\d{10}$)/, '');
           if (!nm) { er.textContent = 'Please add your name.'; er.hidden = false; return; }
-          if (!/^\d{10}$/.test(mb)) { er.textContent = 'Please give your 10-digit mobile number.'; er.hidden = false; return; }
+          if (cc === '+91' ? !/^[6-9]\d{9}$/.test(mb) : !/^\d{6,13}$/.test(mb)) { er.textContent = cc === '+91' ? 'Please give your 10-digit mobile number.' : 'Please give your mobile number (without the country code).'; er.hidden = false; return; }
+          var mobile = cc === '+91' ? mb : cc + mb;
           var r = li._r, sh = DQS.indexOf(li._sh) >= 0 ? li._sh : 'Other';
           var body = { type: 'Lab-grown', shape: [sh], color: DQC.indexOf(r[2]) >= 0 ? [r[2]] : ['Fancy'], clarity: DQL.indexOf(r[3]) >= 0 ? [r[3]] : [], ctMin: r[1], ctMax: r[1], qty: 1,
-            remarks: 'Stone ' + r[0] + ' from Diamond Search (' + li._sh + ' ' + r[1] + ' ct, USD ' + tot(r) + ')', name: nm, mobile: mb, city: box.ct.value.trim(), website: box.website.value };
+            remarks: 'Stone ' + r[0] + ' from Diamond Search (' + li._sh + ' ' + r[1] + ' ct, USD ' + tot(r) + ')', name: nm, mobile: mobile, city: box.ct.value.trim(), website: box.website.value };
           bt.disabled = true; bt.textContent = 'Sending…';
           fetch('/hooks/vj-req', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
             .then(function (x) { return x.json().then(function (j) { return { ok: x.ok, j: j }; }); })

@@ -400,17 +400,29 @@ async function vjPublicReq(request, env, ctx) {
   const hr = await env.DB.prepare('SELECT count(*) AS n FROM vj_req_rl WHERE ip = ? AND ts > ?').bind(ip, now - 3600000).first();
   const day = await env.DB.prepare('SELECT count(*) AS n FROM vj_req_rl WHERE ts > ?').bind(now - 86400000).first();
   if ((hr && hr.n >= 5) || (day && day.n >= 300)) return json({ error: 'Too many requests - please call us or try again later.' }, 429);
-  const mob = vjPhone(b.mobile); if (!/^\d{10}$/.test(mob)) return json({ error: 'Please give your 10-digit mobile number.' }, 400);
+  // owner 27/11 11:38: country code too - Indian 10-digit kept as is; foreign numbers kept as '+<code> <number>' (8-15 digits)
+  const rawMob = String(b.mobile || '').trim(), dig = rawMob.replace(/\D/g, '');
+  let mob = vjPhone(rawMob);
+  if (!/^\d{10}$/.test(mob)) { if (/^\+/.test(rawMob) && dig.length >= 8 && dig.length <= 15 && !/^91\d{10}$/.test(dig)) mob = '+' + dig; else return json({ error: 'Please give your mobile number with country code.' }, 400); }
+  b.mobile = mob;
   const who = { email: 'website', role: 'staff', name: 'Website' };
   const r = vjDreq(Object.assign({}, b, { from: 'Customer', status: 'New', sent: 0, replies: 0, matches: 0, ack: false, result: '', no: '', stones: [], rules: '' }), null, who);
   if (r.error) return json({ error: r.error.charAt(0).toUpperCase() + r.error.slice(1) + '.' }, 400);
   const cnt = await env.DB.prepare("SELECT count(*) AS n FROM docs WHERE path LIKE 'dreq/%'").first();
   const doc = r.doc; doc.no = 'REQ-' + String(((cnt && cnt.n) || 0) + 1).padStart(4, '0'); doc.web = true;
+  if (/^\d{8,15}$/.test(String(b.mobile).replace(/^\+/, '')) && String(b.mobile).startsWith('+')) doc.mobile = String(b.mobile); // vjDreq may shorten a foreign number
+  // Diamond Search enquiry (C-20261127-STOCKMAP): which supplier holds the stone -> only into this owner/Fenil-only doc and their alert
+  let supTxt = '';
+  try { const m = String(doc.remarks || '').match(/\bStone (VJ[A-Z0-9]{5,10})\b/);
+    if (m) { const sm = await env.DB.prepare('SELECT * FROM vj_stockmap WHERE code = ?').bind(m[1]).first();
+      if (sm) { const sr = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'stocksup'").first(); const sl = sr ? JSON.parse(sr.v) : []; const s = sl[sm.s] || {};
+        supTxt = 'Supplier: ' + (s.name || '?') + (s.contact ? ' (' + s.contact + ')' : '') + (s.ph ? ' ' + s.ph : '') + (sm.stock ? ' . stock ' + sm.stock : '') + (sm.cert ? ' . cert ' + sm.cert : '') + (sm.rpc ? ' . USD ' + sm.rpc + '/ct' : '') + (sm.d ? ' . list ' + sm.d : '');
+        doc.result = vjClean(supTxt, 500); } else supTxt = 'Supplier: not found for ' + m[1] + ' (check private code map)'; } } catch (e) { supTxt = ''; }
   const path = 'dreq/w' + now + Math.floor(Math.random() * 1000), s = JSON.stringify(doc);
   if (s.length > 8000) return json({ error: 'too large' }, 413);
   await env.DB.batch([env.DB.prepare('INSERT INTO docs (path, data, version, updated_at, updated_by) VALUES (?, ?, 1, ?, ?) ON CONFLICT(path) DO NOTHING').bind(path, s, now, 'website'),
     env.DB.prepare('INSERT INTO vj_req_rl (ip, ts) VALUES (?, ?)').bind(ip, now), env.DB.prepare('DELETE FROM vj_req_rl WHERE ts < ?').bind(now - 2 * 86400000)]);
-  if (ctx) ctx.waitUntil(vjReqAlert(env, doc).catch(() => {}));
+  if (ctx) ctx.waitUntil(vjReqAlert(env, doc, supTxt).catch(() => {}));
   return json({ ok: true, no: doc.no });
 }
 // Instant phone alert to Abhinav + Fenil for every new requirement (owner 26/11 15:20, C-20261126-DREQALERT): approved template lead_alert_v1
@@ -418,12 +430,13 @@ async function vjPublicReq(request, env, ctx) {
 // once from /hooks/vj-reqdue (numbers come from the worker, never from n8n).
 const VJ_REQ_HOOK = 'https://n8n-epei.srv2114308.hstgr.cloud/webhook/vj-dreq-40dacddc7d2fb9868eb943fb';
 const VJ_REQ_TO = [['917567400099', 'Abhinav'], ['919930822640', 'Fenil']];
-async function vjReqAlert(env, d) {
+async function vjReqAlert(env, d, supTxt) {
   const clip = (x, n) => String(x || '-').replace(/[\r\n\t]+/g, ' ').replace(/\s{4,}/g, '   ').slice(0, n) || '-';
+  d = Object.assign({}, d, { mobile: d.mobile ? vjPhoneTxt(d.mobile) : '' }); // owner 27/11: show the country code (+91 for Indian numbers)
   const ct = d.ctMin != null && d.ctMax != null ? (d.ctMin === d.ctMax ? d.ctMin + ' ct' : d.ctMin + '-' + d.ctMax + ' ct') : d.ctMin != null ? d.ctMin + '+ ct' : 'up to ' + d.ctMax + ' ct';
   const what = [d.type, (d.shape || []).join('/'), ct, (d.color || []).join(',') + (d.fancy ? ' ' + d.fancy : ''), (d.clarity || []).join(','), (d.cut || []).length ? 'Cut ' + d.cut.join(',') : '', (d.lab || []).join(','), d.qty ? d.qty + ' pcs' : '', d.pair ? 'pair' : '', d.remarks ? 'Note: ' + d.remarks : ''].filter(Boolean).join(' . ');
   const params = [clip(d.name + (d.city ? ', ' + d.city : '') + (d.mobile ? ' (' + d.mobile + ')' : ''), 120), clip('New diamond requirement ' + d.no + ' from the website', 120),
-    clip(what, 400), clip((d.mobile ? 'Call / WhatsApp ' + d.mobile + '. ' : '') + 'Please check VJ Tags > Diamond requirements.', 160)];
+    clip(what, 400), clip((d.mobile ? 'Call / WhatsApp ' + d.mobile + '. ' : '') + (supTxt ? supTxt + '. ' : '') + 'Please check VJ Tags > Diamond requirements.', 400)];
   const msgs = VJ_REQ_TO.filter(([, n]) => !/^TEST/i.test(String(d.name || '')) || n === 'Abhinav').map(([to]) => /* tests go to Abhinav only */ ({ body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template: { name: 'lead_alert_v1', language: { code: 'en' }, components: [{ type: 'body', parameters: params.map(text => ({ type: 'text', text })) }] } }) }));
   await vjMetaT(env);
   const token = [...crypto.getRandomValues(new Uint8Array(16))].map(x => x.toString(16).padStart(2, '0')).join('');
@@ -6085,6 +6098,19 @@ async function vjHandle(request, env, ctx, url) {
   if (p === '/api/vj/repairs' && request.method === 'GET') return vjRepairsGet(url, env, who);
   if (p === '/api/vj/sync' && request.method === 'GET') return vjSync(request, env, who, ctx);
   if (p === '/api/vj/dreqview') return vjDreqViewApi(request, env, who); // C-20261126-DREQVIEW
+  if (p === '/api/vj/stockmap' && request.method === 'POST') { // C-20261127-STOCKMAP: private VJ code -> supplier map for Diamond Search enquiries (owner-only write, never public)
+    if (who.role !== 'admin' || !(await vjDreqCan(env, who))) return vjDeny(403, 'owner only');
+    const len = Number(request.headers.get('content-length') || 0); if (len > 400000) return vjDeny(413, 'too large');
+    let b; try { b = await request.json(); } catch (e) { return vjDeny(400, 'bad json'); }
+    await env.DB.prepare('CREATE TABLE IF NOT EXISTS vj_stockmap (code TEXT PRIMARY KEY, s INTEGER, stock TEXT, cert TEXT, rpc REAL, d TEXT)').run();
+    if (b && b.reset === true) await env.DB.prepare('DELETE FROM vj_stockmap').run();
+    if (b && Array.isArray(b.sup)) { await vjMetaT(env); const sup = b.sup.slice(0, 500).map(x => ({ name: vjClean(x && x.name, 60), contact: vjClean(x && x.contact, 60), ph: vjClean(x && x.ph, 40) }));
+      await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES ('stocksup', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(sup)).run(); }
+    const rows = (b && Array.isArray(b.rows) ? b.rows : []).slice(0, 3000).filter(r => Array.isArray(r) && /^VJ[A-Z0-9]{5,10}$/.test(String(r[0])));
+    for (let i = 0; i < rows.length; i += 50) await env.DB.batch(rows.slice(i, i + 50).map(r => env.DB.prepare('INSERT INTO vj_stockmap (code, s, stock, cert, rpc, d) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(code) DO UPDATE SET s = excluded.s, stock = excluded.stock, cert = excluded.cert, rpc = excluded.rpc, d = excluded.d')
+      .bind(String(r[0]), Number.isInteger(r[1]) ? r[1] : 0, vjClean(r[2], 30), vjClean(r[3], 30), Number(r[4]) || 0, vjClean(r[5], 10))));
+    const n = await env.DB.prepare('SELECT count(*) AS n FROM vj_stockmap').first();
+    return vjJson({ ok: true, added: rows.length, total: (n && n.n) || 0 }); }
   if (p === '/api/vj/supdocs' && request.method === 'GET') { // C-20261126-SUPPLIERSEND: stock-list files suppliers sent to Aashvi (owner-only, read-only; media ids only, no file bytes)
     if (who.role !== 'admin' || !(await vjDreqCan(env, who))) return vjDeny(403, 'owner only');
     const since = Math.max(0, Number(url.searchParams.get('since')) || Date.now() - 3 * 86400e3);
