@@ -1,0 +1,88 @@
+---
+// One price page per popular size (owner 27/11/2026 14:03: start now, India and worldwide).
+// All numbers come from our live Diamond Search stock at build time (src/data/price-guide.ts).
+import InfoPage from '../../layouts/InfoPage.astro';
+import { median, load, certified, stats, inr, usd, total, updTxt, SHAPES, GOODCUT, CARATS, INR } from '../../data/price-guide';
+
+export function getStaticPaths() {
+  return Object.keys(CARATS).map((carat) => ({ params: { carat } }));
+}
+const { carat } = Astro.params as { carat: string };
+const [label, lo, hi] = CARATS[carat];
+const inBand = (r: any[]) => r[1] >= lo && r[1] < hi && certified(r);
+
+const round0 = load('Round').filter((r) => inBand(r) && GOODCUT.includes(r[4]));
+// whole-size median guard: premium one-off listings (over 2x the size's median price per carat) are left out of the tables
+const bandMed = median(round0.map((r) => r[12]));
+const round = round0.filter((r) => r[12] <= bandMed * 2);
+const COLS = ['D', 'E', 'F', 'G', 'H'];
+const CLAS = ['VVS1', 'VVS2', 'VS1', 'VS2', 'SI1'];
+const grid = COLS.map((c) => ({ c, cells: CLAS.map((k) => stats(round.filter((r) => r[2] === c && r[3] === k))) }));
+const top = stats(round.filter((r) => ['D', 'E', 'F'].includes(r[2]) && ['VVS1', 'VVS2', 'VS1'].includes(r[3])));
+const all = stats(round);
+const shapes = SHAPES.map((name) => ({ name, ...stats(load(name).filter((r) => inBand(r) && ['D', 'E', 'F', 'G'].includes(r[2]) && ['VVS1', 'VVS2', 'VS1', 'VS2'].includes(r[3]) && (name !== 'Round' || GOODCUT.includes(r[4])))) })).filter((x) => x.n >= 3);
+const cheapest = shapes.length ? shapes.reduce((a, b) => (a.from < b.from ? a : b)) : null;
+const others = Object.entries(CARATS).filter(([k]) => k !== carat);
+const ctParam = `${lo}-${(hi - 0.01).toFixed(2)}`;
+
+const faqs: [string, string][] = [
+  [`How much does a ${label} lab-grown diamond cost?`, all.n
+    ? `In our live stock (${updTxt}), a certified ${label} round lab-grown diamond with an excellent cut starts from about ${inr(all.from)} (${usd(all.from)}). In D-F colour and VVS1-VS1 clarity, most stones are around ${inr(top.typ || all.typ)} (${usd(top.typ || all.typ)}), including GST.`
+    : `See our live Diamond Search for today's ${label} prices.`],
+  [`What is the price of a ${label} lab-grown diamond in US dollars?`, all.n
+    ? `From about ${usd(all.from)} per stone for a certified round with excellent cut; most top-colour, high-clarity stones are around ${usd(top.typ || all.typ)}. Fancy shapes${cheapest ? ` such as ${cheapest.name.toLowerCase()} start from about ${usd(cheapest.from)}` : ' are priced similarly'}.`
+    : 'See our live Diamond Search for prices in US dollars.'],
+  [`Which ${label} colour and clarity gives the best value?`, 'For a white look at a lower price, many buyers choose F-G colour with VS1-VS2 clarity and an Excellent or Ideal cut. The stone looks clean and white once set, and costs less than D colour or VVS1. Compare the prices in the table above.'],
+  [`Is a ${label} lab-grown diamond certified?`, 'Yes. Every stone in our stock carries a lab report, mostly from IGI. Check the report number on the lab\'s official website before you buy; most stones also have it laser-inscribed on the girdle.'],
+  ['Do you deliver outside India?', 'Yes. Buyers in India and abroad can search our stock and enquire; prices are shown in rupees and US dollars. Our team confirms the delivery, insurance and timeline for your city or country before booking.'],
+];
+---
+<InfoPage
+  title={`${label[0].toUpperCase() + label.slice(1)} Lab-Grown Diamond Price Today (₹ & USD) - Live Stock | Vaishnavi Jewels`}
+  description={`Live ${label} lab-grown diamond prices from certified stock in Surat: from ${inr(all.from)} (${usd(all.from)}). Price by colour, clarity and shape, incl. GST, updated ${updTxt}.`}
+  path={`/lab-grown-diamond-price/${carat}`}
+  eyebrow="LIVE PRICE GUIDE"
+  heading={`${label[0].toUpperCase() + label.slice(1)} lab-grown diamond price today`}
+  intro={`From ${round.length.toLocaleString('en-IN')} certified ${label} round stones (excellent cut) in our live Surat stock. Updated ${updTxt}.`}
+  faqs={faqs}
+  compact={true}
+>
+  <div class="lp">
+    <p class="lp-cta"><a class="btn btn-solid" href={`/diamond-search?shape=Round&ct=${ctParam}`}>See all {label} stones</a></p>
+
+    <h2>{label[0].toUpperCase() + label.slice(1)} round: price by colour and clarity</h2>
+    <p class="lp-small">Most stones' price per stone, excellent cut, incl. GST. "-" = not in stock today.</p>
+    <div class="lp-tw"><table class="lp-t">
+      <thead><tr><th>Colour</th>{CLAS.map((k) => <th>{k}</th>)}</tr></thead>
+      <tbody>{grid.map((row) => <tr><td>{row.c}</td>{row.cells.map((s) => <td>{s.n >= 2 ? <>{inr(s.typ)}<small>{usd(s.typ)}</small></> : '-'}</td>)}</tr>)}</tbody>
+    </table></div>
+
+    {shapes.length > 0 && <>
+      <h2>{label[0].toUpperCase() + label.slice(1)} price by shape (D-G, VVS-VS)</h2>
+      <div class="lp-tw"><table class="lp-t">
+        <thead><tr><th>Shape</th><th>Starts from</th><th>Most stones</th><th></th></tr></thead>
+        <tbody>{shapes.map((r) => <tr><td>{r.name}</td><td>{inr(r.from)}<small>{usd(r.from)}</small></td><td>{inr(r.typ)}<small>{usd(r.typ)}</small></td><td><a href={`/diamond-search?shape=${r.name}&ct=${ctParam}`}>View</a></td></tr>)}</tbody>
+      </table></div>
+    </>}
+
+    <p class="lp-small">Our selling price per stone, including GST, from certified stones (mostly IGI) in our live stock on {updTxt}. ₹ is approximate (USD × {INR}). A single bill above USD 1,000 gets 4% off. We confirm availability and the final price before booking.</p>
+
+    <h2>Other sizes</h2>
+    <p>{others.map(([k, v], i) => <>{i > 0 && ' · '}<a href={`/lab-grown-diamond-price/${k}`}>{v[0]} price</a></>)} · <a href="/lab-grown-diamond-price">All sizes</a></p>
+    <p>Want it set? See our <a href="/solitaire-rings">solitaire rings</a> and <a href="/lab-grown-diamond-jewellery">lab-grown diamond jewellery</a>, or <a href="/diamond-requirement">tell us your requirement</a>.</p>
+    <p class="lp-cta"><a class="btn btn-solid" href={`/diamond-search?shape=Round&ct=${ctParam}`}>Open Diamond Search</a></p>
+  </div>
+</InfoPage>
+
+<style>
+  .lp h2 { margin-top: 1.6rem; }
+  .lp-tw { overflow-x: auto; margin: .6rem 0 1rem; }
+  .lp-t { width: 100%; border-collapse: collapse; min-width: 460px; font-size: .95rem; }
+  .lp-t th, .lp-t td { padding: .5rem .6rem; border-bottom: 1px solid rgba(42, 38, 32, .12); text-align: right; }
+  .lp-t th:first-child, .lp-t td:first-child { text-align: left; font-weight: 600; }
+  .lp-t th { background: rgba(169, 133, 46, .08); }
+  .lp-t small { display: block; font-size: .76rem; opacity: .7; }
+  .lp-small { font-size: .88rem; opacity: .8; }
+  .lp-cta { margin: 1rem 0; }
+  .lp-cta .btn { text-decoration: none !important; }
+</style>

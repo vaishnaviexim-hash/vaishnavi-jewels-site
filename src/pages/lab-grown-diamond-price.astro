@@ -61,7 +61,7 @@ const faqs: [string, string][] = [
   ['Is a lab-grown diamond a real diamond?', 'Yes. A laboratory-grown diamond has the same chemical, physical and optical properties as a mined diamond. Only its origin is different. Independent labs such as IGI and GIA grade it and state on the report that it is laboratory-grown.'],
   ['How do I check a lab-grown diamond certificate?', 'Every IGI or GIA report has a number. Enter it on the lab\'s official website to see the same report. Most stones also have the number laser-inscribed on the girdle, which a jeweller can show you under a loupe.'],
   ['Where do lab-grown diamonds come from?', 'Surat, India - where our showroom is - cuts and polishes most of the world\'s diamonds, and is a leading centre for lab-grown diamonds too. Buying here means stock close to the source.'],
-  ['Can I buy if I live outside India?', 'Yes, you can search the stock and send an enquiry from anywhere - prices are shown in US dollars. Our team replies with the available options for your country.'],
+  ['Do you deliver outside India?', 'Yes. Buyers in India and abroad can search our stock and enquire; prices are shown in rupees and US dollars. Our team confirms the delivery, insurance and timeline for your city or country before booking.'],
   ['How do I buy one?', 'Open Diamond Search, choose your shape, carat, colour and clarity, and press Enquire on the stone you like. You get a code number at once and our team calls you. Every stone comes with its lab certificate.'],
 ];
 ---
@@ -81,7 +81,7 @@ const faqs: [string, string][] = [
     <h2>Price by carat (round, D-F, VVS1-VS1, excellent cut)</h2>
     <div class="lp-tw"><table class="lp-t">
       <thead><tr><th>Carat</th><th>Starts from</th><th>Most stones</th><th>Per carat</th></tr></thead>
-      <tbody>{caratRows.map((r) => <tr><td>{r.label}</td><td>{inr(r.from)}<small>{usd(r.from)}</small></td><td>{inr(r.typ)}<small>{usd(r.typ)}</small></td><td>{inr(r.perCt)}<small>{usd(r.perCt)}</small></td></tr>)}</tbody>
+      <tbody>{caratRows.map((r) => <tr><td>{({'1 ct':'1-carat','1.50 ct':'1-5-carat','2 ct':'2-carat','3 ct':'3-carat'} as any)[r.label] ? <a href={'/lab-grown-diamond-price/' + ({'1 ct':'1-carat','1.50 ct':'1-5-carat','2 ct':'2-carat','3 ct':'3-carat'} as any)[r.label]}>{r.label}</a> : r.label}</td><td>{inr(r.from)}<small>{usd(r.from)}</small></td><td>{inr(r.typ)}<small>{usd(r.typ)}</small></td><td>{inr(r.perCt)}<small>{usd(r.perCt)}</small></td></tr>)}</tbody>
     </table></div>
 
     {shapeRows.length > 0 && <>
@@ -93,6 +93,9 @@ const faqs: [string, string][] = [
     </>}
 
     <p class="lp-small">Prices are our selling price per stone, including GST, from certified stones (mostly IGI) in our live stock on {updTxt}. ₹ is approximate (USD × {INR}). A single bill above USD 1,000 gets 4% off. Stock moves fast, so we confirm availability and the final price before booking.</p>
+
+    <h2>Price by size</h2>
+    <p><a href="/lab-grown-diamond-price/1-carat">1 carat price</a> · <a href="/lab-grown-diamond-price/1-5-carat">1.5 carat price</a> · <a href="/lab-grown-diamond-price/2-carat">2 carat price</a> · <a href="/lab-grown-diamond-price/3-carat">3 carat price</a></p>
 
     <h2>What changes the price</h2>
     <ul>

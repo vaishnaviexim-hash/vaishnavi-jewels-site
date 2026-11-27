@@ -276,7 +276,10 @@ const faqs: [string, string][] = [
       fetch('/stock/index.json?t=' + Math.floor(Date.now() / 600000)).then(function (r) { return r.json(); }).then(function (j) {
         idx = j; var d = new Date(j.updated + 'T12:00:00'); $('ds-upd').textContent = 'Stock updated ' + d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + '.' + (j.inr ? ' ₹ at ₹' + j.inr + ' per USD.' : '');
         j.shapes.forEach(function (s) { var b = chip(s.name, false, s.n.toLocaleString('en-IN')); b.setAttribute('data-v', s.name); b.addEventListener('click', function () { load(s.name); }); $('f-shape').appendChild(b); });
-        load('Round');
+        // deep links from the price guide pages: ?shape=Oval&ct=1-1.1 (27/11)
+        var qs = new URLSearchParams(location.search), qsh = qs.get('shape') || '', qct = (qs.get('ct') || '').match(/^(\d{1,2}(?:\.\d{1,2})?)-(\d{1,2}(?:\.\d{1,2})?)$/);
+        if (qct) { $('f-ctmin').value = qct[1]; $('f-ctmax').value = qct[2]; }
+        load(j.shapes.some(function (s) { return s.name === qsh; }) ? qsh : 'Round');
       }).catch(function () { $('ds-count').textContent = 'Could not load stock. Please refresh the page.'; });
     })();
   </script>
