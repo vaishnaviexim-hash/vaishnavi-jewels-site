@@ -4469,7 +4469,7 @@ async function vjChatsGet(url, env, who, ctx) {
     await vjAhT(env);
     const ahRows = ((await env.DB.prepare("SELECT * FROM vj_chat_ah WHERE status = 'open' ORDER BY promised_at, first_at LIMIT 200").all()).results) || [];
     const ah = [];
-    for (const r of ahRows) { const q = enqs.get(r.number.slice(-10)), tin = TI.get(r.number) || 0, x = { id: await vjChatId(env, r.number), name: r.name || N.get(r.number) || (q && q.first.C) || '', promised: r.promised_at, firstAt: r.first_at, to: r.assignee, topic: String(q ? (q.last.F || q.first.F || '') : ((L.get(r.number) || {}).text || '')).slice(0, 120), winLeft: tin ? Math.max(0, VJ_CHAT_WIN - (now - tin)) : 0, lastIn: tin, alerted: !!r.alerted_at }; if (!sales) x.number = '+' + r.number; ah.push(x); }
+    for (const r of ahRows) { if (await vjIsSupplier(String(r.number || '').replace(/\D/g, '').slice(-10))) continue; /* owner 27/11: suppliers are not handover leads */ const q = enqs.get(r.number.slice(-10)), tin = TI.get(r.number) || 0, x = { id: await vjChatId(env, r.number), name: r.name || N.get(r.number) || (q && q.first.C) || '', promised: r.promised_at, firstAt: r.first_at, to: r.assignee, topic: String(q ? (q.last.F || q.first.F || '') : ((L.get(r.number) || {}).text || '')).slice(0, 120), winLeft: tin ? Math.max(0, VJ_CHAT_WIN - (now - tin)) : 0, lastIn: tin, alerted: !!r.alerted_at }; if (!sales) x.number = '+' + r.number; ah.push(x); }
     const hz = vjHours(now);
     return vjJson(Object.assign({ ok: true, chats: list.slice(0, 400), ah, open: hz.open, nextOpen: hz.nextMs, now }, meta));
   }
@@ -4660,6 +4660,7 @@ async function vjAhBrain(env) {
 async function vjAhQueue(env, number, name, assignee) {
   await vjAhT(env);
   const hz = vjHours(); if (hz.open) return;
+  if (await vjIsSupplier(String(number || '').replace(/\D/g, '').slice(-10))) return; // owner 27/11 11:04: supplier numbers are never customer leads (no next-day handover)
   const cur = await env.DB.prepare("SELECT id FROM vj_chat_ah WHERE number = ? AND status = 'open'").bind(number).first(); if (cur) return;
   await env.DB.prepare("INSERT INTO vj_chat_ah (number, name, first_at, promised_at, assignee, topic, status) VALUES (?, ?, ?, ?, ?, '', 'open')").bind(number, name || '', Date.now(), hz.nextMs, assignee).run();
 }
@@ -4675,10 +4676,12 @@ async function vjAhBell(env, ctx) {
   const rows = ((await env.DB.prepare("SELECT * FROM vj_chat_ah WHERE status = 'open' AND alerted_at IS NULL AND promised_at <= ? ORDER BY first_at").bind(Date.now() + 10 * 60e3).all()).results) || [];
   if (!rows.length) return reply('nothing waiting', 200);
   // C-20261124-AHFRESH (owner 24/11 12:55): only leads from the last 3 days are alerted (older backlog is marked, stays in VJ Tags > Chats); max 12 names per alert
-  const fresh = rows.filter(r => Number(r.first_at) >= Date.now() - 3 * 864e5), enqs = await vjChatEnq(env), by = {};
+  const sup = new Set(); for (const r of rows) if (await vjIsSupplier(String(r.number || '').replace(/\D/g, '').slice(-10))) sup.add(r.id); // owner 27/11 11:04: suppliers never in the handover alert
+  const fresh = rows.filter(r => !sup.has(r.id) && Number(r.first_at) >= Date.now() - 3 * 864e5), enqs = await vjChatEnq(env), by = {};
   fresh.forEach(r => { const q = enqs.get(r.number.slice(-10)); (by[r.assignee || 'Abhinav'] = by[r.assignee || 'Abhinav'] || []).push((r.name || 'Customer') + (q ? ' - ' + String(q.last.F || q.first.F || '').slice(0, 40) : '')); });
   for (const [to, list] of Object.entries(by)) await vjChatAlert(env, ctx, to, 'Next-day handover: ' + list.length + ' lead' + (list.length === 1 ? '' : 's') + ' from after hours', 'Promised contact today from 11 AM', list.slice(0, 12).join('; ') + (list.length > 12 ? '; +' + (list.length - 12) + ' more - VJ Tags > Chats > Next-day handover' : ''), false, '');
   await env.DB.prepare(`UPDATE vj_chat_ah SET alerted_at = ? WHERE id IN (${rows.map(() => '?').join(',')})`).bind(Date.now(), ...rows.map(r => r.id)).run();
+  if (sup.size) await env.DB.prepare(`UPDATE vj_chat_ah SET status = 'done', done_at = ?, done_by = 'supplier' WHERE id IN (${[...sup].map(() => '?').join(',')})`).bind(Date.now(), ...sup).run();
   return reply('alerted ' + rows.length, 200);
 }
 
