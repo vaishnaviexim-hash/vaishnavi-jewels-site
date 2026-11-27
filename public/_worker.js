@@ -412,17 +412,24 @@ async function vjPublicReq(request, env, ctx) {
   const doc = r.doc; doc.no = 'REQ-' + String(((cnt && cnt.n) || 0) + 1).padStart(4, '0'); doc.web = true;
   if (/^\d{8,15}$/.test(String(b.mobile).replace(/^\+/, '')) && String(b.mobile).startsWith('+')) doc.mobile = String(b.mobile); // vjDreq may shorten a foreign number
   // Diamond Search enquiry (C-20261127-STOCKMAP): which supplier holds the stone -> only into this owner/Fenil-only doc and their alert
-  let supTxt = '';
+  let supTxt = '', supAsk = null;
   try { const m = String(doc.remarks || '').match(/\bStone (VJ[A-Z0-9]{5,10})\b/);
     if (m) { const sm = await env.DB.prepare('SELECT * FROM vj_stockmap WHERE code = ?').bind(m[1]).first();
       if (sm) { const sr = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'stocksup'").first(); const sl = sr ? JSON.parse(sr.v) : []; const s = sl[sm.s] || {};
         supTxt = 'Supplier: ' + (s.name || '?') + (s.contact ? ' (' + s.contact + ')' : '') + (s.ph ? ' ' + s.ph : '') + (sm.stock ? ' . stock ' + sm.stock : '') + (sm.cert ? ' . cert ' + sm.cert : '') + (sm.rpc ? ' . USD ' + sm.rpc + '/ct' : '') + (sm.d ? ' . list ' + sm.d : '');
-        doc.result = vjClean(supTxt, 500); } else supTxt = 'Supplier: not found for ' + m[1] + ' (check private code map)'; } } catch (e) { supTxt = ''; }
+        doc.result = vjClean(supTxt, 500);
+        // owner 27/11 11:45: the supplier also gets 'we need this piece, buyer Vaishnavi Jewels, call Fenil / Abhinav' - NEVER the customer's name or number.
+        // Once per stone per day (no repeat if several customers ask for the same stone); test enquiries (name TEST...) never go to a supplier.
+        const sph = String(s.ph || '').split('/')[0].replace(/\D/g, ''), day = new Date(Date.now() + 19800e3).toISOString().slice(0, 10);
+        if (/^91[6-9]\d{9}$/.test(sph) && !/^TEST/i.test(String(doc.name || ''))) {
+          const once = await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES (?, '1') ON CONFLICT(k) DO NOTHING").bind('suphold:' + m[1] + ':' + day).run();
+          if (once.meta && once.meta.changes === 1) supAsk = { to: sph, ref: m[1], text: [doc.shape && doc.shape[0], doc.ctMin != null ? doc.ctMin + ' ct' : '', (doc.color || [])[0], (doc.clarity || [])[0], sm.stock ? 'your stock ' + sm.stock : '', sm.cert ? 'cert ' + sm.cert : ''].filter(Boolean).join(', ') }; }
+      } else supTxt = 'Supplier: not found for ' + m[1] + ' (check private code map)'; } } catch (e) { supTxt = ''; }
   const path = 'dreq/w' + now + Math.floor(Math.random() * 1000), s = JSON.stringify(doc);
   if (s.length > 8000) return json({ error: 'too large' }, 413);
   await env.DB.batch([env.DB.prepare('INSERT INTO docs (path, data, version, updated_at, updated_by) VALUES (?, ?, 1, ?, ?) ON CONFLICT(path) DO NOTHING').bind(path, s, now, 'website'),
     env.DB.prepare('INSERT INTO vj_req_rl (ip, ts) VALUES (?, ?)').bind(ip, now), env.DB.prepare('DELETE FROM vj_req_rl WHERE ts < ?').bind(now - 2 * 86400000)]);
-  if (ctx) ctx.waitUntil(vjReqAlert(env, doc, supTxt).catch(() => {}));
+  if (ctx) ctx.waitUntil(vjReqAlert(env, doc, supTxt, supAsk).catch(() => {}));
   return json({ ok: true, no: doc.no });
 }
 // Instant phone alert to Abhinav + Fenil for every new requirement (owner 26/11 15:20, C-20261126-DREQALERT): approved template lead_alert_v1
@@ -430,7 +437,7 @@ async function vjPublicReq(request, env, ctx) {
 // once from /hooks/vj-reqdue (numbers come from the worker, never from n8n).
 const VJ_REQ_HOOK = 'https://n8n-epei.srv2114308.hstgr.cloud/webhook/vj-dreq-40dacddc7d2fb9868eb943fb';
 const VJ_REQ_TO = [['917567400099', 'Abhinav'], ['919930822640', 'Fenil']];
-async function vjReqAlert(env, d, supTxt) {
+async function vjReqAlert(env, d, supTxt, supAsk) {
   const clip = (x, n) => String(x || '-').replace(/[\r\n\t]+/g, ' ').replace(/\s{4,}/g, '   ').slice(0, n) || '-';
   d = Object.assign({}, d, { mobile: d.mobile ? vjPhoneTxt(d.mobile) : '' }); // owner 27/11: show the country code (+91 for Indian numbers)
   const ct = d.ctMin != null && d.ctMax != null ? (d.ctMin === d.ctMax ? d.ctMin + ' ct' : d.ctMin + '-' + d.ctMax + ' ct') : d.ctMin != null ? d.ctMin + '+ ct' : 'up to ' + d.ctMax + ' ct';
@@ -438,6 +445,8 @@ async function vjReqAlert(env, d, supTxt) {
   const params = [clip(d.name + (d.city ? ', ' + d.city : '') + (d.mobile ? ' (' + d.mobile + ')' : ''), 120), clip('New diamond requirement ' + d.no + ' from the website', 120),
     clip(what, 400), clip((d.mobile ? 'Call / WhatsApp ' + d.mobile + '. ' : '') + (supTxt ? supTxt + '. ' : '') + 'Please check VJ Tags > Diamond requirements.', 400)];
   const msgs = VJ_REQ_TO.filter(([, n]) => !/^TEST/i.test(String(d.name || '')) || n === 'Abhinav').map(([to]) => /* tests go to Abhinav only */ ({ body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template: { name: 'lead_alert_v1', language: { code: 'en' }, components: [{ type: 'body', parameters: params.map(text => ({ type: 'text', text })) }] } }) }));
+  if (supAsk) { const st = String(supAsk.text).replace(/[\r\n\t]+/g, ' ').replace(/\s{4,}/g, '   ').slice(0, 300);
+    msgs.push({ body: JSON.stringify({ messaging_product: 'whatsapp', to: supAsk.to, type: 'template', template: { name: 'supplier_requirement_v1', language: { code: 'en' }, components: [{ type: 'body', parameters: [{ type: 'text', text: supAsk.ref }, { type: 'text', text: 'We need this stone - please hold it and confirm availability + final price: ' + st + '. Buyer: Vaishnavi Jewels, Surat. Contact: Fenil +91 99308 22640 / Abhinav +91 75674 00099.' }] }] } }) }); }
   await vjMetaT(env);
   const token = [...crypto.getRandomValues(new Uint8Array(16))].map(x => x.toString(16).padStart(2, '0')).join('');
   await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('reqdue:' + token, JSON.stringify({ msgs, at: Date.now() })).run();
