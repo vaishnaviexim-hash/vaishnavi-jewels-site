@@ -66,6 +66,7 @@ export const infoPages = [
   { path: '/visit-us', label: 'Visit Our Showroom' },
   { path: '/book-a-visit', label: 'Book a Showroom Visit' },
   { path: '/diamond-search', label: 'Diamond Search' },
+  { path: '/lab-grown-diamond-price', label: 'Lab-Grown Diamond Price' },
   { path: '/diamond-requirement', label: 'Find a Diamond' },
   { path: '/delivery-across-india', label: 'Delivery Across India' },
   { path: '/faq', label: 'FAQ' },

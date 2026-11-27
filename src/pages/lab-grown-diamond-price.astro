@@ -1,0 +1,121 @@
+---
+// Lab-grown diamond price guide (owner 27/11/2026 13:59: "when people search how much a diamond costs, our page should come up").
+// Every number on this page is worked out at build time from our live Diamond Search stock (public/stock/*.json),
+// so it refreshes each time the stock is updated. Only our own selling price is used - never supplier names or prices.
+import fs from 'node:fs';
+import path from 'node:path';
+import InfoPage from '../layouts/InfoPage.astro';
+
+const dir = path.join(process.cwd(), 'public', 'stock');
+const idx = JSON.parse(fs.readFileSync(path.join(dir, 'index.json'), 'utf8'));
+const INR: number = idx.inr || 93;
+const load = (name: string): any[] => {
+  const s = (idx.shapes || []).find((x: any) => x.name === name);
+  if (!s) return [];
+  try { return JSON.parse(fs.readFileSync(path.join(dir, s.file), 'utf8')); } catch { return []; }
+};
+// record: [code, ct, col, cla, cut, pol, sym, fl, tbl, dep, lab, meas, usd_ct, video, date, image, ...]
+const GOOD_COL = new Set(['D', 'E', 'F']);
+const GOOD_CLA = new Set(['VVS1', 'VVS2', 'VS1']);
+const certified = (r: any[]) => ['IGI', 'GIA', 'GCAL', 'SGL'].includes(r[10]);
+const good = (r: any[]) => certified(r) && GOOD_COL.has(r[2]) && GOOD_CLA.has(r[3]);
+const stoneInr = (r: any[]) => r[12] * r[1] * INR;
+const r500 = (v: number) => Math.round(v / 500) * 500;
+const inr = (v: number) => '₹' + r500(v).toLocaleString('en-IN');
+const usd = (v: number) => 'USD ' + (Math.round(v / INR / 5) * 5).toLocaleString('en-US'); // v is in ₹; back to our USD price
+const median = (a: number[]) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
+
+const round = load('Round');
+const bands: [string, number, number][] = [['0.50 ct', 0.5, 0.6], ['0.75 ct', 0.7, 0.8], ['1 ct', 1.0, 1.1], ['1.50 ct', 1.5, 1.6], ['2 ct', 2.0, 2.2], ['3 ct', 3.0, 3.3], ['4 ct', 4.0, 4.4], ['5 ct', 5.0, 5.5]];
+const caratRows = bands.map(([label, lo, hi]) => {
+  const L = round.filter((r) => r[1] >= lo && r[1] < hi && good(r) && ['EX', 'ID', '8X'].includes(r[4]));
+  const p = L.map(stoneInr);
+  return { label, n: L.length, from: p.length ? Math.min(...p) : 0, typ: median(p), perCt: median(L.map((r) => r[12] * INR)) };
+}).filter((x) => x.n >= 3);
+
+const SHAPES = ['Round', 'Oval', 'Pear', 'Emerald', 'Cushion', 'Radiant', 'Princess', 'Marquise', 'Heart', 'Asscher'];
+const shapeRows = SHAPES.map((name) => {
+  const L = load(name).filter((r) => r[1] >= 1.0 && r[1] < 1.1 && good(r) && (name !== 'Round' || ['EX', 'ID', '8X'].includes(r[4])));
+  const p = L.map(stoneInr);
+  return { name, n: L.length, from: p.length ? Math.min(...p) : 0, typ: median(p) };
+}).filter((x) => x.n >= 3);
+
+const total = (idx.shapes || []).reduce((s: number, x: any) => s + (x.n || 0), 0);
+const upd = String(idx.updated || '');
+const updTxt = upd ? new Date(upd + 'T00:00:00Z').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }) : '';
+const one = caratRows.find((x) => x.label === '1 ct');
+const two = caratRows.find((x) => x.label === '2 ct');
+
+const faqs: [string, string][] = [
+  ['How much does a 1 carat lab-grown diamond cost in India?', one
+    ? `In our live stock (${updTxt}), a certified 1 carat round lab-grown diamond in D-F colour and VVS1-VS1 clarity with excellent cut starts from about ${inr(one.from)}, and most stones are around ${inr(one.typ)} per stone, including GST. The price depends on colour, clarity, cut and the exact weight.`
+    : 'The price of a certified 1 carat lab-grown diamond depends on colour, clarity, cut and the exact weight. See our live Diamond Search for today\'s prices.'],
+  ['How much does a 2 carat lab-grown diamond cost?', two
+    ? `In our live stock, a certified 2 carat round lab-grown diamond (D-F, VVS1-VS1, excellent cut) starts from about ${inr(two.from)}, with most stones around ${inr(two.typ)}, including GST.`
+    : 'A 2 carat lab-grown diamond depends on its grades. See our live Diamond Search for today\'s prices.'],
+  ['Why are lab-grown diamond prices so different from natural diamonds?', 'A laboratory-grown diamond is real diamond - the same carbon crystal - but it is grown above ground in weeks, so it costs a fraction of a natural diamond of the same size and grades. Always ask for the lab certificate and check the report number online.'],
+  ['Are these prices live?', `Yes. This page is worked out from the ${total.toLocaleString('en-IN')} certified stones in our Diamond Search, updated as suppliers in Surat send their latest stock. ₹ figures are approximate (USD × ${INR}); we confirm availability and the final price before booking.`],
+  ['What is the lab-grown diamond price per carat in US dollars?', one
+    ? `In our live stock, a certified 1 carat round lab-grown diamond (D-F, VVS1-VS1, excellent cut) starts from about ${usd(one.from)} per stone and most are around ${usd(one.typ)}. Larger stones cost more per carat. All prices are our selling price, including GST.`
+    : 'See our live Diamond Search for today\'s prices in US dollars.'],
+  ['Is a lab-grown diamond a real diamond?', 'Yes. A laboratory-grown diamond has the same chemical, physical and optical properties as a mined diamond. Only its origin is different. Independent labs such as IGI and GIA grade it and state on the report that it is laboratory-grown.'],
+  ['How do I check a lab-grown diamond certificate?', 'Every IGI or GIA report has a number. Enter it on the lab\'s official website to see the same report. Most stones also have the number laser-inscribed on the girdle, which a jeweller can show you under a loupe.'],
+  ['Where do lab-grown diamonds come from?', 'Surat, India - where our showroom is - cuts and polishes most of the world\'s diamonds, and is a leading centre for lab-grown diamonds too. Buying here means stock close to the source.'],
+  ['Can I buy if I live outside India?', 'Yes, you can search the stock and send an enquiry from anywhere - prices are shown in US dollars. Our team replies with the available options for your country.'],
+  ['How do I buy one?', 'Open Diamond Search, choose your shape, carat, colour and clarity, and press Enquire on the stone you like. You get a code number at once and our team calls you. Every stone comes with its lab certificate.'],
+];
+---
+<InfoPage
+  title="Lab-Grown Diamond Price Today (India & USD) - Live 1 ct, 2 ct, 3 ct Prices | Vaishnavi Jewels"
+  description={`Today's lab-grown diamond prices in ₹ and USD from ${total.toLocaleString('en-IN')} certified stones in Surat: 1 carat${one ? ' from ' + inr(one.from) : ''}, 2 carat${two ? ' from ' + inr(two.from) : ''}. Price by carat and shape, incl. GST, updated ${updTxt}.`}
+  path="/lab-grown-diamond-price"
+  eyebrow="LIVE PRICE GUIDE"
+  heading="Lab-grown diamond price today"
+  intro={`Worked out from ${total.toLocaleString('en-IN')} certified laboratory-grown diamonds in our live Surat stock. Updated ${updTxt}.`}
+  faqs={faqs}
+  compact={true}
+>
+  <div class="lp">
+    <p class="lp-cta"><a class="btn btn-solid" href="/diamond-search">Search all {total.toLocaleString('en-IN')} stones</a></p>
+
+    <h2>Price by carat (round, D-F, VVS1-VS1, excellent cut)</h2>
+    <div class="lp-tw"><table class="lp-t">
+      <thead><tr><th>Carat</th><th>Starts from</th><th>Most stones</th><th>Per carat</th></tr></thead>
+      <tbody>{caratRows.map((r) => <tr><td>{r.label}</td><td>{inr(r.from)}<small>{usd(r.from)}</small></td><td>{inr(r.typ)}<small>{usd(r.typ)}</small></td><td>{inr(r.perCt)}<small>{usd(r.perCt)}</small></td></tr>)}</tbody>
+    </table></div>
+
+    {shapeRows.length > 0 && <>
+      <h2>1 carat price by shape (D-F, VVS1-VS1)</h2>
+      <div class="lp-tw"><table class="lp-t">
+        <thead><tr><th>Shape</th><th>Starts from</th><th>Most stones</th></tr></thead>
+        <tbody>{shapeRows.map((r) => <tr><td>{r.name}</td><td>{inr(r.from)}<small>{usd(r.from)}</small></td><td>{inr(r.typ)}<small>{usd(r.typ)}</small></td></tr>)}</tbody>
+      </table></div>
+    </>}
+
+    <p class="lp-small">Prices are our selling price per stone, including GST, from certified stones (mostly IGI) in our live stock on {updTxt}. ₹ is approximate (USD × {INR}). A single bill above USD 1,000 gets 4% off. Stock moves fast, so we confirm availability and the final price before booking.</p>
+
+    <h2>What changes the price</h2>
+    <ul>
+      <li><strong>Carat</strong> - price per carat rises with size, so a 2 ct stone costs more than two 1 ct stones.</li>
+      <li><strong>Colour</strong> - D, E and F are the whitest; G-H look white once set and cost less.</li>
+      <li><strong>Clarity</strong> - VVS and VS stones look clean to the eye; SI can save money if no mark is visible.</li>
+      <li><strong>Cut</strong> - an Excellent or Ideal round cut gives the most sparkle; it matters more than one colour grade.</li>
+      <li><strong>Certificate</strong> - buy only with a lab report (IGI or GIA) and check the report number on the lab's website.</li>
+    </ul>
+    <p>Looking for a <a href="/natural-diamond-jewellery">natural diamond</a> or a special size? <a href="/diamond-requirement">Tell us your requirement</a> and we source it from Surat. See our <a href="/lab-grown-diamond-jewellery">lab-grown diamond jewellery</a> and <a href="/solitaire-rings">solitaire rings</a>.</p>
+    <p class="lp-cta"><a class="btn btn-solid" href="/diamond-search">Open Diamond Search</a></p>
+  </div>
+</InfoPage>
+
+<style>
+  .lp h2 { margin-top: 1.6rem; }
+  .lp-tw { overflow-x: auto; margin: .6rem 0 1rem; }
+  .lp-t { width: 100%; border-collapse: collapse; min-width: 420px; font-size: .98rem; }
+  .lp-t th, .lp-t td { padding: .55rem .7rem; border-bottom: 1px solid rgba(42, 38, 32, .12); text-align: left; }
+  .lp-t th { font-weight: 600; background: rgba(169, 133, 46, .08); }
+  .lp-t td:not(:first-child), .lp-t th:not(:first-child) { text-align: right; }
+  .lp-small { font-size: .88rem; opacity: .8; }
+  .lp-t small { display: block; font-size: .78rem; opacity: .7; }
+  .lp-cta { margin: 1rem 0; }
+  .lp-cta .btn { text-decoration: none !important; }
+</style>
