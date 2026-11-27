@@ -412,23 +412,34 @@ async function vjPublicReq(request, env, ctx) {
   const doc = r.doc; doc.no = 'REQ-' + String(((cnt && cnt.n) || 0) + 1).padStart(4, '0'); doc.web = true;
   if (/^\d{8,15}$/.test(String(b.mobile).replace(/^\+/, '')) && String(b.mobile).startsWith('+')) doc.mobile = String(b.mobile); // vjDreq may shorten a foreign number
   // Diamond Search enquiry (C-20261127-STOCKMAP): which supplier holds the stone -> only into this owner/Fenil-only doc and their alert
-  let supTxt = '', supAsk = null;
-  try { const m = String(doc.remarks || '').match(/\bStone (VJ[A-Z0-9]{5,10})\b/);
-    if (m) { const sm = await env.DB.prepare('SELECT * FROM vj_stockmap WHERE code = ?').bind(m[1]).first();
-      if (sm) { const sr = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'stocksup'").first(); const sl = sr ? JSON.parse(sr.v) : []; const s = sl[sm.s] || {};
-        // owner 27/11 11:48: show the money too - supplier's ask and our website price, in USD and approx. rupees (Rs 93 per USD, same as the page)
-        const INR = 93, ct1 = Number(doc.ctMin) || 0, supTot = Math.round((Number(sm.rpc) || 0) * ct1), ourTot = Math.round(Math.round((Number(sm.rpc) || 0) * 2.857 / 5) * 5 * ct1);
-        const rs = v => 'Rs ' + Math.round(v * INR / 100) * 100;
-        supTxt = 'Supplier: ' + (s.name || '?') + (s.contact ? ' (' + s.contact + ')' : '') + (s.ph ? ' ' + s.ph : '') + (sm.stock ? ' . stock ' + sm.stock : '') + (sm.cert ? ' . cert ' + sm.cert : '')
-          + (sm.rpc ? ' . Supplier asks USD ' + sm.rpc + '/ct = USD ' + supTot + ' (~' + rs(supTot) + ')' : '') + (ourTot ? ' . Our website price USD ' + ourTot + ' (~' + rs(ourTot) + ')' : '') + (sm.d ? ' . list ' + sm.d : '');
-        doc.result = vjClean(supTxt, 500);
+  let supTxt = '', supAsk = [];
+  // one or several stones (owner 27/11 11:55 'select pieces'): codes from the remarks, stone details from the page (b.pick), supplier from the private map
+  try { const codes = [...new Set((String(doc.remarks || '').match(/\bVJ[A-Z0-9]{5,10}\b/g) || []))].slice(0, 10);
+    if (codes.length) {
+      const picks = {}; (Array.isArray(b.pick) ? b.pick.slice(0, 10) : []).forEach(x => { if (x && /^VJ[A-Z0-9]{5,10}$/.test(String(x.code))) picks[x.code] = { sh: vjClean(x.sh, 20), ct: Number(x.ct) || 0, col: vjClean(x.col, 8), cla: vjClean(x.cla, 6) }; });
+      if (codes.length === 1 && !picks[codes[0]]) picks[codes[0]] = { sh: (doc.shape || [])[0] || '', ct: Number(doc.ctMin) || 0, col: (doc.color || [])[0] || '', cla: (doc.clarity || [])[0] || '' };
+      const sr = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'stocksup'").first(); const sl = sr ? JSON.parse(sr.v) : [];
+      // owner 27/11 11:48: show the money too - supplier's ask and our website price, in USD and approx. rupees (Rs 93 per USD, same as the page)
+      const INR = 93, rs = v => 'Rs ' + Math.round(v * INR / 100) * 100, parts = [], bySup = {}, day = new Date(Date.now() + 19800e3).toISOString().slice(0, 10);
+      let supSum = 0, ourSum = 0;
+      for (const code of codes) {
+        const sm = await env.DB.prepare('SELECT * FROM vj_stockmap WHERE code = ?').bind(code).first(); const pk = picks[code] || {};
+        if (!sm) { parts.push(code + ': supplier not found (check private code map)'); continue; }
+        const s = sl[sm.s] || {}, ct1 = pk.ct || 0, supTot = Math.round((Number(sm.rpc) || 0) * ct1), ourTot = Math.round(Math.round((Number(sm.rpc) || 0) * 2.857 / 5) * 5 * ct1);
+        supSum += supTot; ourSum += ourTot;
+        parts.push((codes.length > 1 ? code + ' ' + [pk.sh, ct1 ? ct1 + 'ct' : '', pk.col, pk.cla].filter(Boolean).join(' ') + ': ' : '') + (s.name || '?') + (s.contact ? ' (' + s.contact + ')' : '') + (s.ph ? ' ' + s.ph : '') + (sm.stock ? ' . stock ' + sm.stock : '') + (sm.cert ? ' . cert ' + sm.cert : '')
+          + (sm.rpc ? ' . asks USD ' + sm.rpc + '/ct = USD ' + supTot + ' (~' + rs(supTot) + ')' : '') + (ourTot ? ' . our price USD ' + ourTot + ' (~' + rs(ourTot) + ')' : '') + (codes.length === 1 && sm.d ? ' . list ' + sm.d : ''));
         // owner 27/11 11:45: the supplier also gets 'we need this piece, buyer Vaishnavi Jewels, call Fenil / Abhinav' - NEVER the customer's name or number.
-        // Once per stone per day (no repeat if several customers ask for the same stone); test enquiries (name TEST...) never go to a supplier.
-        const sph = String(s.ph || '').split('/')[0].replace(/\D/g, ''), day = new Date(Date.now() + 19800e3).toISOString().slice(0, 10);
+        // Once per stone per day; test enquiries (name TEST...) never go to a supplier.
+        const sph = String(s.ph || '').split('/')[0].replace(/\D/g, '');
         if (/^91[6-9]\d{9}$/.test(sph) && !/^TEST/i.test(String(doc.name || ''))) {
-          const once = await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES (?, '1') ON CONFLICT(k) DO NOTHING").bind('suphold:' + m[1] + ':' + day).run();
-          if (once.meta && once.meta.changes === 1) supAsk = { to: sph, ref: m[1], text: [doc.shape && doc.shape[0], doc.ctMin != null ? doc.ctMin + ' ct' : '', (doc.color || [])[0], (doc.clarity || [])[0], sm.stock ? 'your stock ' + sm.stock : '', sm.cert ? 'cert ' + sm.cert : ''].filter(Boolean).join(', ') }; }
-      } else supTxt = 'Supplier: not found for ' + m[1] + ' (check private code map)'; } } catch (e) { supTxt = ''; }
+          const once = await env.DB.prepare("INSERT INTO vj_meta (k, v) VALUES (?, '1') ON CONFLICT(k) DO NOTHING").bind('suphold:' + code + ':' + day).run();
+          if (once.meta && once.meta.changes === 1) (bySup[sph] = bySup[sph] || []).push({ code, text: [pk.sh, ct1 ? ct1 + ' ct' : '', pk.col, pk.cla, sm.stock ? 'your stock ' + sm.stock : '', sm.cert ? 'cert ' + sm.cert : ''].filter(Boolean).join(', ') }); }
+      }
+      supTxt = (codes.length > 1 ? codes.length + ' stones, supplier total USD ' + supSum + ' (~' + rs(supSum) + '), our total USD ' + ourSum + ' (~' + rs(ourSum) + '). ' : 'Supplier: ') + parts.join(' | ');
+      doc.result = vjClean(supTxt, 500);
+      supAsk = Object.entries(bySup).slice(0, 3).map(([to, l]) => ({ to, ref: l.length > 1 ? l[0].code + ' +' + (l.length - 1) : l[0].code, text: l.map(x => (l.length > 1 ? x.code + ': ' : '') + x.text).join(' | ') }));
+    } } catch (e) { supTxt = ''; supAsk = []; }
   const path = 'dreq/w' + now + Math.floor(Math.random() * 1000), s = JSON.stringify(doc);
   if (s.length > 8000) return json({ error: 'too large' }, 413);
   await env.DB.batch([env.DB.prepare('INSERT INTO docs (path, data, version, updated_at, updated_by) VALUES (?, ?, 1, ?, ?) ON CONFLICT(path) DO NOTHING').bind(path, s, now, 'website'),
@@ -449,7 +460,7 @@ async function vjReqAlert(env, d, supTxt, supAsk) {
   const params = [clip(d.name + (d.city ? ', ' + d.city : '') + (d.mobile ? ' (' + d.mobile + ')' : ''), 120), clip('New diamond requirement ' + d.no + ' from the website', 120),
     clip(what, supTxt ? 260 : 400), clip((d.mobile ? 'Call / WhatsApp ' + d.mobile + '. ' : '') + (supTxt ? supTxt + '. ' : '') + 'Please check VJ Tags > Diamond requirements.', 480)]; // whole template body stays under WhatsApp's 1,024 characters
   const msgs = VJ_REQ_TO.filter(([, n]) => !/^TEST/i.test(String(d.name || '')) || n === 'Abhinav').map(([to]) => /* tests go to Abhinav only */ ({ body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template: { name: 'lead_alert_v1', language: { code: 'en' }, components: [{ type: 'body', parameters: params.map(text => ({ type: 'text', text })) }] } }) }));
-  if (supAsk) { const st = String(supAsk.text).replace(/[\r\n\t]+/g, ' ').replace(/\s{4,}/g, '   ').slice(0, 300);
+  for (const sa of (Array.isArray(supAsk) ? supAsk : supAsk ? [supAsk] : []).slice(0, 3)) { const supAsk = sa; const st = String(supAsk.text).replace(/[\r\n\t]+/g, ' ').replace(/\s{4,}/g, '   ').slice(0, 600);
     msgs.push({ body: JSON.stringify({ messaging_product: 'whatsapp', to: supAsk.to, type: 'template', template: { name: 'supplier_requirement_v1', language: { code: 'en' }, components: [{ type: 'body', parameters: [{ type: 'text', text: supAsk.ref }, { type: 'text', text: 'We need this stone - please hold it and confirm availability + final price: ' + st + '. Buyer: Vaishnavi Jewels, Surat. Contact: Fenil +91 99308 22640 / Abhinav +91 75674 00099. Please also send your latest full stock list (Excel) on this number.' }] }] } }) }); }
   await vjMetaT(env);
   const token = [...crypto.getRandomValues(new Uint8Array(16))].map(x => x.toString(16).padStart(2, '0')).join('');

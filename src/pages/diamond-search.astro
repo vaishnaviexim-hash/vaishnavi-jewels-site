@@ -42,6 +42,8 @@ const faqs: [string, string][] = [
     </div>
     <ol class="ds-list" id="ds-list"></ol>
     <button type="button" class="btn btn-solid ds-moreb" id="ds-moreb" hidden>Show more stones</button>
+    <div class="ds-selform" id="ds-selform" hidden></div>
+    <div class="ds-sel" id="ds-sel" hidden><span id="ds-seln"></span><button type="button" id="ds-selgo">Enquire selected</button><button type="button" id="ds-selclr" class="ds-selc">Clear</button><span id="ds-selmsg" class="ds-selm" hidden></span></div>
     <p class="ds-empty" id="ds-empty" hidden>No stone matches these filters right now. <a href="/diamond-requirement">Tell us your requirement</a> and we will source it for you.</p>
   </div>
   <style is:global>
@@ -89,6 +91,16 @@ const faqs: [string, string][] = [
     .ds-qe { color: #9b1c1c; margin: 0; font-size: 14px; } .ds-qn { margin: 0; font-size: 12.5px; color: var(--color-ink-soft); }
     .ds-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
     .ds-ok { margin: 0; padding: 12px 14px; border: 2px solid var(--color-gold); background: rgba(176, 141, 87, 0.08); font-size: 15px; line-height: 1.6; }
+    .ds-selb { font: inherit; font-size: 14px; padding: 7px 14px; border: 1px solid var(--color-gold); background: #fff; cursor: pointer; min-height: 36px; color: inherit; }
+    .ds-selb[aria-pressed=true] { background: #3a0f1a; border-color: #3a0f1a; color: #fff; }
+    .ds-sel { position: sticky; bottom: 12px; z-index: 20; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; background: #3a0f1a; color: #fff; padding: 10px 14px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+    .ds-sel #ds-seln { font-weight: 600; font-size: 14.5px; }
+    .ds-sel #ds-selgo { font: inherit; font-weight: 600; background: var(--color-gold); color: #fff; border: 0; padding: 9px 14px; cursor: pointer; }
+    .ds-selc { font: inherit; background: none; border: 0; color: #f3e7cf; text-decoration: underline; cursor: pointer; }
+    .ds-selm { font-size: 13px; color: #ffd27a; }
+    .ds-selform { border: 2px solid var(--color-gold); background: #fff; padding: 12px 14px; }
+    .ds-selform .ds-q { border-top: 0; padding-top: 0; }
+    @media (max-width: 860px) { .ds-sel { bottom: 76px; } }
     .ds-moreb { justify-self: center; }
     .ds-empty { text-align: center; }
     @media (max-width: 520px) { .ds-f { padding: 10px; gap: 8px; } .ds-row { grid-template-columns: minmax(0, 1fr); gap: 4px; } .ds-l { padding-top: 0; font-size: 13px; } .ds .chip { font-size: 13px; padding: 5px 9px; min-height: 32px; }
@@ -135,7 +147,7 @@ const faqs: [string, string][] = [
           '<div class="ds-d">' + esc(spec) + '</div>' + (prop ? '<div class="ds-d">' + esc(prop) + '</div>' : '') +
           '<div class="ds-c">' + esc(r[0]) + (r[10] ? ' · ' + esc(r[10]) + ' certified' : '') + ' · laboratory-grown</div></div>' +
           '<div class="ds-p"><div class="tot">USD ' + tot(r).toLocaleString('en-US') + '</div>' + (idx.inr ? '<div class="inr">≈ ₹' + (Math.round(tot(r) * idx.inr / 100) * 100).toLocaleString('en-IN') + '</div>' : '') + '<div class="ppc">USD ' + r[12].toLocaleString('en-US') + ' per ct</div></div>' +
-          '<div class="ds-a"><a class="go" data-enq="1" href="/diamond-requirement' + q + '">Enquire</a>' + (r[13] ? '<a href="' + esc(r[13]) + '" target="_blank" rel="noopener noreferrer nofollow">Video</a>' : '') + '</div>';
+          '<div class="ds-a"><a class="go" data-enq="1" href="/diamond-requirement' + q + '">Enquire</a><button type="button" class="ds-selb" data-sel="1" aria-pressed="' + (SEL[r[0]] ? 'true' : 'false') + '">' + (SEL[r[0]] ? '✓ Selected' : 'Select') + '</button>' + (r[13] ? '<a href="' + esc(r[13]) + '" target="_blank" rel="noopener noreferrer nofollow">Video</a>' : '') + '</div>';
         li._r = r; li._sh = sh;
         return li;
       }
@@ -150,43 +162,69 @@ const faqs: [string, string][] = [
           .catch(function () { $('ds-count').textContent = 'Could not load stock. Please refresh the page.'; });
       }
 
-      // Quick enquiry right on the stone (owner 27/11 09:03): name + mobile -> /hooks/vj-req -> 'thank you + code number' at once.
-var CCS = [['+91', 'India +91'], ['+44', 'UK +44'], ['+971', 'UAE +971'], ['+1', 'USA/Canada +1'], ['+61', 'Australia +61'], ['+64', 'New Zealand +64'], ['+65', 'Singapore +65'], ['+60', 'Malaysia +60'], ['+968', 'Oman +968'], ['+974', 'Qatar +974'], ['+966', 'Saudi +966'], ['+965', 'Kuwait +965'], ['+973', 'Bahrain +973'], ['+230', 'Mauritius +230'], ['+41', 'Switzerland +41'], ['+47', 'Norway +47'], ['+49', 'Germany +49'], ['+33', 'France +33'], ['+31', 'Netherlands +31'], ['+81', 'Japan +81'], ['+82', 'Korea +82'], ['+977', 'Nepal +977'], ['+254', 'Kenya +254'], ['+27', 'South Africa +27']];
+      // Quick enquiry right on the stone (owner 27/11 09:03) + several stones in one enquiry (owner 27/11 11:55): name + mobile -> /hooks/vj-req -> thank-you + code number.
+      var CCS = [['+91', 'India +91'], ['+44', 'UK +44'], ['+971', 'UAE +971'], ['+1', 'USA/Canada +1'], ['+61', 'Australia +61'], ['+64', 'New Zealand +64'], ['+65', 'Singapore +65'], ['+60', 'Malaysia +60'], ['+968', 'Oman +968'], ['+974', 'Qatar +974'], ['+966', 'Saudi +966'], ['+965', 'Kuwait +965'], ['+973', 'Bahrain +973'], ['+230', 'Mauritius +230'], ['+41', 'Switzerland +41'], ['+47', 'Norway +47'], ['+49', 'Germany +49'], ['+33', 'France +33'], ['+31', 'Netherlands +31'], ['+81', 'Japan +81'], ['+82', 'Korea +82'], ['+977', 'Nepal +977'], ['+254', 'Kenya +254'], ['+27', 'South Africa +27']];
       var DQS = ['Round', 'Oval', 'Pear', 'Cushion', 'Emerald', 'Radiant', 'Princess', 'Asscher', 'Marquise', 'Heart', 'Baguette', 'Trilliant', 'Old Miner', 'Rose Cut'];
       var DQC = ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'Fancy'], DQL = ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'SI3', 'I1', 'I2'];
-      $('ds-list').addEventListener('click', function (e) {
-        var a = e.target.closest && e.target.closest('a[data-enq]'); if (!a) return; e.preventDefault();
-        var li = a.closest('.ds-st'), box = li.querySelector('.ds-q'); if (box) { box.querySelector('input[name=nm]').focus(); return; }
-        box = document.createElement('form'); box.className = 'ds-q'; box.noValidate = true;
-        box.innerHTML = '<p class="ds-qh">Enquire about stone <b>' + esc(li._r[0]) + '</b></p>' +
+      var SEL = {}, MAXSEL = 10;
+      function openForm(host, items, onDone) {
+        var box = document.createElement('form'); box.className = 'ds-q'; box.noValidate = true;
+        var codes = items.map(function (it) { return it.r[0]; });
+        box.innerHTML = '<p class="ds-qh">' + (items.length > 1 ? 'Enquire about <b>' + items.length + ' stones</b>: ' + esc(codes.join(', ')) : 'Enquire about stone <b>' + esc(codes[0]) + '</b>') + '</p>' +
           '<div class="ds-qf"><input name="nm" type="text" maxlength="60" autocomplete="name" placeholder="Your name" aria-label="Your name" />' +
           '<div class="ds-mb"><select name="cc" aria-label="Country code">' + CCS.map(function (c) { return '<option value="' + c[0] + '">' + c[1] + '</option>'; }).join('') + '</select><input name="mb" type="tel" maxlength="15" inputmode="tel" autocomplete="tel-national" placeholder="Mobile number (e.g. 98765 43210)" aria-label="Mobile number" /></div>' +
           '<input name="ct" type="text" maxlength="40" autocomplete="address-level2" placeholder="City (optional)" aria-label="City" />' +
           '<input name="website" type="text" tabindex="-1" autocomplete="off" class="ds-hp" aria-hidden="true" />' +
           '<button type="submit" class="ds-qs">Send enquiry</button></div><p class="ds-qe" role="alert" hidden></p>' +
           '<p class="ds-qn">Your name and number stay with Vaishnavi Jewels only.</p>';
-        li.appendChild(box); box.querySelector('input[name=nm]').focus();
+        host.appendChild(box); box.querySelector('input[name=nm]').focus();
         box.addEventListener('submit', function (ev) {
           ev.preventDefault(); var er = box.querySelector('.ds-qe'), bt = box.querySelector('.ds-qs'); er.hidden = true; if (bt.disabled) return;
           var nm = box.nm.value.trim(), cc = box.cc.value, mb = box.mb.value.replace(/\D/g, '').replace(/^0+/, '');
           if (cc === '+91') mb = mb.replace(/^91(?=\d{10}$)/, '');
           if (!nm) { er.textContent = 'Please add your name.'; er.hidden = false; return; }
           if (cc === '+91' ? !/^[6-9]\d{9}$/.test(mb) : !/^\d{6,13}$/.test(mb)) { er.textContent = cc === '+91' ? 'Please give your 10-digit mobile number.' : 'Please give your mobile number (without the country code).'; er.hidden = false; return; }
-          var mobile = cc === '+91' ? mb : cc + mb;
-          var r = li._r, sh = DQS.indexOf(li._sh) >= 0 ? li._sh : 'Other';
-          var body = { type: 'Lab-grown', shape: [sh], color: DQC.indexOf(r[2]) >= 0 ? [r[2]] : ['Fancy'], clarity: DQL.indexOf(r[3]) >= 0 ? [r[3]] : [], ctMin: r[1], ctMax: r[1], qty: 1,
-            remarks: 'Stone ' + r[0] + ' from Diamond Search (' + li._sh + ' ' + r[1] + ' ct, USD ' + tot(r) + ')', name: nm, mobile: mobile, city: box.ct.value.trim(), website: box.website.value };
+          var mobile = cc === '+91' ? mb : cc + mb, uniq = function (a) { return a.filter(function (v, i) { return a.indexOf(v) === i; }); };
+          var cts = items.map(function (it) { return it.r[1]; }), sum = items.reduce(function (s, it) { return s + tot(it.r); }, 0);
+          var body = { type: 'Lab-grown', shape: uniq(items.map(function (it) { return DQS.indexOf(it.sh) >= 0 ? it.sh : 'Other'; })),
+            color: uniq(items.map(function (it) { return DQC.indexOf(it.r[2]) >= 0 ? it.r[2] : 'Fancy'; })), clarity: uniq(items.map(function (it) { return it.r[3]; }).filter(function (c) { return DQL.indexOf(c) >= 0; })),
+            ctMin: Math.min.apply(null, cts), ctMax: Math.max.apply(null, cts), qty: items.length,
+            remarks: (items.length > 1 ? 'Stones ' : 'Stone ') + codes.join(' ') + ' from Diamond Search (' + (items.length > 1 ? items.length + ' stones, ' : items[0].sh + ' ' + items[0].r[1] + ' ct, ') + 'USD ' + sum + ')',
+            name: nm, mobile: mobile, city: box.ct.value.trim(), website: box.website.value,
+            pick: items.map(function (it) { return { code: it.r[0], sh: it.sh, ct: it.r[1], col: it.r[2], cla: it.r[3] }; }) };
           bt.disabled = true; bt.textContent = 'Sending…';
           fetch('/hooks/vj-req', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
             .then(function (x) { return x.json().then(function (j) { return { ok: x.ok, j: j }; }); })
             .then(function (x) {
               if (!x.ok || !x.j.ok) { er.textContent = (x.j && x.j.error) || 'Could not send. Please try again.'; er.hidden = false; return; }
-              box.innerHTML = '<p class="ds-ok"><b>Thank you, ' + esc(nm) + '!</b> We have received your enquiry for stone <b>' + esc(r[0]) + '</b>.<br>Your code number: <b>' + esc(x.j.no || '') + '</b> &middot; Our team will call you shortly.</p>';
+              box.innerHTML = '<p class="ds-ok"><b>Thank you, ' + esc(nm) + '!</b> We have received your enquiry for ' + (items.length > 1 ? items.length + ' stones' : 'stone <b>' + esc(codes[0]) + '</b>') + '.<br>Your code number: <b>' + esc(x.j.no || '') + '</b> &middot; Our team will call you shortly.</p>';
+              if (onDone) onDone();
             })
             .catch(function () { er.textContent = 'Could not send. Please check your internet and try again.'; er.hidden = false; })
             .finally(function () { if (bt.isConnected) { bt.disabled = false; bt.textContent = 'Send enquiry'; } });
         });
+        return box;
+      }
+      function selBar() {
+        var ks = Object.keys(SEL), bar = $('ds-sel'); bar.hidden = !ks.length;
+        $('ds-seln').textContent = ks.length + (ks.length === 1 ? ' stone' : ' stones') + ' selected · USD ' + ks.reduce(function (s, k) { return s + tot(SEL[k].r); }, 0).toLocaleString('en-US');
+      }
+      $('ds-list').addEventListener('click', function (e) {
+        var sb = e.target.closest && e.target.closest('button[data-sel]');
+        if (sb) { var li0 = sb.closest('.ds-st'), c0 = li0._r[0];
+          if (SEL[c0]) delete SEL[c0]; else { if (Object.keys(SEL).length >= MAXSEL) { alertBox('You can select up to ' + MAXSEL + ' stones in one enquiry.'); return; } SEL[c0] = { r: li0._r, sh: li0._sh }; }
+          sb.setAttribute('aria-pressed', SEL[c0] ? 'true' : 'false'); sb.textContent = SEL[c0] ? '✓ Selected' : 'Select'; selBar(); return; }
+        var a = e.target.closest && e.target.closest('a[data-enq]'); if (!a) return; e.preventDefault();
+        var li = a.closest('.ds-st'), box = li.querySelector('.ds-q'); if (box) { box.querySelector('input[name=nm]').focus(); return; }
+        openForm(li, [{ r: li._r, sh: li._sh }]);
       });
+      function alertBox(t) { var m = $('ds-selmsg'); m.textContent = t; m.hidden = false; setTimeout(function () { m.hidden = true; }, 3000); }
+      $('ds-selgo').addEventListener('click', function () {
+        var ks = Object.keys(SEL); if (!ks.length) return; var host = $('ds-selform'); host.innerHTML = ''; host.hidden = false;
+        openForm(host, ks.map(function (k) { return SEL[k]; }), function () { SEL = {}; document.querySelectorAll('button[data-sel]').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); b.textContent = 'Select'; }); $('ds-sel').hidden = true; });
+        host.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+      $('ds-selclr').addEventListener('click', function () { SEL = {}; document.querySelectorAll('button[data-sel]').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); b.textContent = 'Select'; }); $('ds-selform').hidden = true; selBar(); });
       multi($('f-col'), 'col', COLS); multi($('f-cla'), 'cla', CLA); multi($('f-cut'), 'cut', CUT); multi($('f-lab'), 'lab', LABS);
       CTQ.forEach(function (q) { var b = chip(q[1] ? q[0] + '-' + q[1] : q[0] + '+', false); b.addEventListener('click', function () { $('f-ctmin').value = q[0]; $('f-ctmax').value = q[1]; run(); }); $('f-ctq').appendChild(b); });
       ['f-ideal', 'f-vid'].forEach(function (id) { $(id).addEventListener('click', function () { var k = id === 'f-ideal' ? 'ideal' : 'vid'; S[k] = !S[k]; $(id).setAttribute('aria-pressed', S[k] ? 'true' : 'false'); run(); }); });
