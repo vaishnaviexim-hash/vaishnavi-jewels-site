@@ -22,8 +22,9 @@ interface Props {
   gallery?: Pic[];           // 3-6 photos of our pieces for this page
   galleryTitle?: string;
   noindex?: boolean;         // previews only
+  compact?: boolean;         // tool pages (Diamond Search): short hero, no hero buttons / trust strip, so the tool is on the first screen
 }
-const { title, description, path, eyebrow, heading, intro, extraSchema = [], faqs = [], hero, gallery = [], galleryTitle = 'From our showroom', noindex = false } = Astro.props;
+const { title, description, path, eyebrow, heading, intro, extraSchema = [], faqs = [], hero, gallery = [], galleryTitle = 'From our showroom', noindex = false, compact = false } = Astro.props;
 const faqSchema = faqs.length ? [{
   '@context': 'https://schema.org',
   '@type': 'FAQPage',
@@ -52,21 +53,21 @@ const trust = [
   <SiteHeader />
   <main>
     <article class="info">
-      <header class:list={['info-hero', { 'has-img': !!hero }]}>
+      <header class:list={['info-hero', { 'has-img': !!hero, compact }]}>
         <div class="container hero-grid">
           <div class="hero-text">
             <p class="eyebrow">{eyebrow}</p>
             <h1>{heading}</h1>
             <span class="rule" aria-hidden="true"></span>
             <p class="lead">{intro}</p>
-            <div class="hero-cta">
+            {!compact && <div class="hero-cta">
               <a class="btn btn-solid" href={business.whatsapp} target="_blank" rel="noopener">Ask on WhatsApp</a>
               {path === '/visit-us'
                 ? <a class="btn btn-outline" href={business.mapsUrl} target="_blank" rel="noopener">Get directions</a>
                 : <a class="btn btn-outline" href="/visit-us">Visit the showroom</a>}
               {path !== '/book-a-visit' && <a class="btn btn-outline" href="/book-a-visit">Book a visit</a>}
-            </div>
-            <p style="margin-top: 16px; font-size: 15px; letter-spacing: 0.04em; color: var(--color-ink-soft);">Diamond jewellery from {business.priceFrom}</p>
+            </div>}
+            {!compact && <p style="margin-top: 16px; font-size: 15px; letter-spacing: 0.04em; color: var(--color-ink-soft);">Diamond jewellery from {business.priceFrom}</p>}
           </div>
           {hero && (
             <figure class="hero-pic">
@@ -78,7 +79,7 @@ const trust = [
         </div>
       </header>
 
-      <section class="trust" aria-label="Why buy from Vaishnavi Jewels">
+      {!compact && <section class="trust" aria-label="Why buy from Vaishnavi Jewels">
         <ul class="container trust-row">
           {trust.map((t) => (
             <li>
@@ -92,7 +93,7 @@ const trust = [
             </li>
           ))}
         </ul>
-      </section>
+      </section>}
 
       <div class="container body-grid">
         <div class="prose">
@@ -175,6 +176,10 @@ const trust = [
 
 
   /* Trust strip */
+  .info-hero.compact .hero-grid { padding-top: 18px; padding-bottom: 14px; gap: 0; }
+  .info-hero.compact h1 { font-size: clamp(26px, 6vw, 40px); margin: 6px 0 10px; }
+  .info-hero.compact .rule { display: none; }
+  .info-hero.compact .lead { font-size: 15.5px; margin: 0; }
   .trust { background: var(--color-maroon); color: #F3E7CF; }
   .trust-row { list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding-top: 22px; padding-bottom: 22px; margin: 0 auto; }
   .trust li { display: flex; align-items: center; gap: 12px; }

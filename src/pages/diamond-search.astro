@@ -17,12 +17,13 @@ const faqs: [string, string][] = [
   path="/diamond-search"
   eyebrow="DIAMOND SEARCH"
   heading="Find your laboratory-grown diamond"
-  intro="Certified laboratory-grown diamonds from Surat, the diamond city. Choose the shape, carat, colour and clarity, then press Enquire on the stone you like."
+  intro="Certified stones from Surat, the diamond city. Choose your filters and press Enquire on the stone you like."
   faqs={faqs}
   noindex={true}
+  compact={true}
 >
   <div class="ds" id="ds">
-    <div class="ds-note">All stones are <strong>laboratory-grown diamonds</strong>, lab certified. Prices per stone in <strong>USD incl. GST</strong>. <strong>4% off</strong> on a single bill above USD 1,000. Availability is confirmed before booking. <span id="ds-upd"></span></div>
+    <div class="ds-note"><strong>Laboratory-grown diamonds</strong>, lab certified · Prices per stone in <strong>USD incl. GST</strong> · <strong>4% off</strong> on a bill above USD 1,000 · Availability confirmed before booking. <span id="ds-upd"></span></div>
     <div class="ds-f">
       <div class="ds-row"><span class="ds-l">Shape</span><div class="chips" id="f-shape"></div></div>
       <div class="ds-row"><span class="ds-l">Carat</span>
@@ -45,10 +46,11 @@ const faqs: [string, string][] = [
     <p class="ds-empty" id="ds-empty" hidden>No stone matches these filters right now. <a href="/diamond-requirement">Tell us your requirement</a> and we will source it for you.</p>
   </div>
   <style is:global>
-    .ds { display: grid; gap: 16px; }
-    .ds-note { font-size: 14.5px; background: rgba(176, 141, 87, 0.09); border-left: 3px solid var(--color-gold); padding: 10px 14px; line-height: 1.6; }
-    .ds-f { display: grid; gap: 10px; border: 1px solid rgba(58, 15, 26, 0.14); padding: 14px; background: #fff; }
-    .ds-row { display: grid; grid-template-columns: 74px 1fr; gap: 10px; align-items: start; }
+    .ds { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); min-width: 0; }
+    .ds > *, .ds-f > *, .ds-row > *, .ds-more > * { min-width: 0; }
+    .ds-note { font-size: 13.5px; background: rgba(176, 141, 87, 0.09); border-left: 3px solid var(--color-gold); padding: 10px 14px; line-height: 1.6; }
+    .ds-f { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; border: 1px solid rgba(58, 15, 26, 0.14); padding: 14px; background: #fff; }
+    .ds-row { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 10px; align-items: start; }
     .ds-l { font-weight: 600; font-size: 14px; padding-top: 7px; }
     .ds .chips { display: flex; flex-wrap: wrap; gap: 6px; }
     .ds .chip { font: inherit; font-size: 13.5px; padding: 6px 10px; border: 1px solid var(--color-gold); background: transparent; cursor: pointer; min-height: 34px; color: inherit; }
@@ -63,7 +65,7 @@ const faqs: [string, string][] = [
     .ds-sort select { font: inherit; padding: 6px 8px; margin-left: 6px; }
     .ds-reset { font: inherit; font-size: 13.5px; background: none; border: 0; text-decoration: underline; cursor: pointer; color: var(--color-ink-soft); }
     .ds-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-    .ds-st { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; border: 1px solid rgba(58, 15, 26, 0.13); padding: 12px 14px; background: #fff; }
+    .ds-st { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; border: 1px solid rgba(58, 15, 26, 0.13); padding: 12px 14px; background: #fff; }
     .ds-h { font-weight: 600; font-size: 16px; }
     .ds-d { font-size: 13.5px; color: var(--color-ink-soft); }
     .ds-c { font-size: 12px; letter-spacing: .06em; color: var(--color-ink-soft); }
@@ -72,13 +74,14 @@ const faqs: [string, string][] = [
     .ds-p .tot { font-size: 19px; font-weight: 700; color: var(--color-maroon, #6b1a2a); }
     .ds-p .ppc { font-size: 13px; color: var(--color-ink-soft); }
     .ds-a { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
-    .ds-a a { font-size: 14px; padding: 7px 14px; border: 1px solid var(--color-gold); text-decoration: none; color: inherit; }
-    .ds-a a.go { background: var(--color-gold); color: #fff; }
+    .ds-a a { min-height: 36px; box-sizing: border-box; font-size: 14px; padding: 7px 14px; border: 1px solid var(--color-gold); text-decoration: none; color: inherit; }
+    .ds-a a.go { background: var(--color-gold); color: #fff !important; text-decoration: none !important; font-weight: 600; }
+    .ds-a a { text-decoration: none !important; color: inherit !important; }
     .ds-moreb { justify-self: center; }
     .ds-empty { text-align: center; }
-    @media (max-width: 520px) { .ds-f { padding: 10px; gap: 8px; } .ds-row { grid-template-columns: 1fr; gap: 4px; } .ds-l { padding-top: 0; font-size: 13px; } .ds .chip { font-size: 13px; padding: 5px 9px; min-height: 32px; }
+    @media (max-width: 520px) { .ds-f { padding: 10px; gap: 8px; } .ds-row { grid-template-columns: minmax(0, 1fr); gap: 4px; } .ds-l { padding-top: 0; font-size: 13px; } .ds .chip { font-size: 13px; padding: 5px 9px; min-height: 32px; }
       #f-shape, #f-ctq { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 2px; } #f-shape .chip, #f-ctq .chip { flex: 0 0 auto; white-space: nowrap; }
-      .ds-ct input { width: 70px; padding: 6px 8px; } .ds-st { grid-template-columns: 1fr auto; padding: 10px 12px; } .ds-h { font-size: 15px; } .ds-p .tot { font-size: 17px; } }
+      .ds-ct input { width: 70px; padding: 6px 8px; } .ds-st { grid-template-columns: minmax(0, 1fr) auto; padding: 10px 12px; } .ds-h { font-size: 15px; } .ds-p .tot { font-size: 17px; } }
   </style>
   <script is:inline>
     (function () {
