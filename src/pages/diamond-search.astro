@@ -1,0 +1,150 @@
+---
+// Diamond Search (owner 27/11/2026 08:35, C-20261127-DIAMONDSEARCH): our live laboratory-grown stock from the Surat sourcing network.
+// Data = /stock/*.json made by the private build step: each stone shows ONLY our VJ code, the stone details and our price.
+// Supplier name / number, stock id, certificate number and supplier price are never in these files (private code map, owner only).
+// Enquire opens /diamond-requirement with the VJ code filled in (website acknowledgement + code number, no WhatsApp to customers).
+import InfoPage from '../layouts/InfoPage.astro';
+const faqs: [string, string][] = [
+  ['Are these natural or laboratory-grown diamonds?', 'All stones on this page are laboratory-grown diamonds, certified by an independent lab (mostly IGI). Natural diamonds are sourced on request - tell us your requirement.'],
+  ['Is the price final?', 'Prices are per stone in US dollars, including GST. A single bill above USD 1,000 gets 4% off. Stock moves fast, so we confirm availability and the final price before booking.'],
+  ['How do I book a stone?', 'Press Enquire on the stone. You get a code number at once and our team calls you. Booking is on 100% advance; delivery as per our delivery policy.'],
+  ['Will I get the certificate?', 'Yes. Every stone comes with its lab certificate. We share the full certificate after booking.'],
+];
+---
+<InfoPage
+  title="Diamond Search | Certified Laboratory-Grown Diamonds | Vaishnavi Jewels, Surat"
+  description="Search thousands of certified laboratory-grown diamonds by shape, carat, colour, clarity and cut. Live stock from Surat, prices per stone, sourced by Vaishnavi Jewels."
+  path="/diamond-search"
+  eyebrow="DIAMOND SEARCH"
+  heading="Find your laboratory-grown diamond"
+  intro="Certified laboratory-grown diamonds from Surat, the diamond city. Choose the shape, carat, colour and clarity, then press Enquire on the stone you like."
+  faqs={faqs}
+  noindex={true}
+>
+  <div class="ds" id="ds">
+    <div class="ds-note">All stones are <strong>laboratory-grown diamonds</strong>, lab certified. Prices per stone in <strong>USD incl. GST</strong>. <strong>4% off</strong> on a single bill above USD 1,000. Availability is confirmed before booking. <span id="ds-upd"></span></div>
+    <div class="ds-f">
+      <div class="ds-row"><span class="ds-l">Shape</span><div class="chips" id="f-shape"></div></div>
+      <div class="ds-row"><span class="ds-l">Carat</span>
+        <div class="ds-ct"><input id="f-ctmin" type="text" inputmode="decimal" maxlength="6" placeholder="min" aria-label="Carat from" /><span>to</span><input id="f-ctmax" type="text" inputmode="decimal" maxlength="6" placeholder="max" aria-label="Carat to" />
+          <div class="chips" id="f-ctq"></div></div></div>
+      <div class="ds-row"><span class="ds-l">Colour</span><div class="chips" data-k="col" id="f-col"></div></div>
+      <div class="ds-row"><span class="ds-l">Clarity</span><div class="chips" data-k="cla" id="f-cla"></div></div>
+      <details class="ds-more"><summary>More filters</summary>
+        <div class="ds-row"><span class="ds-l">Cut</span><div class="chips" data-k="cut" id="f-cut"></div></div>
+        <div class="ds-row"><span class="ds-l">Lab</span><div class="chips" data-k="lab" id="f-lab"></div></div>
+        <div class="ds-row"><span class="ds-l">Budget</span><div class="ds-ct"><span>up to USD</span><input id="f-bud" type="text" inputmode="numeric" maxlength="7" placeholder="any" aria-label="Budget per stone in USD" /><span>per stone</span></div></div>
+        <div class="ds-row"><span class="ds-l">Show</span><div class="chips"><button type="button" class="chip" id="f-ideal" aria-pressed="false">Ideal proportions</button><button type="button" class="chip" id="f-vid" aria-pressed="false">With video</button></div></div>
+      </details>
+      <div class="ds-bar"><span id="ds-count" aria-live="polite">Loading stock…</span>
+        <label class="ds-sort">Sort <select id="f-sort"><option value="p">Price: low to high</option><option value="t">Total: low to high</option><option value="c">Carat: high to low</option><option value="m">Best make first</option></select></label>
+        <button type="button" class="ds-reset" id="f-reset">Clear filters</button></div>
+    </div>
+    <ol class="ds-list" id="ds-list"></ol>
+    <button type="button" class="btn btn-solid ds-moreb" id="ds-moreb" hidden>Show more stones</button>
+    <p class="ds-empty" id="ds-empty" hidden>No stone matches these filters right now. <a href="/diamond-requirement">Tell us your requirement</a> and we will source it for you.</p>
+  </div>
+  <style is:global>
+    .ds { display: grid; gap: 16px; }
+    .ds-note { font-size: 14.5px; background: rgba(176, 141, 87, 0.09); border-left: 3px solid var(--color-gold); padding: 10px 14px; line-height: 1.6; }
+    .ds-f { display: grid; gap: 10px; border: 1px solid rgba(58, 15, 26, 0.14); padding: 14px; background: #fff; }
+    .ds-row { display: grid; grid-template-columns: 74px 1fr; gap: 10px; align-items: start; }
+    .ds-l { font-weight: 600; font-size: 14px; padding-top: 7px; }
+    .ds .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .ds .chip { font: inherit; font-size: 13.5px; padding: 6px 10px; border: 1px solid var(--color-gold); background: transparent; cursor: pointer; min-height: 34px; color: inherit; }
+    .ds .chip[aria-pressed=true] { background: var(--color-gold); color: #fff; }
+    .ds .chip small { opacity: .7; margin-left: 3px; }
+    .ds-ct { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .ds-ct input { font: inherit; width: 84px; padding: 7px 9px; border: 1px solid rgba(58, 15, 26, 0.25); }
+    .ds-more summary { cursor: pointer; font-weight: 600; font-size: 14px; padding: 4px 0; }
+    .ds-more[open] { display: grid; gap: 10px; }
+    .ds-bar { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; border-top: 1px solid rgba(58, 15, 26, 0.1); padding-top: 10px; }
+    #ds-count { font-weight: 600; }
+    .ds-sort select { font: inherit; padding: 6px 8px; margin-left: 6px; }
+    .ds-reset { font: inherit; font-size: 13.5px; background: none; border: 0; text-decoration: underline; cursor: pointer; color: var(--color-ink-soft); }
+    .ds-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+    .ds-st { display: grid; grid-template-columns: 1fr auto; gap: 6px 14px; border: 1px solid rgba(58, 15, 26, 0.13); padding: 12px 14px; background: #fff; }
+    .ds-h { font-weight: 600; font-size: 16px; }
+    .ds-d { font-size: 13.5px; color: var(--color-ink-soft); }
+    .ds-c { font-size: 12px; letter-spacing: .06em; color: var(--color-ink-soft); }
+    .ds-b { display: inline-block; font-size: 11.5px; padding: 1px 7px; border: 1px solid var(--color-gold); margin-left: 6px; vertical-align: 2px; }
+    .ds-p { text-align: right; }
+    .ds-p .tot { font-size: 19px; font-weight: 700; color: var(--color-maroon, #6b1a2a); }
+    .ds-p .ppc { font-size: 13px; color: var(--color-ink-soft); }
+    .ds-a { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; }
+    .ds-a a { font-size: 14px; padding: 7px 14px; border: 1px solid var(--color-gold); text-decoration: none; color: inherit; }
+    .ds-a a.go { background: var(--color-gold); color: #fff; }
+    .ds-moreb { justify-self: center; }
+    .ds-empty { text-align: center; }
+    @media (max-width: 520px) { .ds-f { padding: 10px; gap: 8px; } .ds-row { grid-template-columns: 1fr; gap: 4px; } .ds-l { padding-top: 0; font-size: 13px; } .ds .chip { font-size: 13px; padding: 5px 9px; min-height: 32px; }
+      #f-shape, #f-ctq { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; padding-bottom: 2px; } #f-shape .chip, #f-ctq .chip { flex: 0 0 auto; white-space: nowrap; }
+      .ds-ct input { width: 70px; padding: 6px 8px; } .ds-st { grid-template-columns: 1fr auto; padding: 10px 12px; } .ds-h { font-size: 15px; } .ds-p .tot { font-size: 17px; } }
+  </style>
+  <script is:inline>
+    (function () {
+      var $ = function (id) { return document.getElementById(id); };
+      var COLS = ['D', 'E', 'F', 'G', 'H', 'Fancy'], CLA = ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2'], CUT = [['ID', 'Ideal'], ['EX', 'Excellent'], ['VG', 'Very Good']], LABS = ['IGI', 'GIA', 'GCAL'];
+      var CTQ = [['0.30', '0.69'], ['0.70', '0.99'], ['1.00', '1.49'], ['1.50', '1.99'], ['2.00', '2.99'], ['3.00', '4.99'], ['5.00', '']];
+      var GR = { ID: 'Ideal', EX: 'Excellent', VG: 'Very Good', G: 'Good', '8X': '8X' };
+      var S = { shape: 'Round', col: [], cla: [], cut: [], lab: [], ideal: false, vid: false }, data = [], rows = [], shown = 0, cache = {}, idx = null, PAGE = 24;
+      function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+      function chip(label, on, extra) { var b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.innerHTML = esc(label) + (extra ? '<small>' + esc(extra) + '</small>' : ''); return b; }
+      function multi(el, key, list) {
+        el.innerHTML = ''; list.forEach(function (it) { var v = Array.isArray(it) ? it[0] : it, l = Array.isArray(it) ? it[1] : it, b = chip(l, S[key].indexOf(v) >= 0);
+          b.addEventListener('click', function () { var i = S[key].indexOf(v); if (i >= 0) S[key].splice(i, 1); else S[key].push(v); b.setAttribute('aria-pressed', i >= 0 ? 'false' : 'true'); run(); }); el.appendChild(b); });
+      }
+      function num(v) { var x = parseFloat(String(v).replace(',', '.')); return isFinite(x) ? x : null; }
+      function ideal(r) { return r[8] != null && r[9] != null && r[8] >= 57 && r[8] <= 58.5 && r[9] >= 61 && r[9] <= 62; }
+      function make(r) { var p = 0; ['ID', 'EX'].indexOf(r[4]) < 0 && (p += 1); r[5] !== 'EX' && (p += 1); r[6] !== 'EX' && (p += 1); r[7] !== 'None' && (p += 1); if (!ideal(r)) p += 0.5; return p; }
+      function tot(r) { var t = r[12] * r[1]; return t >= 50 ? Math.round(t / 5) * 5 : Math.round(t); }
+      function run() {
+        var a = num($('f-ctmin').value), z = num($('f-ctmax').value), bud = num($('f-bud').value), so = $('f-sort').value;
+        rows = data.filter(function (r) {
+          if (a != null && r[1] < a) return false; if (z != null && r[1] > z) return false;
+          if (S.col.length && S.col.indexOf(r[2]) < 0) return false; if (S.cla.length && S.cla.indexOf(r[3]) < 0) return false;
+          if (S.cut.length && S.cut.indexOf(r[4]) < 0) return false; if (S.lab.length && S.lab.indexOf(r[10]) < 0) return false;
+          if (bud != null && tot(r) > bud) return false; if (S.ideal && !ideal(r)) return false; if (S.vid && !r[13]) return false; return true;
+        });
+        rows.sort(so === 'c' ? function (x, y) { return y[1] - x[1] || x[12] - y[12]; } : so === 't' ? function (x, y) { return tot(x) - tot(y); } : so === 'm' ? function (x, y) { return make(x) - make(y) || x[12] - y[12]; } : function (x, y) { return x[12] - y[12] || make(x) - make(y); });
+        $('ds-list').innerHTML = ''; shown = 0; more();
+        $('ds-count').textContent = rows.length.toLocaleString('en-IN') + ' ' + S.shape.toLowerCase() + ' stones';
+        $('ds-empty').hidden = rows.length > 0;
+      }
+      function card(r) {
+        var li = document.createElement('li'); li.className = 'ds-st';
+        var sh = S.shape === 'Other shapes' ? (r[15] || 'Fancy shape') : S.shape;
+        var spec = [GR[r[4]] ? 'Cut ' + GR[r[4]] : '', r[5] ? 'Polish ' + (GR[r[5]] || r[5]) : '', r[6] ? 'Sym ' + (GR[r[6]] || r[6]) : '', 'Fluor ' + r[7]].filter(Boolean).join(' · ');
+        var prop = [r[8] != null ? 'Table ' + r[8] + '%' : '', r[9] != null ? 'Depth ' + r[9] + '%' : '', r[11] ? r[11].replace(/\s+/g, ' ') + ' mm' : ''].filter(Boolean).join(' · ');
+        var q = '?code=' + encodeURIComponent(r[0]) + '&shape=' + encodeURIComponent(sh) + '&ct=' + r[1] + '&col=' + encodeURIComponent(r[2]) + '&cla=' + encodeURIComponent(r[3]);
+        li.innerHTML = '<div><div class="ds-h">' + esc(sh) + ' ' + r[1].toFixed(2) + ' ct · ' + esc(r[2]) + ' · ' + esc(r[3]) + (ideal(r) ? '<span class="ds-b">Ideal proportions</span>' : '') + '</div>' +
+          '<div class="ds-d">' + esc(spec) + '</div>' + (prop ? '<div class="ds-d">' + esc(prop) + '</div>' : '') +
+          '<div class="ds-c">' + esc(r[0]) + (r[10] ? ' · ' + esc(r[10]) + ' certified' : '') + ' · laboratory-grown</div></div>' +
+          '<div class="ds-p"><div class="tot">USD ' + tot(r).toLocaleString('en-US') + '</div><div class="ppc">USD ' + r[12].toLocaleString('en-US') + ' per ct</div></div>' +
+          '<div class="ds-a"><a class="go" href="/diamond-requirement' + q + '">Enquire</a>' + (r[13] ? '<a href="' + esc(r[13]) + '" target="_blank" rel="noopener noreferrer nofollow">Video</a>' : '') + '</div>';
+        return li;
+      }
+      function more() { var f = document.createDocumentFragment(), end = Math.min(rows.length, shown + PAGE); for (var i = shown; i < end; i++) f.appendChild(card(rows[i])); $('ds-list').appendChild(f); shown = end; $('ds-moreb').hidden = shown >= rows.length; }
+      function load(name) {
+        var s = idx.shapes.filter(function (x) { return x.name === name; })[0] || idx.shapes[0]; S.shape = s.name;
+        $('f-shape').querySelectorAll('.chip').forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-v') === s.name ? 'true' : 'false'); });
+        $('f-cut').parentNode.hidden = !/^(Round|Old Miner)$/.test(s.name);
+        if (cache[s.file]) { data = cache[s.file]; return run(); }
+        $('ds-count').textContent = 'Loading ' + s.name.toLowerCase() + ' stones…';
+        fetch('/stock/' + s.file + '?v=' + (idx.v || idx.updated)).then(function (r) { return r.json(); }).then(function (j) { cache[s.file] = j; if (S.shape === s.name) { data = j; run(); } })
+          .catch(function () { $('ds-count').textContent = 'Could not load stock. Please refresh the page.'; });
+      }
+      multi($('f-col'), 'col', COLS); multi($('f-cla'), 'cla', CLA); multi($('f-cut'), 'cut', CUT); multi($('f-lab'), 'lab', LABS);
+      CTQ.forEach(function (q) { var b = chip(q[1] ? q[0] + '-' + q[1] : q[0] + '+', false); b.addEventListener('click', function () { $('f-ctmin').value = q[0]; $('f-ctmax').value = q[1]; run(); }); $('f-ctq').appendChild(b); });
+      ['f-ideal', 'f-vid'].forEach(function (id) { $(id).addEventListener('click', function () { var k = id === 'f-ideal' ? 'ideal' : 'vid'; S[k] = !S[k]; $(id).setAttribute('aria-pressed', S[k] ? 'true' : 'false'); run(); }); });
+      var t; ['f-ctmin', 'f-ctmax', 'f-bud'].forEach(function (id) { $(id).addEventListener('input', function () { clearTimeout(t); t = setTimeout(run, 250); }); });
+      $('f-sort').addEventListener('change', run); $('ds-moreb').addEventListener('click', more);
+      $('f-reset').addEventListener('click', function () { S.col = []; S.cla = []; S.cut = []; S.lab = []; S.ideal = S.vid = false; ['f-ctmin', 'f-ctmax', 'f-bud'].forEach(function (id) { $(id).value = ''; });
+        document.querySelectorAll('.ds .chip').forEach(function (b) { if (!b.hasAttribute('data-v')) b.setAttribute('aria-pressed', 'false'); }); run(); });
+      fetch('/stock/index.json?t=' + Math.floor(Date.now() / 600000)).then(function (r) { return r.json(); }).then(function (j) {
+        idx = j; var d = new Date(j.updated + 'T12:00:00'); $('ds-upd').textContent = 'Stock updated ' + d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) + '.';
+        j.shapes.forEach(function (s) { var b = chip(s.name, false, s.n.toLocaleString('en-IN')); b.setAttribute('data-v', s.name); b.addEventListener('click', function () { load(s.name); }); $('f-shape').appendChild(b); });
+        load('Round');
+      }).catch(function () { $('ds-count').textContent = 'Could not load stock. Please refresh the page.'; });
+    })();
+  </script>
+</InfoPage>

@@ -82,6 +82,17 @@ const RANGES = [['0.30', '0.39'], ['0.40', '0.49'], ['0.50', '0.69'], ['0.70', '
         });
       });
       form.querySelectorAll('.rng').forEach(function (c) { c.addEventListener('click', function () { form.ctMin.value = c.getAttribute('data-a'); form.ctMax.value = c.getAttribute('data-z'); }); });
+      // Enquire from /diamond-search (C-20261127-DIAMONDSEARCH): fill the stone in; the VJ code goes in the remarks.
+      try {
+        var qp = new URLSearchParams(location.search), qc = String(qp.get('code') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
+        if (/^VJ[A-Z0-9]{5,10}$/.test(qc)) {
+          var setp = function (k, v) { if (!v) return; var g = form.querySelector('.chips[data-k="' + k + '"]'); if (!g) return; var c = g.querySelector('.chip[data-v="' + v.replace(/"/g, '') + '"]'); if (!c) return; pick[k] = [v]; g.querySelectorAll('.chip').forEach(function (x) { x.setAttribute('aria-pressed', x === c ? 'true' : 'false'); }); };
+          setp('type', 'Lab-grown'); setp('shape', String(qp.get('shape') || '')); setp('color', String(qp.get('col') || '')); setp('clarity', String(qp.get('cla') || ''));
+          var qct = parseFloat(qp.get('ct')); if (isFinite(qct) && qct > 0 && qct < 100) { form.ctMin.value = qct.toFixed(2); form.ctMax.value = qct.toFixed(2); }
+          form.qty.value = '1'; form.remarks.value = 'Stone ' + qc + ' from Diamond Search';
+          var nb = document.createElement('p'); nb.className = 'hint'; nb.textContent = 'You are asking about stone ' + qc + '. Add your name and mobile and press Send.'; form.insertBefore(nb, form.firstChild);
+        }
+      } catch (e) {}
       function bad(t) { err.textContent = t; err.hidden = false; err.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
       form.addEventListener('submit', function (e) {
         e.preventDefault(); err.hidden = true; if (sent || go.disabled) return; // no double send
