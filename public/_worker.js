@@ -416,7 +416,11 @@ async function vjPublicReq(request, env, ctx) {
   try { const m = String(doc.remarks || '').match(/\bStone (VJ[A-Z0-9]{5,10})\b/);
     if (m) { const sm = await env.DB.prepare('SELECT * FROM vj_stockmap WHERE code = ?').bind(m[1]).first();
       if (sm) { const sr = await env.DB.prepare("SELECT v FROM vj_meta WHERE k = 'stocksup'").first(); const sl = sr ? JSON.parse(sr.v) : []; const s = sl[sm.s] || {};
-        supTxt = 'Supplier: ' + (s.name || '?') + (s.contact ? ' (' + s.contact + ')' : '') + (s.ph ? ' ' + s.ph : '') + (sm.stock ? ' . stock ' + sm.stock : '') + (sm.cert ? ' . cert ' + sm.cert : '') + (sm.rpc ? ' . USD ' + sm.rpc + '/ct' : '') + (sm.d ? ' . list ' + sm.d : '');
+        // owner 27/11 11:48: show the money too - supplier's ask and our website price, in USD and approx. rupees (Rs 93 per USD, same as the page)
+        const INR = 93, ct1 = Number(doc.ctMin) || 0, supTot = Math.round((Number(sm.rpc) || 0) * ct1), ourTot = Math.round(Math.round((Number(sm.rpc) || 0) * 2.857 / 5) * 5 * ct1);
+        const rs = v => 'Rs ' + Math.round(v * INR / 100) * 100;
+        supTxt = 'Supplier: ' + (s.name || '?') + (s.contact ? ' (' + s.contact + ')' : '') + (s.ph ? ' ' + s.ph : '') + (sm.stock ? ' . stock ' + sm.stock : '') + (sm.cert ? ' . cert ' + sm.cert : '')
+          + (sm.rpc ? ' . Supplier asks USD ' + sm.rpc + '/ct = USD ' + supTot + ' (~' + rs(supTot) + ')' : '') + (ourTot ? ' . Our website price USD ' + ourTot + ' (~' + rs(ourTot) + ')' : '') + (sm.d ? ' . list ' + sm.d : '');
         doc.result = vjClean(supTxt, 500);
         // owner 27/11 11:45: the supplier also gets 'we need this piece, buyer Vaishnavi Jewels, call Fenil / Abhinav' - NEVER the customer's name or number.
         // Once per stone per day (no repeat if several customers ask for the same stone); test enquiries (name TEST...) never go to a supplier.
@@ -443,10 +447,10 @@ async function vjReqAlert(env, d, supTxt, supAsk) {
   const ct = d.ctMin != null && d.ctMax != null ? (d.ctMin === d.ctMax ? d.ctMin + ' ct' : d.ctMin + '-' + d.ctMax + ' ct') : d.ctMin != null ? d.ctMin + '+ ct' : 'up to ' + d.ctMax + ' ct';
   const what = [d.type, (d.shape || []).join('/'), ct, (d.color || []).join(',') + (d.fancy ? ' ' + d.fancy : ''), (d.clarity || []).join(','), (d.cut || []).length ? 'Cut ' + d.cut.join(',') : '', (d.lab || []).join(','), d.qty ? d.qty + ' pcs' : '', d.pair ? 'pair' : '', d.remarks ? 'Note: ' + d.remarks : ''].filter(Boolean).join(' . ');
   const params = [clip(d.name + (d.city ? ', ' + d.city : '') + (d.mobile ? ' (' + d.mobile + ')' : ''), 120), clip('New diamond requirement ' + d.no + ' from the website', 120),
-    clip(what, 400), clip((d.mobile ? 'Call / WhatsApp ' + d.mobile + '. ' : '') + (supTxt ? supTxt + '. ' : '') + 'Please check VJ Tags > Diamond requirements.', 400)];
+    clip(what, supTxt ? 260 : 400), clip((d.mobile ? 'Call / WhatsApp ' + d.mobile + '. ' : '') + (supTxt ? supTxt + '. ' : '') + 'Please check VJ Tags > Diamond requirements.', 480)]; // whole template body stays under WhatsApp's 1,024 characters
   const msgs = VJ_REQ_TO.filter(([, n]) => !/^TEST/i.test(String(d.name || '')) || n === 'Abhinav').map(([to]) => /* tests go to Abhinav only */ ({ body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template: { name: 'lead_alert_v1', language: { code: 'en' }, components: [{ type: 'body', parameters: params.map(text => ({ type: 'text', text })) }] } }) }));
   if (supAsk) { const st = String(supAsk.text).replace(/[\r\n\t]+/g, ' ').replace(/\s{4,}/g, '   ').slice(0, 300);
-    msgs.push({ body: JSON.stringify({ messaging_product: 'whatsapp', to: supAsk.to, type: 'template', template: { name: 'supplier_requirement_v1', language: { code: 'en' }, components: [{ type: 'body', parameters: [{ type: 'text', text: supAsk.ref }, { type: 'text', text: 'We need this stone - please hold it and confirm availability + final price: ' + st + '. Buyer: Vaishnavi Jewels, Surat. Contact: Fenil +91 99308 22640 / Abhinav +91 75674 00099.' }] }] } }) }); }
+    msgs.push({ body: JSON.stringify({ messaging_product: 'whatsapp', to: supAsk.to, type: 'template', template: { name: 'supplier_requirement_v1', language: { code: 'en' }, components: [{ type: 'body', parameters: [{ type: 'text', text: supAsk.ref }, { type: 'text', text: 'We need this stone - please hold it and confirm availability + final price: ' + st + '. Buyer: Vaishnavi Jewels, Surat. Contact: Fenil +91 99308 22640 / Abhinav +91 75674 00099. Please also send your latest full stock list (Excel) on this number.' }] }] } }) }); }
   await vjMetaT(env);
   const token = [...crypto.getRandomValues(new Uint8Array(16))].map(x => x.toString(16).padStart(2, '0')).join('');
   await env.DB.prepare('INSERT INTO vj_meta (k, v) VALUES (?, ?)').bind('reqdue:' + token, JSON.stringify({ msgs, at: Date.now() })).run();
