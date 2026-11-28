@@ -425,7 +425,7 @@ async function vjPublicReq(request, env, ctx) {
       for (const code of codes) {
         const sm = await env.DB.prepare('SELECT * FROM vj_stockmap WHERE code = ?').bind(code).first(); const pk = picks[code] || {};
         if (!sm) { parts.push(code + ': supplier not found (check private code map)'); continue; }
-        const s = sl[sm.s] || {}, ct1 = pk.ct || 0, supTot = Math.round((Number(sm.rpc) || 0) * ct1), ourTot = Math.round(Math.round((Number(sm.rpc) || 0) * (supTot > 2000 ? 2 : 2.857) / 5) * 5 * ct1); // owner 28/11 08:04: stones costing over USD 2,000 capped at 100% margin (2x, GST inside)
+        const s = sl[sm.s] || {}, ct1 = pk.ct || 0, supTot = Math.round((Number(sm.rpc) || 0) * ct1), ourTot = Math.round(Math.round((Number(sm.rpc) || 0) * (supTot > 2000 ? 1.5 : 2.857) / 5) * 5 * ct1); // owner 28/11 08:07: stones costing over USD 2,000 capped at 50% margin (1.5x, GST inside)
         supSum += supTot; ourSum += ourTot;
         parts.push((codes.length > 1 ? code + ' ' + [pk.sh, ct1 ? ct1 + 'ct' : '', pk.col, pk.cla].filter(Boolean).join(' ') + ': ' : '') + (s.name || '?') + (s.contact ? ' (' + s.contact + ')' : '') + (s.ph ? ' ' + s.ph : '') + (sm.stock ? ' . stock ' + sm.stock : '') + (sm.cert ? ' . cert ' + sm.cert : '')
           + (sm.rpc ? ' . asks USD ' + sm.rpc + '/ct = USD ' + supTot + ' (~' + rs(supTot) + ')' : '') + (ourTot ? ' . our price USD ' + ourTot + ' (~' + rs(ourTot) + ')' : '') + (codes.length === 1 && sm.d ? ' . list ' + sm.d : ''));
